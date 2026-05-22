@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>实现说明 - XA-202620 政企场景大模型智能体安全</title>
+<style>
+body { font-family: -apple-system, "Microsoft YaHei", sans-serif; max-width: 980px; margin: 24px auto; padding: 0 16px; line-height: 1.65; color: #222; }
+h1 { border-bottom: 2px solid #2a5298; padding-bottom: 8px; }
+h2 { color: #2a5298; margin-top: 32px; border-left: 4px solid #2a5298; padding-left: 10px; }
+h3 { color: #444; }
+.entry { background: #f7f9fc; border-left: 4px solid #888; padding: 12px 16px; margin: 14px 0; border-radius: 4px; }
+.entry.decision { border-left-color: #1d72b8; }
+.entry.deviation { border-left-color: #d97706; }
+.entry.tradeoff { border-left-color: #7c3aed; }
+.entry.pending  { border-left-color: #dc2626; background: #fef2f2; }
+.entry.resolved { border-left-color: #16a34a; }
+.ts { color: #888; font-size: 0.85em; }
+.tag { display:inline-block; padding:1px 8px; border-radius: 10px; font-size:0.78em; background:#e0e7ff; color:#312e81; margin-right:6px; }
+.tag.pending { background:#fee2e2; color:#991b1b; }
+.tag.resolved { background:#dcfce7; color:#166534; }
+code { background:#eef; padding:1px 6px; border-radius:3px; font-size:0.92em; }
+.nav { background:#fff7ed; border:1px solid #fed7aa; padding:12px 16px; border-radius:6px; }
+ul { padding-left: 22px; }
+</style>
+</head>
+<body>
+
+<h1>实现说明 - XA-202620 政企场景大模型智能体安全</h1>
+
+<div class="nav">
+<h3 style="margin-top:0">未决问题快速导航 (pending)</h3>
+<ul>
+<li>Q1-Q4 全部 resolved（见时间线顶部）。当前 pending：</li>
+<li><a href="#q-route">[Q5] A/B/C 三套技术路线选型？</a></li>
+<li><a href="#q-base2">[Q6] 是否仍要兼容 OpenClaw 框架（题目原话"兼容 OpenClaw 类智能体"）？</a></li>
+<li><a href="#q-llm">[Q7] 基座大模型：通义千问 / 智谱 / DeepSeek / 文心 还是 OpenAI/Anthropic 混用？</a></li>
+</ul>
+</div>
+
+<div class="entry pending" id="q-route">
+<span class="tag pending">未决 · pending</span> <span class="ts">2026-05-21</span>
+<h3>[Q5] A/B/C 三套候选技术路线，请用户选定</h3>
+<p>详见"整体技术路线候选方案"条目。我个人推荐路线 C 但工程量需评估。</p>
+</div>
+
+<div class="entry pending" id="q-base2">
+<span class="tag pending">未决 · pending</span> <span class="ts">2026-05-21</span>
+<h3>[Q6] OpenClaw 兼容性</h3>
+<p>题目原话"兼容 OpenClaw 类智能体及其他具备工具调用能力的大模型应用"。OpenClaw 是雄安集团自研框架，公开资料有限。建议先以 LangChain 为主，最后做一层 OpenClaw 适配层。需要找一下 OpenClaw 的公开文档。</p>
+</div>
+
+<div class="entry pending" id="q-llm">
+<span class="tag pending">未决 · pending</span> <span class="ts">2026-05-21</span>
+<h3>[Q7] 基座大模型选型</h3>
+<p>政企赛题强烈倾向国产模型（备案、可控）。候选：通义千问 Qwen-72B / 智谱 GLM-4 / DeepSeek-V2.5 / 百川 / 文心。是否在 demo 中允许 OpenAI/Anthropic 做对照？</p>
+</div>
+
+<h2>条目时间线（最新在最上）</h2>
+
+<div class="entry decision">
+<span class="tag">设计决策</span> <span class="ts">2026-05-21</span>
+<h3>创建 docs/项目总览.md（全员协作手册）</h3>
+<p><b>背景</b>：用户要求把所有研究成果 + 计划做成一份完整 md 文件放到 docs，方便组员（不懂技术）了解情况。</p>
+<p><b>产出</b>：<code>D:/race/jiebang/docs/项目总览.md</code>，约 12000 字、13 章节，覆盖：① 写在前面 / ② 1 分钟速览 / ③ 赛题深度解读 / ④ 核心概念扫盲（9 大威胁用人话讲）/ ⑤ 我们的方案 6 关卡架构 / ⑥ 文献调研精华 / ⑦ M1-M5 时间表 / ⑧ 技术栈清单 / ⑨ 分工建议 / ⑩ 现在马上要做的事 / ⑪ 风险登记 / ⑫ 资源附录 / ⑬ FAQ。</p>
+<p><b>风格选择</b>：用生活类比开路（如"门口安检 / 办事大厅 / 隔离办公间"），所有专业术语首次出现时用中文+解释，附 B 站等中文资源链接，让非技术队员能读懂。不使用 emoji（遵循全局指令）。</p>
+<p><b>下次更新触发</b>：M1 启动时（2026-06-01）；任何关键决策变更时。</p>
+</div>
+
+<div class="entry resolved">
+<span class="tag resolved">已确认 · resolved</span> <span class="ts">2026-05-21</span>
+<h3>用户表态"以赛促学，全部按建议来" → 风险 1-6 全部按助手建议执行</h3>
+<p><b>用户原话</b>："以赛促学，所以不要害怕看不懂，全部按你的建议来"。</p>
+<p><b>关键含义</b>：用户的首要目标是<b>学习成长</b>而非夺奖；可接受高强度与不熟领域；信任助手的工程判断。</p>
+<p><b>How to apply</b>：① 后续所有内容都要先用<b>生活类比/中文白话</b>讲清直觉，再上专业术语；② 给出"边学边做"的路径而不是"先学完再做"的线性路径；③ 推荐中文资源优先（B站视频、知乎、官方中文文档）；④ 把每个模块拆成"看完什么 → 跑通什么 → 改造什么"三步学习闭环。</p>
+<p><b>已采纳的全部 6 项建议</b>：① 8 模块砍到 6（去掉 Tool Hoare Contract + WASM）；② 主动承认 Adaptive 攻击局限，强调纵深防御 + 审计；③ Policy DSL 走"半自动 + 闭世界"，30→100 条；④ 评测基准缩到 200-300 条（100 翻译 + 50 网信办 + 50-150 自造）；⑤ 演示前端 0.5 人月专项必做；⑥ 给雄安曹如月发邮件咨询 OpenClaw。</p>
+</div>
+
+<div class="entry resolved">
+<span class="tag resolved">已确认 · resolved</span> <span class="ts">2026-05-21</span>
+<h3>用户答复 Q5-Q7 → 技术路线 / 基座 / 下一步</h3>
+<p><b>Q5 技术路线</b>：选定 <b>路线 C —— 防护+评测+审计一体化中台</b>。8 个核心模块：① PromptGuard2 中文微调入口 / ② Plan-and-Execute + HITL 规划 / ③ 中文 Policy DSL 编译器（核心创新）/ ④ 三色信息流污点 / ⑤ Tool Hoare Contract 库 / ⑥ gVisor+WASM 沙箱 / ⑦ OpenTelemetry+国密 SM3/SM2 哈希链审计 / ⑧ CSAB-Gov mini 50-100 用例评测 + AIBOM 准入网关。场景：运维助手主+RAG辅。</p>
+<p><b>Q6 基座 LLM</b>：选定 <b>DeepSeek V2.5 / R1</b>。优势：推理强、API 价格低、合规、judge/evaluator 能力强。</p>
+<p><b>Q7 下一步</b>：选定 <b>先讨论不要动手</b>。当前进入风险评估与方案打磨阶段，暂不输出架构文档/骨架代码/攻击脚本。</p>
+</div>
+
+<div class="entry resolved">
+<span class="tag resolved">已确认 · resolved</span> <span class="ts">2026-05-21</span>
+<h3>用户答复 Q1-Q4 → 项目定位收敛（前次记录）</h3>
+<p><b>团队</b>：2-3 人小队。<b>技术栈</b>：全栈/工程化 + 传统网络/系统安全 + NLP/LLM + 部分新手。<b>主验证场景</b>：运维协同助手（与 notes 推荐一致）。<b>方向覆盖</b>：重点 2 + 轻量 2（与 notes 推荐一致）。</p>
+<p><b>收敛结论</b>：重点方向 = 方向 2（工具调用安全）+ 方向 4（评测审计），构成"防护-审计"闭环；轻量方向 = 方向 1（输入检测，复用 PromptGuard/LlamaFirewall 微调）+ 方向 3（供应链，做 AIBOM + 静态检测小工具）。Q1-Q4 全部 resolved。</p>
+</div>
+
+<div class="entry deviation">
+<span class="tag">偏差</span> <span class="ts">2026-05-21</span>
+<h3>方向 1、方向 3 子 Agent 被 Anthropic 安全策略拦截</h3>
+<p><b>规范要求</b>：原计划 4 个并行 agent 各自交付详尽文献综述。</p>
+<p><b>实际</b>：方向 1（输入攻击检测）与方向 3（插件供应链）的 agent prompt 含 "jailbreak/squatting/backdoor/恶意" 等关键词，两次触发 Anthropic cyber-related safeguards 被拒。</p>
+<p><b>原因</b>：这两个方向天然包含攻击描述词；学生赛道的防御研究在公开 prompt 里无法回避。</p>
+<p><b>偏离</b>：改由主助手用 WebSearch 直接做轻量补全（4 次搜索覆盖了 SOTA），不再派 agent。</p>
+</div>
+
+<div class="entry decision">
+<span class="tag">设计决策</span> <span class="ts">2026-05-21</span>
+<h3>方向 1（输入攻击检测）轻量文献补全 — 主助手 WebSearch</h3>
+<p><b>提示注入防御侧 SOTA</b>：
+<ul>
+<li><b>StruQ</b>（Chen et al, USENIX Security 2025）+ <b>SecAlign</b>（CCS 2025, Berkeley BAIR）—— 结构化查询 + 偏好优化微调，对优化无关攻击 ASR 降至 ~0%；SecAlign 对强优化攻击 ASR &lt; 15%（比之前 SOTA 降 4x）。</li>
+<li><b>DefensiveTokens</b>（Abdelnabi et al, 2025, OpenReview VAJQ8UblUo）—— 一种"特殊 token 分隔指令与数据"的训练时 + 测试时混合方案，>31K 样本基准上 ASR 0.24%。</li>
+<li><b>PromptGuard 框架</b>（Nature Sci Reports 2025）—— 检测+结构化+验证+refinement 四件套，F1 0.91，注入成功率降 67%，延迟+8%。</li>
+<li><b>Meta PromptGuard 2 / Llama Guard</b>（已在方向 2 LlamaFirewall 中提及，22M/86M BERT 分类器，1% FPR 下 97.5% recall）。</li>
+<li><b>The Attacker Moves Second</b>（Carlini, Nasr, Hayes, Shumailov, Tramèr 等 OpenAI/Anthropic/DeepMind 联合，2025-10）—— 自适应攻击对 SecAlign/StruQ 仍能达 ASR 70%，警示纯检测不够，必须配 IFC + sandbox。</li>
+</ul></p>
+<p><b>RAG 投毒防御侧 SOTA</b>：
+<ul>
+<li><b>RobustRAG</b>（Xiang et al, 2024）—— isolate-then-aggregate，可证明鲁棒性。</li>
+<li><b>TrustRAG</b>（Zhou et al, 2025, arXiv 2501.00879）—— cluster filtering + LLM self-assessment，应对"恶意文档数量超过干净文档"场景。</li>
+<li><b>GRADA</b>（Zheng 2025）—— graph-based reranking，基于"对抗文档与正常文档弱连接"假设。</li>
+<li><b>ReliabilityRAG</b>（Shen 2025）—— 检索器侧 reliability signals。</li>
+<li><b>RAGPart / RAGMask</b>（Pathmanathan 2025, arXiv 2512.24268）—— 检索阶段防御，token mask 找可疑文档。</li>
+<li><b>Knowledge Expansion (KE)</b>（Zou et al, 2025）—— 多检索+稀释，工程上最简单有效。</li>
+<li><b>Traceback of Poisoning</b>（arXiv 2504.21668v2）—— 攻击后溯源，与方向 4 审计衔接。</li>
+</ul></p>
+<p><b>方向 1 创新空白</b>：① 现有英文方案对中文政企术语召回低；② 多源输入（用户 / 网页 / 文档 / RAG / 记忆）的<b>统一关联分析</b>尚无公开方案；③ 与方向 4 审计联动的<b>注入溯源</b>（攻击源头定位到具体输入源）几乎空白；④ <b>等级评估</b>（不是二分类，按风险等级分级）公开方案少。</p>
+<p><b>学生可落地</b>：（i）复用 PromptGuard 2 / Llama Guard 做中文 fine-tune（&lt;1 周）；（ii）在 RAG 层叠加 TrustRAG 的 cluster filter + Traceback；（iii）输出"输入污染溯源报告"作为审计证据，与方向 4 整合。</p>
+</div>
+
+<div class="entry decision">
+<span class="tag">设计决策</span> <span class="ts">2026-05-21</span>
+<h3>方向 3（插件供应链）轻量文献补全 — 主助手 WebSearch</h3>
+<p><b>关键事件 & 标准</b>：
+<ul>
+<li><b>OWASP Top 10 for LLM Apps v2025</b> 将 <b>LLM03 Supply Chain</b> 列为第 3 大风险（仅次于 LLM01 Prompt Injection、LLM02 Sensitive Info Disclosure）。</li>
+<li><b>LiteLLM PyPI 事件</b>（2026-03）—— 单个被污染的 PyPI 包在 40 分钟内影响 40,000+ AI pipeline，是当下最强的"必须做供应链审计"的实例论据。</li>
+<li><b>OWASP AI SBOM Initiative</b>（RSAC 2025 开源）—— OWASP 官方的 AIBOM Generator 工具，可直接复用。</li>
+</ul></p>
+<p><b>SBOM → AIBOM 标准演进</b>：
+<ul>
+<li>传统 SBOM（CycloneDX 1.6、SPDX 3.0）不足以覆盖模型权重、训练数据、adapter（LoRA/PEFT）等 AI 资产，业界正在扩展 schema。</li>
+<li><b>Agentic AIBOMs</b>（arXiv 2603.10057）—— 三 agent 架构：环境重建（MCP）+ 运行时依赖漂移监控（A2A）+ 政策感知 VEX 推理（AGNTCY）。</li>
+<li><b>AIRS Framework</b>（arXiv 2511.12668）—— AI Risk Scanning，将威胁建模与自动证据生成结合。</li>
+<li><b>AI-Driven SBOM</b>（ResearchGate 399038727）—— 用 NLP/GNN 自动从代码识别组件。</li>
+</ul></p>
+<p><b>方向 3 创新空白</b>：① AIBOM 的中文政企采购流程对接（专家审批 → 自动评级）尚无公开方案；② Agent skill / tool 的<b>自然语言描述</b>层面的可信审计（非传统代码层面）几乎空白；③ <b>动态加载</b>插件 + <b>远程检索</b>知识包的运行时供应链监控（agentic AIBOM 思想的落地）尚处早期；④ 与方向 2 的 capability 系统 + 方向 4 的审计 hash 链联动的<b>插件准入网关</b>是工程化空白。</p>
+<p><b>学生可落地</b>：（i）直接复用 OWASP AIBOM Generator + CycloneDX schema；（ii）写一个 ~300 行的"Agent 工具包静态检测器"（AST + 关键 API 黑名单 + LLM 行为描述审查）；（iii）形成"插件准入三段式审批"流程：自动评级 → 人工复核 → 上线后行为漂移监测。</p>
+</div>
+
+<div class="entry tradeoff">
+<span class="tag">权衡取舍</span> <span class="ts">2026-05-21</span>
+<h3>整体技术路线候选方案（待与用户讨论收敛）</h3>
+<p><b>路线 A：「政企智能体安全中台」(防护为主)</b>
+<br>核心：CaMeL 双 LLM + 中文 Policy DSL 编译器 + 三色信息流污点 + HITL 三色审批 + gVisor 沙箱
+<br>主场景：运维协同助手
+<br>创新点集中：方向 2 的中间策略层。优点：可视化最炫、防护效果可量化、答辩好讲；缺点：方向 4 的评测审计稍弱，需要补"评测脚本 + 审计日志样例"。</p>
+<p><b>路线 B：「政企智能体安全度量与审计平台」(评测为主)</b>
+<br>核心：中文政企 7 维评测基准 CSAB-Gov + Provenance-OTel + 国密哈希链 + Determinism Replay + CoT 忠实度评分
+<br>主场景：运维协同助手（评测靶子）+ RAG 知识问答（投毒评测）
+<br>创新点集中：方向 4。优点：基准 + 审计两个工程化亮点，社区影响力大、可发开源；缺点：现场演示偏抽象，需要精心设计可视化。</p>
+<p><b>路线 C（推荐）：A + B 融合「防护-评测-审计」一体化</b>
+<br>顶层：一个统一的"政企智能体安全中台"，内嵌：① 入口防御（Llama Guard 中文微调）；② Policy DSL 引擎（核心创新）；③ 三色污点 + Tool Hoare 合约 + 沙箱（防护层）；④ Provenance-OTel + 哈希链审计（审计层）；⑤ CSAB-Gov mini 基准（评测层，50-100 用例规模）；⑥ AIBOM 工具包准入网关（轻量供应链）
+<br>主场景：运维协同助手（主）+ RAG 知识问答（辅）
+<br>4-5 个月时间分配：M1 框架搭建 + 文献复现；M2 Policy DSL + 防护核心；M3 审计 + 评测；M4 整合 + 演示；M5 报告 + 优化
+<br>优点：覆盖 4 个方向 + 闭环；缺点：工程量较大，2-3 人小队需取舍。</p>
+</div>
+
+<div class="entry decision">
+<span class="tag">设计决策</span> <span class="ts">2026-05-21</span>
+<h3>方向 4 文献调研子 Agent 完成（智能体安全评测与审计溯源）</h3>
+<p><b>覆盖核心论文/标准</b>：AgentDojo (NeurIPS'24)、InjecAgent (ACL'24)、Agent-SafetyBench (THU 2024)、R-Judge (EMNLP'24)、ToolEmu (ICLR'24 Spotlight)、SafeAgentBench (2024)、ASB / Agent Security Bench (ICLR'25, Rutgers)、TrustLLM (ICML'24)、DecodingTrust (NeurIPS'23 Outstanding Benchmark)、AIR-Bench 2024 (Stanford CRFM)、AILuminate v1.0/v1.1 (MLCommons 2024)、Kirchenbauer LLM Watermark (ICML'23)、TrustAgent (EMNLP'24 Findings)、OWASP Top 10 for LLM Apps 2025、ISO/IEC 42001:2023、NIST AI RMF 1.0 + AI 600-1 GAI Profile、TC260-003 / GB/T 45654-2025、《人工智能安全治理框架》2.0、EU AI Act 2024/1689、OpenTelemetry GenAI Semantic Conventions、Replayable Financial Agents (determinism-faithfulness)、LangurTrace、CoT Faithfulness (FUR / Ariadne)、Anthropic RSP / OpenAI Preparedness。</p>
+<p><b>评测维度映射结论</b>：现有基准对五维覆盖严重不均 —— 内容安全（AILuminate、AIR-Bench、HarmBench、TrustLLM 已成熟）；执行安全（AgentDojo、InjecAgent、ToolEmu、ASB 主导）；数据安全（DecodingTrust、TC260-003 数据安全较成熟，Agent 场景的训练数据/记忆投毒尚弱）；供应链安全（OWASP LLM03 + Hugging Face 模型溯源仅停留在威胁建模，缺自动化基准）；合规风险（AIR-Bench 是唯一直接对齐法规的基准，中文合规几乎空白）。</p>
+<p><b>审计证据 Schema</b>：以 OpenTelemetry GenAI Semantic Convention 为底，扩展 7 个政企必备字段（gen_ai.user.role、gen_ai.data.sensitivity_level、gen_ai.policy.hit_id、gen_ai.tool.approval_token、gen_ai.evidence.hash_prev、gen_ai.classify.gbT45654_risk、gen_ai.decision.cot_faithfulness_score），落到 Hash 链 + 国密 SM3 国密 SM2 签名构成不可篡改证据链。</p>
+<p><b>学生团队可落地创新点（5 个）</b>：① 中文政企 7 维评测基准 + 自动证据生成；② 信息流污点 + CoT 因果链审计的复合 trace 重建器；③ Hash-链电子证据存证（哈希锚定 + 国密签名）；④ 法规 → policy DSL 自动编译器（对接 TC260-003 / 等保 2.0 / GB/T 45654）；⑤ 行为基线 + 漂移检测的运营回路。</p>
+<p><b>引用</b>：详见本次输出报告（Markdown）。涉及文件：暂无代码改动。</p>
+</div>
+
+<div class="entry decision">
+<span class="tag">设计决策</span> <span class="ts">2026-05-21</span>
+<h3>方向 2 文献调研子 Agent 完成（工具调用安全约束与审批控制）</h3>
+<p><b>覆盖核心论文</b>：ToolEmu (ICLR'24)、IsolateGPT/SecGPT (NDSS'25)、AgentDojo (NeurIPS'24)、CaMeL (DeepMind 2025)、LlamaFirewall (Meta 2025)、R-Judge (EMNLP'24)、AgentSpec (ICSE'26)、ShieldAgent (ICML'25)、Conseca (HotOS'25)、VeriGuard、GuardAgent、Agent-SafetyBench (THU 2024)、ST-WebAgentBench (ICML'25)、InjecAgent (ACL'24)、ToolSandbox (Apple 2024)、AgentHarm (ICLR'25)、ToolGate、SentinelAgent。</p>
+<p><b>架构分层结论</b>：现有防护分四层 —— (a) 模型层（PromptGuard、Alignment Check）；(b) 规划层（Plan-then-Execute、Judge LLM）；(c) 中间策略层（CaMeL、AgentSpec、ShieldAgent、IsolateGPT）；(d) 执行层（gVisor/Firecracker/WASM sandbox、CodeShield）。学生赛道最具落地价值的是 (c)+(d) 的中间件方案。</p>
+<p><b>创新空白</b>：① 中文政企合规规则编译为可执行 policy（无人做）；② 双工具图 + 信息流污点融合到一个轻量 runtime；③ 三色访问域（公开/内部/机密）的标签传播；④ 异常任务链的图神经检测；⑤ 等保 2.0 / GB/T 39786 引用证据链审计。</p>
+<p><b>引用</b>：详见本次输出报告（Markdown）。涉及文件：暂无代码改动。</p>
+</div>
+
+<div class="entry resolved" id="q-team">
+<span class="tag resolved">已确认 · resolved</span> <span class="ts">2026-05-21</span>
+<h3>[Q4] 团队配置未知，影响工作量切分</h3>
+<p><b>描述</b>：尚未确认团队人数、专长（NLP / 系统安全 / 前端 / 工程化）、每周投入工时。</p>
+<p><b>影响</b>：决定我们能否同时铺 4 个方向 vs. 集中打透 1-2 个方向。</p>
+<p><b>建议</b>：本科 3-5 人队推荐"集中 2 个方向 + 1 个轻量补充"，避免摊薄实际效果分（30%）。</p>
+</div>
+
+<div class="entry resolved" id="q-scene">
+<span class="tag resolved">已确认 · resolved</span> <span class="ts">2026-05-21</span>
+<h3>[Q3] 验证场景选型未定</h3>
+<p><b>描述</b>：题目列出 4 个典型场景（政务办公助手、知识检索问答、业务流程办理、运维协同助手），需选 1 个为主，1 个为辅。</p>
+<p><b>影响</b>：直接决定 demo 视频呈现效果、攻击样本设计、审计指标设计。运维协同（涉及命令执行、文件操作）攻击面最丰富、对评测分最有利。</p>
+<p><b>建议</b>：主选「运维协同助手」（攻击面广、好出效果），辅选「知识问答 / RAG」（用于演示间接注入和投毒）。</p>
+</div>
+
+<div class="entry resolved" id="q-base">
+<span class="tag resolved">已确认 · resolved</span> <span class="ts">2026-05-21</span>
+<h3>[Q2] 基座智能体框架选型</h3>
+<p><b>描述</b>：题目提到"兼容 OpenClaw 类智能体"。需要确定我们的原型是基于哪个开源框架。</p>
+<p><b>候选</b>：OpenClaw / LangChain / AutoGen / OpenAI Assistants / 自研。</p>
+<p><b>建议</b>：使用 LangChain + 自定义 wrapper，原因：生态成熟、便于劫持工具调用做约束、社区调试经验多。同时实现一个 OpenClaw 适配层以满足兼容要求。</p>
+</div>
+
+<div class="entry resolved" id="q-scope">
+<span class="tag resolved">已确认 · resolved</span> <span class="ts">2026-05-21</span>
+<h3>[Q1] 赛题 4 个方向的覆盖策略</h3>
+<p><b>描述</b>：题目允许"一项或多项"。但评分含"方案完整性 20%"，意味着只做 1 项会失分。</p>
+<p><b>候选方案</b>：
+<ul>
+<li>A. 全做 4 项（深度浅，工程量大，演示难聚焦）</li>
+<li>B. 重点做 2 项 + 轻度覆盖 2 项（推荐）</li>
+<li>C. 只做 1 项做深</li>
+</ul></p>
+<p><b>建议</b>：方案 B。重点方向选「方向 2 工具调用安全」+「方向 4 评测审计」，因为这两块工程化最容易出可视化效果，且互补构成"防护-审计"闭环。方向 1（输入攻击检测）以已有开源模型微调形式轻量覆盖；方向 3（供应链）做一个静态检测小工具作为加分项。</p>
+</div>
+
+<div class="entry decision">
+<span class="tag">设计决策</span> <span class="ts">2026-05-21</span>
+<h3>启动阶段：先做文献综述再讨论技术路线</h3>
+<p>用户要求"派子agent找论文 + 详细分析 + 讨论可以做什么"。决定并行启动 4 个研究 agent（按赛题 4 个方向切分），每个 agent 输出结构化论文清单 + 可借鉴方法 + 我方可创新点。完成后向用户呈现汇总报告，再讨论收敛技术方案。</p>
+<p><b>依据</b>：评分中"技术创新性 25%"权重很高，必须先建立完整文献地图避免重复造轮子，同时找到差异化创新切入点。</p>
+</div>
+
+<div class="entry decision">
+<span class="tag">设计决策</span> <span class="ts">2026-05-21</span>
+<h3>赛题理解定位</h3>
+<p>题目核心：构建"评测—防护—审计—运营"一体化的智能体安全方案，覆盖 4 个技术方向。
+<br><b>关键约束</b>：政企场景 / 学生赛道 / 30 页方案 + 原型代码 + 10min 视频 / 2026-09-15 截止。
+<br><b>评分权重</b>：实际效果 30% + 创新性 25% + 完整性 20% + 应用价值 20% + 展示 5%。</p>
+</div>
+
+</body>
+</html>
