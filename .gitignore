@@ -1,0 +1,12 @@
+# Word/Office lock & temp files
+~$*
+
+# Claude Code local settings
+.claude/
+
+# OS junk
+Thumbs.db
+.DS_Store
+
+# Node
+node_modules/
