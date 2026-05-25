@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XA-Guard · 审计回放时间线</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============ BANNER ============ -->
+<div class="banner">
+  <div class="banner-logo">XA-Guard &middot; 审计回放时间线</div>
+  <div class="banner-sep"></div>
+  <div class="banner-desc">
+    关卡 6 黑匣子 &middot; OTel GenAI 14 字段 &middot; 国密 SM3 哈希链验证<br>
+    面向政企场景的大模型智能体安全审计可视化（XA-202620）
+  </div>
+</div>
+
+<!-- ============ 主布局 ============ -->
+<div class="layout">
+
+  <!-- 左侧边栏 -->
+  <aside class="sidebar">
+
+    <div class="sidebar-section">
+      <h3>审计文件</h3>
+      <label for="audit-path">JSONL 文件路径或 URL</label>
+      <input
+        type="text"
+        id="audit-path"
+        placeholder="../logs/audit/audit.jsonl"
+        value="../logs/audit/audit.jsonl"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <button class="btn btn-primary" id="btn-load-url">加载</button>
+      <button class="btn btn-secondary" id="btn-load-sample">加载示例数据</button>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>本地文件</h3>
+      <div class="drop-zone" id="drop-zone">
+        <input type="file" id="file-input" accept=".jsonl,.json">
+        <div>拖拽 .jsonl 文件到此处</div>
+        <div style="margin-top:6px;font-size:0.76rem;opacity:0.7">或点击选择文件</div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>说明</h3>
+      <p style="font-size:0.78rem;color:#5a6880;line-height:1.7;">
+        每条卡片对应一次工具调用审计记录，包含 14 个 OTel GenAI 字段。
+        点击卡片可展开查看完整字段与哈希链验证状态。<br><br>
+        链状态 <b style="color:#1b5e20">[OK]</b> 表示 hash_prev 与前一条 record_hash 匹配；
+        <b style="color:#b71c1c">[FAIL]</b> 表示链断裂，需排查。
+      </p>
+    </div>
+
+  </aside>
+
+  <!-- 右侧主区 -->
+  <div class="main-area">
+
+    <!-- 统计条 -->
+    <div class="stats-strip">
+      <div class="stat-item">
+        <span class="stat-value" id="stat-total">0</span>
+        <span class="stat-label">总记录</span>
+      </div>
+      <div class="stats-sep"></div>
+      <div class="stat-item">
+        <span class="stat-value deny" id="stat-deny">0</span>
+        <span class="stat-label">拒绝</span>
+      </div>
+      <div class="stats-sep"></div>
+      <div class="stat-item">
+        <span class="stat-value warn" id="stat-warn">0</span>
+        <span class="stat-label">警告</span>
+      </div>
+      <div class="stats-sep"></div>
+      <div class="stat-item">
+        <span class="stat-value trace" id="stat-trace">0</span>
+        <span class="stat-label">会话数</span>
+      </div>
+      <div class="chain-status">
+        哈希链：<span class="chain-badge na" id="chain-global-badge">无数据</span>
+      </div>
+    </div>
+
+    <!-- 时间线区域 -->
+    <div class="timeline-container" id="timeline-container">
+      <div class="status-message">
+        <div class="icon">[...]</div>
+        <h3>正在加载示例数据...</h3>
+        <p>若加载失败，请点击左侧"加载示例数据"或拖拽 .jsonl 文件。</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="timeline.js"></script>
+</body>
+</html>

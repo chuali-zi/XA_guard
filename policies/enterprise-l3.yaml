@@ -1,0 +1,104 @@
+# 等保 2.0 三级 + GB/T 45654-2025 + TC260-003 seed 规则
+# 子 agent G3 扩展至 30 条；当前 10 条 seed 覆盖 4 类风险。
+# predicate 语法见 src/xa_guard/policy/compiler.py
+metadata:
+  name: enterprise-l3
+  version: "0.1"
+  sources:
+    - "GB/T 22239-2019 等保 2.0 三级"
+    - "GB/T 45654-2025 网络安全技术 生成式 AI 服务安全基本要求"
+    - "TC260-003 大模型安全基本要求"
+
+rules:
+  - id: GBT-22239-8.1.4.4
+    name: 重要操作授权
+    source: "GB/T 22239-2019 8.1.4.4"
+    triggers: [exec_command, delete_file, drop_table]
+    predicate: "tool in ('exec_command', 'shell', 'delete_file') and risk in ('yellow', 'red')"
+    enforce: require_approval
+    severity: high
+    audit: required
+    description: 重要操作必须人工审批 + 留存日志
+
+  - id: GBT-22239-8.1.4.5
+    name: 高危命令拒绝
+    source: "GB/T 22239-2019 8.1.4.5"
+    triggers: [exec_command]
+    predicate: "tool == 'exec_command' and (contains('cmd', 'rm -rf') or contains('cmd', 'format') or contains('cmd', 'mkfs'))"
+    enforce: deny
+    severity: critical
+    audit: required
+
+  - id: GBT-45654-A.1.1
+    name: 涉密内容不外泄
+    source: "GB/T 45654-2025 附录 A.1.1"
+    triggers: [send_email, send_notification, post_url]
+    predicate: "taint == 'CONFIDENTIAL'"
+    enforce: deny
+    severity: critical
+    audit: required
+    description: 机密标签数据禁止流向外发型工具
+
+  - id: GBT-45654-A.2.3
+    name: 禁止生成涉敏内容
+    source: "GB/T 45654-2025 附录 A.2.3"
+    triggers: [content_generation, write_file]
+    predicate: "tool in ('write_file', 'append_file') and (contains('content', '身份证') or contains('content', '密码') or contains('content', '密钥'))"
+    enforce: deny
+    severity: high
+    audit: required
+
+  - id: TC260-003-7.2
+    name: 外部输入提示注入拦截
+    source: "TC260-003 第 7.2 节"
+    triggers: [tool_call_with_external_input]
+    predicate: "'web' in sources or 'document' in sources or 'rag' in sources"
+    enforce: warn
+    severity: medium
+    audit: required
+    description: 来自外部源的输入必须经过关卡 1 复检
+
+  - id: GBT-22239-8.1.3.1
+    name: 角色越权访问拦截
+    source: "GB/T 22239-2019 8.1.3.1"
+    triggers: [restart_service, exec_command, delete_file, admin_action]
+    predicate: "tool in ('restart_service', 'exec_command', 'delete_file') and role != 'admin' and role != 'ops'"
+    enforce: deny
+    severity: high
+    audit: required
+
+  - id: GBT-45654-A.4.1
+    name: 系统提示套取
+    source: "GB/T 45654-2025 附录 A.4.1"
+    triggers: [prompt_leak]
+    predicate: "contains('message', 'system prompt') or contains('message', '系统提示') or contains('message', 'ignore previous')"
+    enforce: deny
+    severity: high
+    audit: required
+
+  - id: GBT-22239-8.1.4.2
+    name: 跨域数据流转留痕
+    source: "GB/T 22239-2019 8.1.4.2"
+    triggers: [send_email, post_url, send_notification, cross_domain_call]
+    predicate: "taint in ('INTERNAL', 'CONFIDENTIAL') and tool in ('send_email', 'post_url', 'send_notification')"
+    enforce: warn
+    severity: medium
+    audit: required
+
+  - id: GBT-45654-A.3.2
+    name: 越狱诱导拒绝
+    source: "GB/T 45654-2025 附录 A.3.2"
+    triggers: [jailbreak]
+    predicate: "contains('message', '忘掉前面') or contains('message', '假装你是') or contains('message', 'jailbreak') or contains('message', 'developer mode')"
+    enforce: deny
+    severity: high
+    audit: required
+
+  - id: TC260-003-9.4
+    name: 审批令牌缺失阻断
+    source: "TC260-003 第 9.4 节"
+    triggers: [red_operation]
+    predicate: "risk == 'red'"
+    enforce: require_approval
+    severity: high
+    audit: required

@@ -1,0 +1,55 @@
+# 关卡 1 输入安检的危险模式库（demo 规则版）
+# M2 由 PromptGuard 2 / Llama Guard 3 替代
+# 子 agent G1 扩展至 50+ 条
+
+patterns:
+  shell_dangerous:
+    - "rm -rf"
+    - "rm  -rf"
+    - "mkfs"
+    - "dd if=/dev/zero"
+    - ":(){ :|:& };:"
+    - "format c:"
+    - "shutdown -h"
+
+  sql_injection:
+    - "drop table"
+    - "delete from"
+    - "; --"
+    - "or 1=1"
+    - "union select"
+
+  jailbreak_zh:
+    - "忘掉前面的指令"
+    - "忘记前面的"
+    - "假装你是"
+    - "扮演一个没有限制的"
+    - "开发者模式"
+    - "DAN 模式"
+
+  jailbreak_en:
+    - "ignore previous instructions"
+    - "ignore all previous"
+    - "you are now"
+    - "developer mode"
+    - "jailbreak"
+    - "DAN mode"
+
+  system_leak:
+    - "system prompt"
+    - "系统提示"
+    - "你的指令是什么"
+    - "repeat your instructions"
+
+  pii_leak:
+    - "/etc/passwd"
+    - "id_rsa"
+    - ".ssh/"
+    - "AKIA"                # AWS Access Key 前缀
+    - "ghp_"                # GitHub PAT 前缀
+
+  indirect_injection:
+    - "[SYSTEM_INSTRUCTION]"
+    - "[ADMIN_OVERRIDE]"
+    - "请同时执行"
+    - "请额外执行"

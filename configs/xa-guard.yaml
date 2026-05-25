@@ -1,0 +1,60 @@
+# XA-Guard demo 默认配置
+# 详细 schema 见 src/xa_guard/config.py
+
+xa_guard:
+  upstream:
+    transport: stdio          # stdio | streamable-http
+    host: 127.0.0.1
+    port: 3000
+
+  downstream:
+    - name: ops_target
+      command: ["python", "-m", "demo.targets.ops_target"]
+      transport: stdio
+
+  gates:
+    gate1:
+      enabled: true
+      classifier: rule         # rule | prompt_guard | llama_guard
+      patterns_file: policies/dangerous_patterns.yaml
+      source_risk_weights:
+        user: 1.0
+        web: 1.5
+        document: 1.5
+        rag: 1.2
+        memory: 1.1
+        tool_result: 1.3
+
+    gate2:
+      enabled: true
+      hitl_required_for: [red]
+      elicitation_fallback: stdout    # stdout | async_notify | deny
+      tool_risk_file: policies/tool_risks.yaml
+      approval_token_ttl_seconds: 300
+
+    gate3:
+      enabled: true
+      backend: python                  # python | rego
+      policy_file: policies/enterprise-l3.yaml
+
+    gate4:
+      enabled: true
+      strict_mode: false               # true 时连 WARN 都阻断
+      tool_capabilities_file: policies/tool_capabilities.yaml
+
+    gate5:
+      enabled: false                   # demo 默认禁用 Docker
+      docker_image: xa-guard/sandbox:latest
+      runtime: runc                    # runc | runsc(gVisor)
+
+    gate6:
+      enabled: true
+      audit_dir: ./logs/audit
+      hash_algo: sha256                # sha256 | sm3
+      enable_sm2_signature: false
+      sm2_key_path: ""
+
+  policy_default: enterprise-l3
+  audit_dir: ./logs/audit
+  log_dir: ./logs/runtime
+  tool_capabilities_file: policies/tool_capabilities.yaml

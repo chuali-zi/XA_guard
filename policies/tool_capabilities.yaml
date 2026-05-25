@@ -1,0 +1,63 @@
+# 工具能力声明（关卡 4 用）
+# 子 agent G4 / D 扩展。每个新工具上线都要在这里登记。
+#
+# capabilities: 工具能做什么（信息流可达性）
+#   NETWORK_EXTERNAL  外网访问
+#   NETWORK_INTERNAL  内网访问
+#   FS_READ           读文件
+#   FS_WRITE          写文件
+#   EXEC              执行命令
+#   NOTIFY            外发消息
+#
+# input_max_taint: 工具能接受的最高数据敏感度
+# output_taint:    工具输出的固定标签
+# risk_level:      green / yellow / red
+
+tools:
+  - tool_name: list_servers
+    capabilities: [NETWORK_INTERNAL, FS_READ]
+    input_max_taint: PUBLIC
+    output_taint: INTERNAL
+    risk_level: green
+
+  - tool_name: get_cpu
+    capabilities: [NETWORK_INTERNAL]
+    input_max_taint: PUBLIC
+    output_taint: INTERNAL
+    risk_level: green
+
+  - tool_name: read_log
+    capabilities: [FS_READ]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: green
+
+  - tool_name: restart_service
+    capabilities: [NETWORK_INTERNAL, EXEC]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: yellow
+
+  - tool_name: exec_command
+    capabilities: [EXEC, FS_WRITE]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: red
+
+  - tool_name: send_notification
+    capabilities: [NETWORK_EXTERNAL, NOTIFY]
+    input_max_taint: INTERNAL                # 不接受 CONFIDENTIAL
+    output_taint: PUBLIC
+    risk_level: yellow
+
+  - tool_name: send_email
+    capabilities: [NETWORK_EXTERNAL, NOTIFY]
+    input_max_taint: INTERNAL
+    output_taint: PUBLIC
+    risk_level: yellow
+
+  - tool_name: post_url
+    capabilities: [NETWORK_EXTERNAL]
+    input_max_taint: PUBLIC                  # 公网只能接受 PUBLIC
+    output_taint: PUBLIC
+    risk_level: yellow

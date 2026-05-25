@@ -10,3 +10,24 @@ Thumbs.db
 
 # Node
 node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Runtime / audit output (保留 .log/ 模块工作日志，不提交 logs/)
+logs/
+*.jsonl
+!bench/.log/.gitkeep
+!**/.log/worklog.md

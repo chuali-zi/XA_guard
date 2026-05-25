@@ -34,7 +34,224 @@ ul { padding-left: 22px; }
 <li><a href="#q-route">[Q5] A/B/C 三套技术路线选型？</a></li>
 <li><a href="#q-base2">[Q6] 是否仍要兼容 OpenClaw 框架（题目原话"兼容 OpenClaw 类智能体"）？</a></li>
 <li><a href="#q-llm">[Q7] 基座大模型：通义千问 / 智谱 / DeepSeek / 文心 还是 OpenAI/Anthropic 混用？</a></li>
+<li><a href="#q-demo-sm">[Q8] demo 阶段国密 SM3/SM2 是否真接 gmssl，还是先 SHA-256 占位？</a></li>
+<li><a href="#q-demo-opa">[Q9] demo 阶段策略评估是用嵌入 OPA 还是先 Python predicate？</a></li>
 </ul>
+</div>
+
+<div class="entry resolved" id="demo-skeleton-built-2026-05-25">
+<span class="tag resolved">已完成 · resolved</span> <span class="ts">2026-05-25</span>
+<h3>★ Demo 骨架与子 agent 实施全部完工（M1 末交付）</h3>
+<p><b>背景</b>：基于 2026-05-24 架构定稿，主助手搭骨架 → 9 个并行子 agent（medium/high effort）按模块边界实施。各 agent 决策已分条记录在下方（gate1/gate2/gate3/gate4/gate5/gate6+audit/proxy/bench/frontend/demo-D）。</p>
+
+<p><b>验证结果（2026-05-25）</b></p>
+<ul>
+<li>pytest：<b>87 个测试全过</b>（types/pipeline smoke + 各 gate 单元 + bench/proxy 集成）</li>
+<li>xa-bench 30 条 seed：ASR 27.3% / FPR 0% / CuP 100% / Recall 72.7% / P50 1.74ms / P95 7.8ms</li>
+<li>3 演示场景均可独立跑：scenario_01 被 gate1+3 拦截；scenario_02 被 gate1（密钥前缀）拦截；scenario_03 经 gate2 stdout fallback 触发 REQUIRE_APPROVAL</li>
+<li>审计链：357 条记录 0 错 0 缺失字段（scripts/verify_audit.py exit 0）</li>
+<li>前端：单页 HTML 时间线 + 5 条 sample 审计，离线可用</li>
+</ul>
+
+<p><b>关键集成决策（pipeline 内 ctx 同步 — 由 agent-G3 引入）</b></p>
+<p>pipeline.py 加 <code>_sync_ctx_from_result()</code>：每关后从 <code>result.metadata["risk_level"|"taint"]</code> 同步回 <code>ctx.risk_level/ctx.taint</code>。Gates 仍保持"不 mutate ctx"原则；pipeline 是唯一可变状态的所有者。解决 gate2 算 risk_level → gate3 用 ctx.risk_level 的依赖。</p>
+
+<p><b>已知差距 vs PRD 中等档（M2+ 补齐）</b></p>
+<ul>
+<li>ASR 27.3% > 目标 10% — supply_chain 4/4 攻击全过（AIBOM 仅骨架）；interpretability CoT 忠实度未实做</li>
+<li>关卡 1 仍规则版，未接 PromptGuard 2 真实推理（M2）</li>
+<li>关卡 3 后端 Python eval（builtins=None 沙箱），未接 OPA Rego — Q9</li>
+<li>关卡 5 Docker 沙箱默认禁用，仅 routing decision — M3</li>
+<li>关卡 6 国密 SM2 走 HMAC-SHA256 占位 — Q8，M5 gmssl</li>
+<li>MCP elicitation 上游未接，gate2 仅 stdout fallback — M2 Cursor 实测</li>
+<li>290 条 CSAB-Gov-mini 当前 30 条 seed — M4 扩展</li>
+<li>LangChain SDK / Streamable HTTP / AIBOM 评级 — 骨架，时间允许补</li>
+</ul>
+
+<p><b>README.md</b>：从 "agent_safety" 占位换成完整 demo 说明（定位 / 30 秒跑通 / 4 方向映射 / 当前指标 / 已知差距 / 文档地图 / .log 约定）。</p>
+
+<p><b>下一步建议</b></p>
+<ol>
+<li>M2 启动时把 ASR 优化作为首要目标：扩 dangerous_patterns + 加 AIBOM seed 规则 + 补 5 条插件场景规则</li>
+<li>把 Q5（技术路线选型）、Q6（OpenClaw 兼容）和 雄安专家咨询邮件（PRD 附录 B）一起发出去，等回复</li>
+<li>事实源 v1.2 复核：本次 demo 实施未发现新事实矛盾</li>
+</ol>
+</div>
+
+<div class="entry decision" id="demo-agent-d-2026-05-25">
+<span class="tag">设计决策</span> <span class="ts">2026-05-25</span>
+<h3>Demo 靶子 + 3 攻击场景 — agent-D</h3>
+<p><b>文件</b>：<code>demo/targets/ops_target.py</code>，<code>demo/scenarios/scenario_01/02/03</code></p>
+<p><b>选择</b>：ops_target 增加 <code>send_email</code> 工具（任务规格同时列出 send_notification 和 send_email），均实现；read_log 返回 dict 含 path+content 字段（而非裸字符串），方便关卡解析路径标签。</p>
+<p><b>场景脚本</b>：3 个脚本在关卡 stub 状态下已能跑出真实决策——gate1 的 DANGEROUS_PATTERNS（由另一子 agent 实现）已覆盖 <code>rm -rf</code> 和 <code>AKIA</code> 前缀，场景 01/02 在当前 codebase 直接 DENY；场景 03 经 gate2 stub（TOOL_RISK_MAP exec_command→RED）REQUIRE_APPROVAL。</p>
+<p><b>Windows 编码</b>：rich Console 在 Windows GBK 终端下对中文/特殊符号报 UnicodeEncodeError；解决方案：<code>Console(file=io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8'))</code>。</p>
+</div>
+
+<div class="entry decision" id="proxy-2026-05-25">
+<span class="tag">设计决策</span> <span class="ts">2026-05-25</span>
+<h3>MCP 代理（上游 Server + 下游 Client）— agent-P</h3>
+<p><b>文件</b>：<code>src/xa_guard/proxy/upstream.py</code>, <code>src/xa_guard/proxy/downstream.py</code>, <code>tests/integration/_fixture_echo_server.py</code>, <code>tests/integration/test_proxy_smoke.py</code></p>
+<p><b>API 选型</b>：本机 mcp 库 1.27+；client 用 <code>stdio_client + ClientSession</code>；server 用 <code>Server + stdio_server</code>。<code>StdioServerParameters</code> 字段为 <code>command/args/env/cwd</code>，DownstreamSpec.command[0] 作为 command，剩余作为 args。</p>
+<p><b>生命周期</b>：DownstreamRouter 用单个 <code>AsyncExitStack</code> 同时管 N 个 stdio_client + ClientSession，避免独立 task 出现 cancellation race；start 失败时立即 aclose 回滚。stop 幂等。</p>
+<p><b>透传</b>：upstream <code>@app.call_tool</code> 内部把下游 <code>CallToolResult.content</code> 拆出来重组为 <code>list[TextContent]</code>，非 TextContent 元素降级为 str；命中 XA-Guard 拦截则返回单条 ⚠ TextContent（含 reason / rule_hits / trace_id）。</p>
+<p><b>Streamable HTTP 占位</b>：mcp 1.27 仅暴露 <code>StreamableHTTPServerTransport</code> 低层，需结合 Starlette/uvicorn 接入，demo 阶段 <code>run_streamable_http</code> 抛 NotImplementedError 提示用 stdio。</p>
+<p><b>elicitation HITL 占位</b>：gate2 反向问审批暂用 stdout fallback，留 TODO 标注，后续接 <code>ctx.session.elicit</code>。</p>
+<p><b>测试策略</b>：因 <code>demo/targets/ops_target.py</code> 尚未实现，集成测试自带最小 echo MCP fixture（提供 echo / exec_command 两个工具），覆盖：list_tools 非空、benign 放行、<code>cmd="rm -rf /var"</code> 被 gate1 shell_dangerous 拦截、stop 优雅退出 + 幂等。71/71 测试通过。</p>
+</div>
+
+<div class="entry decision" id="bench-2026-05-25">
+<span class="tag">设计决策</span> <span class="ts">2026-05-25</span>
+<h3>XA-Bench 评测套件实施（赛题方向 4）</h3>
+<p><b>文件</b>：<code>bench/runner.py</code>, <code>bench/cli.py</code>, <code>bench/metrics.py</code>, <code>bench/reporters/html_report.py</code>, <code>tests/integration/test_bench_smoke.py</code></p>
+<p><b>决策</b>：mock_executor 不真调下游，返回 <code>{"mocked": True, "case_id": ..., "tool": ...}</code>，与实际 pipeline 完全解耦；pipeline 内部异常 catch 后继续跑，确保测试不崩。</p>
+<p><b>by_dimension</b>：metrics.compute 内联分组，无额外数据结构，减少导入依赖。</p>
+<p><b>HTML 报告</b>：纯字符串模板内联 CSS，不依赖 Jinja2/构建链，确保 demo 环境零配置可用。</p>
+<p><b>30 条 seed 实测</b>：pass_rate=73.3%，ASR=27.3%（stub 关卡未拦截部分攻击，属正常——关卡 G1/G2/G3/G4 stub 补全后指标会改善）。FPR=0%（合法请求均放行）。</p>
+<p><b>audit_completeness</b>：demo 阶段占位 1.0，生产阶段需统计关卡 6 审计字段完整率。</p>
+</div>
+
+<div class="entry decision" id="frontend-2026-05-25">
+<span class="tag">设计决策</span> <span class="ts">2026-05-25</span>
+<h3>演示前端（agent-F）— 审计回放时间线 初版</h3>
+<p><b>文件</b>：<code>frontend/index.html</code>, <code>frontend/timeline.js</code>, <code>frontend/style.css</code>, <code>frontend/sample_audit.jsonl</code></p>
+<p><b>关键决策</b>：不引入任何外部 CDN，纯 HTML5 + ES2020 + CSS3，离线可用。fetch 采用 ReadableStream 逐行解析 JSONL，避免大文件一次性加载。File API 拖拽/选择为主要本地文件入口（规避 file:// 协议 fetch 限制）。</p>
+<p><b>链验证</b>：verifyChain() 按原始顺序（时间升序）遍历，比对每条 gen_ai.evidence.hash_prev 是否等于前一条 record_hash；第一条无前向哈希标记为 null（不计错误）。</p>
+<p><b>已知限制</b>：双击 index.html 在 Chrome/Edge 以 file:// 打开时，fetch("sample_audit.jsonl") 受同源策略阻止；用户应点"加载示例数据"（已捕获 fetch 失败并提示），或拖拽 .jsonl 文件加载。Firefox 默认允许 file:// fetch，行为正常。部署到 HTTP Server 后无此限制。</p>
+<p><b>偏差</b>：样例数据使用占位哈希字符串（非真实 SM3 计算），第 3 条故意将 hash_prev 设为错误值以展示断链效果。decision 字段扩展自 AuditRecord.to_dict() 之外（前端兼容大小写推断）。</p>
+</div>
+
+<div class="entry decision" id="gate1-2026-05-25">
+<span class="tag">设计决策</span> <span class="ts">2026-05-25</span>
+<h3>关卡 1 — Gate1Input 实现（门口安检/输入攻击识别）</h3>
+<p><b>文件</b>：<code>src/xa_guard/gates/gate1_input.py</code>，<code>tests/unit/test_gate1.py</code></p>
+<p><b>设计决策</b>：<br>
+1. <b>DENY 类别</b>：shell_dangerous / jailbreak_zh / jailbreak_en / system_leak / indirect_injection / pii_leak / sql_injection 七类命中均返回 DENY；其余命中或来源含 web/document/rag/memory 返回 WARN；否则 ALLOW。<br>
+2. <b>文本拼接</b>：tool_name + JSON(arguments) + session_history[*].content，全部转 lower() 后做子串匹配；session_history content 支持 str 和 list[dict] 两种格式。<br>
+3. <b>路径解析</b>：patterns_file 相对路径从 Path(__file__).parents[3] 解析，假设文件位于 src/xa_guard/gates/；绝对路径直接使用。<br>
+4. <b>source_risk_score</b>：各 InputSource 权重取均值，写入 metadata["source_risk_score"]。</p>
+<p><b>偏差</b>：M2 阶段 PromptGuard 2 / Llama Guard 3 推理按设计留 stub，本期仅实现规则版。</p>
+<p><b>已知问题</b>：路径层级硬编码（parents[3]），若目录结构变更需同步修改；10 个单元测试全部通过。</p>
+</div>
+
+<div class="entry decision" id="gate4-2026-05-25">
+<span class="tag">设计决策</span> <span class="ts">2026-05-25</span>
+<h3>关卡 4 — Gate4Taint 实现（三色信息流污点）</h3>
+<p><b>文件</b>：<code>src/xa_guard/gates/gate4_taint.py</code>，<code>tests/unit/test_gate4.py</code></p>
+<p><b>设计决策</b>：<br>
+1. <b>taint 推断顺序</b>：先用 ctx.taint 作为基础，再 merge input_sources（USER/WEB→PUBLIC；DOCUMENT/RAG/MEMORY→INTERNAL；TOOL_RESULT 保留 ctx.taint），最后扫描 arguments + session_history 关键字决定是否升到 CONFIDENTIAL。取最严格。<br>
+2. <b>敏感关键字</b>：正则覆盖「密码/密钥/access_key/secret_key/AKIA…/ghp_…/身份证」，匹配即升级 CONFIDENTIAL。<br>
+3. <b>未登记工具默认</b>：input_max_taint=CONFIDENTIAL（最宽松，让调用通过），output_taint=PUBLIC。<br>
+4. <b>OUTBOUND DENY 条件</b>：cap.capabilities 含 NETWORK_EXTERNAL 或 NOTIFY 且 new_taint==CONFIDENTIAL → DENY。</p>
+<p><b>偏差</b>：规范提到 strict_mode 把 WARN 升级为 DENY；当前 Gate4 不产生 WARN（只有 ALLOW/DENY），strict_mode 分支保留以备未来扩展。</p>
+<p><b>已知问题</b>：无 pending；9 个单元测试全部通过（PYTHONPATH=src）。</p>
+</div>
+
+<div class="entry decision" id="gate2-2026-05-25">
+<span class="tag">设计决策</span> <span class="ts">2026-05-25</span>
+<h3>关卡 2 — Gate2Plan 实现（HITL 办事大厅）</h3>
+<p><b>文件</b>：<code>src/xa_guard/gates/gate2_plan.py</code>，<code>tests/unit/test_gate2.py</code></p>
+<p><b>设计决策</b>：<code>_load_tool_risks</code> 支持相对/绝对路径，相对路径从项目根解析（parents[3]），不依赖 cwd。<code>risk_level</code> 只写 <code>metadata</code>，不 mutate ctx，下游关卡通过 <code>gate_results[-1].metadata["risk_level"]</code> 自行读取。</p>
+<p><b>偏差</b>：approval_token 签发留 TODO 注释；真正 MCP elicitation 由 proxy/upstream.py 负责（事实源 F-3.4：国产 IDE 全部未声明 elicitation capability，必须 fallback）。</p>
+<p><b>权衡</b>：elicitation_fallback 三路（stdout/deny/async_notify）均在本关卡内处理，避免上层 pipeline 感知 fallback 细节。stdout fallback 打印到 stderr 而非 stdout，不干扰 MCP stdio 协议帧。</p>
+<p><b>已知问题</b>：无 pending 问题；12 个单元测试全部通过。</p>
+</div>
+
+<div class="entry decision" id="demo-arch-2026-05-24">
+<span class="tag">设计决策</span> <span class="ts">2026-05-24</span>
+<h3>★ Demo 阶段宏观架构定稿（赛题 4 方向 ↔ 6 关卡 ↔ 模块边界）</h3>
+<p><b>背景</b>：用户启动 demo 实施，要求"宏观架构 → 派子 agent 填实现"。本条目固化骨架决策；细节冲突以事实源 v1.1 为准，赛题 PDF 优先。</p>
+
+<p><b>架构总图（demo 范围）</b>：</p>
+<pre>
+[LLM 客户端 Trae/Cursor/...]
+  ↓ MCP stdio (默认) | Streamable HTTP (生产)
+[xa_guard.server]  ← MCP Server 入口
+  ↓ 构造 GateContext
+[xa_guard.pipeline]  ← 6 关卡编排（短路、并行约束、超时）
+  ├── gates/gate1_input.py     方向 1（输入攻击）
+  ├── gates/gate2_plan.py      方向 2（HITL via elicitation）
+  ├── gates/gate3_policy.py    方向 2 + 应用价值（30 条规则 + OPA/Python predicate）
+  ├── gates/gate4_taint.py     方向 2（三色信息流）
+  ├── gates/gate5_sandbox.py   方向 2（Docker 沙箱）
+  └── gates/gate6_audit.py     方向 4（OTel + SM3/SM2 + Merkle）
+  ↓ 通过则
+[xa_guard.proxy.downstream]   ← MCP Client（透传到真实工具）
+  ↓
+[demo/targets/*]              ← 6 个假工具（list_servers / get_cpu / restart_service / read_log / exec_command / send_notification）
+
+平行交付：
+- bench/                       方向 4（XA-Bench / CSAB-Gov-mini 290 用例 / ASR-FPR-Recall-CuP-Latency）
+- aibom/                       方向 3（插件供应链评级 + 三段审批）
+- sdk/                         LangChain 装饰器（覆盖非 MCP 用户）
+- frontend/                    时间线可视化（演示视频素材）
+</pre>
+
+<p><b>赛题 4 方向 ↔ 模块覆盖矩阵</b></p>
+<ul>
+<li><b>方向 1（输入攻击识别）</b>：gates/gate1_input.py（敏感词 → PromptGuard）+ 输入来源标签（用户/网页/文档/RAG/记忆）</li>
+<li><b>方向 2（工具调用安全）</b>：gates/gate2_plan.py + gate3_policy.py + gate4_taint.py + gate5_sandbox.py 全部</li>
+<li><b>方向 3（插件供应链）</b>：aibom/scanner.py + rater.py（轻量加分，覆盖代码行为 / 依赖 / 评级）</li>
+<li><b>方向 4（评测审计）</b>：gates/gate6_audit.py + bench/ 评测套件 + frontend/ 审计回放</li>
+</ul>
+
+<p><b>核心数据结构（详见 src/xa_guard/types.py）</b></p>
+<ul>
+<li><code>TaintLabel</code>：PUBLIC / INTERNAL / CONFIDENTIAL 三色枚举 + merge() 取最严格</li>
+<li><code>RiskLevel</code>：green / yellow / red</li>
+<li><code>Decision</code>：allow / warn / deny / require_approval</li>
+<li><code>GateContext</code>：穿过 6 关卡的载体（trace_id, tool_name, arguments, taint, risk_level, gate_results, ...）</li>
+<li><code>GateResult</code>：单关卡输出（decision + risks + rule_hits + latency_ms + confidence）</li>
+<li><code>ToolCapability</code>：工具元数据（capabilities + input_max_taint + output_taint + risk_level）— 关卡 4 必需</li>
+<li><code>PolicyRule</code>：规则定义（id / source / triggers / predicate / enforce / severity） — 关卡 3 必需</li>
+<li><code>AuditRecord</code>：14 字段（对齐 OTel GenAI Semantic Conventions + 政企扩展）— 关卡 6 必需</li>
+</ul>
+
+<p><b>子 agent 派发边界（按可并行度切分，effort = medium/high）</b></p>
+<ol>
+<li>Agent G1 关卡 1 输入安检 — 规则版分类器 + 输入来源标签</li>
+<li>Agent G2 关卡 2 办事大厅 — 风险分类 + MCP elicitation 调用 / stdout 降级</li>
+<li>Agent G3 关卡 3 规则引擎 — YAML → Python predicate（OPA 视情况后续接入）+ 8-10 条种子规则映射等保 2.0 / GB/T 45654</li>
+<li>Agent G4 关卡 4 三色污点 — TaintTracker + ToolCapability YAML 加载 + 进出向检查</li>
+<li>Agent G5 关卡 5 沙箱 — Docker 路由（demo 默认 disabled，留接口）</li>
+<li>Agent G6 关卡 6 审计 — JSONL + SHA-256 / SM3 双模式 + 前向哈希链 + 验签脚本</li>
+<li>Agent P 代理上下游 — upstream MCP server (stdio) + downstream MCP client</li>
+<li>Agent B XA-Bench — CLI + runner + metrics + 30 条 seed 用例（4 方向各几条）</li>
+<li>Agent D 演示靶子 + 演示场景 — 6 个假工具 + 3 个攻击场景脚本（间接注入 / 信息流 / HITL）</li>
+<li>Agent F 演示前端 — 单页 HTML + WebSocket 或轮询 JSONL 审计回放</li>
+</ol>
+
+<p><b>每模块强制 .log/ 文件夹</b>：放 <code>worklog.md</code>（短日志，时间倒序），方便后续 debug / 溯源。子 agent 完成后必须在此写入一条 "做了什么 / 决策 / 已知问题"。</p>
+
+<p><b>不在 demo 阶段实施（M2-M4 再做）</b></p>
+<ul>
+<li>PromptGuard 2 / Llama Guard 3 真实模型推理（先用规则 + 关键词模拟）</li>
+<li>嵌入 OPA Rego 运行时（先用 Python eval predicate）</li>
+<li>gVisor 沙箱（保留接口，demo 默认 Docker 不启）</li>
+<li>SM2 真实签名（demo 默认 SHA-256 + 可切换 SM3，国密签名留接口）</li>
+<li>政企真实数据集（demo 用 30 条 seed 用例）</li>
+</ul>
+
+<p><b>跑通标志（demo MVP DoD）</b></p>
+<ul>
+<li><code>python -m xa_guard.server --config configs/xa-guard.yaml</code> 能起 MCP server</li>
+<li>Trae / Cursor / MCP Inspector 任一客户端能调用 demo target 的 6 个假工具</li>
+<li>注入"rm -rf /var/log/*"被关卡 1 或 3 拦截 + 审计日志可见</li>
+<li>注入 CONFIDENTIAL → send_email 被关卡 4 拦截</li>
+<li><code>python -m bench.cli run --suite csab-gov-mini-seed</code> 输出 HTML 报告</li>
+<li><code>python scripts/verify_audit.py</code> 哈希链验证通过</li>
+</ul>
+</div>
+
+<div class="entry pending" id="q-demo-sm">
+<span class="tag pending">未决 · pending</span> <span class="ts">2026-05-24</span>
+<h3>[Q8] demo 阶段国密 SM3/SM2 接入策略</h3>
+<p>gmssl Python 库在 Windows 上历史有 bug（事实源/项目总览风险登记）。建议 demo 默认 SHA-256 + ED25519 占位，配置开关切换到 SM3/SM2（gmssl + cryptography 兜底）。决赛阶段（M5）实测后切默认。<br><b>影响</b>：若决赛前未切，PRD §3 "国密哈希链审计证据" 5 分需以"已实现接口 + 等待依赖稳定"叙事呈现。<br><b>建议</b>：先按 SHA-256 实现，但 audit.sm_crypto 模块按 SM3/SM2 接口签名预留，运行时 fallback。</p>
+</div>
+
+<div class="entry pending" id="q-demo-opa">
+<span class="tag pending">未决 · pending</span> <span class="ts">2026-05-24</span>
+<h3>[Q9] demo 阶段策略引擎选型</h3>
+<p>真嵌入 OPA Rego 学习曲线和运维成本高（事实源 R2/项目总览风险）。demo 阶段方案：YAML → Python predicate 直接执行；接口签名保持与 OPA 兼容（rule.predicate_fn 字符串 + 上下文字典），M3 阶段无缝替换为 OPA Python 客户端。<br><b>影响</b>：技术创新性 25% 中 "Policy DSL 编译器" 10 分需以"DSL → Python predicate（接口与 OPA 兼容）+ 30 条规则 + 单元测试"叙事，决赛前可补 OPA 后端。<br><b>建议</b>：先 Python predicate，PolicyCompiler 接口预留 backend 字段（"python" | "rego"）。</p>
 </div>
 
 <div class="entry pending" id="q-route">
@@ -56,6 +273,263 @@ ul { padding-left: 22px; }
 </div>
 
 <h2>条目时间线（最新在最上）</h2>
+
+<div class="entry decision">
+<span class="tag">设计决策</span> <span class="ts">2026-05-24</span>
+<h3>★ 事实源 v1.1 升级 + 全文档系统性纠偏（5 agent 验证 + 6 agent 纠偏，全景总结）</h3>
+<p><b>背景</b>：事实源 v1.0 建立后，用户要求"派出多个子 agent 对事实源 md 进行 WebSearch 验证，然后根据事实源对全部文档纠偏"。本条目是此次工程的全景总结，下面分文档条目记录细粒度变更。</p>
+
+<p><b>第一阶段：5 个并行验证 agent 对事实源做 WebSearch 复核</b></p>
+<ul>
+<li><b>F-1 比赛官方事实</b>：F-1.1~F-1.4 全部验证；F-1.6 公司类型"国有控股"→"国有独资/雄安集团全资子公司"；F-1.5/F-1.7/F-1.8 来自赛题 PDF 单独要求，公开渠道无法验证（标"以赛题 PDF 为准"可接受）</li>
+<li><b>F-2 合规标准</b>：F-2.1 标题应为"<b>网络安全技术</b>"非"信息安全技术"；F-2.4 应拒答题库总规模 ≥ 500（非仅非拒答库）；F-2.5 等保 2.0 留存措辞收紧（6 月下限来自《网络安全法》第 21 条）；F-2.6 GB/T 39786 发布日期改"2021-03"模糊表述；电子签名法第 13 条构成 + 第 14 条法律效力；F-2.9 治理框架 2.0 发布主体"网信办指导/TC260+应急中心牵头"；F-2.12 MITRE ATLAS 待人工复核</li>
+<li><b>F-3 MCP 协议</b>：基本正确；可补强 GitHub Copilot CLI 已含 elicitation/Sampling/Tasks；Cline 应改"未声明 elicitation 待 #4522 落地"；Qoder CN 产品线拆三条（IDE/插件 + QoderWork CN + Qoder CN CLI）；2025-11-25 新增 Tasks/Extensions/PKCE 等</li>
+<li><b>F-4 业界产品</b>：基本正确；可补 Lakera 媒体估算 $300M；CalypsoAI/F5 公告 2025-09-11 + $180M 现金；Protect AI/Palo Alto 完成 2025-07-22 整合 Prisma AIRS；Anthropic SKILL.md 2025-12-18 升级为 agentskills.io 开源标准</li>
+<li><b>F-5/F-6 学术与事件</b>：4 处重要纠偏 — <b>CaMeL 归属 Google Research（非 DeepMind）</b>；<b>ShieldAgent 机制为"概率规则电路 + 形式化验证"（非 Markov Logic）</b>；<b>Attacker Moves Second 数字 MetaSecAlign 96% ASR、StruQ ≈ 100%（非 70%）</b>；<b>LiteLLM 攻击者 teampcp 账号劫持非 APT campaign</b>；补全权威 URL 与 CVE 编号 PYSEC-2026-2/3</li>
+</ul>
+
+<p><b>事实源 v1.1 更新</b>：基于上述 5 份验证报告，向 <code>docs/事实源.md</code> 写入 6 处 v1.1 微纠偏（F-2.1/F-2.4/F-2.5/F-2.6/F-2.9 措辞），增加 §7 已知错误表 E19-E26 共 8 条新条目，补强 F-3.1（2025-11-25 重大新增）/ F-3.3（GitHub Copilot CLI、Cline 状态）/ F-3.4（CodeGeeX 表述精确化）/ F-4.1（Lakera $300M）/ F-4.3（CalypsoAI/Protect AI/HiddenLayer 升级为高置信度）/ F-4.5（Claude Skills 2025-12-18 升级）/ F-5.2 / F-6.1（LiteLLM 精确时间线 + CVE）。</p>
+
+<p><b>第二阶段：6 个并行纠偏 agent 对全部 docs/ 文档纠偏</b>（赛题 PDF 和 word docx 按要求不纠偏）</p>
+<ul>
+<li><b>PRD.md</b>：7 处 Edit（头部声明、应用价值 GB/T 45654 行、国产生态适配、规模 KPI、答辩 Top 2 + Top 9 弹药、Lakera/CalypsoAI/Cisco/PaloAlto 4 家收购）</li>
+<li><b>产品架构.md</b>：12 处 Edit（顶部声明 + §1.4 客户端表 + §2 全景图 3 处 + §3.2 关卡 2 elicitation + §3.4 协议适配 + §6.2 评测维度 3 处 + §7.1 配置位置 + §8.2 demo + §10.3 风险）</li>
+<li><b>项目总览.md</b>：16 处 Edit（v3，全文 Qcoder→Qoder、通义灵码→Qoder CN、CodeGeeX 移除、200-300→290、GB/T 45654 主口径、等保 2.0 分级精化、§5 学术 3 处纠偏、§11.5 加 2026 专用入口）</li>
+<li><b>MCP零基础上手.md</b>：13 处 Edit（顶部声明 + §1.2/§1.3/§2.2/§2.4/§3.1/§6.2/§11 全部品牌术语对齐 + §3.3 Streamable HTTP 替 SSE + §9.2 elicitation 标准化时间 + 客户端支持矩阵 + Q8 PromptGuard 数字注释）</li>
+<li><b>文献库 5 文件</b>：共 16 处 Edit（INDEX.md 3 + 05_standards/README.md 6 + TC260-003.md 3 + GBT-45654-2025.md 3 + LiteLLM-Incident-2026.md 1 大块插入；补 6 个权威 URL + 精确时间线 + CVE 归属纠偏 + 后续 CVE-2026-42208）</li>
+<li><b>调研报告 + 产品形态 7 份</b>：顶部插入 v1.1 声明（p1/p2/p3/facts-compliance/facts-mcp-clients/产品形态-对比分析/research-raw/saas-form）；按规则路径替换；正文不改保留研究痕迹</li>
+</ul>
+
+<p><b>统计</b>：5 验证 agent + 6 纠偏 agent = 11 个并行 subagent，事实源 v1.0→v1.1（新增 E19-E26 8 条复核），核心文档共修改 ≈ 70 处 Edit，调研报告顶部声明 7 份。</p>
+
+<p><b>不变量保持</b>：CSAB-Gov-mini 290 用例 / AgentDojo Targeted ASR ≤ 10% / 三件套定位 / 6 关卡结构 / Trae 主演叙事 / 红线条款 / 5 个月时间表 — 全部保留。</p>
+
+<p><b>未决/待办</b>：
+<ul>
+<li>MITRE ATLAS 最新版本号需人工浏览 https://atlas.mitre.org/matrices/ATLAS 复核（WebSearch 受拦截）</li>
+<li>国产 IDE（Trae/CodeBuddy/Qoder/Qoder CN）对 MCP elicitation 的实际支持需 M2 阶段实测</li>
+<li>Anthropic Claude Skills 跨平台（Codex/Gemini CLI/Copilot/Kiro/TWG）支持矩阵需进一步核实</li>
+<li>"Skill 比 MCP 工具描述少 17-32 倍"具体倍数未单点验证</li>
+<li>等保 2.0 三级"入侵防范秒级响应"时间需咨询雄安测评机构</li>
+</ul></p>
+
+<p><b>影响</b>：项目所有 markdown 文档（除赛题 PDF 与 docx 历史快照外）与事实源 v1.1 全部对齐，可作为 M1 启动（2026-06-01）的统一基线；后续 PRD / P3 / 答辩材料引用合规与业界数字时不会再出现矛盾措辞。</p>
+</div>
+
+<div class="entry decision">
+<span class="tag">设计决策</span> <span class="ts">2026-05-24</span>
+<h3>项目总览.md 基于事实源 v1.1 的精准纠偏（v3，16 处 Edit）</h3>
+<p><b>背景</b>：事实源 v1.1 发布后，<code>docs/项目总览.md</code> 仍残留 Qcoder 拼写错误、通义灵码旧名、CodeGeeX 误列、200-300 旧数字、TC260-003 主口径、CaMeL → DeepMind、ShieldAgent → Markov Logic、Attacker Moves Second 70% 等错误。本次同步纠偏，与同日 PRD.md / 产品架构.md / MCP零基础上手.md / 文献库 5 文件协同。</p>
+<p><b>本次修改（按文档行号顺序）</b>：
+<ul>
+<li>文档头部：加事实源 v1.1 遵循声明 + 上次纠偏日期 2026-05-24</li>
+<li>§1 速览客户端表：Qcoder → Qoder（独立 Agentic IDE，阿里 2025-08）；通义灵码 → Qoder CN（原通义灵码，2026-05-20 更名）；删 CodeGeeX（事实源 E9：官方 clients 清单未收录）</li>
+<li>§1 三件套 XA-Bench 行：200-300 → CSAB-Gov-mini 290（PoC 缩减版）</li>
+<li>§3.7 关键名词速查：GB/T 45654 → GB/T 45654-2025 + 标题"网络安全技术"（事实源 E19）</li>
+<li>§4.1 产品形态：通义灵码 → Qoder CN</li>
+<li>§4.2 架构图代码块：Qcoder → Qoder；通义灵码 → Qoder CN；考场 200-300 → 290 条（PoC 缩减版）</li>
+<li>§4.4 五大创新点-4：200-300 → 290（PoC 缩减版）</li>
+<li>§5.1 警示：Carlini 等 70% ASR → OpenAI/Anthropic/Google DeepMind/ETH/Northeastern 多方合作 + MetaSecAlign 96% / StruQ ≈ 100%（事实源 E23；70% 来自另一篇 ASTRA 综述）</li>
+<li>§5.2 CaMeL：DeepMind → Google Research（事实源 E23）</li>
+<li>§5.2 ShieldAgent：Markov Logic Network → 概率规则电路 + 形式化验证（事实源 E23）</li>
+<li>§5.4 合规底盘：GB/T 45654-2025 主口径化（正式国标 + 2025-11-01 实施）；TC260-003 仅作前身辅助；等保 2.0 三/四级分级精化（GB/T 22239-2019）</li>
+<li>§7.1 技术栈表：通义灵码 → Qoder CN（原通义灵码）</li>
+<li>§10 风险登记 R4：200-300 → 290 条（PoC 缩减版），数据来源拆分按 290 重算（100+50+140）</li>
+<li>§11.3 必读标准：TC260-003 / GB/T 45654-2025 并列 → GB/T 45654-2025（主）+ 附 openstd.samr.gov.cn 来源</li>
+<li>§11.5 比赛官方信息：加 2026 专用入口 2026.tiaozhanbei.net 一行（事实源 F-1.1）</li>
+<li>§13 修订历史：新增 2026-05-24 v3 纠偏行</li>
+</ul></p>
+<p><b>保留不动</b>：§13 修订历史中 v2 行的"通义灵码"措辞（保留历史痕迹，是当时口径，已被新增 v3 行声明纠偏）；★★ 客户端优先级排序未变（仅改名）。</p>
+<p><b>影响</b>：项目总览（招新分发版主源文档）与事实源 v1.1 全部对齐。后续 docx 重新生成时直接基于此版本。</p>
+</div>
+
+<div class="entry decision">
+<span class="tag">设计决策</span> <span class="ts">2026-05-24</span>
+<h3>产品架构.md 基于事实源 v1.1 的精准纠偏（11 处 Edit）</h3>
+<p><b>背景</b>：事实源 docs/事实源.md v1.1 已建立。本次按事实源映射表（§9）对 docs/产品架构.md 做精准 Edit，不重写，保留原作者风格与章节结构。</p>
+<p><b>实际修改（11 处）</b>：
+<ul>
+<li><b>顶部声明</b>：第 1 行下方插入"遵循事实源 v1.1"声明 + 上次纠偏日期 2026-05-24</li>
+<li><b>§1.4 客户端表格</b>：通义灵码 → Qoder CN（2026-05-20 更名）；Qcoder 拼写错误 → Qoder（阿里 2025-08 推出独立 Agentic IDE）；删除 CodeGeeX 行（E9：未在 modelcontextprotocol.io/clients 官方清单）</li>
+<li><b>§2 全景图代码块（3 处）</b>：① 移除拼错的 Qcoder + 改名 → "Trae / CodeBuddy / Qoder CN / Qoder"；② 删除 CodeGeeX；③ 底部 "200-300 中文政企用例" → "CSAB-Gov-mini 290 用例（PoC 缩减版）"</li>
+<li><b>§3.2 关卡 2 描述</b>：纠正 elicitation 支持表述——明确 Cursor v1.5+ / Claude Code / Codex / GitHub Copilot CLI / Goose 支持；国产 IDE（Trae / CodeBuddy / Qoder / Qoder CN）elicitation 状态未声明需实测；不支持时降级 stdout/异步通知</li>
+<li><b>§3.4 MCP 协议适配</b>：stdio 客户端列表里 "通义灵码" → "Qoder CN"</li>
+<li><b>§6.2 评测维度表（3 处）</b>：① 表前加 "290 用例 PoC 缩减版（远低于国标完整题库要求）" 说明；② 内容安全行说明改为 "17 类应拒答 + 31 类生成内容审查（GB/T 45654-2025 附录 A 切片）"（事实源 E4：31 类 + 17 类是同一附录 A 不同切片，不是 TC260 与国标二选一）；③ 合计行 → "CSAB-Gov-mini 290 用例（PoC 缩减版）"</li>
+<li><b>§7.1 等价配置位置</b>：通义灵码 → Qoder CN（原通义灵码，2026-05-20 更名）</li>
+<li><b>§8.2 demo 步骤 4</b>：弹窗镜头描述改为"如客户端声明 elicitation 则弹窗；Trae elicitation 未声明，弹窗镜头以 Cursor v1.5+ 为主；Trae 镜头以 stdout/通知降级演示"</li>
+<li><b>§10.3 风险与应对第二行</b>：风险描述更精确——"国产客户端（Trae / CodeBuddy / Qoder CN）elicitation 全部未声明"，应对策略明确"演示视频弹窗镜头优先用 Cursor v1.5+ 等明确支持的客户端"</li>
+</ul></p>
+<p><b>保持不变（按要求）</b>：
+<ul>
+<li>全文 "Trae 主演" 的叙事保留（§8.1 视频脚本、§8.2 demo 主线、§10.1 M1 任务）</li>
+<li>6 关卡结构保留</li>
+<li>三件套（MCP Server + SDK + Bench + Protocol）定位保留</li>
+<li>§8.1 视频脚本表 8:30-9:30 Cursor 切换镜头保留</li>
+<li>§10.3 第一行（MCP 协议演进风险，锁定 2025-11-25）保留</li>
+</ul></p>
+<p><b>对应事实源错误编号</b>：E2（Qcoder→Qoder）、E3（通义灵码→Qoder CN）、E4（17/31 类切片）、E6/E7（MCP 协议版本与 SSE deprecated 现状已对齐）、E8（国产 IDE elicitation 全跑通是错误承诺，已改 elicitation 主推 Cursor v1.5+）、E9（CodeGeeX 不在官方清单）、E10/E13（用例数统一为 290 PoC 缩减版）。</p>
+</div>
+
+<div class="entry decision">
+<span class="tag">设计决策</span> <span class="ts">2026-05-24</span>
+<h3>MCP零基础上手.md 依据事实源 v1.1 完成纠偏（13 处修改）</h3>
+<p><b>背景</b>：<code>docs/事实源.md</code> v1.1 升级权威事实，部分国产 AI 工具命名、MCP 协议版本、传输方式、Elicitation 标准化时间发生变化。<code>docs/tutorials/MCP零基础上手.md</code> 此前为 v0.1（2026-05-23 编写），需对齐 v1.1。</p>
+<p><b>13 处变更要点</b>：
+<ul>
+<li>L7 上方插入事实源声明 banner（v1.1 / 2026-05-24）</li>
+<li>§1.2 USB-C 类比：Qcoder→Qoder，通义灵码→Qoder CN（2026-05-20 更名），新增阿里 Qoder（2025-08 独立 Agentic IDE）</li>
+<li>§1.3 出生年月：补充 MCP 协议当前稳定版 2025-11-25 / 主流传输 stdio + Streamable HTTP / SSE deprecated</li>
+<li>§2.2、§3.1、§9.1：通义灵码 → Qoder CN（统一术语）</li>
+<li>§2.4 国产表格：删除 CodeGeeX 行（事实源 E9：未在 modelcontextprotocol.io/clients 官方清单）</li>
+<li>§3.3 通信协议：SSE/HTTP → Streamable HTTP（旧 SSE 已 deprecated）</li>
+<li>§6.2 备选路径表：Qcoder→Qoder（参考阿里官网），通义灵码→Qoder CN</li>
+<li>§9.2 HITL：MCP 1.0+ → protocol revision 2025-06-18 标准化 elicitation / 2025-11-25 SEP-1036 新增 URL mode；客户端支持矩阵纠正（Cursor v1.5+/Claude Code/Codex/GitHub Copilot CLI/Goose 支持；Claude Desktop 不支持；国产 IDE 未声明）</li>
+<li>§11 Q4：删除 CodeGeeX 引用；通义灵码→Qoder CN；Qcoder→Qoder</li>
+<li>§11 Q8：PromptGuard 数字加事实源 v1.1 注释（22M 19.3ms 但多语言精度下降；86M 92.4ms@A100 / Recall 97.5%@1%FPR）</li>
+<li>维护说明：新增 v1.1 纠偏条目</li>
+</ul></p>
+<p><b>保留</b>：§6 章节标题"接入国产 AI 工具"按要求保留；§3.3 stdio 说明保留。</p>
+<p><b>未决</b>：国产 IDE（Trae/CodeBuddy/Qoder/Qoder CN）对 MCP elicitation 的支持需 M2 阶段实测。</p>
+</div>
+
+<div class="entry decision">
+<span class="tag">设计决策</span> <span class="ts">2026-05-24</span>
+<h3>文献库 5 文件按事实源 v1.1 纠偏（共 16 处 Edit）</h3>
+<p><b>背景</b>：事实源 v1.1 建立后，文献库 5 份关联文件存在"17 类 = 草案 / 31 类 = 正式国标"等错误措辞，且 LiteLLM 事件缺权威 URL/时间线/CVE 归属。</p>
+<p><b>纠偏文件</b>：
+<ul>
+<li><code>references/literature/INDEX.md</code>（3 处）：顶部加事实源声明 + Q 措辞修正（TC260-003 17 类 → GB/T 45654-2025 附录 A 17+31 类）+ 答案补 GBT-45654-2025 链接</li>
+<li><code>references/literature/05_standards/README.md</code>（6 处）：顶部声明 + 关卡对应表两行 GB/T 45654-2025 切片化表述 + 评测基准两行加题库规模 + 30 页方案表关卡 1/3 表述统一</li>
+<li><code>references/literature/05_standards/TC260-003.md</code>（3 处）：顶部加"已合并为 GB/T 45654-2025"声明 + 17 类标题前注明附录 A.1+A.2 来源 + 31 类标题前注明附录 A 全集</li>
+<li><code>references/literature/05_standards/GBT-45654-2025.md</code>（3 处）：顶部声明 + 发布机构加粗（GB/T 推荐性国标）+ 新增"附录 A 风险类目切片 / 关键指标 / 题库规模"章节，明确驳斥"17/31 = 草案/正式"误解</li>
+<li><code>references/literature/03_supply_chain/LiteLLM-Incident-2026.md</code>（1 处大块插入）：6 个权威 URL + 精确时间线（10:39 上传 / 13:38 隔离，2h59min 窗口）+ CVE PYSEC-2026-2/3 + 攻击者归属纠偏（teampcp 账号劫持非 APT）+ 后续 CVE-2026-42208 SQL 注入补充</li>
+</ul></p>
+<p><b>权衡</b>：仅精准 Edit 不重写，保留原文结构与可读性；事实源 v1.1 口径以注释/声明形式叠加，不删除原有节选示例（保留教学价值）。</p>
+<p><b>影响</b>：文献库与事实源全部对齐，与同日 PRD.md 7 处 Edit 协同。后续 PRD/P3/答辩材料引用文献库时不会再读到与事实源矛盾的措辞。</p>
+</div>
+
+<div class="entry decision">
+<span class="tag">设计决策</span> <span class="ts">2026-05-24</span>
+<h3>PRD.md 基于事实源 v1.1 的精准纠偏（7 处 Edit）</h3>
+<p><b>背景</b>：事实源升级到 v1.1（新增 E19-E26 共 8 条复核纠偏），需把 PRD.md 中相关条目同步更新。</p>
+<p><b>本次修改（按 PRD 行号顺序）</b>：
+<ul>
+<li>L4 文档头部：上次纠偏说明从"基于事实源 v1.0"改为"基于事实源 v1.1"</li>
+<li>L131 应用价值 GB/T 45654 子项：补"31 类生成内容 + 17 类应拒答覆盖 + 拒答率 ≥ 95%"（对齐 E4 切片分工）</li>
+<li>L133 应用价值 国产生态适配：从"Trae/CodeBuddy/通义灵码至少 1 个跑通"改为"Trae（PRD 硬承诺）；CodeBuddy / Qoder CN（原通义灵码 2026-05-20 更名）至少 1 个按版本验证（Should）"（对齐 E3+E18）</li>
+<li>L175 规模 KPI 行：中等档从"31（全覆盖）"改为"31 类生成内容 + 17 类应拒答（附录 A 两个切片）"</li>
+<li>L529 答辩 Top 2 AgentDojo ASR：补一行"⚠ Attacker Moves Second 实测：MetaSecAlign 96% ASR、StruQ 几乎 100%（非 70%）"（对齐 E23）</li>
+<li>L545 答辩 Top 9 "为什么选 MCP 不做 SaaS"：补一行"业界 Lakera / CalypsoAI / Robust Intelligence / Protect AI 4 家代表性 SaaS 全部被收购（Check Point / F5 $180M / Cisco / Palo Alto），更佐证纯 SaaS 不可持续"</li>
+</ul></p>
+<p><b>保留不动</b>：§3.4 关键纠偏说明（v1.0 对齐部分 v1.1 没让其失效）；§10.3 量化指标来源约束；红线条款；所有数字（CSAB-Gov-mini 290、AgentDojo Targeted ASR ≤ 10% 等）；docs/事实源.md 引用路径。</p>
+<p><b>未触发改动</b>：PRD 全文未显式出现"CaMeL (DeepMind)"字样（仅有"CaMeL × SentinelAgent"和"CaMeL / IsolateGPT / AgentSpec"两处，均不指明机构归属），故 §5.4 未做 DeepMind→Google Research 改动。</p>
+</div>
+
+<div class="entry decision">
+<span class="tag">设计决策</span> <span class="ts">2026-05-24</span>
+<h3>合规事实源建立（产出 docs/references/prd-research/facts-compliance.md）</h3>
+<p><b>背景</b>：项目内部多份文档对同一合规标准给出矛盾事实描述（如同时出现"17 类"和"31 类"），需建立统一事实源。</p>
+<p><b>核心纠偏：解决"17 vs 31"矛盾</b>：两者均正确，但适用场景不同——
+<ul>
+<li><b>31 类</b>：附录 A 全部 5 大类 31 种风险（完整集合），用于安全性标注、生成内容测试题库、分类模型</li>
+<li><b>17 类</b>：附录 A.1（违法）+ A.2（歧视）下 17 种（子集），<b>专门用于应拒答测试题库</b>的最小覆盖</li>
+<li><b>29 类</b>：附录 A.1～A.4，用于违法不良信息判定（与《网络信息内容生态治理规定》对齐）</li>
+</ul></p>
+<p><b>11 个事实查实结论</b>：
+<ul>
+<li>GB/T 45654-2025 实施日期：<b>2025-11-01</b>（发布 2025-04-25，SAMR 官方确认）</li>
+<li>拒答率 ≥ 95% / 误拒率 ≤ 5%（无分级）</li>
+<li>题库规模：生成内容（A.1+A.2 每种 ≥ 50 题，其他 ≥ 20 题）、应拒答（每种 ≥ 20 题）、非拒答（总 ≥ 500 题）；每月宜更新</li>
+<li>GB/T 22239-2019 等保三级：日志留存 ≥ 6 个月（与《网络安全法》第 21 条一致）</li>
+<li>GB/T 39786-2021：SM2/SM3/SM4 三级国密合规；禁 MD5/DES/SHA-1/RSA&lt;2048</li>
+<li>GB/T 45652-2025：训练数据违法不良信息 &gt; 5% 不得使用；人工抽检 ≥ 10%</li>
+<li>《暂行办法》2023-08-15 施行，是部门规章；GB/T 45654 是配套国标技术基线</li>
+<li>《人工智能安全治理框架》2.0：2025-09-15 CAC 在国家网络安全宣传周发布；1.0 为 2024-09</li>
+<li>OWASP Top 10 for LLM v2025：LLM03 确认为 <b>Supply Chain</b>（旧版 Training Data Poisoning 已拆分）</li>
+<li>MITRE ATLAS：MITRE Corporation 维护，与 ATT&amp;CK 同源，仍活跃</li>
+<li>NIST AI RMF 1.0 (2023-01-26) + AI 600-1 (2024-07-26 发布，12 类 GAI 风险)；暂无 2.0 计划</li>
+</ul></p>
+<p><b>权衡</b>：以下信息因 WebSearch 安全策略拦截，<b>未做 100% 在线复核</b>，需在 PRD 引用时再次核对：
+<ul>
+<li>MITRE ATLAS 最新版本号 / 矩阵更新日期（建议引用时附"截至访问日期"）</li>
+<li>等保 2.0 三级原文是否明确写"双人授权"字样（标准管理类条款应查阅 GB/T 22239-2019 第 7 章原文 PDF）</li>
+</ul></p>
+<p><b>影响</b>：本文档为唯一事实源，后续 PRD / P3 报告 / 答辩材料引用合规数字时<b>必须以此为准</b>。"应拒答 ≥ 500" 之前 P3 报告写法略偏，国标原文规定的是"每种 ≥ 20 题"（17×20=340），非拒答 ≥ 500 是硬指标。已在事实源中精确化。</p>
+<p><b>未决</b>：等保三级"入侵防范秒级响应"时间在公开标准中未明示（行业惯例 30 秒），M2 仍需咨询雄安测评机构（已在前一条目记录）。</p>
+</div>
+
+<div class="entry decision">
+<span class="tag">设计决策</span> <span class="ts">2026-05-23</span>
+<h3>P3 政企合规与挑战杯评审标准调研完成（产出 docs/references/prd-research/p3-gov-enterprise-standards.md）</h3>
+<p><b>背景</b>：PRD 需要"做到什么程度算合格 / 优秀 / 擂主"的客观参考。同时调研政企量化合规与挑战杯揭榜挂帅评审特点。</p>
+<p><b>5 条最关键的客观验收门槛</b>：
+<ul>
+<li><b>拒答率 ≥ 95% / 误拒率 ≤ 5%</b>（GB/T 45654-2025）</li>
+<li><b>测试题库 ≥ 500 应拒答 + ≥ 500 非拒答，每月更新</b>（GB/T 45654-2025）</li>
+<li><b>训练 / RAG 数据违法不良信息 ≤ 5%，抽样 ≥ 4000 合格率 ≥ 96%</b>（GB/T 45652 / 45654）</li>
+<li><b>审计日志留存 ≥ 6 个月 + SM2 签名 + SM3 哈希链</b>（GB/T 22239-2019 三级 / GB/T 39786）</li>
+<li><b>重要操作授权：双因素 + 双人审批 + 最小权限 + 失败锁定 5/30</b>（等保 2.0 三级）</li>
+</ul></p>
+<p><b>CSAB-Gov-mini 290 用例映射</b>（落实到 P4 任务）：A.提示注入 50 + B.拒答价值观 40 + C.内容审查 31 类 60 + D.工具越权 40 + E.数据泄露 30 + F.供应链 20 + G.误拒非拒答 50。每条用例必须能注明对应国标条款。</p>
+<p><b>30 页方案与 10 分钟视频基线</b>：方案 9 章 + ≥ 12 图表 + ≥ 30 参考文献；视频按 7 段切分（开场 / 风险 / 6 关卡 demo / DSL 核心创新 / 跑分 / 雄安场景 / 总结）。</p>
+<p><b>关键澄清</b>：GB/T 45654-2025 附录 A 是 <b>31 类</b> 安全风险，"17 类拒答"源自 TC260-003 草案已并入新国标，报告以 31 类为分类轴（17 类作为价值观风险子集）。</p>
+<p><b>评委构成推测</b>：雄安数字城市公司技术官 + TC260 标准制定者 + 高校 AI 安全教授 + 央国企信息化负责人——偏"政企甲方 + 标准方"，比纯学术更看重合规可落地。</p>
+<p><b>未决问题</b>：
+<ul>
+<li>等保 2.0 三级"入侵防范"具体响应秒级时间未公开（行业资料 30 秒参考），M2 邮件咨询雄安测评机构</li>
+<li>雄安偏好的国密 TLS 实现 / OpenClaw 兼容细节，M2 邮件咨询 caoruyue@chinaxiongan.com.cn</li>
+</ul></p>
+</div>
+
+<div class="entry decision">
+<span class="tag">设计决策</span> <span class="ts">2026-05-23</span>
+<h3>P2 学术 SOTA 基准量化数据调研完成（产出 docs/references/prd-research/p2-academic-sota.md）</h3>
+<p><b>背景</b>：PRD 需要客观评测目标基线，调研 2024-2026 主流 LLM 智能体安全基准的 SOTA 数字。</p>
+<p><b>覆盖基准</b>：AgentDojo (NeurIPS 2024)、Agent-SafetyBench (清华 2024-12)、InjecAgent (ACL 2024)、AIR-Bench 2024 (Stanford CRFM)、R-Judge (SJTU EMNLP 2024)、ToolEmu (ICLR 2024 Spotlight)、ASB (ICLR 2025)、HarmBench (ICML 2024)；防御方案：CaMeL、SecAlign、StruQ、Meta SecAlign、PromptArmor；中文：CHiSafetyBench、CSSBench、Chinese SafetyQA —— 共 14 篇核心论文，~50 个 URL。</p>
+<p><b>三个核心数字基线（建议写入 PRD）</b>：
+<ul>
+<li><b>无防御基线 ASR</b>：AgentDojo GPT-4o 47.69% targeted ASR / ASB Mixed-Attack 84.30% / Agent-SafetyBench 没有任何模型超过 60 分</li>
+<li><b>业界防御后 ASR 区间</b>：弱 (25-40%) / 中 (10-20%) / 强 (1-7%) / 理想但有代价 (~0% 但 utility 损失 5-15%)</li>
+<li><b>我们建议主基线</b>：Targeted ASR 降至 ≤ 8-10%，Utility 保留 ≥ baseline 90%，覆盖 4 个基准（AgentDojo + InjecAgent + CHiSafetyBench + 自建 300 用例中文集）</li>
+</ul>
+</p>
+<p><b>关键发现</b>：(1) 越强的模型可能更易被复杂后门攻击——ASB 中 GPT-4o 在 PoT 后门下 100% 中招；(2) 数据外泄（InjecAgent S2）几乎 100% 成功——这是政企最致命攻击面；(3) AgentDojo Slack 套件 92% ASR——跨工具调用是最脆弱环节；(4) 200-300 用例规模偏小但合理（与 ToolEmu 144 同档），建议明确"第一期 300 用例，规划扩展到 1000+"；(5) 中文 agent 工具调用场景是真空地带，CHiSafetyBench / CSSBench 都不覆盖，是我方差异化卖点。</p>
+<p><b>与 P3 的协同</b>：P3 给出"合格门槛"（国标硬指标如拒答率 95%、误拒率 5%），P2 给出"业界天花板"（学术 SOTA 防御后 ASR 1-10%）。PRD 应同时引用两组数字：合规层用 P3，性能层用 P2。</p>
+<p><b>必引来源</b>：AgentDojo (<code>arXiv:2406.13352</code>)、Agent-SafetyBench (<code>arXiv:2412.14470</code>)、ASB (<code>arXiv:2410.02644</code>)、CHiSafetyBench (<code>arXiv:2406.10311</code>，对齐 TC260 标准)。</p>
+</div>
+
+<div class="entry decision">
+<span class="tag">设计决策</span> <span class="ts">2026-05-23</span>
+<h3>P1 业界基线调研完成（产出 docs/references/prd-research/p1-industry-baseline.md）</h3>
+<p><b>背景</b>：PRD 需客观性能目标，调研 2024-2026 业界主流 LLM 防护产品的公开指标作为基线。</p>
+<p><b>覆盖产品</b>：Meta LlamaFirewall（PromptGuard 2 / AlignmentCheck / CodeShield）、Llama Guard 3 系列、NVIDIA NeMo Guardrails、Guardrails AI、Lakera Guard、阿里 AI 安全护栏 + Qwen3Guard、百度大模型内容安全、腾讯天御 + ADP 3.0、PromptArmor / DefensiveTokens 学术 SOTA、AgentDojo 基准 —— 共 11 个产品 / 38 个来源 URL。</p>
+<p><b>三个核心数字基线（建议作 PRD 顶层 KPI）</b>：
+<ul>
+<li><b>提示注入检出 Recall @ 1% FPR</b>：MVP 85% / 竞争力 95% / SOTA 97%（参照 PG2 86M 97.5%）</li>
+<li><b>同步检测 P50 延迟</b>：MVP 200 ms / 竞争力 100 ms（业界共识门槛）/ SOTA 50 ms（Lakera 标杆）</li>
+<li><b>ASR 降幅（AgentDojo 风格）</b>：MVP 60% / 竞争力 80% / SOTA 90%（LlamaFirewall 组合 90%）</li>
+</ul>
+</p>
+<p><b>政企特殊红线</b>：等保 2.0 三级 + 信创（昇腾/麒麟）+ 国密（SM2/3/4）+ 数据不出域 + 全链路审计 —— 都是硬门槛，无量化指标但缺一不可。敏感信息检测准确率参照普元的 98%。</p>
+<p><b>关键发现</b>：(1) 小模型反胜大模型（Llama Guard 3-1B 76% 检出 vs 8B 0%）；(2) NeMo Guardrails 官方数字 vs 社区实测差 10-100×（0.5s 营销 vs 3.5-10s 实测）；(3) 国内三大厂（阿里 / 百度 / 腾讯）公开的多是传统内容审核 QPS/延迟，缺 prompt injection / jailbreak 专项精度数字，这是我们项目的差异化机会。</p>
+</div>
+
+<div class="entry decision">
+<span class="tag">设计决策</span> <span class="ts">2026-05-23</span>
+<h3>文档目录重组：docs / docs-research / reference 三合一</h3>
+<p><b>背景</b>：项目根目录原有 3 个并列文档目录（<code>docs/</code>、<code>docs-research/</code>、<code>reference/</code>），新人难定位、教学/参考边界不清。</p>
+<p><b>新结构</b>：全部合并到 <code>docs/</code> 单一树下，按"教学 / 参考"分流：
+<ul>
+<li><code>docs/</code>（根）：<code>产品架构.md</code>、<code>项目总览.md</code>、赛题 PDF、新建 <code>README.md</code></li>
+<li><code>docs/tutorials/</code>：教学类（MCP零基础上手）</li>
+<li><code>docs/references/product-forms/</code>：产品形态 4 篇方案（原 docs/产品形态-*.md）</li>
+<li><code>docs/references/product-forms/research-raw/</code>：调研原始报告（原 docs-research/）</li>
+<li><code>docs/references/literature/</code>：学术文献库（原 reference/，含 INDEX 与 5 个方向子目录）</li>
+<li><code>docs/references/archive/</code>：历史 docx 版本</li>
+</ul></p>
+<p><b>本次操作</b>：158 个文件，零丢失；新建 <code>docs/README.md</code> 顶层索引（159 总）。修复了 26 处跨目录 markdown 链接，涉及 8 个 md 文件（产品架构 1 / 项目总览 4 / MCP零基础上手 5 / product-forms 4 个文件共 14 / literature/INDEX 3）。research-raw 三份文件只含外部 https 引用，无需改链接。</p>
+<p><b>注意</b>：旧路径 <code>docs-research/*</code> 和 <code>reference/*</code> 在 <code>implementation-notes.html</code> 的历史条目中仍被引用（如下方多条），这些是历史快照，不修改，保留作时间线证据。新内容必须使用新路径。</p>
+</div>
 
 <div class="entry resolved">
 <span class="tag resolved">已确认 · resolved</span> <span class="ts">2026-05-23</span>

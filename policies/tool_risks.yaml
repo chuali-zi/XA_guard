@@ -1,0 +1,12 @@
+# 工具风险等级（关卡 2 办事大厅用）
+# green: 自动放行   yellow: 异步通知人审   red: 同步阻塞 HITL
+tool_risks:
+  list_servers: green
+  get_cpu: green
+  read_log: green
+  restart_service: yellow
+  send_notification: yellow
+  send_email: yellow
+  exec_command: red
+  delete_file: red
+  drop_table: red

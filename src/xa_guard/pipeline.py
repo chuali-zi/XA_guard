@@ -1,0 +1,134 @@
+"""6 关卡 pipeline 编排。
+
+调用顺序（产品架构 §3.2）：
+    inbound:  gate1 → gate2 → gate3 → gate4(in) → gate5
+    [downstream tool execution]
+    outbound: gate4(out) → gate6(audit)
+
+任一关卡返回 DENY 立即短路；REQUIRE_APPROVAL 不短路（关卡 2 内部处理 HITL）；
+WARN 累积。每关卡 latency_ms 写入 GateResult，全程 trace 由 gate6 落审计。
+"""
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from typing import Awaitable, Callable
+
+from xa_guard.config import XAGuardConfig
+from xa_guard.gates import GateStage
+from xa_guard.gates.base import Gate
+from xa_guard.types import Decision, GateContext, GateResult, RiskLevel, TaintLabel
+
+log = logging.getLogger("xa_guard.pipeline")
+
+ToolExecutor = Callable[[GateContext], Awaitable[object]]
+
+
+def _sync_ctx_from_result(ctx: GateContext, result: GateResult) -> None:
+    """把 gate result.metadata 中的 risk_level / taint 同步到 ctx。
+
+    gate2 决定 risk_level，gate3 的 predicate 依赖 ctx.risk_level；
+    gate4 决定 taint，下游同理。
+    """
+    rl = result.metadata.get("risk_level")
+    if rl is not None:
+        try:
+            ctx.risk_level = RiskLevel(rl) if not isinstance(rl, RiskLevel) else rl
+        except ValueError:
+            pass
+    tt = result.metadata.get("taint")
+    if tt is not None:
+        try:
+            ctx.taint = TaintLabel(tt) if not isinstance(tt, TaintLabel) else tt
+        except ValueError:
+            pass
+
+
+@dataclass
+class PipelineResult:
+    ctx: GateContext
+    allowed: bool
+    tool_result: object | None
+    final_decision: Decision
+    final_reason: str
+
+
+class Pipeline:
+    """6 关卡编排器。pipeline 不知道关卡内部细节，只按顺序串。"""
+
+    def __init__(
+        self,
+        gate1: Gate,
+        gate2: Gate,
+        gate3: Gate,
+        gate4: Gate,
+        gate5: Gate,
+        gate6: Gate,
+        cfg: XAGuardConfig | None = None,
+    ) -> None:
+        self.gate1 = gate1
+        self.gate2 = gate2
+        self.gate3 = gate3
+        self.gate4 = gate4
+        self.gate5 = gate5
+        self.gate6 = gate6
+        self.cfg = cfg
+
+    async def run(self, ctx: GateContext, executor: ToolExecutor) -> PipelineResult:
+        """跑完整 6 关卡 + 工具执行。
+
+        executor: 真正调用下游工具的协程函数（由 proxy.downstream 提供）。
+        """
+        # ---- inbound ----
+        for gate in (self.gate1, self.gate2, self.gate3, self.gate4, self.gate5):
+            result = gate(ctx, GateStage.INBOUND)
+            _sync_ctx_from_result(ctx, result)
+            ctx.append(result)
+            if result.decision == Decision.DENY:
+                # 写一条 audit 后返回
+                self.gate6(ctx, GateStage.OUTBOUND)
+                return PipelineResult(
+                    ctx=ctx,
+                    allowed=False,
+                    tool_result=None,
+                    final_decision=Decision.DENY,
+                    final_reason=ctx.final_reason,
+                )
+
+        # ---- 工具执行 ----
+        tool_result = None
+        try:
+            tool_result = await executor(ctx)
+            ctx.tool_result = tool_result
+        except Exception as exc:
+            log.exception("downstream tool failed")
+            ctx.final_reason = f"tool_error: {type(exc).__name__}: {exc}"
+            # 仍写 audit
+            self.gate6(ctx, GateStage.OUTBOUND)
+            return PipelineResult(
+                ctx=ctx,
+                allowed=False,
+                tool_result=None,
+                final_decision=Decision.DENY,
+                final_reason=ctx.final_reason,
+            )
+
+        # ---- outbound ----
+        # 出向先过关卡 4（输出 taint 检查）再过关卡 6（审计）
+        out_taint_result = self.gate4(ctx, GateStage.OUTBOUND)
+        _sync_ctx_from_result(ctx, out_taint_result)
+        ctx.append(out_taint_result)
+        if out_taint_result.decision == Decision.DENY:
+            ctx.tool_result = None
+            tool_result = None
+
+        audit_result = self.gate6(ctx, GateStage.OUTBOUND)
+        ctx.append(audit_result)
+
+        return PipelineResult(
+            ctx=ctx,
+            allowed=ctx.final_decision != Decision.DENY,
+            tool_result=tool_result,
+            final_decision=ctx.final_decision,
+            final_reason=ctx.final_reason,
+        )

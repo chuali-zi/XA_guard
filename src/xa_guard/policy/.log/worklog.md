@@ -1,0 +1,18 @@
+# policy 模块工作日志
+
+---
+
+## 2026-05-25 agent-G3
+- loader.py / compiler.py 无需改动；签名稳定
+- 验证：load_policy_yaml 对 10 条 seed 规则全部解析通过；compile_predicate 在 builtins=None 沙箱内执行 risk/taint/role/sources/contains() 表达式正常
+- 修正 policies/enterprise-l3.yaml：GBT-22239-8.1.3.1 / 8.1.4.2 两条规则的 triggers 与 predicate 引用工具不一致（triggers 是抽象动作名，predicate 是具体工具名），统一扩展 triggers 列表使其与 predicate 中 tool in (...) 同步
+- 已知问题：predicate 表达式语法未做白名单过滤；M3 切 OPA 后由 Rego 语义约束接管
+- 后续 TODO：predicate AST 校验（禁止 dunder / import 风险）；rego backend 在 M3 接 OPA HTTP/embedded
+
+---
+
+## 2026-05-24 23:55 主助手
+- loader.py / compiler.py 接口骨架
+- 决策（implementation-notes Q9）：demo 用 Python predicate（受限 eval, builtins=None）；M3 切 OPA Rego
+- 决策：predicate 表达式可用变量 tool/args/role/taint/risk/sources + contains() 辅助
+- TODO（agent-G3）：扩 predicate 表达式安全检查；非法字符抛错；接 OPA 时保持 backend 字段切换

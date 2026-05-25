@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xa-guard"
+version = "0.1.0"
+description = "XA-Guard MCP Server — 政企智能体安全防护层（XA-202620 demo）"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "XA-Guard Team" }]
+dependencies = [
+    "mcp>=1.27.0",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "rich>=13.0",
+    "anyio>=4.0",
+]
+
+[project.optional-dependencies]
+crypto = ["gmssl>=3.2.2", "cryptography>=42.0"]
+bench = ["pytest>=8.0", "jinja2>=3.1"]
+sdk = ["langchain>=0.2"]
+dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.6", "mypy>=1.10"]
+all = ["xa-guard[crypto,bench,sdk,dev]"]
+
+[project.scripts]
+xa-guard = "xa_guard.cli:main"
+xa-bench = "bench.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src", "."]
+include = ["xa_guard*", "bench*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-ra -q"
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
