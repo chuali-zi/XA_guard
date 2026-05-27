@@ -58,7 +58,7 @@ python -m venv .venv && source .venv/Scripts/activate    # Windows Git Bash
 # source .venv/bin/activate                              # macOS/Linux
 pip install -e ".[bench]"
 
-# 2. 跑测试（87 个全过）
+# 2. 跑测试（93 个全过）
 PYTHONPATH=src pytest -q
 
 # 3. 跑 3 个演示场景（无需 LLM）
