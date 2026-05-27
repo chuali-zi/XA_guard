@@ -1,7 +1,7 @@
 """6 关卡 pipeline 编排。
 
 调用顺序（产品架构 §3.2）：
-    inbound:  gate1 → gate2 → gate3 → gate4(in) → gate5
+    inbound:  gate1 → gate2 → gate4(in) → gate3 → gate5
     [downstream tool execution]
     outbound: gate4(out) → gate6(audit)
 
@@ -80,7 +80,7 @@ class Pipeline:
         executor: 真正调用下游工具的协程函数（由 proxy.downstream 提供）。
         """
         # ---- inbound ----
-        for gate in (self.gate1, self.gate2, self.gate3, self.gate4, self.gate5):
+        for gate in (self.gate1, self.gate2, self.gate4, self.gate3, self.gate5):
             result = gate(ctx, GateStage.INBOUND)
             _sync_ctx_from_result(ctx, result)
             ctx.append(result)

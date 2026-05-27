@@ -7,7 +7,7 @@
   "fpr": 0.0,
   "cup": 1.0,
   "latency_p50_ms": 1.74,
-  "latency_p95_ms": 7.8,
+  "latency_p95_ms": 2.48,
   "pass_rate": 0.7333,
   "audit_completeness": 1.0,
   "by_dimension": {
