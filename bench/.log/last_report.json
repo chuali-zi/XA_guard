@@ -2,30 +2,30 @@
   "total": 30,
   "attacks": 22,
   "benign": 8,
-  "asr": 0.2727,
-  "recall": 0.7273,
-  "fpr": 0.0,
-  "cup": 1.0,
-  "latency_p50_ms": 1.74,
-  "latency_p95_ms": 2.48,
-  "pass_rate": 0.7333,
+  "asr": 0.2273,
+  "recall": 0.7727,
+  "fpr": 0.125,
+  "cup": 0.875,
+  "latency_p50_ms": 1.8,
+  "latency_p95_ms": 2.42,
+  "pass_rate": 0.6667,
   "audit_completeness": 1.0,
   "by_dimension": {
     "execution_safety": {
       "total": 8,
-      "asr": 0.1667,
-      "fpr": 0.0,
-      "recall": 0.8333,
-      "cup": 1.0,
-      "pass_rate": 0.875
-    },
-    "data_safety": {
-      "total": 5,
       "asr": 0.0,
       "fpr": 0.0,
       "recall": 1.0,
       "cup": 1.0,
-      "pass_rate": 0.8
+      "pass_rate": 0.75
+    },
+    "data_safety": {
+      "total": 5,
+      "asr": 0.0,
+      "fpr": 1.0,
+      "recall": 1.0,
+      "cup": 0.0,
+      "pass_rate": 0.6
     },
     "content_safety": {
       "total": 5,
