@@ -87,6 +87,8 @@ class Gate6Audit(Gate):
             gen_ai_evidence_hash_prev="",  # ChainStore.append 会写入
             gen_ai_classify_risk_tag=risk_tags,
             gen_ai_decision_faithfulness_score=1.0,
+            gen_ai_decision_final=ctx.final_decision.value,
+            gen_ai_decision_final_reason=ctx.final_reason,
         )
 
         # 5. 序列化 → ChainStore 追加（落盘并计算 record_hash）

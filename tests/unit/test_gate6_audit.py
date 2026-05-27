@@ -133,6 +133,20 @@ def test_gate6_sm2_signature_optional(tmp_path: Path):
     assert rec.get("signature") == r.metadata["signature"]
 
 
+def test_audit_record_carries_final_decision(tmp_path: Path):
+    """AuditRecord must capture ctx.final_decision and ctx.final_reason."""
+    g = Gate6Audit(GateConfig(enabled=True, options={"audit_dir": str(tmp_path), "hash_algo": "sha256"}))
+    ctx = _make_ctx()
+    ctx.final_decision = Decision.DENY
+    ctx.final_reason = "gate3: blocked"
+    g(ctx, GateStage.OUTBOUND)
+
+    p = tmp_path / "audit.jsonl"
+    rec = json.loads(p.read_text(encoding="utf-8").strip())
+    assert rec["gen_ai.decision.final"] == "deny"
+    assert rec["gen_ai.decision.final_reason"] == "gate3: blocked"
+
+
 def test_gate6_outbound_stage_only(tmp_path: Path):
     """INBOUND 阶段不应写审计。"""
     g = Gate6Audit(GateConfig(enabled=True, options={"audit_dir": str(tmp_path), "hash_algo": "sha256"}))
