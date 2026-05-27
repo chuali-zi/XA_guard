@@ -8,7 +8,7 @@ from xa_guard.gates.gate3_policy import Gate3Policy
 from xa_guard.gates.gate4_taint import Gate4Taint
 from xa_guard.gates.gate5_sandbox import Gate5Sandbox
 from xa_guard.gates.gate6_audit import Gate6Audit
-from xa_guard.gates.base import Gate
+from xa_guard.gates.base import Gate, GateStage
 from xa_guard.pipeline import Pipeline
 from xa_guard.types import Decision, GateContext, GateResult, TaintLabel
 
@@ -82,3 +82,62 @@ def test_pipeline_runs_gate4_before_gate3_so_policy_sees_inbound_taint():
     assert result.allowed is True
     assert calls[:5] == ["gate1", "gate2", "gate4", "gate3", "gate5"]
     assert seen_taints["gate3"] == TaintLabel.CONFIDENTIAL
+
+
+class _ApprovalGate(Gate):
+    """Inbound gate that returns REQUIRE_APPROVAL to test pipeline short-circuit."""
+
+    def __init__(self, name, calls):
+        super().__init__()
+        self.name = name
+        self.calls = calls
+
+    def evaluate(self, ctx, stage):
+        self.calls.append(self.name)
+        return GateResult(
+            gate_name=self.name,
+            decision=Decision.REQUIRE_APPROVAL,
+            risks=["needs human approval"],
+        )
+
+
+class _AuditStubGate(Gate):
+    """Stub for gate6 slot — accepts both INBOUND and OUTBOUND stages."""
+
+    supported_stages = (GateStage.INBOUND, GateStage.OUTBOUND)
+
+    def __init__(self, name, calls):
+        super().__init__()
+        self.name = name
+        self.calls = calls
+
+    def evaluate(self, ctx, stage):
+        self.calls.append(self.name)
+        return GateResult(gate_name=self.name, decision=Decision.ALLOW)
+
+
+def test_pipeline_blocks_executor_on_require_approval():
+    calls = []
+    executor_called = []
+
+    pipe = Pipeline(
+        gate1=_PipelineOrderGate("gate1", calls),
+        gate2=_ApprovalGate("gate2", calls),
+        gate3=_PipelineOrderGate("gate3", calls),
+        gate4=_PipelineOrderGate("gate4", calls),
+        gate5=_PipelineOrderGate("gate5", calls),
+        gate6=_AuditStubGate("gate6", calls),
+    )
+
+    async def fake_executor(c):
+        executor_called.append(True)
+        return {"should": "not reach here"}
+
+    ctx = GateContext(tool_name="dangerous_op")
+    result = asyncio.run(pipe.run(ctx, fake_executor))
+
+    assert result.allowed is False
+    assert result.final_decision == Decision.REQUIRE_APPROVAL
+    assert result.tool_result is None
+    assert len(executor_called) == 0, "executor must NOT be called when REQUIRE_APPROVAL"
+    assert "gate6" in calls, "gate6 audit must still run"

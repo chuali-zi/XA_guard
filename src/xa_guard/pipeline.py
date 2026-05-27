@@ -5,7 +5,7 @@
     [downstream tool execution]
     outbound: gate4(out) → gate6(audit)
 
-任一关卡返回 DENY 立即短路；REQUIRE_APPROVAL 不短路（关卡 2 内部处理 HITL）；
+任一关卡返回 DENY 或 REQUIRE_APPROVAL 立即短路（pre-executor 阻断）；
 WARN 累积。每关卡 latency_ms 写入 GateResult，全程 trace 由 gate6 落审计。
 """
 from __future__ import annotations
@@ -84,14 +84,14 @@ class Pipeline:
             result = gate(ctx, GateStage.INBOUND)
             _sync_ctx_from_result(ctx, result)
             ctx.append(result)
-            if result.decision == Decision.DENY:
-                # 写一条 audit 后返回
+            if result.decision in (Decision.DENY, Decision.REQUIRE_APPROVAL):
+                # 写一条 audit 后返回；REQUIRE_APPROVAL 同样阻断 executor
                 self.gate6(ctx, GateStage.OUTBOUND)
                 return PipelineResult(
                     ctx=ctx,
                     allowed=False,
                     tool_result=None,
-                    final_decision=Decision.DENY,
+                    final_decision=result.decision,
                     final_reason=ctx.final_reason,
                 )
 

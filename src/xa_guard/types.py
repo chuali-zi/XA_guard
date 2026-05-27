@@ -161,10 +161,11 @@ class GateContext:
         if result.decision == Decision.DENY:
             self.final_decision = Decision.DENY
             self.final_reason = f"{result.gate_name}: {', '.join(result.risks) or 'denied'}"
-        elif result.decision == Decision.REQUIRE_APPROVAL and self.final_decision == Decision.ALLOW:
+        elif result.decision == Decision.REQUIRE_APPROVAL and self.final_decision in (Decision.ALLOW, Decision.WARN):
             self.final_decision = Decision.REQUIRE_APPROVAL
             self.final_reason = f"{result.gate_name}: approval required"
         elif result.decision == Decision.WARN and self.final_decision == Decision.ALLOW:
+            self.final_decision = Decision.WARN
             self.final_reason = f"{result.gate_name}: warned"
 
 
@@ -199,6 +200,8 @@ class AuditRecord:
     gen_ai_evidence_hash_prev: str = ""                           # 前一条审计记录的哈希
     gen_ai_classify_risk_tag: list[str] = field(default_factory=list)
     gen_ai_decision_faithfulness_score: float = 0.0
+    gen_ai_decision_final: str = "allow"        # final pipeline decision (allow/warn/deny/require_approval)
+    gen_ai_decision_final_reason: str = ""
 
     # 链式签名（关卡 6）
     record_hash: str = ""                                         # 本条记录的哈希
@@ -222,6 +225,8 @@ class AuditRecord:
             "gen_ai.evidence.hash_prev": self.gen_ai_evidence_hash_prev,
             "gen_ai.classify.risk_tag": self.gen_ai_classify_risk_tag,
             "gen_ai.decision.faithfulness_score": self.gen_ai_decision_faithfulness_score,
+            "gen_ai.decision.final": self.gen_ai_decision_final,
+            "gen_ai.decision.final_reason": self.gen_ai_decision_final_reason,
             "record_hash": self.record_hash,
             "signature": self.signature,
         }
