@@ -1,3 +1,14 @@
+# TODO: PLACEHOLDER MAPPING — must be refined before enabling the llamaguard backend in production.
+# Real Meta Llama Guard 3 taxonomy distinguishes 14 safety categories:
+#   S1=violent crimes, S2=non-violent crimes, S3=sex crimes, S4=child exploitation,
+#   S5=defamation, S6=specialized advice (medical/legal/financial), S7=privacy violations,
+#   S8=intellectual property, S9=indiscriminate weapons (CBRN), S10=hate speech,
+#   S11=self-harm, S12=sexual content, S13=elections/civic integrity, S14=code interpreter abuse.
+# Each of these should be mapped to a meaningful XA-Guard unified category such as:
+#   shell_dangerous, pii_leak, unsafe, political_sensitive, etc.
+# Collapsing all to "unsafe" loses this signal. Refine this file AND the DEFAULT_CATEGORY_MAP
+# in src/xa_guard/detectors/backends/llamaguard.py before activating this backend.
+#
 # Llama Guard S-category -> XA-Guard unified Gate1 category.
 # The upstream taxonomy is broad; until project-specific mapping is refined,
 # unsafe S-categories are treated as generic unsafe Gate1 hits.

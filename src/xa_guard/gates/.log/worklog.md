@@ -4,6 +4,9 @@
 
 ---
 
+## 2026-05-31 主助手 (revert spotlighting default)
+- 将 configs/xa-guard.yaml 的 spotlighting.enabled 从 true 改回 false，并还原原始注释。原因：PR #1 全局开启 spotlighting 超出"接入模型"范畴，应保持不影响现有行为。测试 51 个全通过。
+
 ## 2026-05-25 子 agent G56A (gate5_sandbox + gate6_audit)
 - Gate5Sandbox：按 ctx.risk_level / 前置 gate2 metadata 路由 native/docker/docker_gvisor；RED 但 runtime!=runsc 自动降级 docker；cfg.enabled=false 统一 native + note="docker disabled in demo"
 - 偏差：base.__call__ 的 disabled 短路会返回空 metadata，与 spec 要求 enabled=false 必须 metadata["sandbox_mode"]="native" 冲突 → Gate5 覆盖 __call__（保留 stage 检查 + 异常捕获 + latency 计时，不走 disabled 短路）

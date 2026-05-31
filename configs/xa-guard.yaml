@@ -61,6 +61,7 @@ xa_guard:
         #   model_path: thu-coai/ShieldLM-14B-qwen
         #   threshold: 0.5
         #   fail_open: true
+        # TODO: category_map currently collapses S1-S14 → unsafe; refine policies/llamaguard_category_map.yaml before enabling.
         # - name: model_llamaguard
         #   type: model
         #   enabled: false              # gated by Meta; 1B is ~5.6GB weights
@@ -70,7 +71,7 @@ xa_guard:
         #   fail_open: true
         #   category_map_file: policies/llamaguard_category_map.yaml
       spotlighting:
-        enabled: true                   # 非user来源加 <untrusted_source> 标记，供模型识别间接注入
+        enabled: false                  # false=不影响现有行为；true=非user来源加 <untrusted_source> 标记
       source_risk_weights:
         user: 1.0
         web: 1.5

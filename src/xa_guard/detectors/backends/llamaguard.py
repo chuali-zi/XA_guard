@@ -7,6 +7,7 @@ from typing import Any, Sequence
 from xa_guard.detectors.base import DetectionLabel, ModelBackend
 
 
+# TODO: Placeholder — refine S1-S14 to distinct XA-Guard categories (e.g. shell_dangerous, pii_leak, political_sensitive) before enabling this backend in production.
 DEFAULT_CATEGORY_MAP: dict[str, str] = {
     "S1": "unsafe",
     "S2": "unsafe",
