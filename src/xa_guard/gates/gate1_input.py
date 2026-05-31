@@ -23,7 +23,10 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
+
+import yaml
 
 from xa_guard.detectors.base import DetectionInput, Detector
 from xa_guard.detectors.fusion import DEFAULT_DENY_CATEGORIES, fuse
@@ -59,6 +62,27 @@ def _compute_source_risk(
         return weights.get("user", 1.0)
     total = sum(weights.get(s.value, 1.0) for s in sources)
     return round(total / len(sources), 4)
+
+
+def _load_category_map(path_value: str | None) -> dict[str, str]:
+    """Load a model native-category mapping from YAML.
+
+    Accepts either ``{category_map: {...}}`` or a flat mapping. Missing or
+    malformed files return an empty map so model startup remains fail-open.
+    """
+    if not path_value:
+        return {}
+    try:
+        path = Path(path_value)
+        if not path.is_absolute():
+            project_root = Path(__file__).parent.parent.parent.parent
+            path = project_root / path_value
+        with open(path, encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+        mapping = raw.get("category_map", raw) if isinstance(raw, dict) else {}
+        return {str(k): str(v) for k, v in mapping.items()}
+    except Exception:
+        return {}
 
 
 @dataclass
@@ -144,11 +168,16 @@ class Gate1Input(Gate):
             from xa_guard.detectors.backends import get_backend
 
             backend_name = spec.options.get("backend", "stub")
-            backend_options = spec.options.get("options", {})
+            backend_options = dict(spec.options.get("options", {}) or {})
+            for key in ("model_path", "model", "device", "dry_run", "threshold", "category_map"):
+                if key in spec.options and key not in backend_options:
+                    backend_options[key] = spec.options[key]
             categories: list[str] | None = spec.options.get("categories")
             threshold: float = float(spec.options.get("threshold", 0.5))
             timeout_ms: int | None = spec.options.get("timeout_ms")
-            category_map: dict[str, str] | None = spec.options.get("category_map")
+            category_map: dict[str, str] = {}
+            category_map.update(_load_category_map(spec.options.get("category_map_file")))
+            category_map.update(spec.options.get("category_map") or {})
 
             try:
                 backend = get_backend(backend_name, backend_options)
@@ -281,12 +310,18 @@ class Gate1Input(Gate):
 
         source_values = [s.value for s in ctx.input_sources] if ctx.input_sources else ["user"]
         main_source = source_values[0]
+        history_roles = [
+            str(entry.get("role", "history"))
+            for entry in ctx.session_history
+            if isinstance(entry, dict)
+        ]
+        origin = "assistant" if history_roles and all(role == "assistant" for role in history_roles) else "tool"
 
         return DetectionInput(
             text=text,
             raw_text=raw_text,
             source=main_source,
-            origin="tool",
+            origin=origin,
             sources=source_values,
             meta={
                 "tool_name": ctx.tool_name,

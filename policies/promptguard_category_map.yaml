@@ -1,0 +1,9 @@
+# PromptGuard native label -> XA-Guard unified Gate1 category.
+category_map:
+  INJECTION: indirect_injection
+  PROMPT_INJECTION: indirect_injection
+  JAILBREAK: jailbreak_en
+  BENIGN: ""
+  LABEL_0: ""
+  LABEL_1: indirect_injection
+  LABEL_2: jailbreak_en

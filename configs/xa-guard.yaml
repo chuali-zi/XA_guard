@@ -25,23 +25,52 @@ xa_guard:
           type: rule
           enabled: true
           patterns_file: policies/dangerous_patterns.yaml
-        # - name: model_qwen
+        - name: model_qwen
+          type: model
+          enabled: true
+          backend: qwen3guard
+          model_path: Qwen/Qwen3Guard-Gen-0.6B
+          device: cpu
+          threshold: 0.5
+          timeout_ms: 200
+          fail_open: true
+          category_map_file: policies/qwen3guard_category_map.yaml
+          options:
+            # Real Qwen3Guard-Gen inference. Set dry_run:true only for CI
+            # environments that intentionally skip model weights.
+            dry_run: false
+            torch_dtype: float32
+            max_new_tokens: 64
+            controversial_score: 0.4
+        # PromptGuard2 is gated by Meta. Enable after accepting the license and
+        # setting HF_TOKEN in the environment.
+        # - name: model_promptguard2
         #   type: model
-        #   enabled: true
-        #   backend: qwen3guard        # 当前是占位类，接入真实权重后启用
+        #   enabled: false
+        #   backend: promptguard
+        #   model_path: meta-llama/Llama-Prompt-Guard-2-86M
+        #   threshold: 0.5
+        #   fail_open: true
+        #   category_map_file: policies/promptguard_category_map.yaml
         #   options:
         #     device: cpu
-        #   threshold: 0.5
-        #   category_map:               # 原生类目 → 统一类目
-        #     jailbreak: jailbreak_zh
-        #     political_sensitive: jailbreak_zh
         # - name: model_shieldlm
         #   type: model
-        #   enabled: false              # 可解释层，先不启用
+        #   enabled: false              # 14B, needs ~26GB weights and much more RAM/VRAM
         #   backend: shieldlm
+        #   model_path: thu-coai/ShieldLM-14B-qwen
         #   threshold: 0.5
+        #   fail_open: true
+        # - name: model_llamaguard
+        #   type: model
+        #   enabled: false              # gated by Meta; 1B is ~5.6GB weights
+        #   backend: llamaguard
+        #   model_path: meta-llama/Llama-Guard-3-1B
+        #   threshold: 0.5
+        #   fail_open: true
+        #   category_map_file: policies/llamaguard_category_map.yaml
       spotlighting:
-        enabled: false                  # false=不影响现有行为；true=非user来源加 <untrusted_source> 标记
+        enabled: true                   # 非user来源加 <untrusted_source> 标记，供模型识别间接注入
       source_risk_weights:
         user: 1.0
         web: 1.5
