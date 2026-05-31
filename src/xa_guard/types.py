@@ -1,7 +1,7 @@
 """XA-Guard 共享数据结构。
 
 ★ 本文件是子 agent 之间的统一契约。任何关卡 / 代理 / 审计 / 评测都从这里 import。
-契约改动必须先在 implementation-notes.html 留痕。
+契约改动必须在根目录 log.md 留痕；能力边界变化时同步更新 status.md。
 
 数据模型来源：
 - TaintLabel 三色 — 产品架构 §3.3 关卡 4

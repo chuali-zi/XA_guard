@@ -15,8 +15,33 @@ xa_guard:
   gates:
     gate1:
       enabled: true
-      classifier: rule         # rule | prompt_guard | llama_guard
-      patterns_file: policies/dangerous_patterns.yaml
+      # v2 检测器架构：模型+YAML 混合。每个 detector 产出一组 DetectionLabel，
+      #   fusion 引擎合并为最终 Decision（ALLOW/WARN/DENY）。
+      # type=rule : YAML 关键词规则（零依赖，始终可用）。
+      # type=model: 通用 ModelBackend 壳子；默认 backend=stub 处于 fail-open 模式
+      #   （不阻塞 pipeline）。后续接入 Qwen3Guard/ShieldLM 只需改 backend 名字。
+      detectors:
+        - name: rule
+          type: rule
+          enabled: true
+          patterns_file: policies/dangerous_patterns.yaml
+        # - name: model_qwen
+        #   type: model
+        #   enabled: true
+        #   backend: qwen3guard        # 当前是占位类，接入真实权重后启用
+        #   options:
+        #     device: cpu
+        #   threshold: 0.5
+        #   category_map:               # 原生类目 → 统一类目
+        #     jailbreak: jailbreak_zh
+        #     political_sensitive: jailbreak_zh
+        # - name: model_shieldlm
+        #   type: model
+        #   enabled: false              # 可解释层，先不启用
+        #   backend: shieldlm
+        #   threshold: 0.5
+      spotlighting:
+        enabled: false                  # false=不影响现有行为；true=非user来源加 <untrusted_source> 标记
       source_risk_weights:
         user: 1.0
         web: 1.5
@@ -24,6 +49,13 @@ xa_guard:
         rag: 1.2
         memory: 1.1
         tool_result: 1.3
+      # 可覆盖 deny 类目（默认用 fusion.DEFAULT_DENY_CATEGORIES）
+      # deny_categories:
+      #   - shell_dangerous
+      #   - jailbreak_zh
+      #   - jailbreak_en
+      #   ...
+      patterns_file: policies/dangerous_patterns.yaml  # 兼容旧 config 读取路径
 
     gate2:
       enabled: true

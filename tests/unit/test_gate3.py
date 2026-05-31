@@ -48,6 +48,18 @@ def test_rule_8_1_4_4_hit_red_exec(gate):
     assert result.decision == Decision.DENY or result.decision == Decision.REQUIRE_APPROVAL
 
 
+def test_rule_8_1_4_4_hit_yellow_restart(gate):
+    ctx = _ctx(
+        tool_name="restart_service",
+        arguments={"host": "web03", "name": "nginx"},
+        user_role="ops",
+        risk_level=RiskLevel.YELLOW,
+    )
+    result = gate.evaluate(ctx)
+    assert "GBT-22239-8.1.4.4" in result.rule_hits
+    assert result.decision == Decision.REQUIRE_APPROVAL
+
+
 def test_rule_8_1_4_4_miss_green(gate):
     # 风险绿色 → 不命中授权规则
     ctx = _ctx(tool_name="exec_command", arguments={"cmd": "ls"}, risk_level=RiskLevel.GREEN)
@@ -157,6 +169,17 @@ def test_rule_8_1_4_2_hit_internal_email(gate):
     result = gate.evaluate(ctx)
     assert "GBT-22239-8.1.4.2" in result.rule_hits
     # enforce=warn；但 A.1.1 不命中（INTERNAL != CONFIDENTIAL），所以聚合应是 warn
+    assert result.decision == Decision.WARN
+
+
+def test_rule_8_1_4_2_hit_internal_post_body(gate):
+    ctx = _ctx(
+        tool_name="post_url",
+        arguments={"url": "https://api.external.com", "body": "内部知识库摘要..."},
+        taint=TaintLabel.PUBLIC,
+    )
+    result = gate.evaluate(ctx)
+    assert "GBT-22239-8.1.4.2" in result.rule_hits
     assert result.decision == Decision.WARN
 
 

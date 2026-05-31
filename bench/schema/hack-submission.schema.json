@@ -1,0 +1,599 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xa-guard.local/schema/hack-submission-v1.json",
+  "title": "XA-Guard HACK-BENCH submission",
+  "description": "Internal red-team submission format. The cases section remains readable by the current bench.runner.load_cases().",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "metadata",
+    "cases",
+    "fixture_extensions",
+    "manual_findings"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "hack-submission/v1"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/automatedCase"
+      }
+    },
+    "fixture_extensions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/fixtureExtension"
+      }
+    },
+    "manual_findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/manualFinding"
+      }
+    }
+  },
+  "$defs": {
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "owner",
+        "created_at",
+        "contest_basis",
+        "notes"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date"
+        },
+        "contest_basis": {
+          "type": "string",
+          "const": "XA-202620"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "direction": {
+      "type": "string",
+      "enum": [
+        "D1",
+        "D2",
+        "D3",
+        "D4"
+      ]
+    },
+    "dimension": {
+      "type": "string",
+      "enum": [
+        "data_safety",
+        "content_safety",
+        "execution_safety",
+        "supply_chain",
+        "compliance",
+        "interpretability",
+        "traceability"
+      ]
+    },
+    "caseKind": {
+      "type": "string",
+      "enum": [
+        "attack_case",
+        "benign_control",
+        "assurance_check",
+        "exploratory_finding"
+      ]
+    },
+    "severityLevel": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "allow",
+        "warn",
+        "deny",
+        "require_approval"
+      ]
+    },
+    "taint": {
+      "type": "string",
+      "enum": [
+        "PUBLIC",
+        "INTERNAL",
+        "CONFIDENTIAL"
+      ]
+    },
+    "inputSource": {
+      "type": "string",
+      "enum": [
+        "user",
+        "web",
+        "document",
+        "rag",
+        "memory",
+        "tool_result"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "candidate",
+        "accepted",
+        "duplicate",
+        "needs_fixture",
+        "rejected"
+      ]
+    },
+    "taxonomy": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9_]+\\.[a-z0-9_]+$"
+      }
+    },
+    "severityDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "impact",
+        "prerequisites"
+      ],
+      "properties": {
+        "impact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prerequisites": {
+          "type": "string"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "required",
+        "attachments"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "captured",
+            "verified"
+          ]
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "dedupe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fingerprint_fields",
+        "variants"
+      ],
+      "properties": {
+        "fingerprint_fields": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "reproduction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deterministic",
+        "command",
+        "notes",
+        "safety"
+      ],
+      "properties": {
+        "deterministic": {
+          "type": "boolean"
+        },
+        "command": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "safety": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "oracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "expected_decision",
+        "rationale",
+        "future_assertions"
+      ],
+      "properties": {
+        "type": {
+          "const": "decision_exact"
+        },
+        "expected_decision": {
+          "$ref": "#/$defs/decision"
+        },
+        "expected_taint": {
+          "$ref": "#/$defs/taint"
+        },
+        "rule_hits_all": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "future_assertions": {
+          "type": "object"
+        }
+      }
+    },
+    "inputPayload": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "tool_name",
+        "arguments"
+      ],
+      "properties": {
+        "tool_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "arguments": {
+          "type": "object"
+        },
+        "user_role": {
+          "type": "string"
+        },
+        "input_sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/inputSource"
+          }
+        },
+        "session_history": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "automatedCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "title",
+        "direction",
+        "dimension",
+        "attack_type",
+        "case_kind",
+        "taxonomy",
+        "tier",
+        "status",
+        "surface",
+        "input_payload",
+        "expected_decision",
+        "oracle",
+        "severity",
+        "severity_details",
+        "reproduction",
+        "evidence",
+        "dedupe",
+        "note"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^HACK-D[1-4]-[A-Z0-9_-]+-[0-9]{4}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "direction": {
+          "$ref": "#/$defs/direction"
+        },
+        "dimension": {
+          "$ref": "#/$defs/dimension"
+        },
+        "attack_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "case_kind": {
+          "$ref": "#/$defs/caseKind"
+        },
+        "taxonomy": {
+          "$ref": "#/$defs/taxonomy"
+        },
+        "tier": {
+          "const": "automated"
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "surface": {
+          "const": "pipeline_harness"
+        },
+        "input_payload": {
+          "$ref": "#/$defs/inputPayload"
+        },
+        "expected_decision": {
+          "$ref": "#/$defs/decision"
+        },
+        "expected_taint": {
+          "$ref": "#/$defs/taint"
+        },
+        "policy_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "oracle": {
+          "$ref": "#/$defs/oracle"
+        },
+        "severity": {
+          "$ref": "#/$defs/severityLevel"
+        },
+        "severity_details": {
+          "$ref": "#/$defs/severityDetails"
+        },
+        "reproduction": {
+          "$ref": "#/$defs/reproduction"
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        },
+        "dedupe": {
+          "$ref": "#/$defs/dedupe"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "fixtureExtension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "title",
+        "direction",
+        "case_kind",
+        "taxonomy",
+        "tier",
+        "status",
+        "surface",
+        "target",
+        "blocked_by",
+        "minimal_fixture",
+        "expected_oracle",
+        "automation_done_when",
+        "severity",
+        "severity_details",
+        "evidence",
+        "dedupe"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^HACK-D[1-4]-[A-Z0-9_-]+-[0-9]{4}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "direction": {
+          "$ref": "#/$defs/direction"
+        },
+        "case_kind": {
+          "$ref": "#/$defs/caseKind"
+        },
+        "taxonomy": {
+          "$ref": "#/$defs/taxonomy"
+        },
+        "tier": {
+          "const": "fixture_extension"
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "surface": {
+          "type": "string",
+          "enum": [
+            "pipeline_harness",
+            "mcp_stdio",
+            "protocol_probe",
+            "aibom_rating",
+            "audit_verify"
+          ]
+        },
+        "target": {
+          "type": "object"
+        },
+        "blocked_by": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minimal_fixture": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_oracle": {
+          "type": "object"
+        },
+        "automation_done_when": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "$ref": "#/$defs/severityLevel"
+        },
+        "severity_details": {
+          "$ref": "#/$defs/severityDetails"
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        },
+        "dedupe": {
+          "$ref": "#/$defs/dedupe"
+        }
+      }
+    },
+    "manualFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "title",
+        "direction",
+        "case_kind",
+        "taxonomy",
+        "tier",
+        "status",
+        "surface",
+        "environment",
+        "steps",
+        "expected_observation",
+        "limitation",
+        "automation_candidate_when",
+        "severity",
+        "severity_details",
+        "evidence",
+        "dedupe"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^HACK-D[1-4]-[A-Z0-9_-]+-[0-9]{4}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "direction": {
+          "$ref": "#/$defs/direction"
+        },
+        "case_kind": {
+          "$ref": "#/$defs/caseKind"
+        },
+        "taxonomy": {
+          "$ref": "#/$defs/taxonomy"
+        },
+        "tier": {
+          "const": "manual_exploration"
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "surface": {
+          "const": "manual_client"
+        },
+        "environment": {
+          "type": "object"
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "expected_observation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limitation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "automation_candidate_when": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "$ref": "#/$defs/severityLevel"
+        },
+        "severity_details": {
+          "$ref": "#/$defs/severityDetails"
+        },
+        "evidence": {
+          "$ref": "#/$defs/evidence"
+        },
+        "dedupe": {
+          "$ref": "#/$defs/dedupe"
+        }
+      }
+    }
+  }
+}

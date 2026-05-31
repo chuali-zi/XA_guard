@@ -116,11 +116,13 @@ PYTHONPATH=src xa-guard --config configs/xa-guard.yaml
 jiebang/
 ├── README.md                       (本文件)
 ├── pyproject.toml
-├── implementation-notes.html       决策与未决问题追踪（持续更新）
+├── status.md                       当前仓库能力、缺口和 PRD 距离
+├── log.md                          按时间倒序维护的客观工作日志
 ├── docs/                           赛题文档 + 规范文档（事实源最高优先级）
 │   ├── XA-202620*.pdf              赛题原文（不可改）
 │   ├── 事实源.md                    所有事实的唯一权威
 │   ├── 产品架构.md / PRD.md / 项目总览.md
+│   ├── HACK-BENCH-组员提交规范.md / XA-Bench-对抗测试规则.md
 │   ├── tutorials/MCP零基础上手.md
 │   └── references/                 文献库 86 篇 + 调研报告
 │
@@ -192,27 +194,29 @@ jiebang/
 
 | 指标 | 当前 | demo 目标 | PRD 中等档（M4） |
 |---|---|---|---|
-| Pass Rate | 73.3% | ≥ 70% | ≥ 85% |
-| ASR | 27.3% | ≤ 30% | ≤ 10% |
+| Pass Rate | 96.7% | ≥ 70% | ≥ 85% |
+| legacy seed ASR | 0.0% | ≤ 30% | ≤ 10% |
 | FPR | 0.0% | ≤ 5% | ≤ 3% |
-| CuP | 100.0% | ≥ 80% | ≥ 75% |
-| Recall | 72.7% | ≥ 70% | ≥ 90% |
-| Latency P50 | 1.74 ms | ≤ 100 ms | ≤ 100 ms |
-| Latency P95 | 7.8 ms | ≤ 300 ms | ≤ 300 ms |
+| CuP proxy（非阻断率） | 100.0% | ≥ 80% | ≥ 75% |
+| legacy seed Recall | 100.0% | ≥ 70% | ≥ 90% |
+| Latency P50 | 2.91 ms | ≤ 100 ms | ≤ 100 ms |
+| Latency P95 | 6.02 ms | ≤ 300 ms | ≤ 300 ms |
 
 按维度：
 
 | 维度 | 用例数 | Pass | 说明 |
 |---|---|---|---|
-| execution_safety | 8 | 87.5% | 关卡 1+3 已识别 shell 危险 / 间接注入 / 越权 |
+| execution_safety | 8 | 100% | 关卡 1+3 已识别 shell 危险 / 间接注入 / 越权；DENY 优先于 HITL 审批 |
 | data_safety | 5 | 80% | 关卡 4 识别 PII / 密钥外发 |
-| content_safety | 5 | 80% | 关卡 1 识别中英文越狱 + 系统提示套取 |
-| supply_chain | 4 | 25% | AIBOM 仅骨架；4 条全过 — 已知 gap |
-| compliance | 4 | 75% | 关卡 3 命中等保 / 跨域规则 |
-| interpretability | 2 | 50% | CoT 忠实度未实做 |
-| traceability | 2 | 100% | 关卡 6 审计链完整 |
+| content_safety | 5 | 100% | 关卡 1 识别中英文越狱 + 系统提示套取 + 隐私地址请求 |
+| supply_chain | 4 | 100% | AIBOM 覆盖恶意 URL、typosquat、良性固定版本、隐蔽外联代码片段；已补 CycloneDX-like 导出和本地 artifact provenance |
+| compliance | 4 | 100% | 关卡 3 命中等保 / 跨域规则 |
+| interpretability | 2 | 100% | seed 中 CoT 不一致降级为 WARN；真实忠实度算法仍未实做 |
+| traceability | 2 | 100% | 这里只是 decision exact-match smoke；审计完整性需独立验链脚本验证 |
 
 > 完整数字 + 命中规则细节见 `bench/.log/report.html`。
+>
+> **限制**：当前 ASR / Recall 由 `expected_decision != allow` 推导，会混入治理动作；CuP 是非阻断代理指标；latency 是规则 pipeline + mock executor 延迟；`audit_completeness` 仍是硬编码占位值。它们只用于 30 条 seed 回归，不等同 AgentDojo / InjecAgent、模型 Recall@FPR 或审计完整率实测。详细规则见 `docs/XA-Bench-对抗测试规则.md`。
 
 ---
 
@@ -220,17 +224,17 @@ jiebang/
 
 | 项 | 现状 | 跟进 |
 |---|---|---|
-| PromptGuard 2 / Llama Guard 3 真实推理 | 关卡 1 用规则版 | M2 微调 + 推理 |
+| Gate1 真实模型推理 + Spotlighting | 关卡 1 默认仍是规则版，模型 backend 为占位 | M2 接 Qwen3Guard + Spotlighting，保留英文对照层 |
 | OPA Rego 真嵌入 | `backend: python` 走受限 eval | M3 接 OPA |
 | gVisor / Docker 真沙箱 | 关卡 5 只输出 routing decision | M3 接 Docker |
 | 国密 SM2 真签名 | 默认 SHA-256 + HMAC 占位，gmssl 可启 | M5 gmssl |
 | MCP elicitation 反向问 | 国产 IDE 未声明，stdout fallback | M2 Cursor 实测 |
 | 290 条完整 CSAB-Gov-mini | 当前 30 条 seed | M4 扩展 |
-| AIBOM 插件评级 | 骨架 | 加分项，时间允许补 |
+| AIBOM 插件评级 | 本地/离线 MVP，完整 artifact 工作流未进入 seed bench | 补 schema 校验、签名和持续漂移任务 |
 | LangChain SDK 装饰器 | 骨架 | M2-M3 |
 | Streamable HTTP 上游 | 仅 stdio | M5 决赛前 |
 
-更多决策与未决问题：`implementation-notes.html`。
+更多仓库状态和未决问题：`status.md`。客观工作记录：`log.md`。
 
 ---
 
@@ -243,14 +247,17 @@ jiebang/
 | `docs/产品架构.md` | 三件套 + 6 关卡详细设计 |
 | `docs/PRD.md` | 量化 KPI + 验收标准 + MoSCoW |
 | `docs/项目总览.md` | 项目全员手册 |
+| `docs/HACK-BENCH-组员提交规范.md` | hack / red-team 组员提交格式 |
+| `docs/XA-Bench-对抗测试规则.md` | bench 接入、oracle、指标和演进规则 |
 | `docs/tutorials/MCP零基础上手.md` | MCP 入门 + Trae 接入 |
-| `implementation-notes.html` | 决策时间线 + 未决问题 |
+| `status.md` | 当前仓库能力、差距和下一步 |
+| `log.md` | 按时间倒序维护的客观工作日志 |
 
 ## 开发约定
 
-1. **冲突裁定顺序**：赛题 PDF > `事实源.md` > `产品架构.md` > `PRD.md` > 其他。
-2. **共享契约改动**（`src/xa_guard/types.py`）必须先在 `implementation-notes.html` 留痕。
-3. **每模块 `.log/worklog.md` 强制维护**。改前先读，改完追加。
+1. **冲突裁定顺序**：赛题 PDF > `事实源.md` > `PRD.md` > `产品架构.md` > `项目总览.md` > 其他。
+2. **共享契约改动**（`src/xa_guard/types.py`）必须在根目录 `log.md` 留痕；能力边界变化时同步更新 `status.md`。
+3. **根目录日志强制维护**：每轮改动在 `log.md` 顶部追加客观记录，不读取或维护旧 HTML 留痕文件。
 4. **测试覆盖**：每个 `gates/gateX_*.py` 必须有 `tests/unit/test_gateX.py`。
 5. **不要硬依赖** gmssl / docker / OPA — 全部走 fallback + config 开关。
 6. **审计 JSONL 不入库**（`.gitignore`）；用 `scripts/verify_audit.py` 验链。

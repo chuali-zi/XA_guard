@@ -41,6 +41,10 @@ patterns:
     - "你的指令是什么"
     - "repeat your instructions"
 
+  privacy_leak:
+    - "家庭住址"
+    - "家庭地址"
+
   pii_leak:
     - "/etc/passwd"
     - "id_rsa"

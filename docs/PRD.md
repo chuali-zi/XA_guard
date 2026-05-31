@@ -155,7 +155,7 @@
 | **InjecAgent 数据外泄 ASR** | ≤ 20% | **≤ 10%** | ≤ 5% | P2: baseline 97-100%, 政企最致命 |
 | **CSAB-Gov-mini 拒答率** | 95% | **97%** | 99% | P3: GB/T 45654-2025 硬指标 ≥ 95% |
 | **CSAB-Gov-mini 误拒率** | ≤ 5% | **≤ 3%** | ≤ 1% | P3: GB/T 45654-2025 硬指标 ≤ 5% |
-| **PromptGuard Recall @ 1% FPR** | 85% | **95%** | 97% | P1: Meta PG2 86M = 97.5% |
+| **Gate1 攻击识别 Recall @ 1% FPR** | 85% | **95%** | 97% | P1: Meta PG2 86M = 97.5%（仅作国际对照基线） |
 
 ### 3.2 性能维度 KPI 三档表
 
@@ -177,7 +177,7 @@
 | **测试覆盖率** | ≥ 50% | **≥ 70%** | ≥ 80% |
 | **GitHub README 详尽度** | 一般 | 含部署 + 使用 + FAQ | 含 API doc + roadmap |
 
-### 3.4 关键纠偏说明（**已对齐事实源 v1.0**）
+### 3.4 关键纠偏说明（**已对齐事实源 v1.1**）
 
 ⚠ **以下事实以 [`docs/事实源.md`](./事实源.md) 为准**：
 
@@ -188,7 +188,7 @@
    - ❌ 旧错误："17 类是 TC260-003 草案，31 类是国标"——**两者都是同一国标附录 A 的不同切片**
 
 2. **测试题库规模**（事实源 F-2.4，**修正前一版数字**）：
-   - **应拒答题库每种 ≥ 20 题**（共 17 类，至少 340 题）—— 不是之前写的"≥ 500"
+   - **应拒答题库总规模 ≥ 500 题，且每种 ≥ 20 题**（17 类相加的 340 只是逐类下限算式，不是题库总下限）
    - 生成内容题库 A.1+A.2 每种 ≥ 50 题，其余每种 ≥ 20 题
    - 非拒答题库总 ≥ 500 题
    - 我们 CSAB-Gov-mini 290 用例是 **PoC 缩减版**，远低于国标完整题库要求
@@ -364,13 +364,13 @@
 
 ### M2（2026-07）关卡 1+2
 
-- [ ] PromptGuard 2 中文微调（200-500 条中文样本）
+- [ ] Qwen3Guard + Spotlighting + 规则层接入；PromptGuard 2 仅保留英文 / 国际对照
 - [ ] **关卡 1 KPI**：中文样本 Recall ≥ 85% @ 1% FPR
-- [ ] LlamaFirewall 整合
+- [ ] ShieldLM 可解释层或 LlamaFirewall 对照层（按资源选做）
 - [ ] MCP elicitation 弹窗机制实现
 - [ ] **关卡 2 KPI**：高危操作 100% 触发弹窗，用户拒绝后 0 执行
 - [ ] 简单拦截日志 + 统计
-- [ ] **月末产出**：Trae 中演示恶意输入被拦截 + 弹窗审批
+- [ ] **月末产出**：Trae 中演示基础 MCP 调用与 fallback；在明确支持 elicitation 的客户端演示恶意输入被拦截 + 弹窗审批
 
 ### M3（2026-08）关卡 3+4+5（最忙）
 
@@ -426,7 +426,7 @@
 
 | # | 风险 | 概率 | 影响 | 缓解 |
 |---|---|---|---|---|
-| R1 | PromptGuard 中文微调精度达不到 85% | 中 | 高 | 降级用 Llama Guard 3 直用 + 文本规则补充 |
+| R1 | Qwen3Guard 在自适应攻击上泛化不足 | 中 | 高 | 保留规则层 + Spotlighting 纵深防御；用独立 adaptive attack 集评测，不把公开集结果外推 |
 | R2 | OPA Rego 学习成本高于预期 | 中 | 中 | M1 提前 1 周开始；备用方案：用 Python if-else 替代 |
 | R3 | gVisor 在 Windows 不能用 | 高 | 低 | 用 Docker 默认 runtime；演示在 Linux 容器内做 |
 | R4 | gmssl Python 库稳定性 | 中 | 中 | 备选：cryptography + pyca/cryptography 国密插件 |
@@ -598,7 +598,7 @@ benchmarks/
 
 ### 10.2 决策记录
 
-所有 PRD 变更必须在 `implementation-notes.html` 留痕（决策 + 时间戳 + 理由）。
+所有 PRD 变更必须在根目录 [`../log.md`](../log.md) 留痕（决策 + 时间戳 + 理由）；若仓库状态发生变化，同时更新 [`../status.md`](../status.md)。
 
 ### 10.3 量化指标的来源约束
 
@@ -624,7 +624,10 @@ benchmarks/
 | [references/prd-research/p1-industry-baseline.md](./references/prd-research/p1-industry-baseline.md) | 业界基线（KPI 性能档来源） |
 | [references/prd-research/p2-academic-sota.md](./references/prd-research/p2-academic-sota.md) | 学术 SOTA（KPI 评测档来源） |
 | [references/prd-research/p3-gov-enterprise-standards.md](./references/prd-research/p3-gov-enterprise-standards.md) | 政企标准（合规验收来源） |
-| [../implementation-notes.html](../implementation-notes.html) | 决策追踪 |
+| [HACK-BENCH-组员提交规范.md](./HACK-BENCH-组员提交规范.md) | hack 组员的攻击样例提交格式 |
+| [XA-Bench-对抗测试规则.md](./XA-Bench-对抗测试规则.md) | bench 维护者的接入和验收规则 |
+| [../status.md](../status.md) | 当前仓库能力与差距 |
+| [../log.md](../log.md) | 客观工作日志 |
 
 ---
 
@@ -648,4 +651,4 @@ benchmarks/
 
 ---
 
-> **如果团队对某项 KPI 有异议**：在 `implementation-notes.html` 提出，附上对应的客观证据（论文 / 实测 / 国标条款），讨论后更新本 PRD。**禁止主观调低 KPI 让自己舒服**。
+> **如果团队对某项 KPI 有异议**：在根目录 `log.md` 提出，附上对应的客观证据（论文 / 实测 / 国标条款），讨论后更新本 PRD 和 `status.md`。**禁止主观调低 KPI 让自己舒服**。

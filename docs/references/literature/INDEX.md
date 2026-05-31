@@ -30,7 +30,7 @@
 
 1. **本文件**（你正在看）—— 整体导览
 2. **[项目总览.md](../../项目总览.md)** —— 项目方案总览（如未读）
-3. **[implementation-notes.html](../../../implementation-notes.html)** —— 决策与未决问题（如未读）
+3. **[status.md](../../../status.md)** —— 当前仓库能力与未决问题（如未读）
 
 ---
 
@@ -179,7 +179,7 @@
 
 ### 如果发现 md 有错误
 - 直接编辑该 md，注意保留**元信息**和**模板结构**
-- 重大修改在 [implementation-notes.html](../../../implementation-notes.html) 记录
+- 重大修改在 [log.md](../../../log.md) 记录；能力边界变化时同步更新 [status.md](../../../status.md)
 
 ---
 

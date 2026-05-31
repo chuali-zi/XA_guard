@@ -10,8 +10,11 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
+import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 log = logging.getLogger("xa_guard.audit.merkle")
 
@@ -66,21 +69,44 @@ class ChainStore:
             log.warning("recover last hash failed: %s", exc)
             self._last_hash = ""
 
+    @contextmanager
+    def _append_lock(self, timeout_seconds: float = 10.0) -> Iterator[None]:
+        lock_path = self.path.with_suffix(self.path.suffix + ".lock")
+        start = time.monotonic()
+        fd: int | None = None
+        while fd is None:
+            try:
+                fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            except FileExistsError:
+                if time.monotonic() - start >= timeout_seconds:
+                    raise TimeoutError(f"timed out waiting for audit append lock: {lock_path}")
+                time.sleep(0.01)
+        try:
+            yield
+        finally:
+            os.close(fd)
+            try:
+                os.unlink(lock_path)
+            except FileNotFoundError:
+                pass
+
     def append(self, record_dict: dict[str, Any]) -> dict[str, Any]:
         """写 hash_prev → 计算 record_hash → JSONL 追加 → 更新 _last_hash。"""
-        record_dict = dict(record_dict)  # 复制避免外部 mutate
-        record_dict[_HASH_PREV_KEY] = self._last_hash
-        # 不让外部预置 record_hash 干扰计算
-        record_dict.pop(_RECORD_HASH_KEY, None)
-        rec_hash = compute_record_hash(record_dict, self.algo)
-        record_dict[_RECORD_HASH_KEY] = rec_hash
+        with self._append_lock():
+            self._recover_last_hash()
+            record_dict = dict(record_dict)  # 复制避免外部 mutate
+            record_dict[_HASH_PREV_KEY] = self._last_hash
+            # 不让外部预置 record_hash 干扰计算
+            record_dict.pop(_RECORD_HASH_KEY, None)
+            rec_hash = compute_record_hash(record_dict, self.algo)
+            record_dict[_RECORD_HASH_KEY] = rec_hash
 
-        line = canonical_json(record_dict).decode("utf-8")
-        with open(self.path, "a", encoding="utf-8") as f:
-            f.write(line + "\n")
+            line = canonical_json(record_dict).decode("utf-8")
+            with open(self.path, "a", encoding="utf-8") as f:
+                f.write(line + "\n")
 
-        self._last_hash = rec_hash
-        return record_dict
+            self._last_hash = rec_hash
+            return record_dict
 
     def verify(self) -> tuple[bool, int | None]:
         """全量校验：逐行重算 record_hash 比对 + hash_prev 链对齐。

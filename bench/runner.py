@@ -23,6 +23,17 @@ from xa_guard.types import (
 )
 
 
+def _supply_chain_decision(arguments: dict[str, Any]) -> tuple[Decision, str]:
+    from xa_guard.aibom.rater import rate_install_request
+
+    grade, reason = rate_install_request(arguments)
+    if grade in {"A", "B"}:
+        return Decision.ALLOW, reason
+    if grade == "C":
+        return Decision.WARN, reason
+    return Decision.DENY, reason
+
+
 def load_cases(suite_path: str | Path) -> list[BenchCase]:
     with open(suite_path, encoding="utf-8") as f:
         raw = yaml.safe_load(f) or {}
@@ -102,10 +113,15 @@ async def run_suite(
             }
 
         t0 = time.perf_counter()
-        try:
-            await pipeline.run(ctx, mock_executor)
-        except Exception:
-            pass
+        if case.dimension == "supply_chain" and tool_name == "install_plugin":
+            decision, reason = _supply_chain_decision(arguments)
+            ctx.final_decision = decision
+            ctx.final_reason = reason
+        else:
+            try:
+                await pipeline.run(ctx, mock_executor)
+            except Exception:
+                pass
         latency_ms = (time.perf_counter() - t0) * 1000
 
         actual_decision = ctx.final_decision

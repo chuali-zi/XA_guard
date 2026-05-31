@@ -14,6 +14,8 @@ from xa_guard.types import Decision, GateContext, GateResult, TaintLabel
 
 
 class _PipelineOrderGate(Gate):
+    supported_stages = (GateStage.INBOUND, GateStage.OUTBOUND)
+
     def __init__(self, name, calls, *, metadata=None, seen_taints=None):
         super().__init__()
         self.name = name
@@ -101,6 +103,23 @@ class _ApprovalGate(Gate):
         )
 
 
+class _DenyGate(Gate):
+    """Inbound gate that returns DENY to test decision aggregation precedence."""
+
+    def __init__(self, name, calls):
+        super().__init__()
+        self.name = name
+        self.calls = calls
+
+    def evaluate(self, ctx, stage):
+        self.calls.append(self.name)
+        return GateResult(
+            gate_name=self.name,
+            decision=Decision.DENY,
+            risks=["role not allowed"],
+        )
+
+
 class _AuditStubGate(Gate):
     """Stub for gate6 slot — accepts both INBOUND and OUTBOUND stages."""
 
@@ -141,3 +160,63 @@ def test_pipeline_blocks_executor_on_require_approval():
     assert result.tool_result is None
     assert len(executor_called) == 0, "executor must NOT be called when REQUIRE_APPROVAL"
     assert "gate6" in calls, "gate6 audit must still run"
+
+
+def test_pipeline_allows_gate3_deny_to_override_gate2_approval():
+    calls = []
+    executor_called = []
+
+    pipe = Pipeline(
+        gate1=_PipelineOrderGate("gate1", calls),
+        gate2=_ApprovalGate("gate2", calls),
+        gate3=_DenyGate("gate3", calls),
+        gate4=_PipelineOrderGate("gate4", calls),
+        gate5=_PipelineOrderGate("gate5", calls),
+        gate6=_AuditStubGate("gate6", calls),
+    )
+
+    async def fake_executor(c):
+        executor_called.append(True)
+        return {"should": "not reach here"}
+
+    ctx = GateContext(tool_name="exec_command", arguments={"cmd": "uptime"}, user_role="user")
+    result = asyncio.run(pipe.run(ctx, fake_executor))
+
+    assert result.allowed is False
+    assert result.final_decision == Decision.DENY
+    assert result.tool_result is None
+    assert len(executor_called) == 0, "executor must NOT be called when DENY wins"
+    assert calls[:4] == ["gate1", "gate2", "gate4", "gate3"]
+    assert "gate5" not in calls
+    assert "gate6" in calls, "gate6 audit must still run"
+
+
+def test_pipeline_after_approval_runs_gate5_executor_outbound_and_audit():
+    calls = []
+    executor_called = []
+
+    pipe = Pipeline(
+        gate1=_PipelineOrderGate("gate1", calls),
+        gate2=_ApprovalGate("gate2", calls),
+        gate3=_PipelineOrderGate("gate3", calls),
+        gate4=_PipelineOrderGate("gate4", calls),
+        gate5=_PipelineOrderGate("gate5", calls),
+        gate6=_AuditStubGate("gate6", calls),
+    )
+
+    async def fake_executor(c):
+        executor_called.append(True)
+        return {"ok": True}
+
+    ctx = GateContext(tool_name="exec_command", arguments={"cmd": "uptime"}, user_role="ops")
+    first = asyncio.run(pipe.run(ctx, fake_executor))
+    assert first.final_decision == Decision.REQUIRE_APPROVAL
+    assert executor_called == []
+
+    resumed = asyncio.run(pipe.run_after_approval(ctx, fake_executor))
+
+    assert resumed.allowed is True
+    assert resumed.final_decision == Decision.ALLOW
+    assert resumed.tool_result == {"ok": True}
+    assert executor_called == [True]
+    assert calls[-3:] == ["gate5", "gate4", "gate6"]

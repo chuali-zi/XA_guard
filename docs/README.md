@@ -1,9 +1,11 @@
 # 项目文档总目录
 
 > **项目**：XA-202620 · 面向政企场景的大模型智能体安全关键技术研究
-> **文档目录版本**：v2（2026-05-23 重组后）
+> **文档目录版本**：v3（2026-05-31 补充 HACK-BENCH 规则后）
 >
 > 本目录是项目所有书面资料的**单一入口**。所有教学、参考、调研、历史版本都收纳在此。
+>
+> **权威顺序**：赛题 PDF > [`事实源.md`](./事实源.md) > [`PRD.md`](./PRD.md) > 产品架构 / 项目总览 > 研究资料。遇到冲突时按此顺序纠偏。
 
 ---
 
@@ -12,8 +14,12 @@
 ```
 docs/
 ├── README.md                ← 你在这里
+├── 事实源.md                ← 维护口径与纠偏清单
+├── PRD.md                   ← 验收目标与 KPI
 ├── 产品架构.md              ← XA-Guard 三件套设计（产品级核心）
 ├── 项目总览.md              ← 项目方案 / 时间线 / 风险（项目级核心）
+├── HACK-BENCH-组员提交规范.md ← hack 组员必读：怎么提交可复现攻击样例
+├── XA-Bench-对抗测试规则.md ← bench 维护者必读：怎么接入、验收和分层报告
 ├── XA-202620…比赛方案.pdf   ← 赛题原文
 │
 ├── tutorials/               ← 教学文档：上手 / 学习类
@@ -42,8 +48,12 @@ docs/
 
 | 路径 | 用途 |
 |---|---|
+| `docs/事实源.md` | 核心事实和纠偏清单，内部衍生文档冲突时优先采用 |
+| `docs/PRD.md` | 验收目标、KPI、里程碑和交付物边界 |
 | `docs/产品架构.md` | XA-Guard MCP Server + Protocol + SDK + Bench 的产品级技术设计，**新人第二份必读** |
 | `docs/项目总览.md` | 5 个月时间表 / 6 关卡方案 / FAQ，**新人第一份必读** |
+| `docs/HACK-BENCH-组员提交规范.md` | hack 组员提交攻击、误报和人工探索记录的统一格式 |
+| `docs/XA-Bench-对抗测试规则.md` | bench 维护者的接入层、oracle、指标和演进规则 |
 | `docs/XA-202620…比赛方案.pdf` | 赛题原文，遇到分歧以此为准 |
 | `docs/tutorials/` | 教学文档。当前只有 MCP 入门指南，未来加入沙盒、审计等手把手教程 |
 | `docs/references/product-forms/` | 产品形态可行性评估的 4 篇方案 + 横向对比 |
@@ -75,6 +85,12 @@ docs/
 
 每个方向都有 `README.md` 介绍重点论文与阅读顺序，详见 [references/literature/INDEX.md](./references/literature/INDEX.md)。
 
+### 我要负责 hack / red-team
+
+1. 先读 [HACK-BENCH-组员提交规范.md](./HACK-BENCH-组员提交规范.md)。
+2. 从 [`../bench/cases/hack-submission-template.yaml`](../bench/cases/hack-submission-template.yaml) 复制提交模板。
+3. 用 [XA-Bench-对抗测试规则.md](./XA-Bench-对抗测试规则.md) 核对接入层和 oracle。
+
 ### 我在准备答辩
 跨方向必读 Top 10、常见评委问题应答清单都在 [references/literature/INDEX.md](./references/literature/INDEX.md) 第 35-165 行。
 
@@ -95,7 +111,7 @@ docs/
 1. 判断它属于上面哪类
 2. 放进对应目录
 3. **更新本 README 的目录树**（如果是新增子目录）
-4. 在 [implementation-notes.html](../implementation-notes.html) 记录新增背景
+4. 在 [`../log.md`](../log.md) 顶部记录本次具体改动；若仓库能力边界变化，同时更新 [`../status.md`](../status.md)
 
 ### 链接维护
 
@@ -104,26 +120,20 @@ docs/
 2. 用 grep 搜其他引用了它的文件，一并修复
 3. 移动后跑一遍链接检查（建议用 markdown-link-check 工具，未来集成到 CI）
 
-### 当前文档统计（2026-05-23 重组后）
+### 当前顶层文档（2026-05-31）
 
-| 类别 | 数量 |
-|---|---|
-| 顶层核心文档 | 3（产品架构 + 项目总览 + 赛题 PDF）|
-| 教学文档 | 1（MCP 入门）|
-| 产品形态方案 + 调研 | 4 + 3 |
-| 文献库（PDF + md + README）| ~145 |
-| 历史 docx | 2 |
-| **总计** | **158** |
+顶层包含：赛题 PDF、事实源、PRD、产品架构、项目总览、Gate1 接入说明、HACK-BENCH 提交规范和 XA-Bench 对抗测试规则。研究资料和历史快照继续放在 `references/`。
 
 ---
 
 ## 关联文件（项目根级，不在 docs/ 内）
 
-- [../implementation-notes.html](../implementation-notes.html) —— 决策追踪 / 未决问题（项目根，浏览器打开）
+- [../status.md](../status.md) —— 当前仓库能力、缺口和 PRD 距离
+- [../log.md](../log.md) —— 按时间倒序记录客观工作日志
 - [../README.md](../README.md) —— 项目根 README（代码级介绍）
 - [../scripts/](../scripts/) —— 项目脚本
 
 ---
 
 > 维护者：项目负责人
-> 上次重组：2026-05-23（v1 → v2，合并 docs / docs-research / reference 三个老目录到统一 docs/ 树）
+> 上次更新：2026-05-31（补充 HACK-BENCH 规范，改用 `log.md` / `status.md` 留痕）

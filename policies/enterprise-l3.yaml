@@ -13,8 +13,8 @@ rules:
   - id: GBT-22239-8.1.4.4
     name: 重要操作授权
     source: "GB/T 22239-2019 8.1.4.4"
-    triggers: [exec_command, delete_file, drop_table]
-    predicate: "tool in ('exec_command', 'shell', 'delete_file') and risk in ('yellow', 'red')"
+    triggers: [exec_command, delete_file, drop_table, restart_service]
+    predicate: "tool in ('exec_command', 'shell', 'delete_file', 'drop_table', 'restart_service') and risk in ('yellow', 'red')"
     enforce: require_approval
     severity: high
     audit: required
@@ -80,7 +80,7 @@ rules:
     name: 跨域数据流转留痕
     source: "GB/T 22239-2019 8.1.4.2"
     triggers: [send_email, post_url, send_notification, cross_domain_call]
-    predicate: "taint in ('INTERNAL', 'CONFIDENTIAL') and tool in ('send_email', 'post_url', 'send_notification')"
+    predicate: "tool in ('send_email', 'post_url', 'send_notification') and (taint in ('INTERNAL', 'CONFIDENTIAL') or contains('body', '内部'))"
     enforce: warn
     severity: medium
     audit: required

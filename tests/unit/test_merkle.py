@@ -52,6 +52,20 @@ def test_chainstore_recovers_last_hash_on_reopen(tmp_path: Path):
     assert ok is True
 
 
+def test_chainstore_append_refreshes_last_hash_across_instances(tmp_path: Path):
+    p = tmp_path / "audit.jsonl"
+    c1 = ChainStore(p)
+    c2 = ChainStore(p)
+
+    r1 = c1.append({"trace_id": "t1"})
+    r2 = c2.append({"trace_id": "t2"})
+
+    assert r2["gen_ai.evidence.hash_prev"] == r1["record_hash"]
+    ok, idx = ChainStore(p).verify()
+    assert ok is True
+    assert idx is None
+
+
 def test_chainstore_verify_detects_tampering(tmp_path: Path):
     p = tmp_path / "audit.jsonl"
     c = ChainStore(p)

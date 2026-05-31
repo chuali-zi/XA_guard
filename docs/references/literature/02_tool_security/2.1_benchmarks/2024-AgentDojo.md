@@ -40,7 +40,7 @@ AgentDojo 的核心架构:
 3. 全英文,中文注入测试需要二次开发。
 
 ## 我们项目里的用法
-**对应关卡 1(入口防御) + 关卡 4(评测)**。AgentDojo 是我们必须复现的"标准考题":① 把我们的 PromptGuard 中文微调模型放进去跑 baseline,生成 official 结果;② 把 CaMeL 思路移植到 AgentDojo 上验证我们 IFC 实现;③ 翻译/改造其中的 5-10 个场景为中文政企场景(政务办公、运维助手),纳入 CSAB-Gov;④ 在答辩 demo 视频里展示"我们的方案在 AgentDojo 上 ASR 从 X% 降到 Y%"——这是最有说服力的数字。
+**对应关卡 1(入口防御) + 关卡 4(评测)**。AgentDojo 是我们必须复现的"标准考题":① 把 Gate1 的规则 + Spotlighting + Qwen3Guard 组合放进去跑 baseline,生成可复现结果;② 把 CaMeL 思路移植到 AgentDojo 上验证我们 IFC 实现;③ 翻译/改造其中的 5-10 个场景为中文政企场景(政务办公、运维助手),纳入 CSAB-Gov;④ 在答辩 demo 视频里展示"我们的方案在 AgentDojo 上 ASR 从 X% 降到 Y%"，并明确模型、配置和 limitation。
 
 ## 学习路径
 - **先看 Section 2 + 图 1** —— 整个环境的设计哲学一目了然。

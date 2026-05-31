@@ -5,7 +5,8 @@
     [downstream tool execution]
     outbound: gate4(out) → gate6(audit)
 
-任一关卡返回 DENY 或 REQUIRE_APPROVAL 立即短路（pre-executor 阻断）；
+Gate1 输入攻击立即短路；Gate2/Gate4/Gate3 属于同一轮执行前决策聚合，
+先让 policy deny 覆盖 HITL require_approval，再进入 Gate5 / executor。
 WARN 累积。每关卡 latency_ms 写入 GateResult，全程 trace 由 gate6 落审计。
 """
 from __future__ import annotations
@@ -79,21 +80,50 @@ class Pipeline:
 
         executor: 真正调用下游工具的协程函数（由 proxy.downstream 提供）。
         """
-        # ---- inbound ----
-        for gate in (self.gate1, self.gate2, self.gate4, self.gate3, self.gate5):
+        # ---- inbound: input firewall ----
+        result = self.gate1(ctx, GateStage.INBOUND)
+        _sync_ctx_from_result(ctx, result)
+        ctx.append(result)
+        if result.decision in (Decision.DENY, Decision.REQUIRE_APPROVAL):
+            self.gate6(ctx, GateStage.OUTBOUND)
+            return PipelineResult(
+                ctx=ctx,
+                allowed=False,
+                tool_result=None,
+                final_decision=ctx.final_decision,
+                final_reason=ctx.final_reason,
+            )
+
+        # ---- inbound: risk, taint, and policy aggregation ----
+        for gate in (self.gate2, self.gate4, self.gate3):
             result = gate(ctx, GateStage.INBOUND)
             _sync_ctx_from_result(ctx, result)
             ctx.append(result)
-            if result.decision in (Decision.DENY, Decision.REQUIRE_APPROVAL):
-                # 写一条 audit 后返回；REQUIRE_APPROVAL 同样阻断 executor
-                self.gate6(ctx, GateStage.OUTBOUND)
-                return PipelineResult(
-                    ctx=ctx,
-                    allowed=False,
-                    tool_result=None,
-                    final_decision=result.decision,
-                    final_reason=ctx.final_reason,
-                )
+
+        if ctx.final_decision in (Decision.DENY, Decision.REQUIRE_APPROVAL):
+            # 写一条 audit 后返回；REQUIRE_APPROVAL 同样阻断 executor。
+            self.gate6(ctx, GateStage.OUTBOUND)
+            return PipelineResult(
+                ctx=ctx,
+                allowed=False,
+                tool_result=None,
+                final_decision=ctx.final_decision,
+                final_reason=ctx.final_reason,
+            )
+
+        # ---- inbound: executor sandbox ----
+        result = self.gate5(ctx, GateStage.INBOUND)
+        _sync_ctx_from_result(ctx, result)
+        ctx.append(result)
+        if result.decision in (Decision.DENY, Decision.REQUIRE_APPROVAL):
+            self.gate6(ctx, GateStage.OUTBOUND)
+            return PipelineResult(
+                ctx=ctx,
+                allowed=False,
+                tool_result=None,
+                final_decision=ctx.final_decision,
+                final_reason=ctx.final_reason,
+            )
 
         # ---- 工具执行 ----
         tool_result = None
@@ -115,6 +145,73 @@ class Pipeline:
 
         # ---- outbound ----
         # 出向先过关卡 4（输出 taint 检查）再过关卡 6（审计）
+        out_taint_result = self.gate4(ctx, GateStage.OUTBOUND)
+        _sync_ctx_from_result(ctx, out_taint_result)
+        ctx.append(out_taint_result)
+        if out_taint_result.decision == Decision.DENY:
+            ctx.tool_result = None
+            tool_result = None
+
+        audit_result = self.gate6(ctx, GateStage.OUTBOUND)
+        ctx.append(audit_result)
+
+        return PipelineResult(
+            ctx=ctx,
+            allowed=ctx.final_decision != Decision.DENY,
+            tool_result=tool_result,
+            final_decision=ctx.final_decision,
+            final_reason=ctx.final_reason,
+        )
+
+    async def run_after_approval(self, ctx: GateContext, executor: ToolExecutor) -> PipelineResult:
+        """Resume a REQUIRE_APPROVAL request after an explicit HITL approval.
+
+        The pre-approval run has already executed Gate1/Gate2/Gate4/Gate3 and
+        written an audit record for the blocked approval request. After approval
+        we still run Gate5 before calling the tool, then Gate4(out)/Gate6.
+        """
+        if ctx.final_decision != Decision.REQUIRE_APPROVAL:
+            return PipelineResult(
+                ctx=ctx,
+                allowed=ctx.final_decision != Decision.DENY,
+                tool_result=ctx.tool_result,
+                final_decision=ctx.final_decision,
+                final_reason=ctx.final_reason,
+            )
+
+        ctx.final_decision = Decision.ALLOW
+        ctx.final_reason = "hitl_approved"
+
+        result = self.gate5(ctx, GateStage.INBOUND)
+        _sync_ctx_from_result(ctx, result)
+        ctx.append(result)
+        if result.decision in (Decision.DENY, Decision.REQUIRE_APPROVAL):
+            self.gate6(ctx, GateStage.OUTBOUND)
+            return PipelineResult(
+                ctx=ctx,
+                allowed=False,
+                tool_result=None,
+                final_decision=ctx.final_decision,
+                final_reason=ctx.final_reason,
+            )
+
+        tool_result = None
+        try:
+            tool_result = await executor(ctx)
+            ctx.tool_result = tool_result
+        except Exception as exc:
+            log.exception("downstream tool failed after HITL approval")
+            ctx.final_decision = Decision.DENY
+            ctx.final_reason = f"tool_error: {type(exc).__name__}: {exc}"
+            self.gate6(ctx, GateStage.OUTBOUND)
+            return PipelineResult(
+                ctx=ctx,
+                allowed=False,
+                tool_result=None,
+                final_decision=Decision.DENY,
+                final_reason=ctx.final_reason,
+            )
+
         out_taint_result = self.gate4(ctx, GateStage.OUTBOUND)
         _sync_ctx_from_result(ctx, out_taint_result)
         ctx.append(out_taint_result)

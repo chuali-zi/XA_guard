@@ -5,7 +5,8 @@
 - @app.call_tool()：构造 GateContext，跑 pipeline.run，命中拦截则返回 TextContent 错误，
   放行则把下游 CallToolResult.content 透传出去。
 
-elicitation 反向问审批留 TODO（demo 阶段 gate2 用 stdout fallback）。
+elicitation 最小接入：当客户端声明 elicitation 能力且 pipeline 返回 REQUIRE_APPROVAL，
+  server 通过 elicitation/create 请求 approve/reject；approve 后才调用下游 executor。
 Streamable HTTP 占位：当前 mcp 1.27 暴露的是 StreamableHTTPServerTransport 低层，
   需结合 ASGI 框架（Starlette/uvicorn），demo 阶段先 NotImplementedError。
 """
@@ -15,15 +16,21 @@ import logging
 from typing import Any
 
 import mcp.types as mtypes
+from pydantic import BaseModel, Field
 from mcp.server import Server
 from mcp.server.models import InitializationOptions
 from mcp.server.stdio import stdio_server
 
 from xa_guard.pipeline import Pipeline
 from xa_guard.proxy.downstream import DownstreamRouter
-from xa_guard.types import GateContext, InputSource
+from xa_guard.types import Decision, GateContext, InputSource
 
 log = logging.getLogger("xa_guard.proxy.upstream")
+
+
+class _ApprovalResponse(BaseModel):
+    approve: bool = Field(description="是否批准执行该高危工具调用")
+    reason: str = Field(default="", description="审批理由，可留空")
 
 
 def _build_app(pipeline: Pipeline, downstream_router: DownstreamRouter) -> Server:
@@ -56,6 +63,42 @@ def _build_app(pipeline: Pipeline, downstream_router: DownstreamRouter) -> Serve
 
         result = await pipeline.run(ctx, _executor)
 
+        if result.final_decision == Decision.REQUIRE_APPROVAL:
+            approved = await _request_hitl_approval(app, ctx)
+            if approved is True:
+                try:
+                    resumed = await pipeline.run_after_approval(ctx, _executor)
+                    if not resumed.allowed:
+                        return [
+                            mtypes.TextContent(
+                                type="text",
+                                text=(
+                                    f"⚠ XA-Guard 审批后仍被拦截: {resumed.final_reason}\n"
+                                    f"命中规则: {ctx.rule_hits}\n"
+                                    f"trace_id={ctx.trace_id}"
+                                ),
+                            )
+                        ]
+                    return _to_text_contents(resumed.tool_result)
+                except Exception as exc:
+                    log.exception("downstream tool failed after HITL approval")
+                    return [
+                        mtypes.TextContent(
+                            type="text",
+                            text=f"⚠ XA-Guard 批准后执行失败: {type(exc).__name__}: {exc}",
+                        )
+                    ]
+            if approved is False:
+                return [
+                    mtypes.TextContent(
+                        type="text",
+                        text=(
+                            f"⚠ XA-Guard HITL 审批已拒绝: {ctx.tool_name}\n"
+                            f"trace_id={ctx.trace_id}"
+                        ),
+                    )
+                ]
+
         if not result.allowed:
             text = (
                 f"⚠ XA-Guard 已拦截: {result.final_reason}\n"
@@ -66,8 +109,58 @@ def _build_app(pipeline: Pipeline, downstream_router: DownstreamRouter) -> Serve
 
         return _to_text_contents(result.tool_result)
 
-    # TODO(agent-P): 接 gate2 HITL elicitation —— 通过 ctx.session.elicit 反向问审批。
     return app
+
+
+def _client_supports_elicitation(session: Any) -> bool:
+    client_params = getattr(session, "client_params", None)
+    capabilities = getattr(client_params, "capabilities", None)
+    elicitation = getattr(capabilities, "elicitation", None)
+    return elicitation is not None
+
+
+async def _request_hitl_approval(app: Server, ctx: GateContext) -> bool | None:
+    """Request approve/reject via MCP elicitation if the current client supports it.
+
+    Returns:
+        True: client accepted and approved.
+        False: client declined/cancelled or accepted with approve=False.
+        None: no request context, no elicitation capability, or elicitation failed.
+    """
+    try:
+        request_context = app.request_context
+    except LookupError:
+        return None
+
+    session = request_context.session
+    if not _client_supports_elicitation(session):
+        return None
+
+    message = (
+        "XA-Guard 需要人工审批高危工具调用。\n"
+        f"tool: {ctx.tool_name}\n"
+        f"arguments: {ctx.arguments}\n"
+        f"trace_id: {ctx.trace_id}\n"
+        "请选择 approve=true 才会继续执行。"
+    )
+    try:
+        result = await session.elicit_form(
+            message=message,
+            requestedSchema=_ApprovalResponse.model_json_schema(),
+            related_request_id=getattr(request_context, "request_id", None),
+        )
+    except Exception as exc:
+        log.warning("MCP elicitation approval request failed: %s", exc)
+        return None
+
+    if result.action != "accept":
+        return False
+    try:
+        response = _ApprovalResponse.model_validate(result.content or {})
+    except Exception as exc:
+        log.warning("MCP elicitation approval response invalid: %s", exc)
+        return False
+    return response.approve
 
 
 def _to_text_contents(tool_result: Any) -> list[mtypes.TextContent]:

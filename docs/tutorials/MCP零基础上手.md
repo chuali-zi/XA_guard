@@ -788,4 +788,5 @@ OpenAPI 和 gRPC 是 RPC 协议——为人写的代码调用设计。MCP 专为
 - [项目总览.md](../项目总览.md) — 项目全局
 - [产品架构.md](../产品架构.md) — XA-Guard 三件套设计
 - [文献库 INDEX.md](../references/literature/INDEX.md) — 文献库
-- [../../implementation-notes.html](../../implementation-notes.html) — 决策追踪
+- [../../status.md](../../status.md) — 当前仓库能力和缺口
+- [../../log.md](../../log.md) — 客观工作日志
