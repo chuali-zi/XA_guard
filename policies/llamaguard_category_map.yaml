@@ -1,0 +1,18 @@
+# Llama Guard S-category -> XA-Guard unified Gate1 category.
+# The upstream taxonomy is broad; until project-specific mapping is refined,
+# unsafe S-categories are treated as generic unsafe Gate1 hits.
+category_map:
+  S1: unsafe
+  S2: unsafe
+  S3: unsafe
+  S4: unsafe
+  S5: unsafe
+  S6: unsafe
+  S7: unsafe
+  S8: unsafe
+  S9: unsafe
+  S10: unsafe
+  S11: unsafe
+  S12: unsafe
+  S13: unsafe
+  S14: unsafe

@@ -49,121 +49,13 @@ def list_backends() -> list[str]:
 
 # ── 内置：stub ────────────────────────────────────────────────────────────────
 from xa_guard.detectors.backends.stub import StubBackend  # noqa: E402
+from xa_guard.detectors.backends.qwen3guard import Qwen3GuardBackend  # noqa: E402
+from xa_guard.detectors.backends.promptguard import PromptGuardBackend  # noqa: E402
+from xa_guard.detectors.backends.shieldlm import ShieldLMBackend  # noqa: E402
+from xa_guard.detectors.backends.llamaguard import LlamaGuardBackend  # noqa: E402
 
 register_backend("stub")(StubBackend)
-
-
-# ── 占位类（placeholder）：真实模型留空插槽 ────────────────────────────────────
-
-@register_backend("qwen3guard")
-class Qwen3GuardBackend(ModelBackend):
-    """占位：Qwen3-Guard 护栏模型后端。
-
-    接入方式：
-        1. 安装依赖：pip install transformers torch accelerate
-        2. 下载权重：modelscope download Qwen/Qwen3-Guard 或 HF 镜像
-        3. 在 load() 中加载 AutoModelForSequenceClassification / pipeline
-        4. classify() 调用 model(**tokenizer(texts, ...)) 取 logits
-        5. 参考：https://huggingface.co/Qwen/Qwen3-Guard （微调文档见 README）
-    """
-
-    name: str = "qwen3guard"
-
-    def load(self) -> None:
-        raise NotImplementedError(
-            "Qwen3GuardBackend 尚未接入真实权重。"
-            "接入步骤：安装 transformers/torch，下载 Qwen/Qwen3-Guard 权重，"
-            "在 load() 中初始化 AutoModelForSequenceClassification。"
-        )
-
-    def is_ready(self) -> bool:
-        # 未加载时永远 False，ModelDetector 会 fail-open 跳过
-        return False
-
-    def classify(self, texts, categories=None):
-        # is_ready()=False 时 ModelDetector 不会调用 classify；此处仍返回全空保持健壮性
-        return [[] for _ in texts]
-
-
-@register_backend("shieldlm")
-class ShieldLMBackend(ModelBackend):
-    """占位：ShieldLM 内容安全分类模型后端。
-
-    接入方式：
-        1. 安装依赖：pip install transformers torch
-        2. 下载权重：modelscope download thu-coai/ShieldLM-7B-internlm2
-        3. 在 load() 中加载 AutoModelForCausalLM（ShieldLM 使用生成式框架）
-        4. classify() 构造 ShieldLM prompt，解析 safe/unsafe 判断及原因
-        5. 参考：https://github.com/thu-coai/ShieldLM （微调文档见 train/README）
-    """
-
-    name: str = "shieldlm"
-
-    def load(self) -> None:
-        raise NotImplementedError(
-            "ShieldLMBackend 尚未接入真实权重。"
-            "接入步骤：安装 transformers/torch，下载 thu-coai/ShieldLM-7B 权重，"
-            "在 load() 中初始化 AutoModelForCausalLM 并配置 ShieldLM prompt 模板。"
-        )
-
-    def is_ready(self) -> bool:
-        return False
-
-    def classify(self, texts, categories=None):
-        return [[] for _ in texts]
-
-
-@register_backend("promptguard")
-class PromptGuardBackend(ModelBackend):
-    """占位：Meta PromptGuard 提示注入检测模型后端。
-
-    接入方式：
-        1. 安装依赖：pip install transformers torch
-        2. 下载权重：huggingface-cli download meta-llama/Prompt-Guard-86M
-        3. 在 load() 中加载 AutoModelForSequenceClassification（BERT 架构）
-        4. classify() 输出 INJECTION / JAILBREAK / BENIGN 三类 logits
-        5. 参考：https://huggingface.co/meta-llama/Prompt-Guard-86M
-    """
-
-    name: str = "promptguard"
-
-    def load(self) -> None:
-        raise NotImplementedError(
-            "PromptGuardBackend 尚未接入真实权重。"
-            "接入步骤：安装 transformers/torch，下载 meta-llama/Prompt-Guard-86M，"
-            "在 load() 中初始化 AutoModelForSequenceClassification（BERT 分类头）。"
-        )
-
-    def is_ready(self) -> bool:
-        return False
-
-    def classify(self, texts, categories=None):
-        return [[] for _ in texts]
-
-
-@register_backend("llamaguard")
-class LlamaGuardBackend(ModelBackend):
-    """占位：Llama Guard 内容安全模型后端。
-
-    接入方式：
-        1. 安装依赖：pip install transformers torch accelerate
-        2. 下载权重：huggingface-cli download meta-llama/Llama-Guard-3-8B
-        3. 在 load() 中加载 AutoModelForCausalLM（生成式，输出 safe/unsafe + 违规类目）
-        4. classify() 构造 Llama Guard 对话格式 prompt，解析输出类目
-        5. 参考：https://huggingface.co/meta-llama/Llama-Guard-3-8B （微调见 mlc-llm docs）
-    """
-
-    name: str = "llamaguard"
-
-    def load(self) -> None:
-        raise NotImplementedError(
-            "LlamaGuardBackend 尚未接入真实权重。"
-            "接入步骤：安装 transformers/torch/accelerate，下载 meta-llama/Llama-Guard-3-8B，"
-            "在 load() 中初始化 AutoModelForCausalLM 并配置对话格式 prompt 模板。"
-        )
-
-    def is_ready(self) -> bool:
-        return False
-
-    def classify(self, texts, categories=None):
-        return [[] for _ in texts]
+register_backend("qwen3guard")(Qwen3GuardBackend)
+register_backend("promptguard")(PromptGuardBackend)
+register_backend("shieldlm")(ShieldLMBackend)
+register_backend("llamaguard")(LlamaGuardBackend)

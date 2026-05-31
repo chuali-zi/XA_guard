@@ -39,6 +39,11 @@ DEFAULT_DENY_CATEGORIES = frozenset({
     "pii_leak",
     "sql_injection",
     "indirect_injection",
+    "political_sensitive",
+    "unsafe",
+    "ops_destructive",
+    "classified_exfil",
+    "social_engineering",
 })
 
 _DENY_DOWNGRADE_RAG: frozenset[str] = frozenset({"indirect_injection"})

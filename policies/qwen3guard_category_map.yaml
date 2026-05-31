@@ -1,0 +1,25 @@
+# Qwen3Guard native category -> XA-Guard unified Gate1 category.
+# The backend also carries this mapping as defaults; this file documents the
+# intended deployment mapping for configs and later model-card corrections.
+category_map:
+  Violent: shell_dangerous
+  Non-violent Illegal Acts: shell_dangerous
+  Sexual Content or Sexual Acts: unsafe
+  Personally Identifiable Information: pii_leak
+  PII: pii_leak
+  Suicide & Self-Harm: unsafe
+  Unethical Acts: unsafe
+  Politically Sensitive Topics: political_sensitive
+  Copyright Violation: unsafe
+  Jailbreak: jailbreak_zh
+  jailbreak: jailbreak_zh
+  prompt_injection: indirect_injection
+  indirect_injection: indirect_injection
+  political_sensitive: political_sensitive
+  privacy_violation: privacy_leak
+  personal_information: pii_leak
+  system_prompt_leakage: system_leak
+  system_leak: system_leak
+  dangerous_content: shell_dangerous
+  dangerous_command: shell_dangerous
+  sql_injection: sql_injection
