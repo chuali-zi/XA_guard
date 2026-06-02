@@ -17,6 +17,7 @@ from typing import Callable
 
 from xa_guard.gates.base import Gate, GateStage
 from xa_guard.policy.compiler import compile_predicate
+from xa_guard.policy.layered import get_global_source
 from xa_guard.policy.loader import load_policy_yaml
 from xa_guard.types import Decision, GateContext, GateResult, PolicyRule
 
@@ -67,8 +68,19 @@ class Gate3Policy(Gate):
             return True
         return tool_name in rule.triggers
 
+    def _current_view(self) -> tuple[list[PolicyRule], dict[str, Callable[[GateContext], bool]]]:
+        """LayeredPolicySource opt-in（cfg.gate3.prefer_layered: true）；默认 legacy。"""
+        if bool(self.opt("prefer_layered", False)):
+            layered = get_global_source()
+            if layered is not None:
+                rules = layered.get_policy_rules()
+                if rules:
+                    return rules, layered.get_compiled_predicates()
+        return self.rules, self.compiled
+
     def evaluate(self, ctx: GateContext, stage: GateStage = GateStage.INBOUND) -> GateResult:
-        if not self.rules:
+        rules, compiled = self._current_view()
+        if not rules:
             return GateResult(
                 gate_name=self.name,
                 decision=Decision.ALLOW,
@@ -77,10 +89,10 @@ class Gate3Policy(Gate):
             )
 
         hits: list[PolicyRule] = []
-        for rule in self.rules:
+        for rule in rules:
             if not self._triggered(rule, ctx.tool_name):
                 continue
-            fn = self.compiled.get(rule.id)
+            fn = compiled.get(rule.id)
             if fn is None:
                 continue
             try:
@@ -103,7 +115,7 @@ class Gate3Policy(Gate):
             risks=[r.name for r in hits],
             rule_hits=[r.id for r in hits],
             metadata={
-                "policy_count": len(self.rules),
+                "policy_count": len(rules),
                 "policy_hit_count": len(hits),
                 "policy_severity_max": severity_max if hits else "none",
                 "backend": self.backend,

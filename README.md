@@ -25,7 +25,7 @@
 [XA-Guard]
     ├ 关卡 1 门口安检         ── 赛题方向 1（输入攻击识别）
     ├ 关卡 2 办事大厅 HITL    ── 赛题方向 2（关键操作审批）
-    ├ 关卡 3 规则引擎         ── 赛题方向 2（动态策略校验）
+    ├ 关卡 3 规则引擎         ── 赛题方向 2（双层 Policy DSL：国标 baseline + 企业 overlay）
     ├ 关卡 4 三色信息流污点   ── 赛题方向 2（异常任务链阻断）
     ├ 关卡 5 沙箱路由         ── 赛题方向 2（高风险隔离）
     └ 关卡 6 黑匣子审计       ── 赛题方向 4（审计溯源）
@@ -34,7 +34,7 @@
 ```
 
 配套：
-- **XA-Bench**（赛题方向 4 评测）：CSAB-Gov-mini 30 条 seed 用例 + ASR/FPR/Recall/CuP/Latency
+- **XA-Bench**（赛题方向 4 评测）：CSAB-Gov-mini 290 条 seed 用例 + ASR/FPR/Recall/CuP/Latency
 - **AIBOM 准入网关**（赛题方向 3）：插件 AST 扫描 + 评级（demo 占位）
 - **演示前端**：审计回放时间线（单页 HTML，离线可用）
 - **演示脚本**：3 个攻击场景独立可跑
@@ -44,7 +44,7 @@
 | 赛题方向 | 主要模块 | 状态 |
 |---|---|---|
 | 1 复杂输入链路攻击识别 | `gates/gate1_input.py` + 多源标签 + 危险模式库 | ✅ |
-| 2 工具调用与任务执行安全 | `gates/gate2_plan.py` + `gate3_policy.py` + `gate4_taint.py` + `gate5_sandbox.py` | ✅ |
+| 2 工具调用与任务执行安全 | `gates/gate2_plan.py` + `gate3_policy.py` + `gate4_taint.py` + `gate5_sandbox.py` + `policy/layered.py`（双层策略） | ✅ |
 | 3 插件 / Skill / 脚本供应链 | `xa_guard/aibom/` （scanner + rater） | 🟡 骨架 |
 | 4 评测与审计溯源 | `gates/gate6_audit.py` + `audit/*` + `bench/*` + `frontend/*` | ✅ |
 
@@ -58,7 +58,7 @@ python -m venv .venv && source .venv/Scripts/activate    # Windows Git Bash
 # source .venv/bin/activate                              # macOS/Linux
 pip install -e ".[bench]"
 
-# 2. 跑测试（93 个全过）
+# 2. 跑测试（204 个全过）
 PYTHONPATH=src pytest -q
 
 # 3. 跑 3 个演示场景（无需 LLM）
@@ -129,16 +129,19 @@ jiebang/
 ├── configs/
 │   └── xa-guard.yaml               运行时配置
 │
-├── policies/                       策略 YAML
-│   ├── enterprise-l3.yaml          10 条 seed（等保 2.0 + GB/T 45654 + TC260-003）
+├── policies/                       策略 YAML（双层：baseline 不可变 + overlay 企业可写）
+│   ├── baseline_manifest.yaml      baseline 层清单（注册下列 4 类国标兜底资源）
+│   ├── enterprise-l3.yaml          30 条 baseline 规则（等保 2.0 + GB/T 45654 + TC260-003）
 │   ├── tool_capabilities.yaml      工具能力声明（关卡 4 用）
 │   ├── tool_risks.yaml             工具风险等级（关卡 2 用）
-│   └── dangerous_patterns.yaml     危险模式库（关卡 1 用）
+│   ├── sensitive_patterns.yaml     敏感词正则（关卡 4 用，从硬编码外置）
+│   ├── dangerous_patterns.yaml     危险模式库（关卡 1 用）
+│   └── overlay/<tenant_id>/        企业私有策略叠加层（单调性约束，不得弱化 baseline）
 │
 ├── src/xa_guard/                   主产品 — XA-Guard MCP Server
 │   ├── server.py / cli.py / pipeline.py / config.py / types.py
 │   ├── gates/                      6 关卡 + base
-│   ├── policy/                     YAML → predicate 编译
+│   ├── policy/                     双层策略：layered + monotonicity + predicate_safe + hot_reload（+ 旧 compiler/loader）
 │   ├── audit/                      SM3/SHA256 + Merkle + OTel
 │   ├── proxy/                      上游 server + 下游 client
 │   ├── aibom/                      插件供应链（骨架）
@@ -149,7 +152,7 @@ jiebang/
 ├── bench/                          XA-Bench 评测套件
 │   ├── runner.py / metrics.py / cli.py
 │   ├── reporters/html_report.py
-│   ├── cases/csab-gov-mini-seed.yaml (30 条 seed)
+│   ├── cases/csab-gov-mini-seed.yaml (290 条 seed)
 │   └── .log/                       last_results.json / report.html
 │
 ├── demo/                           演示资源
@@ -216,7 +219,7 @@ jiebang/
 
 > 完整数字 + 命中规则细节见 `bench/.log/report.html`。
 >
-> **限制**：当前 ASR / Recall 由 `expected_decision != allow` 推导，会混入治理动作；CuP 是非阻断代理指标；latency 是规则 pipeline + mock executor 延迟；`audit_completeness` 仍是硬编码占位值。它们只用于 30 条 seed 回归，不等同 AgentDojo / InjecAgent、模型 Recall@FPR 或审计完整率实测。详细规则见 `docs/XA-Bench-对抗测试规则.md`。
+> **限制**：当前 ASR / Recall 由 `expected_decision != allow` 推导，会混入治理动作；CuP 是非阻断代理指标；latency 是规则 pipeline + mock executor 延迟；`audit_completeness` 仍是硬编码占位值。它们只用于 290 条 seed 回归，不等同 AgentDojo / InjecAgent、模型 Recall@FPR 或审计完整率实测。详细规则见 `docs/XA-Bench-对抗测试规则.md`。
 
 ---
 
@@ -225,11 +228,11 @@ jiebang/
 | 项 | 现状 | 跟进 |
 |---|---|---|
 | Gate1 真实模型推理 + Spotlighting | 关卡 1 默认仍是规则版，模型 backend 为占位 | M2 接 Qwen3Guard + Spotlighting，保留英文对照层 |
-| OPA Rego 真嵌入 | `backend: python` 走受限 eval | M3 接 OPA |
+| 双层 Policy DSL（baseline + overlay） | ✅ 已落地：baseline 走受限 eval、overlay 走 evalidate AST 白名单 + 单调性门控 + watchfiles 热加载 + bundle_sha 入审计 | M3 迁 OPA `base/tenant/decision` 三层包 |
 | gVisor / Docker 真沙箱 | 关卡 5 只输出 routing decision | M3 接 Docker |
 | 国密 SM2 真签名 | 默认 SHA-256 + HMAC 占位，gmssl 可启 | M5 gmssl |
 | MCP elicitation 反向问 | 国产 IDE 未声明，stdout fallback | M2 Cursor 实测 |
-| 290 条完整 CSAB-Gov-mini | 当前 30 条 seed | M4 扩展 |
+| 完整国标题库（≥ 500 题） | 当前 CSAB-Gov-mini 290 条（PoC 缩减版，已达 PRD 目标） | M4/M5 向国标完整规模扩展 |
 | AIBOM 插件评级 | 本地/离线 MVP，完整 artifact 工作流未进入 seed bench | 补 schema 校验、签名和持续漂移任务 |
 | LangChain SDK 装饰器 | 骨架 | M2-M3 |
 | Streamable HTTP 上游 | 仅 stdio | M5 决赛前 |

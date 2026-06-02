@@ -1,0 +1,5 @@
+# 示例：本集团额外的工具风险分级
+# 只能 ADD 新工具，或把现有工具等级 ↑；不能 ↓
+tool_risks:
+  internal_hr_query: yellow      # 集团 HR 系统查询：异步通知
+  audit_log_purge: red           # 审计清理：必须 HITL

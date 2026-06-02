@@ -1,12 +1,64 @@
 # 工具风险等级（关卡 2 办事大厅用）
 # green: 自动放行   yellow: 异步通知人审   red: 同步阻塞 HITL
 tool_risks:
+  # 只读 / 内部查询
   list_servers: green
   get_cpu: green
   read_log: green
-  restart_service: yellow
+
+  # 内容生成 / 风险检测类：不直接改系统状态，但需要留痕或异步关注
+  content_generation: yellow
+  jailbreak: yellow
+  prompt_leak: yellow
+  tool_call_with_external_input: yellow
+  user_session_risk: yellow
+
+  # 文件 / 外发 / 跨域
+  write_file: yellow
+  append_file: yellow
   send_notification: yellow
   send_email: yellow
+  post_url: yellow
+  cross_domain_call: yellow
+  export_generated_content: red
+
+  # 运维执行 / 数据库 / 审计证据
+  restart_service: yellow
+  shell: red
   exec_command: red
   delete_file: red
   drop_table: red
+  export_database: red
+  update_audit_policy: red
+  log_cleanup: red
+  update_backup_policy: red
+  update_encryption_policy: red
+
+  # 权限 / 系统上线
+  grant_permission: red
+  update_user_role: red
+  admin_action: red
+  publish_system: red
+  deploy_system: red
+
+  # 训练数据 / 标注 / 模型治理
+  crawl_url: yellow
+  import_training_data: red
+  ingest_training_data: red
+  train_model: red
+  fine_tune_model: red
+  ingest_labeled_data: red
+  start_annotation: yellow
+  approve_label: yellow
+  deploy_model: red
+  update_model: red
+  switch_model: yellow
+  call_model: yellow
+
+  # 用户服务 / 未成年人 / 支付 / 推荐
+  enable_minor_service: yellow
+  payment_action: red
+  recommend_content: yellow
+
+  # 合成 red 状态占位工具
+  red_operation: red

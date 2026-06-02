@@ -1,0 +1,10 @@
+2026-06-02 | 双层策略技术选型调研
+任务：为XA-Guard项目调研双层策略系统（硬规则兜底层+企业私有规则层）的业界做法。
+覆盖方向：OPA bundles、Gatekeeper、AWS SCP/IAM、AI安全网关、SELinux/Istio/Cloudflare。
+关键发现：
+1. OPA通过bundle roots（manifest声明namespace所有权）+ signed bundle（JWT签名）防止覆盖，REST API对bundle-loaded policy只读。
+2. Gatekeeper用ConstraintTemplate（社区/厂商维护蓝图）+ Constraint（租户实例化参数）分离；v1版本强类型Schema阻止参数错配。
+3. AWS SCP是"速限器"不授权，与IAM取交集；硬规则作为SCP即使root账户也无法绕过。
+4. AI安全网关普遍采用"厂商默认检测层+客户自定义规则层"叠加，Meta LlamaFirewall开源+正则/LLM自定义扩展为代表。
+5. Istio评估顺序：CUSTOM→DENY→ALLOW，mesh-wide最优先，具体workload可覆盖但DENY层不可被ALLOW取消。
+结论：推荐XA-Guard采用"根包/根空间声明+签名锁定"作为硬规则层，企业规则用独立namespace注入，冲突由中央entrypoint policy合并裁决。

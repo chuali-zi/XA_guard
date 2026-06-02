@@ -1,0 +1,8 @@
+# 示例：本集团对工具能力的扩展声明
+# 只能 ↓ input_max_taint（更收紧）；可 ADD 新工具
+tools:
+  - tool_name: internal_hr_query
+    capabilities: [NETWORK_INTERNAL, FS_READ]
+    input_max_taint: INTERNAL
+    output_taint: CONFIDENTIAL
+    risk_level: yellow

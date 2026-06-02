@@ -32,8 +32,11 @@ model = [
     "psutil>=5.9",
 ]
 sdk = ["langchain>=0.2"]
+# 双层策略层：evalidate（overlay predicate AST 白名单）+ watchfiles（overlay 热加载）
+# 两者都是可选；不装时 layered.py 走 fail-safe 路径，layered 仍可用但热加载降级为手动
+policy = ["evalidate>=2.0", "watchfiles>=0.21"]
 dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.6", "mypy>=1.10"]
-all = ["xa-guard[crypto,bench,model,sdk,dev]"]
+all = ["xa-guard[crypto,bench,model,sdk,policy,dev]"]
 
 [project.scripts]
 xa-guard = "xa_guard.cli:main"

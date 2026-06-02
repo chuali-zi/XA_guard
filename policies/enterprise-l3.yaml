@@ -13,7 +13,7 @@ rules:
   - id: GBT-22239-8.1.4.4
     name: 重要操作授权
     source: "GB/T 22239-2019 8.1.4.4"
-    triggers: [exec_command, delete_file, drop_table, restart_service]
+    triggers: [exec_command, shell, delete_file, drop_table, restart_service]
     predicate: "tool in ('exec_command', 'shell', 'delete_file', 'drop_table', 'restart_service') and risk in ('yellow', 'red')"
     enforce: require_approval
     severity: high
@@ -42,8 +42,8 @@ rules:
   - id: GBT-45654-A.2.3
     name: 禁止生成涉敏内容
     source: "GB/T 45654-2025 附录 A.2.3"
-    triggers: [content_generation, write_file]
-    predicate: "tool in ('write_file', 'append_file') and (contains('content', '身份证') or contains('content', '手机号') or contains('content', '密码') or contains('content', '密钥') or contains('content', 'secret_key') or contains('content', 'access_key'))"
+    triggers: [content_generation, write_file, append_file]
+    predicate: "tool in ('content_generation', 'write_file', 'append_file') and (contains('content', '身份证') or contains('content', '手机号') or contains('content', '密码') or contains('content', '密钥') or contains('content', 'secret_key') or contains('content', 'access_key'))"
     enforce: deny
     severity: high
     audit: required
@@ -77,11 +77,11 @@ rules:
     audit: required
 
   - id: GBT-22239-8.1.4.2
-    name: 跨域数据流转留痕
+    name: 跨域数据流转审批
     source: "GB/T 22239-2019 8.1.4.2"
     triggers: [send_email, post_url, send_notification, cross_domain_call]
-    predicate: "tool in ('send_email', 'post_url', 'send_notification') and (taint in ('INTERNAL', 'CONFIDENTIAL') or contains('body', '内部'))"
-    enforce: warn
+    predicate: "tool in ('send_email', 'post_url', 'send_notification', 'cross_domain_call') and (taint in ('INTERNAL', 'CONFIDENTIAL') or contains('body', '内部'))"
+    enforce: require_approval
     severity: medium
     audit: required
 
@@ -97,7 +97,7 @@ rules:
   - id: TC260-003-9.4
     name: 审批令牌缺失阻断
     source: "TC260-003 第 9.4 节"
-    triggers: [red_operation]
+    triggers: [exec_command, shell, delete_file, drop_table, red_operation]
     predicate: "risk == 'red'"
     enforce: require_approval
     severity: high

@@ -1,11 +1,18 @@
 # 仓库状态 · XA-Guard / XA-202620
 
-更新时间：2026-06-02 +08:00（主 agent Opus 4.7 二次刷新，完成 290 条 mini 资产可信化）
-维护者：Codex 主 agent / 本轮 Opus 4.7 主 agent
+更新时间：2026-06-02 +08:00（Codex 主 agent Gate2/3/4 baseline 错位补齐后刷新）
+维护者：Codex 主 agent
 
 ## 总体判断
 
 当前仓库仍应定位为 **demo MVP / M1 末到 M2 前的可运行骨架**，不是 PRD 目标里的 L3 政企原型。主线已经成立：双面 MCP 代理把 LLM 客户端和下游工具隔开，中间串 6 个安全关卡，并用 XA-Bench、审计 JSONL 和前端时间线提供演示证据。
+
+2026-06-02 本轮补齐前次侦察确认的 Gate2/3/4 baseline 明显错位：`post_url` 现在在 Gate2 和 Gate4 均为 yellow 外联工具；`delete_file`、`drop_table` 在 Gate4 有显式 red capability；`shell`、`append_file`、`content_generation`、`red_operation` 的 Gate3 trigger/predicate 与 Gate2 风险登记已对齐。当前更准确的状态是：**共享加载源已完成，本轮选定错位已补齐；跨资源一致性自动校验、统一工具目录和 bundle_sha 生效语义仍未完成**。
+
+本轮仍保留的后续项：
+- overlay 单调性已有单资源校验，但缺少跨资源一致性校验，例如同一工具在 `tool_risks.yaml` 与 `tool_capabilities.yaml` 的 `risk_level` 是否一致。
+- Gate3 的 30 条规则仍覆盖大量政企/模型/训练/审计工具，未对所有 trigger 建立“必须登记 Gate2/Gate4 或显式豁免”的自动检查。
+- `bundle_sha` 当前会纳入被拒绝 overlay 的文件字节，和“当前生效策略快照”的审计语义存在偏差。
 
 本轮更新的关键纠偏是：**当前工作区可复现的 bench 是规则链路 + mock executor 口径，不是 Qwen3Guard 真实模型推理口径**。`configs/xa-guard.yaml` 虽然配置了 `model_qwen` 且 `dry_run: false`，但当前环境没有项目 `.venv`，全局 Python 也未安装 `transformers` / `torch` / `huggingface_hub`；模型 detector 当前 `is_ready=False` 并 fail-open，bench 延迟不能宣传成真实模型延迟。
 
@@ -13,12 +20,14 @@
 
 2026-06-02 进一步把 290 条升级为「可信评测资产」：每条 case 现在带 `case_kind`（attack_case 193 / benign_control 76 / assurance_check 21）、`source_documents`（按 policy_refs 前缀映射到 GB/T 22239-2019、GB/T 45654-2025、TC260-003、网安法、AIGC 标识办法；合计 137 / 148 / 48 / 12 / 11 条引用）、稳定 `fingerprint`；fingerprint 全部唯一（重复 payload 通过 `variant_index` 解碰撞）。新增 `bench/schema/csab-gov-mini.schema.json` + `scripts/enrich_csab_gov_mini.py`（幂等，`--check` 给 CI）+ `scripts/validate_csab_gov_mini.py`（必填字段 / ID 唯一 / fingerprint 唯一 / policy_refs 白名单 / metadata 对账，`--strict` 把告警提为错误）+ `tests/test_csab_gov_mini_assets.py` 7 个用例钉在 CI 里，避免 YAML 继续扩量后悄悄回退。当前 `validate --strict` errors=0/warnings=0，`pytest` 183 passed，bench 290/100%。
 
+2026-06-02 三次刷新落地 **Gate2/3/4 双层策略层**（对标 Google Model Armor Floor Settings + AWS SCP Deny-不被-IAM-Allow-推翻 + Kubernetes Gatekeeper ConstraintTemplate）。新增 `src/xa_guard/policy/{layered,monotonicity,predicate_safe,hot_reload}.py` 四个模块和 `policies/baseline_manifest.yaml` + `policies/sensitive_patterns.yaml` + `policies/overlay/_template/`。`LayeredPolicySource` 把 baseline（项目内置国标兜底，运行时只读）和 overlay（`policies/overlay/<tenant_id>/*.yaml`，企业可写）合并为单一视图给三家 Gate 共享；单调性门控强制 4 类红线（rule.id 不可覆盖、tool_risks 不可弱化、`input_max_taint` 不可放宽、敏感词不可删 baseline）违例则整批 overlay 拒绝加载并保留旧 snapshot。overlay predicate 走 AST 白名单（`evalidate` 优先，缺失时内置 walker）。`watchfiles` 监听 overlay 目录做原子热加载。每次合并出 `bundle_sha`（baseline + overlay 文件字节 sha256），通过 `gen_ai.policy.bundle_sha` 字段贴入每条 `AuditRecord`，让监管可复现"事故时哪个版本生效"。Gate2/3/4 增加 `prefer_layered` 开关（生产 true / 单测 false）。本轮进一步补齐后 baseline 当前为 30 条策略规则 + 46 个工具风险 + 46 个工具能力 + 29 条敏感模式；Gate3 当前 43 个唯一 trigger 均已在 Gate2/Gate4 登记，Gate2/Gate4 同工具 `risk_level` 已由自动测试钉住；`call_model` 被视为外部模型调用边界，内部跨域外发从 warn 升级为 require_approval。`pyproject` 把 `evalidate` + `watchfiles` 放进新的 `[policy]` extra（可选依赖，缺失时自动降级到内置兜底）。
+
 ## 与赛题 4 个方向的贴合度
 
 | 赛题方向 | 当前仓库状态 | 空位 / 未完成 |
 |---|---|---|
 | 方向 1：复杂输入链路攻击识别 | `gate1_input.py` 已有规则检测、模型 detector 壳子、fusion、Qwen3Guard / PromptGuard / ShieldLM / LlamaGuard 后端代码；当前配置启用 Qwen3Guard 后端但本机缺模型依赖，实际可复现为规则层 fail-open 链路。 | 当前 `spotlighting.enabled: false`，不是默认开启；没有 Recall@1%FPR、adaptive attack、AgentDojo/InjecAgent 指标；当前环境未复现真实 Qwen 推理；PromptGuard2 / Llama Guard 仍受 gated 授权限制，ShieldLM-14B 资源过大。 |
-| 方向 2：工具调用与任务执行安全 | `gate2` 风险分级、`gate3` Python 策略、`gate4` 三色污点、`gate5` 沙箱路由决策已存在；pipeline 已能让 Gate3 DENY 覆盖 Gate2 REQUIRE_APPROVAL；Policy DSL 已扩到 30 条并覆盖等保/生成式 AI 治理主题；上游有最小 MCP elicitation approve/reject 逻辑和 toy probe。 | 真实 Cursor / Claude Code / Codex 弹窗 UI 未人工实测；国产客户端仍只能写 fallback；OPA/Rego 未实现；Docker/gVisor 只给路由决策不执行真实沙箱；approval_token / approver / reason 未进入审计闭环。 |
+| 方向 2：工具调用与任务执行安全 | `gate2` 风险分级、`gate3` Python 策略、`gate4` 三色污点、`gate5` 沙箱路由决策已存在；pipeline 已能让 Gate3 DENY 覆盖 Gate2 REQUIRE_APPROVAL；Policy DSL 已扩到 30 条并覆盖等保/生成式 AI 治理主题；上游有最小 MCP elicitation approve/reject 逻辑和 toy probe。**Gate2/3/4 已落地 baseline+overlay 双层策略：项目自带 30 条规则 + 46 工具风险 + 46 工具能力 + 29 敏感模式为 baseline；企业可在 `policies/overlay/<tenant_id>/` 注入私有规则，单调性门控强制不得弱化国标，热加载经 watchfiles 落地，`bundle_sha` 进 audit。** | 真实 Cursor / Claude Code / Codex 弹窗 UI 未人工实测；国产客户端仍只能写 fallback；OPA/Rego 未实现（baseline+overlay 已为 M3 切 Rego 摆好包结构）；Docker/gVisor 只给路由决策不执行真实沙箱；approval_token / approver / reason 未进入审计闭环；统一工具目录仍未实现，当前靠测试保证 baseline 对齐。 |
 | 方向 3：插件 / Skill / 脚本供应链安全 | `src/xa_guard/aibom/` 已有本地静态扫描、依赖风险解析、A/B/C/D/F 评级、CycloneDX-like 导出、本地 artifact/file URL/zip/tar 解包、sha256 provenance、typosquat 启发式和 drift 比较；4 条 supply_chain seed 通过。 | 没有远程包下载、外部信誉库、漏洞库、真实签名体系、Sigstore/TUF、公钥校验、CycloneDX schema 校验；bench 的 supply_chain case 仍走简化评级路径，不覆盖完整 artifact + provenance + audit。 |
 | 方向 4：评测与审计溯源 | `Gate6Audit`、哈希链、OTel 字段、`bench` CLI、HTML report、前端时间线已存在；CSAB-Gov-mini 已扩到 290 条并刷新报告；旧损坏审计链已归档，当前主日志验链通过。 | 290 条仍是规则链路 + mock executor 口径，尚不是真实 MCP E2E / 真实模型评测；`audit_completeness` 固定 1.0，不是逐 case 实测；pipeline 异常仍可能被 runner 吞掉；SM3/SM2 是 fallback，CoT faithfulness 是占位。 |
 
@@ -59,12 +68,12 @@
 
 本次维护在当前工作区重新执行：
 
-- `PYTHONPATH=src python -m pytest -q`：通过，176 个测试点全绿。
-- `PYTHONPATH=src python -m compileall -q src tests bench demo sdk scripts`：通过。
-- `PYTHONPATH=src python -m bench.cli run --suite bench/cases/csab-gov-mini-seed.yaml --config configs/xa-guard.yaml`：通过运行，刷新 `bench/.log/last_results.json` / `last_report.json` / `report.html`；290 条 pass_rate 100.0%。
-- `PYTHONPATH=src python scripts\verify_audit.py --path logs\audit\audit.jsonl`：通过，2691 条记录，0 个链错误，0 条缺字段。
-- `python -c "import importlib.util; ..."`：当前环境 `transformers=False`、`torch=False`、`huggingface_hub=False`。
-- 直接构造 Gate1 检查 detector：`rule` 存在，`model:qwen3guard` 后端存在但 `is_ready=False`。
+- `python -m pytest --collect-only -q -p no:cacheprovider`：收集到 230 个测试点。
+- `python -m pytest -q --basetemp pytest_tmp_final_p1_fixed -p no:cacheprovider`：通过，230 个测试点全绿。
+- `python scripts\enrich_csab_gov_mini.py --check`：通过，290 条 bench YAML 元数据为最新。
+- `$env:PYTHONPATH='src'; python -m compileall -q src tests bench demo sdk scripts`：通过。
+- `python -m bench.cli run --suite bench\cases\csab-gov-mini-seed.yaml --config configs\xa-guard.yaml`：通过运行，刷新 `bench/.log/last_results.json` / `last_report.json` / `report.html`；290 条 pass_rate 100.0%。
+- `$env:PYTHONPATH='src'; python scripts\verify_audit.py --path logs\audit\audit.jsonl`：通过，11773 条记录，0 个链错误，0 条缺字段。
 
 最新 bench 指标：
 
@@ -76,8 +85,8 @@
 | legacy seed Recall | 100.0% | 当前是 `1 - legacy seed ASR`，不能等同模型 Recall@FPR |
 | FPR | 0.0% | 新口径下 WARN 不算阻断 |
 | CuP proxy | 100.0% | 只是合法样例非阻断率，不验证真实任务完成 |
-| Latency P50 / P95 | 8.37 ms / 11.87 ms | 当前是规则 pipeline + mock executor + 模型 fail-open；不是 Qwen 真实推理延迟 |
-| audit_completeness | 占位 100% | bench 固定写 `1.0`；独立 `verify_audit.py` 对当前主日志 2691 条可验，0 链错误 |
+| Latency P50 / P95 | 37.93 ms / 62.53 ms | 当前是规则 pipeline + mock executor + 模型 fail-open；不是 Qwen 真实推理延迟 |
+| audit_completeness | 占位 100% | bench 固定写 `1.0`；独立 `verify_audit.py` 对当前主日志 11773 条可验，0 链错误 |
 
 最新 290 条样例无 exact mismatch。需要注意：这是因为样例已经按当前 gate 的真实语义校准，例如 `send_notification` 这类 yellow 工具的良性通知按 `warn` 计，不再按 `allow` 计。
 

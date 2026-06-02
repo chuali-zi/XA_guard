@@ -24,6 +24,7 @@ from xa_guard.audit.otel import to_otel_dict
 from xa_guard.audit.sm_crypto import sm2_sign, sm3_hash
 from xa_guard.config import GateConfig
 from xa_guard.gates.base import Gate, GateStage
+from xa_guard.policy.layered import get_global_source
 from xa_guard.types import AuditRecord, Decision, GateContext, GateResult
 
 
@@ -71,6 +72,10 @@ class Gate6Audit(Gate):
                 approval_token = str(tok)
                 break
 
+        # 5. 双层策略 bundle_sha（若 LayeredPolicySource 已实例化）
+        layered = get_global_source()
+        bundle_sha = layered.bundle_sha if layered is not None else ""
+
         record = AuditRecord(
             trace_id=ctx.trace_id,
             span_id=ctx.span_id,
@@ -89,9 +94,10 @@ class Gate6Audit(Gate):
             gen_ai_decision_faithfulness_score=1.0,
             gen_ai_decision_final=ctx.final_decision.value,
             gen_ai_decision_final_reason=ctx.final_reason,
+            gen_ai_policy_bundle_sha=bundle_sha,
         )
 
-        # 5. 序列化 → ChainStore 追加（落盘并计算 record_hash）
+        # 6. 序列化 → ChainStore 追加（落盘并计算 record_hash）
         record_dict = to_otel_dict(record)
         # 移除占位字段，让 ChainStore 重新计算
         record_dict.pop("record_hash", None)
@@ -99,7 +105,7 @@ class Gate6Audit(Gate):
         appended = self.chain.append(record_dict)
         record_hash = appended.get("record_hash", "")
 
-        # 6. 可选 SM2 签名（demo HMAC-SHA256 fallback）
+        # 7. 可选 SM2 签名（demo HMAC-SHA256 fallback）
         signature: Any = None
         if self.enable_sig:
             payload = canonical_json({k: v for k, v in appended.items() if k != "signature"})

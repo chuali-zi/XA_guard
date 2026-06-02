@@ -1,0 +1,12 @@
+# 企业 overlay 模板。复制本目录、把 _template 改成你们的 tenant_id。
+metadata:
+  tenant_id: _template
+  org_name: "示例集团"
+  layer: overlay
+  version: "0.1"
+  contact: "secops@example.com"
+  effective_from: "2026-06-01"
+  notes: |
+    本目录下所有 yaml 都是企业私有策略叠加层。
+    可加新规则、新工具风险、新敏感词；不可弱化 baseline。
+    详见 ../README.md。

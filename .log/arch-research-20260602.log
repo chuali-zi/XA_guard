@@ -1,0 +1,8 @@
+2026-06-02 调研：XA-Guard 双层策略架构
+任务：调研 L0 不可变基线 + L1 企业动态层实现方案。
+搜索覆盖：HCL/Kustomize/Helm 叠加模式；单调性策略；Python 热加载（watchfiles/watchdog/SIGHUP）；predicate eval 安全（simpleeval/asteval/evalidate）；审计版本化（git-sha hash chaining）；Cedar forbid-wins vs Rego 手写 deny-overrides。
+结论：推荐渐进路线：先用 rule.id 冲突检测锁定 L0；用 threading.Lock + 原子引用切换实现热加载；eval 替换为 simpleeval/evalidate；审计日志贴 policy_bundle_sha；长期考虑迁移 OPA/Cedar。
+
+[2026-06-02] 行业方案调研：企业私有策略分层注入
+查询范围：Lakera/CheckPoint、NeMo Guardrails、Cloudflare AI Gateway、Azure Content Safety、Google Model Armor、Cisco AI Defense、Palo Alto Prisma AIRS、MCP 2025-11 规范、OPA多租户最佳实践、配置热加载方案。
+关键发现：①Styra DAS已于2025-08被苹果收购创始团队后走向日落，OPA bundle仍可用；②MCP 2025-11规范无声明式policy字段，但开源网关（Lasso、IBM ContextForge、Intercept、GUARDRAIL）已填补此空白；③Google Model Armor的"floor settings"与XA-Guard国标兜底模式最相似；④Rego多租户单调性依赖decision层显式组合，不是语言内置。

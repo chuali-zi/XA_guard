@@ -1,0 +1,31 @@
+# XA-Guard baseline 策略层清单（L0 / 不可变层）
+#
+# 本文件由 src/xa_guard/policy/layered.py 加载。
+# 列出的所有文件都被视为"项目内置国标兜底"——
+# 任何企业 overlay 都不能删除/覆盖/弱化其中的条目。
+# 单调性检查（monotonicity）由 layered._check_monotonic 强制执行。
+#
+# 不要在这里直接写规则；规则继续放在各自的 yaml 文件里，
+# 本清单只声明 "哪些 yaml 属于 baseline 层"。
+
+metadata:
+  layer: baseline
+  version: "0.1"
+  description: "L0 国标兜底层 — 等保 2.0 三级 + GB/T 45654-2025 + TC260-003"
+  immutable: true                # 运行时只读
+  sources:
+    - "GB/T 22239-2019 信息安全技术 网络安全等级保护基本要求"
+    - "GB/T 45654-2025 网络安全技术 生成式人工智能服务安全基本要求"
+    - "TC260-003 生成式人工智能服务安全基本要求"
+
+# 4 类资源，对应 Gate2 / Gate3 / Gate4 的需求
+resources:
+  policy_rules:                  # Gate3 用：enterprise-l3 30 条
+    file: policies/enterprise-l3.yaml
+    rule_id_namespace: ""        # baseline 无前缀，历史 id 不动
+  tool_risks:                    # Gate2 用：工具风险分级
+    file: policies/tool_risks.yaml
+  tool_capabilities:             # Gate4 用：工具能力 + 污点上限
+    file: policies/tool_capabilities.yaml
+  sensitive_patterns:            # Gate4 用：敏感词正则
+    file: policies/sensitive_patterns.yaml

@@ -1,14 +1,24 @@
 """Unit tests for Gate4Taint — 三色信息流污点关卡。"""
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from xa_guard.config import GateConfig
 from xa_guard.gates.base import GateStage
 from xa_guard.gates.gate4_taint import Gate4Taint
+from xa_guard.policy.layered import LayeredPolicySource, set_global_source
 from xa_guard.types import Decision, GateContext, InputSource, TaintLabel
 
 CAP_FILE = "policies/tool_capabilities.yaml"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.fixture(autouse=True)
+def _isolate_layered_source():
+    yield
+    set_global_source(None)
 
 
 def _gate(strict: bool = False) -> Gate4Taint:
@@ -17,6 +27,24 @@ def _gate(strict: bool = False) -> Gate4Taint:
         options={
             "tool_capabilities_file": CAP_FILE,
             "strict_mode": strict,
+        },
+    )
+    return Gate4Taint(cfg)
+
+
+def _layered_gate() -> Gate4Taint:
+    set_global_source(
+        LayeredPolicySource(
+            manifest_path="policies/baseline_manifest.yaml",
+            overlay_root=None,
+            project_root=PROJECT_ROOT,
+        )
+    )
+    cfg = GateConfig(
+        enabled=True,
+        options={
+            "tool_capabilities_file": CAP_FILE,
+            "prefer_layered": True,
         },
     )
     return Gate4Taint(cfg)
@@ -126,6 +154,16 @@ def test_outbound_read_log_upgrades_taint():
     assert result.metadata["output_taint"] == "INTERNAL"
 
 
+@pytest.mark.parametrize("tool_name", ["delete_file", "drop_table"])
+def test_destructive_red_tools_have_explicit_capabilities(tool_name):
+    gate = _gate()
+    ctx = GateContext(tool_name=tool_name, arguments={}, taint=TaintLabel.PUBLIC)
+    result = gate.evaluate(ctx, GateStage.INBOUND)
+    cap = result.metadata["tool_capability"]
+    assert cap["risk_level"] == "red"
+    assert cap["capabilities"]
+
+
 # ──────────────────────────────────────────────
 # 6. 未登记工具默认 input_max=CONFIDENTIAL → PUBLIC 输入 ALLOW
 # ──────────────────────────────────────────────
@@ -152,6 +190,66 @@ def test_session_history_sensitive_escalates_taint():
         input_sources=[InputSource.USER],
         taint=TaintLabel.PUBLIC,
         session_history=[{"role": "assistant", "content": "密码是 hunter2"}],
+    )
+    result = gate.evaluate(ctx, GateStage.INBOUND)
+    assert result.decision == Decision.DENY
+    assert result.metadata["taint"] == "CONFIDENTIAL"
+
+
+def test_sensitive_argument_key_escalates_taint():
+    gate = _gate()
+    ctx = GateContext(
+        tool_name="send_email",
+        arguments={"password": "hunter2"},
+        input_sources=[InputSource.USER],
+        taint=TaintLabel.PUBLIC,
+    )
+    result = gate.evaluate(ctx, GateStage.INBOUND)
+    assert result.decision == Decision.DENY
+    assert result.metadata["taint"] == "CONFIDENTIAL"
+
+
+def test_layered_email_destination_does_not_escalate_payload_taint():
+    gate = _layered_gate()
+    ctx = GateContext(
+        tool_name="send_email",
+        arguments={"to": "ops@example.com", "body": "hello"},
+        input_sources=[InputSource.USER],
+        taint=TaintLabel.PUBLIC,
+    )
+    result = gate.evaluate(ctx, GateStage.INBOUND)
+    assert result.decision == Decision.ALLOW
+    assert result.metadata["taint"] == "PUBLIC"
+
+
+def test_layered_email_body_still_escalates_payload_taint():
+    gate = _layered_gate()
+    ctx = GateContext(
+        tool_name="send_email",
+        arguments={"to": "ops@example.com", "body": "contact: user@example.com"},
+        input_sources=[InputSource.USER],
+        taint=TaintLabel.PUBLIC,
+    )
+    result = gate.evaluate(ctx, GateStage.INBOUND)
+    assert result.decision == Decision.DENY
+    assert result.metadata["taint"] == "CONFIDENTIAL"
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        {"to": "AKIAIOSFODNN7EXAMPLE@example.com", "body": "hello"},
+        {"recipient": "身份证 110105199001011234", "body": "hello"},
+        {"channel": "secret_key=prod_12345678901234567890", "msg": "hello"},
+    ],
+)
+def test_layered_routing_fields_still_scan_high_confidence_secrets(arguments):
+    gate = _layered_gate()
+    ctx = GateContext(
+        tool_name="send_email",
+        arguments=arguments,
+        input_sources=[InputSource.USER],
+        taint=TaintLabel.PUBLIC,
     )
     result = gate.evaluate(ctx, GateStage.INBOUND)
     assert result.decision == Decision.DENY

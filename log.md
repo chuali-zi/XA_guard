@@ -1,5 +1,126 @@
 # 工作日志
 
+## 2026-06-02 +08:00 Codex 主 agent — Gate2/3/4 baseline policy 可扩展与严格对齐
+
+按用户要求，本轮目标是先让 policies 具备可扩展 baseline/overlay 口径，再严格审查并补齐 Gate2/Gate3/Gate4 baseline 对齐。期间使用多个子 agent 做只读审查和分项建议：先由 xhigh 审查指出 Gate3 triggers 与 Gate2/Gate4 登记严重错位，再由多个 medium agent 分别建议 Gate2 风险、Gate4 能力、敏感模式扩展，之后由验证 agent 和最终 xhigh agent 多轮核验。本轮没有提交 git commit，也没有读取或维护 implementation HTML。
+
+本次具体做了：
+- 扩展 `policies/tool_risks.yaml`：baseline 工具风险从原先少量 demo 工具扩到 46 个工具，覆盖 Gate3 当前 43 个唯一 trigger；训练/微调/部署、审计/权限/备份/加密策略、数据库导出、支付、系统发布、生成内容对外导出等政企高风险动作按 red/yellow 重新归类。
+- 扩展 `policies/tool_capabilities.yaml`：baseline 工具能力扩到 46 个工具；补 `DATA_EXPORT`、`DATA_INGEST`、`POLICY_ADMIN`、`AUTHZ_ADMIN`、`AUDIT_ADMIN`、`MODEL_CALL`、`MODEL_TRAINING`、`MODEL_DEPLOY`、`CONTENT_PUBLISH`、`PAYMENT` 等能力口径；`call_model` 明确带 `NETWORK_EXTERNAL`，CONFIDENTIAL 输入不能外发到外部模型边界。
+- 扩展 `policies/sensitive_patterns.yaml`：敏感模式扩到 29 条，补身份证号、手机号、银行卡样式、统一社会信用代码、邮箱、内网 IP、Bearer/JWT/API token/private key/AKIA/GitHub PAT、中文密级和内部资料标识。这里仍只是 regex baseline 兜底，不等同完整 DLP。
+- 修改 `src/xa_guard/gates/gate4_taint.py`：敏感扫描现在递归扫描 dict key 和 value，修复 `{"password": "hunter2"}` 这类 key 敏感但 value 不明显的问题；同时为 routing 字段做更细的误伤控制，普通 `to=ops@example.com` 不再被当正文泄密，但 `to=AKIA...@example.com`、`recipient=身份证...`、`channel=secret_key=...` 仍会升级 CONFIDENTIAL 并 DENY。
+- 修改 `policies/enterprise-l3.yaml`：`GBT-22239-8.1.4.2` 从跨域留痕 warn 收紧为跨域审批 require_approval，并把 `cross_domain_call` 纳入 predicate；内部信息通过 `send_email/post_url/send_notification/cross_domain_call` 跨域外发至少需要审批。
+- 修改 `bench/cases/csab-gov-mini-seed.yaml`：同步 9 个内部 `post_url` 跨域 case（DATA-016..021、INTP-003/008/013）预期从 `warn` 升为 `require_approval`，并运行 `scripts/enrich_csab_gov_mini.py` 重算 fingerprint，保持 bench YAML 幂等。
+- 新增/扩展测试：`tests/unit/test_layered_policy.py` 增加 Gate3 triggers 必须有 Gate2/Gate4 profile、Gate2/Gate4 risk level 一致、外部工具拒绝 CONFIDENTIAL、模型调用外部边界、结构化敏感样本覆盖等断言；`tests/unit/test_gate4.py` 增加 key 敏感扫描、layered 普通邮件目的地不误伤、正文邮箱仍命中、routing 字段高置信秘密仍命中；`tests/unit/test_gate3.py` 增加 `cross_domain_call` 内部跨域审批断言。
+
+审查与修复过程：
+- 初始 xhigh 审查指出 P0：Gate3 43 个 trigger 中有大量工具缺 Gate2/Gate4 baseline 登记，未知工具会偏 fail-open。
+- 分项扩展后，验证 agent 确认 43/43 triggers 均有 Gate2 risk 和 Gate4 capability，且同名 risk level 一致。
+- 第一轮最终 xhigh 发现两个 P1：`call_model` 没有 `NETWORK_EXTERNAL`、内部 `send_email/send_notification` 只 warn。本轮已分别修为 `call_model` 外部边界、内部跨域 require_approval。
+- 第二轮 xhigh 发现两个 P1：`cross_domain_call` 在 triggers 里但 predicate 漏枚举；普通 `to=ops@example.com` 在 layered 模式下会被邮箱正则误拒。本轮已补 predicate 和 Gate4 routing 字段语义测试。
+- 第三轮 xhigh 发现 routing 字段整值跳过过宽，可能藏入 AKIA/身份证/secret。本轮已收窄为只豁免低置信普通 routing 地址，高置信秘密仍扫描。
+- 最终 xhigh 只读复审结论：当前没有 P0/P1 blocker，Gate2/Gate3/Gate4 baseline policy 对齐可以通过最终复审；剩余均为 P2/P3 长期增强项。
+
+最终验证结果：
+- `python -m pytest --collect-only -q -p no:cacheprovider`：收集 230 个测试点。
+- `python -m pytest -q --basetemp pytest_tmp_final_p1_fixed -p no:cacheprovider`：通过，230 个测试点全绿。
+- `python scripts\enrich_csab_gov_mini.py --check`：通过，bench YAML 元数据最新。
+- `$env:PYTHONPATH='src'; python -m compileall -q src tests bench demo sdk scripts`：通过。
+- `python -m bench.cli run --suite bench\cases\csab-gov-mini-seed.yaml --config configs\xa-guard.yaml`：290 条，pass_rate 1.0，ASR 0.0，FPR 0.0，Recall 1.0，P50/P95 37.93/62.53 ms。
+- `$env:PYTHONPATH='src'; python scripts\verify_audit.py --path logs\audit\audit.jsonl`：verified 11773 records, 0 chain errors, 0 missing-field records。
+
+未完成 / 客观限制：
+- overlay 新增 Gate3 trigger 时，还没有强制要求同时新增 Gate2 risk 与 Gate4 capability；当前只是 baseline 层有自动一致性测试，后续应把这个检查接入 overlay merge。
+- Gate4 legacy fallback regex 仍只是 `sensitive_patterns.yaml` 的子集；生产 layered 路径可用，但 fallback 注释/同源生成后续应处理。
+- routing 字段高置信模式可继续调优，避免少数低风险通道名误报。
+- 这轮仍没有完成真实客户端 HITL、OPA/Rego、approval token、Docker/gVisor 真执行、真实模型推理评测。
+
+## 2026-06-02 +08:00 Codex 主 agent — Gate2/3/4 baseline 错位补齐
+
+按用户要求“先把错位补上，别的先不动”，本轮只修前一轮侦察确认的 Gate2/Gate3/Gate4 baseline 明显错位；没有改 `bundle_sha` 语义，没有新增跨资源一致性校验，没有重构为统一 tool registry，也没有读取或维护 `implementation-notes.html`。
+
+本次具体做了：
+- 先按 TDD 补失败测试：`tests/unit/test_gate2.py` 覆盖 `post_url` 应为 yellow warn、`red_operation` 应为 red require_approval；`tests/unit/test_gate3.py` 覆盖 `shell` alias、`append_file`、`content_generation` 触发原有规则；`tests/unit/test_gate4.py` 覆盖 `delete_file`/`drop_table` 必须有显式 red capability。
+- 修改 `policies/tool_risks.yaml`：补齐 `post_url: yellow`、`write_file: yellow`、`append_file: yellow`、`shell: red`、`red_operation: red`，保持 `exec_command/delete_file/drop_table` 为 red。
+- 修改 `policies/tool_capabilities.yaml`：补齐 `write_file`、`append_file`、`shell`、`delete_file`、`drop_table`、`red_operation` 的能力、输入污点上限、输出污点和 risk_level，使 Gate4 不再对这些工具走默认 capability。
+- 修改 `policies/enterprise-l3.yaml`：把 `shell` 加入 `GBT-22239-8.1.4.4` triggers；把 `append_file` 加入 `GBT-45654-A.2.3` triggers，并让 `content_generation` 也能被 predicate 命中；把 `exec_command/shell/delete_file/drop_table` 加入 `TC260-003-9.4` triggers，保留 `red_operation`。
+
+验证结果：
+- 先运行新增定向测试，确认红测失败在 `post_url` 被 Gate2 当 green allow。
+- 修改后运行 `PYTHONPATH=src python -m pytest -q -p no:cacheprovider --basetemp pytest_tmp_run tests\unit\test_gate2.py tests\unit\test_gate3.py tests\unit\test_gate4.py -x --tb=short`：通过，71 个定向测试全绿。
+- 运行 `PYTHONPATH=src python -m pytest -q -p no:cacheprovider --basetemp pytest_tmp_run tests\unit\test_layered_policy.py tests\test_pipeline_smoke.py tests\integration\test_bench_smoke.py tests\unit\test_bench_metrics.py -x --tb=short`：通过，34 个相关测试全绿。
+- 运行 `PYTHONPATH=src python -m pytest -q -p no:cacheprovider --basetemp pytest_tmp_run`：全量 pytest 通过，211 个测试点全绿。
+- 运行 `PYTHONPATH=src python -m bench.cli run --suite bench\cases\csab-gov-mini-seed.yaml --config configs\xa-guard.yaml`：290 条 pass_rate 1.0。
+- 运行 `PYTHONPATH=src python scripts\validate_csab_gov_mini.py --strict`：cases=290 errors=0 warnings=0。
+- 运行 `PYTHONPATH=src python scripts\verify_audit.py --path logs\audit\audit.jsonl`：verified 8278 records, 0 chain errors, 0 missing-field records。
+
+未完成 / 客观限制：
+- 尚未实现跨资源一致性校验；后续新增工具仍可能只改 Gate3 triggers 而漏改 Gate2/Gate4。
+- 尚未修 `bundle_sha` 包含 rejected overlay 文件的问题。
+- 尚未做统一 `tool_registry.yaml` 或自动生成 Gate2/Gate4 资源。
+- 尚未补生产口径 `prefer_layered=true` 的专门 pipeline 测试；本轮只补 legacy 单文件路径和现有 layered/bench 回归。
+
+## 2026-06-02 +08:00 Codex 主 agent — Gate2/3/4 baseline 对齐只读侦察
+
+按用户要求，重点侦察 Gate2、Gate3、Gate4 以及相关 baseline 策略，目标是先给整理方案，不直接改策略代码。本轮没有读取或维护 `implementation-notes.html`，没有修改产品代码、策略 YAML 或测试。
+
+本次具体做了：
+- 使用 3 个只读 explorer 子 agent 并行侦察 Gate2、Gate3、Gate4/跨 gate baseline，均要求不改文件、不写日志。
+- 本地读取 `status.md`、`AGENTS.md`、`configs/xa-guard.yaml`、`src/xa_guard/gates/gate2_plan.py`、`gate3_policy.py`、`gate4_taint.py`、`src/xa_guard/policy/layered.py`、`monotonicity.py`、`compiler.py`、`src/xa_guard/pipeline.py`、`src/xa_guard/server.py`、`src/xa_guard/types.py`、`src/xa_guard/gates/gate6_audit.py`、`policies/baseline_manifest.yaml`、`policies/enterprise-l3.yaml`、`policies/tool_risks.yaml`、`policies/tool_capabilities.yaml`、`policies/sensitive_patterns.yaml` 以及相关单元测试。
+- 确认 Gate2/3/4 已共享 `LayeredPolicySource`，但共享的是 4 类资源入口，不是同一份“工具语义契约”。Gate3 的 30 条规则 trigger 已扩到大量政企/模型/训练/审计工具，而 Gate2/Gate4 baseline 工具元数据仍只覆盖少量演示工具。
+- 发现当前最直接的不齐点：`post_url` 在 Gate4 `tool_capabilities.yaml` 是 `risk_level: yellow`，但 Gate2 `tool_risks.yaml` 未登记，Gate2 会按 unknown tool 默认 green；`delete_file`、`drop_table` 在 Gate2 是 red，但 Gate4 未登记 capability，会走默认 `input_max_taint=CONFIDENTIAL`。
+- 发现 Gate3 规则自身也有 trigger/predicate 不一致：`GBT-22239-8.1.4.4` predicate 包含 `shell` 但 triggers 不含 `shell`；`GBT-45654-A.2.3` triggers 包含 `content_generation`，predicate 却只检查 `write_file`/`append_file`，且 `append_file` 不在 triggers。
+- 发现 `TC260-003-9.4` 规则 trigger `red_operation` 且 predicate 依赖 `risk == 'red'`，但 `red_operation` 未登记 Gate2 risk，pipeline 真实运行会默认 green，除非外部手动设置 risk。
+- 发现 `LayeredPolicySource` 的 `bundle_sha` 当前按 baseline + 所有 overlay 文件计算，包含之后被 monotonicity 拒绝的 overlay；这和“当前生效策略快照”的语义不完全一致。
+
+本轮完成情况：
+- 已完成只读侦察和方案准备。
+- 未实现任何修复；未运行 pytest/bench；未改 baseline 文件、overlay 校验或 pipeline 逻辑。
+
+下一步建议：
+- 先做低风险 baseline 对齐：补齐 `tool_risks.yaml` 与 `tool_capabilities.yaml` 的同工具风险一致性，修正 Gate3 trigger/predicate 明显错位。
+- 再抽象统一工具目录或一致性校验，避免 Gate3 新增 trigger 后 Gate2/Gate4 漏登记。
+- 最后补生产口径测试：`prefer_layered=true` + 全局 `LayeredPolicySource` + pipeline 真实顺序下的跨 gate 行为。
+
+## 2026-06-02 +08:00 主 agent（Opus 4.7） — Gate2/3/4 双层策略 + bundle_sha 审计
+
+按用户要求把 Gate2/3/4 改造成 **baseline（项目自带国标兜底）+ overlay（企业动态注入）** 的双层结构，让 XA-Guard 能在保留根本性硬规则的前提下动态接入企业实际策略。
+
+调研：派 3 个 sonnet 子 agent 并行 WebSearch，覆盖 (1) OPA bundles / Gatekeeper / AWS SCP / Istio 的双层模型，(2) Lakera / NeMo Guardrails / Cloudflare AI Gateway / Azure Content Safety / Google Model Armor / Cisco AI Defense / Palo Alto Prisma AIRS 的客户策略形态与基线锁定能力，(3) 配置叠加 / 单调性 / 热加载 / predicate 沙箱替代品。结论：**Google Model Armor 的 Floor Settings + Kubernetes Gatekeeper 的 Template+Constraint 分离 + AWS SCP 的 "Deny 不被 IAM Allow 推翻"** 是最贴合本项目的三个范式，OPA Rego 留作 M3 切换路径。
+
+本次具体做了：
+- 新增 `src/xa_guard/policy/layered.py` `LayeredPolicySource` 进程级单例：读 baseline manifest + 扫 overlay 目录 → 4 类资源（policy_rules / tool_risks / tool_capabilities / sensitive_patterns）合并 → 暴露给 Gate2/3/4 共享；计算 `bundle_sha = sha256(所有源文件字节)`；线程安全 atomic ref swap。
+- 新增 `monotonicity.py` 强制 4 类红线（rule.id 命中 baseline / tool_risks 从严降到松 / `input_max_taint` 放宽 / sensitive_patterns 重复 baseline），违例的 overlay 整批拒绝并写到 `overlay_rejections`，baseline 永远不动。
+- 新增 `predicate_safe.py`：baseline tier 走原 `compile_predicate`；overlay tier 必须过 AST 白名单（`evalidate` 优先；缺失时用内置 walker 校验 ast.Compare/BoolOp/Call(限白名单) 等节点），拒绝 lambda / `__import__` / 属性调用等不安全表达。
+- 新增 `hot_reload.py` `OverlayWatcher`：`watchfiles` 监听 overlay/，触发 `LayeredPolicySource.reload()`，新 snapshot 通过原子引用切换，失败保留旧 snapshot 不中断服务。`watchfiles` 缺失时降级为 noop。
+- 新增 `policies/baseline_manifest.yaml` 注册 4 类 baseline 文件；`policies/sensitive_patterns.yaml` 把 Gate4 硬编码正则提取为可审计资产；`policies/overlay/_template/` 给企业接入示例（manifest / policy / tool_risks / tool_capabilities / sensitive_patterns 五件套）。
+- 改 `src/xa_guard/gates/gate2_plan.py` / `gate3_policy.py` / `gate4_taint.py` 加 `prefer_layered` 开关（default false，生产 true），三家 Gate 都从 `get_global_source()` 读合并视图；缺失时 fallback 到原单文件路径，确保旧单测零改动。
+- 改 `src/xa_guard/types.py` `AuditRecord` 加 `gen_ai_policy_bundle_sha` 字段，`to_dict()` 同步加 `"gen_ai.policy.bundle_sha"` key。
+- 改 `src/xa_guard/gates/gate6_audit.py` 在写 record 时从 `get_global_source()` 取当前 `bundle_sha` 贴上；监管可凭这个 SHA 回查事故时刻生效的策略快照。
+- 改 `src/xa_guard/server.py` `build_pipeline()` 启动期 `_init_layered_policy()` 实例化单例 + 启动 `OverlayWatcher`；`configs/xa-guard.yaml` 新增 `gates.policy_layered` 块默认启用。
+- 改 `pyproject.toml` 把 `evalidate>=2.0` + `watchfiles>=0.21` 放进新的 `[project.optional-dependencies] policy` extra；缺失时 layered 自动降级。
+- 新增 `tests/unit/test_layered_policy.py` 21 个测试覆盖 baseline 加载、命名空间强制、覆盖企图拦截、tool_risks/capabilities 弱化拦截、纯追加路径、AST 白名单拒绝 `__import__`/`lambda`、bundle_sha 随文件变化、reload fail-safe。
+
+验证（每一步留 stdout 证据）：
+1. `PYTHONPATH=src python -m pytest -q` → **204 passed**（旧 183 + 新 21），0 失败。
+2. `PYTHONPATH=src python -m bench.cli run --suite bench/cases/csab-gov-mini-seed.yaml --config configs/xa-guard.yaml` → **290 条 pass_rate 1.0**，7 个 dimension 子分数全部 1.0。
+3. `PYTHONPATH=src python scripts/validate_csab_gov_mini.py --strict` → cases=290 errors=0 warnings=0。
+4. `PYTHONPATH=src python scripts/verify_audit.py --path logs/audit/audit.jsonl` → verified 7031 records, 0 chain errors。
+5. `tail -1 logs/audit/audit.jsonl | jq '."gen_ai.policy.bundle_sha"'` → `"ffedcd6820ca3eecc9fd7f65bb8acec9e3ff6fa3bd97125d810cd85475f96672"`，新字段已落盘。
+
+设计决策（与用户的三次拍板）：
+- 改造范围 = **三 Gate 全做**（不是只动 Gate3），sensitive_patterns 一并外置为 yaml
+- overlay predicate eval = **evalidate AST 白名单**（不留 `eval` 给企业可写路径）
+- 热加载 = **watchfiles + atomic ref swap**（带 fail-safe 回退）
+
+未完成 / 客观限制：
+- 当前环境没装 evalidate / watchfiles，代码走"内置 walker + 无文件监听"兜底；生产环境装上 `pip install -e .[policy]` 自动启用。
+- baseline 仍是 Python 受限 `eval()`；M3 切 OPA Rego 时同时迁 baseline 与 overlay 到 `base/tenant/decision` 三层 Rego 包。
+- `bundle_sha` 是文件字节哈希，不是 git sha；M4 国密阶段可叠加 SM2 签名 + TSA 时间戳形成完整 bundle 信任链。
+- overlay 模板 `_template/` 不会被加载（前缀 `_` 跳过），实际企业接入时新建非下划线开头的子目录。
+
+---
+
 ## 2026-06-02 +08:00 主 agent（Opus 4.7） — 把 290 条 mini 升级为可信评测资产
 
 按用户要求把 `bench/cases/csab-gov-mini-seed.yaml` 从「裸列表」升级到「带 case_kind + 标准来源 + 去重 + 覆盖率 + schema 校验」的可审计资产。

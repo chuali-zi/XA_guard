@@ -19,6 +19,7 @@ from typing import Any
 import yaml
 
 from xa_guard.gates.base import Gate, GateStage
+from xa_guard.policy.layered import get_global_source
 from xa_guard.types import Decision, GateContext, GateResult, RiskLevel
 
 
@@ -37,6 +38,16 @@ class Gate2Plan(Gate):
     supported_stages = (GateStage.INBOUND,)
 
     def _load_risks(self) -> dict[str, RiskLevel]:
+        """LayeredPolicySource（baseline+overlay 合并）opt-in；默认走单文件。
+
+        prefer_layered: true 时优先 layered（生产推荐），否则保持 legacy（兼容单测）。
+        """
+        if bool(self.opt("prefer_layered", False)):
+            layered = get_global_source()
+            if layered is not None:
+                risks = layered.get_tool_risks()
+                if risks:
+                    return risks
         risk_file = self.opt("tool_risk_file", "policies/tool_risks.yaml")
         return _load_tool_risks(risk_file)
 

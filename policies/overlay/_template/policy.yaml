@@ -1,0 +1,12 @@
+# 示例：企业私有规则
+# rule.id 必须以 tenant::<tenant_id>:: 开头，否则 monotonicity 校验拒绝
+rules:
+  - id: "tenant::_template::INTERNAL-DOMAIN-DENY"
+    name: 禁止访问竞品域名
+    source: "本集团安全办公室 2026-Q2 通告"
+    triggers: [post_url, send_email]
+    predicate: "tool == 'post_url' and contains('url', 'competitor.example.com')"
+    enforce: deny
+    severity: high
+    audit: required
+    description: 集团内部规定，不得通过任何工具调用访问竞品域名

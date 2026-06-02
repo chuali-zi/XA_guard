@@ -60,6 +60,13 @@ def test_rule_8_1_4_4_hit_yellow_restart(gate):
     assert result.decision == Decision.REQUIRE_APPROVAL
 
 
+def test_rule_8_1_4_4_hit_shell_alias(gate):
+    ctx = _ctx(tool_name="shell", arguments={"cmd": "uptime"}, risk_level=RiskLevel.RED)
+    result = gate.evaluate(ctx)
+    assert "GBT-22239-8.1.4.4" in result.rule_hits
+    assert result.decision == Decision.REQUIRE_APPROVAL
+
+
 def test_rule_8_1_4_4_miss_green(gate):
     # 风险绿色 → 不命中授权规则
     ctx = _ctx(tool_name="exec_command", arguments={"cmd": "ls"}, risk_level=RiskLevel.GREEN)
@@ -114,6 +121,26 @@ def test_rule_a_2_3_hit_secret_key_in_write(gate):
     ctx = _ctx(
         tool_name="write_file",
         arguments={"path": "/tmp/x", "content": "secret_key=prod"},
+    )
+    result = gate.evaluate(ctx)
+    assert "GBT-45654-A.2.3" in result.rule_hits
+    assert result.decision == Decision.DENY
+
+
+def test_rule_a_2_3_hit_sensitive_append_file(gate):
+    ctx = _ctx(
+        tool_name="append_file",
+        arguments={"path": "/tmp/x", "content": "手机号 13800138000"},
+    )
+    result = gate.evaluate(ctx)
+    assert "GBT-45654-A.2.3" in result.rule_hits
+    assert result.decision == Decision.DENY
+
+
+def test_rule_a_2_3_hit_sensitive_content_generation(gate):
+    ctx = _ctx(
+        tool_name="content_generation",
+        arguments={"content": "请生成包含身份证字段的示例"},
     )
     result = gate.evaluate(ctx)
     assert "GBT-45654-A.2.3" in result.rule_hits
@@ -185,8 +212,8 @@ def test_rule_8_1_4_2_hit_internal_email(gate):
     ctx = _ctx(tool_name="send_email", arguments={"to": "x@y.com"}, taint=TaintLabel.INTERNAL)
     result = gate.evaluate(ctx)
     assert "GBT-22239-8.1.4.2" in result.rule_hits
-    # enforce=warn；但 A.1.1 不命中（INTERNAL != CONFIDENTIAL），所以聚合应是 warn
-    assert result.decision == Decision.WARN
+    # INTERNAL 数据跨域外发在政企 baseline 中至少需要人工审批。
+    assert result.decision == Decision.REQUIRE_APPROVAL
 
 
 def test_rule_8_1_4_2_hit_internal_post_body(gate):
@@ -197,7 +224,18 @@ def test_rule_8_1_4_2_hit_internal_post_body(gate):
     )
     result = gate.evaluate(ctx)
     assert "GBT-22239-8.1.4.2" in result.rule_hits
-    assert result.decision == Decision.WARN
+    assert result.decision == Decision.REQUIRE_APPROVAL
+
+
+def test_rule_8_1_4_2_hit_internal_cross_domain_call(gate):
+    ctx = _ctx(
+        tool_name="cross_domain_call",
+        arguments={"target": "partner-api", "body": "内部知识库摘要"},
+        taint=TaintLabel.PUBLIC,
+    )
+    result = gate.evaluate(ctx)
+    assert "GBT-22239-8.1.4.2" in result.rule_hits
+    assert result.decision == Decision.REQUIRE_APPROVAL
 
 
 def test_rule_8_1_4_2_miss_public(gate):

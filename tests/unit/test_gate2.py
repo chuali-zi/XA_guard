@@ -51,6 +51,12 @@ class TestGate2Yellow:
         assert result.metadata["risk_level"] == RiskLevel.YELLOW.value
         assert result.metadata.get("notify_async") is True
 
+    def test_post_url_warn(self):
+        gate = _make_gate()
+        result = gate.evaluate(_ctx("post_url"))
+        assert result.decision == Decision.WARN
+        assert result.metadata["risk_level"] == RiskLevel.YELLOW.value
+
     def test_restart_service_warn(self):
         gate = _make_gate()
         result = gate.evaluate(_ctx("restart_service"))
@@ -67,6 +73,12 @@ class TestGate2RedFallbackStdout:
         captured = capsys.readouterr()
         assert "APPROVAL REQUIRED" in captured.err
         assert "exec_command" in captured.err
+
+    def test_red_operation_require_approval(self):
+        gate = _make_gate(fallback="stdout")
+        result = gate.evaluate(_ctx("red_operation"))
+        assert result.decision == Decision.REQUIRE_APPROVAL
+        assert result.metadata["risk_level"] == RiskLevel.RED.value
 
 
 class TestGate2RedFallbackDeny:

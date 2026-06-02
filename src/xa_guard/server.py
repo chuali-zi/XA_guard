@@ -27,13 +27,42 @@ from xa_guard.gates.gate4_taint import Gate4Taint
 from xa_guard.gates.gate5_sandbox import Gate5Sandbox
 from xa_guard.gates.gate6_audit import Gate6Audit
 from xa_guard.pipeline import Pipeline
+from xa_guard.policy.hot_reload import OverlayWatcher
+from xa_guard.policy.layered import LayeredPolicySource, set_global_source
 from xa_guard.proxy.downstream import DownstreamRouter
 from xa_guard.proxy.upstream import run_stdio, run_streamable_http
 
 log = logging.getLogger("xa_guard.server")
 
 
+def _init_layered_policy(cfg: XAGuardConfig) -> tuple[LayeredPolicySource | None, OverlayWatcher | None]:
+    """读 cfg.gates['policy_layered'] 决定是否启用双层策略 + 热加载。"""
+    layered_cfg = cfg.gates.get("policy_layered")
+    if layered_cfg is None or not layered_cfg.enabled:
+        return None, None
+    opts = layered_cfg.options
+    src = LayeredPolicySource(
+        manifest_path=opts.get("baseline_manifest", "policies/baseline_manifest.yaml"),
+        overlay_root=opts.get("overlay_root", "policies/overlay"),
+    )
+    set_global_source(src)
+    log.info(
+        "LayeredPolicySource ready: bundle_sha=%s stats=%s",
+        src.bundle_sha[:12], src.stats(),
+    )
+    watcher: OverlayWatcher | None = None
+    if opts.get("hot_reload", True):
+        watcher = OverlayWatcher(
+            src,
+            opts.get("overlay_root", "policies/overlay"),
+        )
+        if watcher.start():
+            log.info("OverlayWatcher started")
+    return src, watcher
+
+
 def build_pipeline(cfg: XAGuardConfig) -> Pipeline:
+    _init_layered_policy(cfg)
     return Pipeline(
         gate1=Gate1Input(cfg.gate("gate1")),
         gate2=Gate2Plan(cfg.gate("gate2")),

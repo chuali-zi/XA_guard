@@ -93,16 +93,19 @@ xa_guard:
       elicitation_fallback: stdout    # stdout | async_notify | deny
       tool_risk_file: policies/tool_risks.yaml
       approval_token_ttl_seconds: 300
+      prefer_layered: true             # 生产模式：优先 baseline + overlay 合并视图
 
     gate3:
       enabled: true
       backend: python                  # python | rego
       policy_file: policies/enterprise-l3.yaml
+      prefer_layered: true
 
     gate4:
       enabled: true
       strict_mode: false               # true 时连 WARN 都阻断
       tool_capabilities_file: policies/tool_capabilities.yaml
+      prefer_layered: true
 
     gate5:
       enabled: false                   # demo 默认禁用 Docker
@@ -115,6 +118,15 @@ xa_guard:
       hash_algo: sha256                # sha256 | sm3
       enable_sm2_signature: false
       sm2_key_path: ""
+
+    # 双层策略层（baseline + overlay + 单调性 + bundle_sha + 热加载）
+    # 见 src/xa_guard/policy/layered.py + docs：对标 Google Model Armor Floor Settings
+    # + AWS SCP（Deny 不被 IAM Allow 推翻）+ Gatekeeper ConstraintTemplate
+    policy_layered:
+      enabled: true
+      baseline_manifest: policies/baseline_manifest.yaml
+      overlay_root: policies/overlay
+      hot_reload: true                  # watchfiles 不可用时自动降级
 
   policy_default: enterprise-l3
   audit_dir: ./logs/audit

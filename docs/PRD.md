@@ -105,7 +105,7 @@
 
 | 子项 | 分值 | 量化标准 |
 |---|---|---|
-| **中文政企 Policy DSL 编译器** | 10 | 至少 30 条规则 + 单元测试 + 与 OPA 对接 |
+| **中文政企双层 Policy DSL 编译器** | 10 | 至少 30 条 baseline 规则 + 单元测试 + baseline/overlay 双层（企业 overlay 可热加载叠加，单调性门控保证不弱化国标兜底）+ 与 OPA 对接 |
 | **三色信息流污点融合** | 7 | CaMeL × SentinelAgent 思想首次合一，工程量 ≥ 500 行 |
 | **国密哈希链审计证据** | 5 | SM3 + SM2 + TSA + 满足《电子签名法》第 14 条 |
 | MCP Server 安全代理范式 | 3 | 业界首批中文 MCP 安全防护层 |
@@ -247,7 +247,7 @@
 - [ ] 测试覆盖率 ≥ 50%（pytest --cov）
 - [ ] 至少 1 个国产 MCP 客户端（Trae）实测通过
 - [ ] 6 关卡每个都有独立单元测试
-- [ ] Policy DSL 至少 30 条规则 + 单元测试
+- [ ] Policy DSL 至少 30 条 baseline 规则 + 单元测试 + baseline/overlay 双层（单调性门控 + bundle_sha 入审计）
 - [ ] 审计日志格式符合 OpenTelemetry GenAI Semantic Conventions
 - [ ] LICENSE（推荐 MIT 或 Apache 2.0）
 

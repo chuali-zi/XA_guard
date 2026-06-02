@@ -22,6 +22,7 @@ from typing import Any
 import yaml
 
 from xa_guard.gates.base import Gate, GateStage
+from xa_guard.policy.layered import get_global_source
 from xa_guard.types import (
     Decision,
     GateContext,
@@ -33,11 +34,43 @@ from xa_guard.types import (
 )
 
 # 敏感关键字正则（命中任意一个 → CONFIDENTIAL）
+# 兜底：未启用 LayeredPolicySource 时直接用此 baseline 正则（与 policies/sensitive_patterns.yaml 一致）
 _SENSITIVE_PATTERNS = re.compile(
     r"密码|密钥|手机号|银行卡|医疗健康|金融账户|行踪轨迹|敏感个人信息|"
-    r"access[_\-]key|secret[_\-]key|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9_]{36}|身份证",
+    r"password|passwd|pwd|access[_\-]key|secret[_\-]key|AKIA[0-9A-Z]{16}|"
+    r"ghp_[A-Za-z0-9_]{36}|身份证",
     re.IGNORECASE,
 )
+_HIGH_CONFIDENCE_ROUTING_PATTERNS = re.compile(
+    r"密码|密钥|手机号|银行卡|医疗健康|金融账户|行踪轨迹|敏感个人信息|身份证|"
+    r"\b[1-9]\d{5}(18|19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[0-9Xx]\b|"
+    r"(?<!\d)1[3-9]\d{9}(?!\d)|"
+    r"(?<!\d)(?:\d[ -]?){13,19}(?!\d)|"
+    r"\b[0-9A-HJ-NPQRTUWXY]{2}\d{6}[0-9A-HJ-NPQRTUWXY]{10}\b|"
+    r"\b(?:10(?:\.\d{1,3}){3}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}|"
+    r"192\.168(?:\.\d{1,3}){2}|127(?:\.\d{1,3}){3}|169\.254(?:\.\d{1,3}){2})\b|"
+    r"password|passwd|\bpwd\b|access[_\-]key|secret[_\-]key|"
+    r"\bBearer\s+[A-Za-z0-9._~+\-/]+=*|"
+    r"\beyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\b|"
+    r"\b(?:api|access|secret|private|auth|session)[_\- ]?(?:key|token|secret)\b\s*[:=]\s*[\"']?[A-Za-z0-9._~+\-/]{16,}[\"']?|"
+    r"-----BEGIN [A-Z ]*PRIVATE KEY-----|"
+    r"AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9_]{36}|"
+    r"(?:秘密|机密|绝密)\s*(?:★|\*)?\s*(?:\d+\s*年|长期|永久)?|"
+    r"(?:秘密级|机密级|绝密级|国家秘密|工作秘密|商业秘密|商密)|"
+    r"(?:内部资料|内部文件|内部使用|内部流转|内部公开|不得外传|严禁外传|禁止外传|涉密|保密)",
+    re.IGNORECASE,
+)
+
+_ROUTING_VALUE_KEYS = {
+    "to",
+    "cc",
+    "bcc",
+    "from",
+    "reply_to",
+    "recipient",
+    "recipients",
+    "channel",
+}
 
 # InputSource → 最低推断污点
 _SOURCE_TAINT: dict[InputSource, TaintLabel] = {
@@ -67,13 +100,37 @@ def _load_capabilities(path: str | Path) -> dict[str, ToolCapability]:
     return caps
 
 
-def _scan_sensitive(value: Any) -> bool:
+def _scan_sensitive(value: Any, pattern: re.Pattern | None = None) -> bool:
+    pat = pattern if pattern is not None else _SENSITIVE_PATTERNS
     if isinstance(value, str):
-        return bool(_SENSITIVE_PATTERNS.search(value))
+        return bool(pat.search(value))
     if isinstance(value, dict):
-        return any(_scan_sensitive(v) for v in value.values())
+        for k, v in value.items():
+            if _scan_sensitive(k, pat):
+                return True
+            key = str(k).lower().replace("-", "_")
+            if key in _ROUTING_VALUE_KEYS:
+                if _scan_routing_value_sensitive(v):
+                    return True
+                continue
+            if _scan_sensitive(v, pat):
+                return True
+        return False
     if isinstance(value, (list, tuple)):
-        return any(_scan_sensitive(v) for v in value)
+        return any(_scan_sensitive(v, pat) for v in value)
+    return False
+
+
+def _scan_routing_value_sensitive(value: Any) -> bool:
+    if isinstance(value, str):
+        return bool(_HIGH_CONFIDENCE_ROUTING_PATTERNS.search(value))
+    if isinstance(value, dict):
+        return any(
+            _scan_sensitive(k) or _scan_routing_value_sensitive(v)
+            for k, v in value.items()
+        )
+    if isinstance(value, (list, tuple)):
+        return any(_scan_routing_value_sensitive(v) for v in value)
     return False
 
 
@@ -107,6 +164,25 @@ class Gate4Taint(Gate):
             output_taint=TaintLabel.PUBLIC,
         )
 
+    def _current_caps(self) -> dict[str, ToolCapability]:
+        """LayeredPolicySource opt-in（cfg.gate4.prefer_layered: true）；默认 legacy。"""
+        if bool(self.opt("prefer_layered", False)):
+            layered = get_global_source()
+            if layered is not None:
+                caps = layered.get_tool_capabilities()
+                if caps:
+                    return caps
+        return self.capabilities
+
+    def _current_pattern(self) -> re.Pattern:
+        if bool(self.opt("prefer_layered", False)):
+            layered = get_global_source()
+            if layered is not None:
+                pat = layered.get_sensitive_pattern()
+                if pat is not None:
+                    return pat
+        return _SENSITIVE_PATTERNS
+
     def _infer_taint(self, ctx: GateContext) -> TaintLabel:
         taint = ctx.taint
         for src in ctx.input_sources:
@@ -116,14 +192,15 @@ class Gate4Taint(Gate):
                 continue
             taint = taint.merge(mapped)
 
+        pat = self._current_pattern()
         # 扫描 arguments 值
-        if _scan_sensitive(ctx.arguments):
+        if _scan_sensitive(ctx.arguments, pat):
             taint = taint.merge(TaintLabel.CONFIDENTIAL)
 
         # 扫描 session_history 中每条消息的 content
         for msg in ctx.session_history:
             content = msg.get("content", "")
-            if _scan_sensitive(content):
+            if _scan_sensitive(content, pat):
                 taint = taint.merge(TaintLabel.CONFIDENTIAL)
                 break
 
@@ -131,7 +208,8 @@ class Gate4Taint(Gate):
 
     def evaluate(self, ctx: GateContext, stage: GateStage = GateStage.INBOUND) -> GateResult:
         strict = bool(self.opt("strict_mode", False))
-        cap = self.capabilities.get(ctx.tool_name) or self._default_cap(ctx.tool_name)
+        caps = self._current_caps()
+        cap = caps.get(ctx.tool_name) or self._default_cap(ctx.tool_name)
 
         if stage == GateStage.INBOUND:
             inferred = self._infer_taint(ctx)

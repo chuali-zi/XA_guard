@@ -20,8 +20,8 @@ Distinct fingerprints: **290**
 ## By expected_decision
 - allow: 73
 - deny: 118
-- require_approval: 77
-- warn: 22
+- require_approval: 86
+- warn: 13
 
 ## By dimension × attack_type
 ### compliance
