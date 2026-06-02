@@ -11,6 +11,8 @@
 
 本轮已按用户要求完成两项规模化补强：**Policy DSL 从 10 条扩到 30 条**，`bench/cases/csab-gov-mini-seed.yaml` 从 30 条扩到 **290 条**。规则和样例围绕等保 2.0 / GB/T 22239-2019、GB/T 45654-2025、TC260-003 补充了日志留存、备份与加密、关键岗位权限、CII/重要场景、训练数据授权、robots 禁采、商业来源证明、个人/敏感个人信息、第三方模型备案、模型更新安全评估、标注职责隔离、未成年人保护、AI 生成合成内容标识、连续诱导违法输入处置等主题。事实源采用官方页面复核：GB/T 22239-2019 为 2019-05-10 发布、2019-12-01 实施的现行标准；GB/T 45654-2025 为 2025-04-25 发布、2025-11-01 实施的现行推荐性国标；TC260-003 为 TC260 于 2024-03-01 发布的技术文件。
 
+2026-06-02 进一步把 290 条升级为「可信评测资产」：每条 case 现在带 `case_kind`（attack_case 193 / benign_control 76 / assurance_check 21）、`source_documents`（按 policy_refs 前缀映射到 GB/T 22239-2019、GB/T 45654-2025、TC260-003、网安法、AIGC 标识办法；合计 137 / 148 / 48 / 12 / 11 条引用）、稳定 `fingerprint`；fingerprint 全部唯一（重复 payload 通过 `variant_index` 解碰撞）。新增 `bench/schema/csab-gov-mini.schema.json` + `scripts/enrich_csab_gov_mini.py`（幂等，`--check` 给 CI）+ `scripts/validate_csab_gov_mini.py`（必填字段 / ID 唯一 / fingerprint 唯一 / policy_refs 白名单 / metadata 对账，`--strict` 把告警提为错误）+ `tests/test_csab_gov_mini_assets.py` 7 个用例钉在 CI 里，避免 YAML 继续扩量后悄悄回退。当前 `validate --strict` errors=0/warnings=0，`pytest` 183 passed，bench 290/100%。
+
 ## 与赛题 4 个方向的贴合度
 
 | 赛题方向 | 当前仓库状态 | 空位 / 未完成 |

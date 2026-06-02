@@ -1,5 +1,41 @@
 # 工作日志
 
+## 2026-06-02 +08:00 主 agent（Opus 4.7） — 把 290 条 mini 升级为可信评测资产
+
+按用户要求把 `bench/cases/csab-gov-mini-seed.yaml` 从「裸列表」升级到「带 case_kind + 标准来源 + 去重 + 覆盖率 + schema 校验」的可审计资产。
+
+本次具体做了：
+- 新增 `bench/schema/csab-gov-mini.schema.json`：JSON Schema，约束每条 case 的必填字段（case_id 正则、case_kind 枚举、source_documents 至少 1 条），可供 IDE / 外部 lint 复用。
+- 新增 `scripts/enrich_csab_gov_mini.py`：幂等地把 290 条样例补齐 `case_kind`（attack_case 193 / benign_control 76 / assurance_check 21）、`source_documents`（按 policy_refs 前缀映射到 GB/T 22239-2019 / GB/T 45654-2025 / TC260-003 / 网安法 / AIGC 标识办法；无 policy_refs 的按 dimension fallback）、稳定 16 位 `fingerprint`；并对原 YAML anchor 复用的 28 组重复 payload 注入 `variant_index`，让 290 条 fingerprint 全部唯一。`--check` 给 CI 用。
+- 新增 `scripts/validate_csab_gov_mini.py`：必填字段 + 枚举 + ID/fingerprint 唯一性 + case_kind↔attack_type 一致性 + policy_refs 白名单（从 `policies/enterprise-l3.yaml` 加载，外加 9 个子条款 ID）+ metadata.total/dimensions 对账；并把覆盖率报告写到 `bench/.log/coverage.md`。`--strict` 把告警提为错误。
+- 新增 `tests/test_csab_gov_mini_assets.py` 7 个测试，把 schema/dedup/coverage/幂等性钉在 CI 里。
+- 改写 `bench/cases/csab-gov-mini-seed.yaml`：290 条全部带 `case_kind` + `source_documents` + `fingerprint`；metadata 新增 `case_kinds` 分布；标准引用合计 137 GB/T 22239-2019 / 148 GB/T 45654-2025 / 48 TC260-003 / 12 网安法 / 11 AIGC，覆盖 41 个 attack_type × 7 dimension。
+
+验证（顺序固定，每一步留有 stdout 证据）：
+1. `python scripts/enrich_csab_gov_mini.py` → 写入；再 `--check` → 幂等通过。
+2. `python scripts/validate_csab_gov_mini.py --strict` → cases=290 errors=0 warnings=0；coverage.md 已刷新。
+3. `PYTHONPATH=src python -m pytest` → 183 passed（含新增 7 个 mini 资产校验测试，旧 176 个全部不变）。
+4. `PYTHONPATH=src python -m bench.cli run --suite bench/cases/csab-gov-mini-seed.yaml --config configs/xa-guard.yaml` → 290 条 pass_rate 1.0，7 个 dimension 子分数全部 1.0。
+
+未完成 / 客观限制：
+- `source_documents` 中 fallback 引用（无 policy_refs 的 benign 案例）只到「附录 A 数据安全」这个粒度，没有逐条人工对齐到「附录 A.1.x.y」级别。
+- `variant_index` 解决了 fingerprint 碰撞，但部分 benign_compliant / risk_explanation / audit_required_red_tool 案例本质上仍是同一 payload 的复制；将来扩量应换样本而不是堆 variant。
+- 真实模型链路 / Qwen3Guard 推理 / MCP E2E / Docker 沙箱 / approval_token 闭环等历史缺口与本次无关，仍未推进。
+
+## 2026-06-02 +08:00 Codex 主 agent
+
+按用户关于 Gate3、政企策略、国密标准和策略审核的问题，做了一轮只读核对并准备答复。本轮没有读取或维护 `implementation-notes.html`，没有修改产品代码逻辑。
+
+本次具体做了：
+- 读取 `status.md`、`src/xa_guard/gates/gate3_policy.py`、`policies/enterprise-l3.yaml`、`configs/xa-guard.yaml`、`docs/事实源.md`，确认 Gate3 当前为运行期加载 YAML 策略文件的 Python predicate 后端。
+- 确认当前 `policies/enterprise-l3.yaml` 已有 30 条 seed 规则，覆盖等保 2.0、GB/T 45654-2025、TC260-003 相关的审批、阻断、告警和审计要求。
+- 确认当前 `backend=rego` 仍未实现，OPA/Rego 属于后续增强；`gate6.hash_algo` 默认仍是 `sha256`，`enable_sm2_signature: false`，正式 SM3/SM2 国密证据链尚未闭环。
+- 准备给用户说明：策略不应写死在业务代码里，应在仓库保留可审计默认策略与 schema/测试，同时支持运行期加载租户/环境策略；国密主要用于审计证据链、重要操作签名、传输/存储保护，不是所有 Gate3 predicate 都要“用国密”。
+
+未完成 / 客观限制：
+- 本轮只做问题解答准备，没有实现 OPA/Rego、审批令牌闭环、正式 SM2 签名、TSA 时间戳或国密 TLS。
+- 未运行测试或 bench，因为未改实现代码。
+
 ## 2026-06-02 +08:00 主 agent（Opus 4.8）
 
 按用户要求更新根目录 `status.md`。本轮只做状态核对与刷新，未改产品代码逻辑。
