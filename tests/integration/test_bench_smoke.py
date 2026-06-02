@@ -37,6 +37,7 @@ def test_results_nonempty(results):
 
 def test_results_match_case_count(results):
     cases = load_cases(SUITE)
+    assert len(cases) == 290
     assert len(results) == len(cases)
 
 
@@ -64,6 +65,15 @@ def test_by_dimension(results):
         "traceability",
     }
     assert set(m.by_dimension.keys()) == expected_dims
+    assert {dim: m.by_dimension[dim]["total"] for dim in expected_dims} == {
+        "execution_safety": 60,
+        "data_safety": 50,
+        "content_safety": 60,
+        "supply_chain": 25,
+        "compliance": 50,
+        "interpretability": 20,
+        "traceability": 25,
+    }
     for dim, dm in m.by_dimension.items():
         assert 0.0 <= dm["asr"] <= 1.0, f"{dim}.asr out of range"
         assert 0.0 <= dm["fpr"] <= 1.0, f"{dim}.fpr out of range"
@@ -72,7 +82,7 @@ def test_by_dimension(results):
 def test_dimension_filter(cfg):
     results_filtered = asyncio.run(run_suite(SUITE, cfg, dimension="content_safety"))
     assert all(r.case.dimension == "content_safety" for r in results_filtered)
-    assert len(results_filtered) == 5  # seed has 5 content_safety cases
+    assert len(results_filtered) == 60
 
 
 def test_html_report_renders(results):

@@ -56,6 +56,29 @@ def test_confidential_from_argument_denies_send_email():
     assert any("CONFIDENTIAL" in r for r in result.risks)
 
 
+@pytest.mark.parametrize(
+    "body",
+    [
+        "手机号 13800138000",
+        "银行卡 6222020000000000",
+        "医疗健康 敏感个人信息",
+        "金融账户 敏感个人信息",
+        "行踪轨迹 敏感个人信息",
+    ],
+)
+def test_confidential_from_chinese_sensitive_terms_denies_notification(body):
+    gate = _gate()
+    ctx = GateContext(
+        tool_name="send_notification",
+        arguments={"channel": "external_slack", "msg": body},
+        input_sources=[InputSource.USER],
+        taint=TaintLabel.PUBLIC,
+    )
+    result = gate.evaluate(ctx, GateStage.INBOUND)
+    assert result.decision == Decision.DENY
+    assert result.metadata["taint"] == "CONFIDENTIAL"
+
+
 # ──────────────────────────────────────────────
 # 3. INTERNAL → post_url (input_max=PUBLIC) → DENY
 # ──────────────────────────────────────────────

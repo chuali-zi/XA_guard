@@ -110,6 +110,16 @@ def test_rule_a_2_3_hit_password_in_write(gate):
     assert result.decision == Decision.DENY
 
 
+def test_rule_a_2_3_hit_secret_key_in_write(gate):
+    ctx = _ctx(
+        tool_name="write_file",
+        arguments={"path": "/tmp/x", "content": "secret_key=prod"},
+    )
+    result = gate.evaluate(ctx)
+    assert "GBT-45654-A.2.3" in result.rule_hits
+    assert result.decision == Decision.DENY
+
+
 def test_rule_a_2_3_miss_clean_write(gate):
     ctx = _ctx(tool_name="write_file", arguments={"path": "/tmp/x", "content": "hello world"})
     result = gate.evaluate(ctx)
@@ -138,6 +148,13 @@ def test_rule_tc260_7_2_miss_user_only(gate):
 # ---------- 6. GBT-22239-8.1.3.1 角色越权访问拦截 ----------
 def test_rule_8_1_3_1_hit_non_admin(gate):
     ctx = _ctx(tool_name="restart_service", arguments={"svc": "nginx"}, user_role="user")
+    result = gate.evaluate(ctx)
+    assert "GBT-22239-8.1.3.1" in result.rule_hits
+    assert result.decision == Decision.DENY
+
+
+def test_rule_8_1_3_1_hit_non_admin_drop_table(gate):
+    ctx = _ctx(tool_name="drop_table", arguments={"table": "tmp_report"}, user_role="user")
     result = gate.evaluate(ctx)
     assert "GBT-22239-8.1.3.1" in result.rule_hits
     assert result.decision == Decision.DENY
@@ -231,7 +248,98 @@ def test_clean_call_allows(gate):
     result = gate.evaluate(ctx)
     assert result.decision == Decision.ALLOW
     assert result.rule_hits == []
-    assert result.metadata["policy_count"] == 10
+    assert result.metadata["policy_count"] == 30
+
+
+# ---------- 新增合规规则抽样覆盖：等保 2.0 / GB/T 45654 / TC260-003 ----------
+@pytest.mark.parametrize(
+    ("ctx_kwargs", "rule_id", "decision"),
+    [
+        (
+            {
+                "tool_name": "update_audit_policy",
+                "arguments": {"retention_days": 30},
+            },
+            "CSL-LOG-RETENTION-6M",
+            Decision.DENY,
+        ),
+        (
+            {
+                "tool_name": "update_encryption_policy",
+                "arguments": {"algorithm": "none"},
+            },
+            "GBT-22239-DATA-ENCRYPTION",
+            Decision.DENY,
+        ),
+        (
+            {
+                "tool_name": "import_training_data",
+                "arguments": {"source_type": "web", "robots": "disallow"},
+            },
+            "GBT-45654-DATA-ROBOTS",
+            Decision.DENY,
+        ),
+        (
+            {
+                "tool_name": "deploy_model",
+                "arguments": {"third_party_model": True, "filing_status": "unknown"},
+            },
+            "GBT-45654-MODEL-FILING",
+            Decision.REQUIRE_APPROVAL,
+        ),
+        (
+            {
+                "tool_name": "export_generated_content",
+                "arguments": {"label_required": True, "visible_label": False},
+            },
+            "AIGC-LABEL-REQUIRED",
+            Decision.DENY,
+        ),
+        (
+            {
+                "tool_name": "user_session_risk",
+                "arguments": {"illegal_input_count": 3},
+            },
+            "TC260-003-REPEATED-ILLEGAL-INPUT",
+            Decision.REQUIRE_APPROVAL,
+        ),
+    ],
+)
+def test_expanded_compliance_rules_hit(gate, ctx_kwargs, rule_id, decision):
+    result = gate.evaluate(_ctx(**ctx_kwargs))
+    assert rule_id in result.rule_hits
+    assert result.decision == decision
+
+
+@pytest.mark.parametrize(
+    ("ctx_kwargs", "rule_id"),
+    [
+        (
+            {
+                "tool_name": "update_audit_policy",
+                "arguments": {"retention_days": 365},
+            },
+            "CSL-LOG-RETENTION-6M",
+        ),
+        (
+            {
+                "tool_name": "import_training_data",
+                "arguments": {"source_type": "web", "robots": "allow"},
+            },
+            "GBT-45654-DATA-ROBOTS",
+        ),
+        (
+            {
+                "tool_name": "export_generated_content",
+                "arguments": {"label_required": True, "visible_label": True},
+            },
+            "AIGC-LABEL-REQUIRED",
+        ),
+    ],
+)
+def test_expanded_compliance_rules_miss_safe_boundary(gate, ctx_kwargs, rule_id):
+    result = gate.evaluate(_ctx(**ctx_kwargs))
+    assert rule_id not in result.rule_hits
 
 
 def test_aggregate_deny_over_approval(gate):

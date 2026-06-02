@@ -1,5 +1,5 @@
 # 等保 2.0 三级 + GB/T 45654-2025 + TC260-003 seed 规则
-# 子 agent G3 扩展至 30 条；当前 10 条 seed 覆盖 4 类风险。
+# 2026-06-01 扩展至 30 条；覆盖等保审计/备份/权限/重要场景，以及生成式 AI 数据、模型、标识治理。
 # predicate 语法见 src/xa_guard/policy/compiler.py
 metadata:
   name: enterprise-l3
@@ -43,7 +43,7 @@ rules:
     name: 禁止生成涉敏内容
     source: "GB/T 45654-2025 附录 A.2.3"
     triggers: [content_generation, write_file]
-    predicate: "tool in ('write_file', 'append_file') and (contains('content', '身份证') or contains('content', '密码') or contains('content', '密钥'))"
+    predicate: "tool in ('write_file', 'append_file') and (contains('content', '身份证') or contains('content', '手机号') or contains('content', '密码') or contains('content', '密钥') or contains('content', 'secret_key') or contains('content', 'access_key'))"
     enforce: deny
     severity: high
     audit: required
@@ -61,8 +61,8 @@ rules:
   - id: GBT-22239-8.1.3.1
     name: 角色越权访问拦截
     source: "GB/T 22239-2019 8.1.3.1"
-    triggers: [restart_service, exec_command, delete_file, admin_action]
-    predicate: "tool in ('restart_service', 'exec_command', 'delete_file') and role != 'admin' and role != 'ops'"
+    triggers: [restart_service, exec_command, delete_file, drop_table, admin_action]
+    predicate: "tool in ('restart_service', 'exec_command', 'delete_file', 'drop_table', 'admin_action') and role != 'admin' and role != 'ops'"
     enforce: deny
     severity: high
     audit: required
@@ -102,3 +102,203 @@ rules:
     enforce: require_approval
     severity: high
     audit: required
+
+  - id: CSL-LOG-RETENTION-6M
+    name: 网络日志留存不少于六个月
+    source: "网络安全法第二十一条 / 等保 2.0 审计通用要求"
+    triggers: [update_audit_policy, log_cleanup]
+    predicate: "tool == 'update_audit_policy' and args.get('retention_days', 180) < 180"
+    enforce: deny
+    severity: critical
+    audit: required
+    description: 生产网络日志留存策略不得低于六个月。
+
+  - id: GBT-22239-AUDIT-DELETE
+    name: 审计证据删除审批
+    source: "等保 2.0 / GB/T 22239-2019 安全审计通用要求"
+    triggers: [delete_file, exec_command, log_cleanup]
+    predicate: "tool in ('delete_file', 'exec_command', 'log_cleanup') and (contains('path', 'audit') or contains('path', 'log') or contains('cmd', 'clearlog') or contains('cmd', 'wevtutil cl'))"
+    enforce: require_approval
+    severity: high
+    audit: required
+    description: 删除、清理或覆盖审计日志需要审批并留痕。
+
+  - id: GBT-22239-BACKUP-DISABLE
+    name: 重要数据备份关闭阻断
+    source: "网络安全法第二十一条 / 等保 2.0 数据备份通用要求"
+    triggers: [update_backup_policy, delete_file, exec_command]
+    predicate: "tool == 'update_backup_policy' and (contains('action', 'disable') or contains('action', '关闭') or contains('target', '重要数据') or contains('target', 'backup'))"
+    enforce: require_approval
+    severity: high
+    audit: required
+    description: 重要数据备份策略变更需要人工审批。
+
+  - id: GBT-22239-DATA-ENCRYPTION
+    name: 重要数据加密降级阻断
+    source: "网络安全法第二十一条 / 等保 2.0 数据加密通用要求"
+    triggers: [update_encryption_policy, export_database, write_file]
+    predicate: "tool == 'update_encryption_policy' and (contains('algorithm', 'none') or contains('algorithm', 'plaintext') or contains('mode', 'disable'))"
+    enforce: deny
+    severity: critical
+    audit: required
+    description: 重要数据保护不得降级为明文或关闭加密。
+
+  - id: GBT-22239-CII-EXTERNAL
+    name: 关键信息基础设施外联审批
+    source: "网络安全法关键信息基础设施重点保护 / 等保 2.0 通用要求"
+    triggers: [post_url, send_email, cross_domain_call]
+    predicate: "tool in ('post_url', 'send_email', 'cross_domain_call') and (contains('body', '关键信息基础设施') or contains('body', '重要数据') or contains('system_type', 'cii'))"
+    enforce: require_approval
+    severity: critical
+    audit: required
+    description: CII 或重要数据跨域外发必须审批。
+
+  - id: GBT-22239-KEY-ROLE
+    name: 关键岗位权限变更审批
+    source: "网络安全法关键信息基础设施重点保护 / 等保 2.0 访问控制通用要求"
+    triggers: [grant_permission, update_user_role, admin_action]
+    predicate: "tool in ('grant_permission', 'update_user_role', 'admin_action') and (contains('role', 'admin') or contains('role', '关键岗位') or contains('permission', 'root'))"
+    enforce: require_approval
+    severity: high
+    audit: required
+    description: 管理员、root 或关键岗位权限授予/变更必须留痕审批。
+
+  - id: GBT-22239-DUTY-SEPARATION
+    name: 审计岗位职责隔离
+    source: "等保 2.0 安全管理通用要求"
+    triggers: [exec_command, restart_service, delete_file, admin_action]
+    predicate: "role == 'auditor' and tool in ('exec_command', 'restart_service', 'delete_file', 'admin_action')"
+    enforce: deny
+    severity: high
+    audit: required
+    description: 审计岗位不应直接执行系统运维或删除类操作。
+
+  - id: GBT-22239-EXT-PROFILE
+    name: 云物工场景扩展要求缺失
+    source: "GB/T 22239-2019 安全扩展要求"
+    triggers: [publish_system, deploy_system]
+    predicate: "tool in ('publish_system', 'deploy_system') and args.get('deployment') in ('cloud', 'iot', 'industrial') and not args.get('extension_profile')"
+    enforce: require_approval
+    severity: medium
+    audit: required
+    description: 云计算、物联网、工业控制等场景应明确适用的安全扩展要求。
+
+  - id: GBT-22239-ASSESSMENT-EVIDENCE
+    name: 等保测评证据缺失审批
+    source: "等保 2.0 测评与整改通用要求"
+    triggers: [publish_system, deploy_system]
+    predicate: "tool in ('publish_system', 'deploy_system') and (contains('compliance_status', 'missing_assessment') or contains('evidence', 'missing') or contains('evidence', '未完成等保测评'))"
+    enforce: require_approval
+    severity: high
+    audit: required
+    description: 等保测评证据不完整时不得静默上线。
+
+  - id: GBT-45654-DATA-AUTH
+    name: 使用者输入训练授权缺失
+    source: "GB/T 45654-2025 / TC260-003 训练数据安全要求"
+    triggers: [import_training_data, ingest_training_data, train_model, fine_tune_model]
+    predicate: "tool in ('import_training_data', 'ingest_training_data', 'train_model', 'fine_tune_model') and contains('source_type', 'user_chat') and not args.get('user_authorized')"
+    enforce: deny
+    severity: critical
+    audit: required
+    description: 使用者输入用于训练前应有授权记录。
+
+  - id: GBT-45654-DATA-ROBOTS
+    name: Robots 禁采数据入训阻断
+    source: "GB/T 45654-2025 / TC260-003 训练数据安全要求"
+    triggers: [import_training_data, ingest_training_data, crawl_url]
+    predicate: "tool in ('import_training_data', 'ingest_training_data', 'crawl_url') and contains('robots', 'disallow')"
+    enforce: deny
+    severity: high
+    audit: required
+    description: 明示禁止抓取的数据不得采集或用于训练。
+
+  - id: GBT-45654-DATA-COMMERCIAL-PROOF
+    name: 商业来源数据证明缺失审批
+    source: "GB/T 45654-2025 / TC260-003 训练数据安全要求"
+    triggers: [import_training_data, ingest_training_data]
+    predicate: "tool in ('import_training_data', 'ingest_training_data') and contains('source_type', 'commercial') and not args.get('contract_proof')"
+    enforce: require_approval
+    severity: high
+    audit: required
+    description: 商业数据入训前应复核合同、来源、质量和安全证明。
+
+  - id: GBT-45654-DATA-PII-CONSENT
+    name: 个人信息入训同意缺失
+    source: "GB/T 45654-2025 / TC260-003 训练数据安全要求"
+    triggers: [import_training_data, ingest_training_data, train_model, fine_tune_model]
+    predicate: "tool in ('import_training_data', 'ingest_training_data', 'train_model', 'fine_tune_model') and (contains('fields', '身份证') or contains('fields', '手机号') or contains('content', '个人信息')) and not args.get('personal_consent')"
+    enforce: deny
+    severity: critical
+    audit: required
+    description: 涉个人信息训练数据应取得个人同意或符合法定情形。
+
+  - id: GBT-45654-DATA-SPI-CONSENT
+    name: 敏感个人信息单独同意缺失
+    source: "GB/T 45654-2025 / TC260-003 训练数据安全要求"
+    triggers: [import_training_data, ingest_training_data, train_model, fine_tune_model]
+    predicate: "tool in ('import_training_data', 'ingest_training_data', 'train_model', 'fine_tune_model') and (contains('fields', '敏感个人信息') or contains('fields', '医疗健康') or contains('fields', '金融账户') or contains('fields', '行踪轨迹')) and not args.get('separate_consent')"
+    enforce: deny
+    severity: critical
+    audit: required
+    description: 敏感个人信息处理应具备单独同意或其他法定依据。
+
+  - id: GBT-45654-MODEL-FILING
+    name: 第三方基础模型备案核验
+    source: "GB/T 45654-2025 / TC260-003 模型安全要求"
+    triggers: [deploy_model, switch_model, call_model]
+    predicate: "tool in ('deploy_model', 'switch_model', 'call_model') and args.get('third_party_model') and args.get('filing_status') != 'registered'"
+    enforce: require_approval
+    severity: high
+    audit: required
+    description: 使用第三方基础模型前应核验备案和供应商安全状态。
+
+  - id: GBT-45654-MODEL-UPDATE-ASSESS
+    name: 模型重大更新安全评估
+    source: "GB/T 45654-2025 / TC260-003 模型更新安全要求"
+    triggers: [update_model, deploy_model, fine_tune_model]
+    predicate: "tool in ('update_model', 'deploy_model', 'fine_tune_model') and args.get('major_update') and not args.get('security_assessed')"
+    enforce: require_approval
+    severity: high
+    audit: required
+    description: 模型重大更新、升级或微调上线前应完成安全评估。
+
+  - id: GBT-45654-LABEL-DUTY-SEPARATION
+    name: 标注审核职责隔离
+    source: "GB/T 45654-2025 / TC260-003 数据标注安全要求"
+    triggers: [start_annotation, approve_label, ingest_labeled_data]
+    predicate: "tool in ('start_annotation', 'approve_label', 'ingest_labeled_data') and args.get('annotator') and args.get('annotator') == args.get('reviewer')"
+    enforce: require_approval
+    severity: medium
+    audit: required
+    description: 同一标注任务的数据标注和数据审核职能不应由同一人员承担。
+
+  - id: GBT-45654-MINOR-PROTECTION
+    name: 未成年人服务保护缺失审批
+    source: "GB/T 45654-2025 / TC260-003 未成年人保护要求"
+    triggers: [enable_minor_service, payment_action, recommend_content]
+    predicate: "tool in ('enable_minor_service', 'payment_action', 'recommend_content') and args.get('minor_user') and (args.get('paid_feature') or not args.get('anti_addiction_enabled'))"
+    enforce: require_approval
+    severity: high
+    audit: required
+    description: 面向未成年人服务应具备防沉迷和与民事行为能力相匹配的付费保护。
+
+  - id: AIGC-LABEL-REQUIRED
+    name: AI 生成合成内容标识缺失
+    source: "GB/T 45654-2025 / TC260-003 服务透明度要求；AI 生成合成内容标识要求"
+    triggers: [export_generated_content, post_url, send_email]
+    predicate: "tool in ('export_generated_content', 'post_url', 'send_email') and args.get('label_required') and not args.get('visible_label')"
+    enforce: deny
+    severity: high
+    audit: required
+    description: 对外发布生成合成内容时不得移除或隐匿必要标识。
+
+  - id: TC260-003-REPEATED-ILLEGAL-INPUT
+    name: 连续诱导违法输入处置
+    source: "TC260-003 / GB/T 45654-2025 用户输入安全检测要求"
+    triggers: [user_session_risk, content_generation]
+    predicate: "tool in ('user_session_risk', 'content_generation') and (args.get('illegal_input_count', 0) >= 3 or args.get('daily_illegal_input_count', 0) >= 5)"
+    enforce: require_approval
+    severity: high
+    audit: required
+    description: 连续多次诱导违法不良内容输入应触发暂停、人工复核或其他处置流程。

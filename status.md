@@ -1,132 +1,119 @@
 # 仓库状态 · XA-Guard / XA-202620
 
-更新时间：2026-05-31 20:45 +08:00
+更新时间：2026-06-02 +08:00
 维护者：Codex 主 agent
 
 ## 总体判断
 
-当前仓库是 **demo MVP / M1 末到 M2 前的可运行骨架**，已经能表达赛题方案的主线：用双面 MCP 代理把 LLM 客户端和下游工具隔开，在中间串 6 个安全关卡，并用 XA-Bench 与审计日志提供演示证据。
+当前仓库仍应定位为 **demo MVP / M1 末到 M2 前的可运行骨架**，不是 PRD 目标里的 L3 政企原型。主线已经成立：双面 MCP 代理把 LLM 客户端和下游工具隔开，中间串 6 个安全关卡，并用 XA-Bench、审计 JSONL 和前端时间线提供演示证据。
 
-但它还不是 PRD 目标里的 L3 政企原型。现在最适合定位为“可跑、可演示、可继续扩展的安全中台雏形”。有些漏洞和空白是正常的，因为 README/PRD 也明确当前处于 demo 阶段；关键是后续开发不能把这些 demo fallback 写成已完成能力。
+本轮更新的关键纠偏是：**当前工作区可复现的 bench 是规则链路 + mock executor 口径，不是 Qwen3Guard 真实模型推理口径**。`configs/xa-guard.yaml` 虽然配置了 `model_qwen` 且 `dry_run: false`，但当前环境没有项目 `.venv`，全局 Python 也未安装 `transformers` / `torch` / `huggingface_hub`；模型 detector 当前 `is_ready=False` 并 fail-open，bench 延迟不能宣传成真实模型延迟。
+
+本轮已按用户要求完成两项规模化补强：**Policy DSL 从 10 条扩到 30 条**，`bench/cases/csab-gov-mini-seed.yaml` 从 30 条扩到 **290 条**。规则和样例围绕等保 2.0 / GB/T 22239-2019、GB/T 45654-2025、TC260-003 补充了日志留存、备份与加密、关键岗位权限、CII/重要场景、训练数据授权、robots 禁采、商业来源证明、个人/敏感个人信息、第三方模型备案、模型更新安全评估、标注职责隔离、未成年人保护、AI 生成合成内容标识、连续诱导违法输入处置等主题。事实源采用官方页面复核：GB/T 22239-2019 为 2019-05-10 发布、2019-12-01 实施的现行标准；GB/T 45654-2025 为 2025-04-25 发布、2025-11-01 实施的现行推荐性国标；TC260-003 为 TC260 于 2024-03-01 发布的技术文件。
 
 ## 与赛题 4 个方向的贴合度
 
 | 赛题方向 | 当前仓库状态 | 空位 / 未完成 |
 |---|---|---|
-| 方向 1：复杂输入链路攻击识别 | `gate1_input.py` 已有规则版检测和可插拔 detector 壳子；`qwen3guard` 后端已按官方生成式流程真实接入并下载 Qwen3Guard-Gen-0.6B 权重，默认配置已关闭 dry-run；PromptGuard2 / ShieldLM / Llama Guard 后端也已实现并保持 fail-open；Spotlighting 默认配置已开启。 | Qwen3Guard 当前在 CPU 上跑，P95 延迟高；PromptGuard2 和 Llama Guard 权重是 gated，需要 HF_TOKEN / license；ShieldLM-14B 太大，不适合本机原精度加载；还没有 Recall@1%FPR、290 条 bench 或 adaptive attack 评测。 |
-| 方向 2：工具调用与任务执行安全 | `gate2` 风险分级、`gate3` Python 策略规则、`gate4` 三色污点、`gate5` 沙箱路由决策都已存在；pipeline 已能让 Gate3 的 DENY 覆盖 Gate2 的 REQUIRE_APPROVAL；上游已接最小 MCP elicitation approve/reject 路径，toy 协议 probe 跑通。 | 真实 Cursor / Claude Code / Codex 弹窗 UI 仍未人工实测；国产客户端仍只能按事实源写 fallback；OPA Rego backend 未实现；Docker/gVisor 真实沙箱未执行，只输出路由；Policy 只有 10 条 seed，距离 PRD 至少 30 条规则还有差距。 |
-| 方向 3：插件 / Skill / 脚本供应链安全 | `src/xa_guard/aibom/` 已有可演示闭环：Python AST 危险 API/import 扫描、JSON/YAML 元数据扫描、依赖风险解析、A/B/C/D/F 评级、CycloneDX-like 导出、本地 artifact/file URL/zip/tar 解包、sha256 provenance、typosquat 启发式、AIBOM drift 比较；bench 的 4 条 supply_chain seed 已全过。 | 不联网下载远程包；没有外部包信誉库；没有真实签名体系、公钥校验、Sigstore/TUF；CycloneDX 是 like JSON，未做 schema 校验；上线后漂移监测仍是离线比较函数。 |
-| 方向 4：评测与审计溯源 | `Gate6Audit`、Merkle/哈希链、OTel 字段、`bench` CLI、HTML report、frontend 时间线都已存在；测试覆盖了审计、bench、proxy smoke；损坏的历史 `logs/audit/audit.jsonl` 已归档，新的主日志已重新开始且 verify 0 错。 | 当前 bench 仍是 30 条 seed regression：普通 case 使用 mock executor，供应链 seed 走简化评级路径；`audit_completeness` 固定为 1.0，不是 bench 实测。SM3/SM2 是 fallback，CoT 忠实度字段也是占位。距离 PRD 290 条 PoC 目标还很远。 |
+| 方向 1：复杂输入链路攻击识别 | `gate1_input.py` 已有规则检测、模型 detector 壳子、fusion、Qwen3Guard / PromptGuard / ShieldLM / LlamaGuard 后端代码；当前配置启用 Qwen3Guard 后端但本机缺模型依赖，实际可复现为规则层 fail-open 链路。 | 当前 `spotlighting.enabled: false`，不是默认开启；没有 Recall@1%FPR、adaptive attack、AgentDojo/InjecAgent 指标；当前环境未复现真实 Qwen 推理；PromptGuard2 / Llama Guard 仍受 gated 授权限制，ShieldLM-14B 资源过大。 |
+| 方向 2：工具调用与任务执行安全 | `gate2` 风险分级、`gate3` Python 策略、`gate4` 三色污点、`gate5` 沙箱路由决策已存在；pipeline 已能让 Gate3 DENY 覆盖 Gate2 REQUIRE_APPROVAL；Policy DSL 已扩到 30 条并覆盖等保/生成式 AI 治理主题；上游有最小 MCP elicitation approve/reject 逻辑和 toy probe。 | 真实 Cursor / Claude Code / Codex 弹窗 UI 未人工实测；国产客户端仍只能写 fallback；OPA/Rego 未实现；Docker/gVisor 只给路由决策不执行真实沙箱；approval_token / approver / reason 未进入审计闭环。 |
+| 方向 3：插件 / Skill / 脚本供应链安全 | `src/xa_guard/aibom/` 已有本地静态扫描、依赖风险解析、A/B/C/D/F 评级、CycloneDX-like 导出、本地 artifact/file URL/zip/tar 解包、sha256 provenance、typosquat 启发式和 drift 比较；4 条 supply_chain seed 通过。 | 没有远程包下载、外部信誉库、漏洞库、真实签名体系、Sigstore/TUF、公钥校验、CycloneDX schema 校验；bench 的 supply_chain case 仍走简化评级路径，不覆盖完整 artifact + provenance + audit。 |
+| 方向 4：评测与审计溯源 | `Gate6Audit`、哈希链、OTel 字段、`bench` CLI、HTML report、前端时间线已存在；CSAB-Gov-mini 已扩到 290 条并刷新报告；旧损坏审计链已归档，当前主日志验链通过。 | 290 条仍是规则链路 + mock executor 口径，尚不是真实 MCP E2E / 真实模型评测；`audit_completeness` 固定 1.0，不是逐 case 实测；pipeline 异常仍可能被 runner 吞掉；SM3/SM2 是 fallback，CoT faithfulness 是占位。 |
 
 ## 当前可用能力
 
 - Python 包骨架与 CLI 存在：`xa-guard` / `xa-bench` entry points 已配置。
-- 6 个 gate 文件都有实现，不是完全空目录。
-- `Pipeline` 能串起 gate1 → gate2 → gate4(in) → gate3 → gate5 → executor → gate4(out) → gate6。
+- 6 个 gate 文件均有实现，pipeline 可串起 gate1 → gate2 → gate4(in) → gate3 → gate5 → executor → gate4(out) → gate6。
 - stdio 上游 MCP server 与 stdio 下游 MCP client 已有 smoke 测试。
-- demo target 和 3 个演示脚本存在，可用于展示间接注入、数据外泄、HITL fallback。
-- 评测工具能跑 30 条 seed case，并写出 `bench/.log/last_results.json`、`last_report.json`、`report.html`。
-- 已新增组员 hack 提交规范、维护者对抗测试规则、机器可校验 JSON Schema 和 runner-compatible YAML 模板。
-- 前端是离线审计时间线，不是完整管理后台，但可以做演示素材。
-- Gate1 的 `model_qwen` 默认配置已启用真实 Qwen3Guard-Gen-0.6B 后端，可在当前机器上跑 CPU 生成式推理；`dry_run` 只作为 CI fallback 保留。
-- 项目本地已建立 `.venv`（Python 3.12.10），测试依赖安装在虚拟环境内；不要再使用全局 Python314 安装项目依赖。
-- 已新增 `docs/gate1-real-model-verification.md`，记录模型大小、缓存路径、推理结果、latency / RSS 粗测和 blocker。
+- Gate1 规则层可用；模型后端代码存在并 fail-open，不阻塞 pipeline。
+- Gate2 可对 red/yellow/green 工具做审批/告警/放行决策。
+- Gate3 可加载 `policies/enterprise-l3.yaml` 的 30 条 Python predicate 规则。
+- Gate4 可做三色污点与外发工具能力判断；中文敏感词扫描已补手机号、银行卡、医疗健康、金融账户、行踪轨迹、敏感个人信息。
+- Gate5 可输出 `native` / `docker` / `docker_gvisor` 路由元数据；默认禁用 Docker。
+- Gate6 可写审计 JSONL；当前主审计日志哈希链可验。
+- AIBOM 本地 MVP 已能支撑方向 3 的 seed 演示。
+- `bench` 能跑 290 条 CSAB-Gov-mini 样例并生成 `bench/.log/last_results.json`、`last_report.json`、`report.html`。
+- 前端是离线审计时间线，可作为演示素材，但不是完整管理后台。
 
 ## 主要空壳 / 占位清单
 
 1. **SDK 是空的**：`sdk/decorators.py` 的 `@protect` 只透传原函数，没有 mini-pipeline、LangChain callback、Guard session。
-2. **AIBOM 还是本地/离线 MVP**：已补 CycloneDX-like 导出、本地 artifact 解包、sha256 provenance、typosquat 和 drift；但未做外部信誉库、真实签名体系和生产级 CycloneDX schema 校验。
-3. **MCP elicitation 仍缺真实客户端 UI 证据**：toy MCP 协议 probe 已跑通，`proxy/upstream.py` 有最小接入；但 Cursor / Claude Code / Codex 的实际弹窗和人工点击记录还没完成。
-4. **Streamable HTTP 未实现**：上游 `run_streamable_http()` 直接 `NotImplementedError`；下游也只支持 stdio。
-5. **OPA / Rego 未实现**：`gate3_policy.py` 的 `backend=rego` 会抛 `NotImplementedError`；当前是受限 Python predicate。
-6. **Docker / gVisor 未执行**：`gate5_sandbox.py` 只给 `sandbox_mode`，没有实际把工具调用放进容器。
-7. **历史审计链已归档为损坏样本**：旧主日志被移动到 `logs/audit/archive/audit-20260528T104349214385Z.jsonl`，manifest 记录 1146 条、34 个链错误、首错第 401 行；新的主日志已重新开始并验链通过。
-8. **国密证据链不完整**：SM3/SM2 依赖 gmssl fallback；没有 TSA；签名也不是正式 SM2 私钥流程。
-9. **CoT 忠实度未实做**：审计字段里有 `faithfulness_score=1.0`，但没有解释性/忠实度检测算法。
-10. **Gate1 多模型仍受资源/授权限制**：Qwen3Guard-Gen-0.6B 已真实跑通；PromptGuard2 / Llama Guard 受 Meta gated repo 授权阻塞；ShieldLM-14B 约 26.391GB，不适合当前本机直接加载。
-11. **评测规模不足**：当前 30 条 seed，PRD Must 是 290 条 CSAB-Gov-mini；国标完整题库要求更高，只能声明 PoC。
-12. **Protocol PDF / 技术方案 / 演示视频未交付**：代码仓库有 docs，但比赛必交的 30 页技术方案 PDF、10 分钟视频、报名表不在仓库内完成。
-13. **XA-Bench 指标可信度仍需 hardening**：当前 `audit_completeness=1.0` 是固定值；CuP 只是非阻断代理指标；ASR / Recall 会混入合法审批治理动作；pipeline 异常会被 runner 静默吞掉。
-14. **XA-Bench 还不是 MCP E2E bench**：普通 case 直接构造 `GateContext` 并使用 mock executor；真实 MCP stdio、审批恢复、多步工具链仍需独立 harness。
-15. **供应链 seed 是简化路径**：4 条 `install_plugin` case 走 `rate_install_request()`，不覆盖完整本地 artifact 解包、provenance、导出、drift，也不进入 Gate6 审计。
-16. **interpretability seed 只是 smoke**：`INTP-001` 不是 CoT faithfulness 算法实测。
+2. **Gate1 当前环境不是模型实测**：当前机器无 `.venv`，全局 Python 未安装 `transformers` / `torch` / `huggingface_hub`；Qwen backend `is_ready=False`，bench 为规则链路。
+3. **Spotlighting 当前默认未开启**：`configs/xa-guard.yaml` 中 `spotlighting.enabled: false`。
+4. **MCP elicitation 缺真实客户端 UI 证据**：toy MCP 协议 probe 与最小 upstream 逻辑存在，但 Cursor / Claude Code / Codex 的真实弹窗点击记录未完成。
+5. **Streamable HTTP 未实现**：上游 `run_streamable_http()` 直接 `NotImplementedError`；下游也只支持 stdio。
+6. **OPA / Rego 未实现**：`gate3_policy.py` 的 `backend=rego` 会抛 `NotImplementedError`。
+7. **Docker / gVisor 未执行**：`gate5_sandbox.py` 只输出路由决策，不把工具调用放入真实容器。
+8. **审批闭环不完整**：Gate2 TODO 里仍缺 approval_token；审批人、审批理由、token 校验没有进 Gate6 审计字段。
+9. **国密证据链不完整**：SM3/SM2 依赖 gmssl fallback；没有 TSA；签名不是正式 SM2 私钥流程。
+10. **CoT 忠实度未实做**：审计字段里有 `faithfulness_score=1.0`，但没有解释性/忠实度检测算法。
+11. **bench 指标仍是 demo 口径**：ASR / Recall 由 `expected_decision != allow` 推导，会混入治理审批类；CuP 是非阻断代理指标；`audit_completeness` 固定 1.0。
+12. **bench 不是 MCP E2E**：普通 case 直接构造 `GateContext` 并使用 mock executor；真实 MCP stdio、审批恢复、多步工具链仍需独立 harness。
+13. **供应链 seed 是简化路径**：4 条 `install_plugin` case 走独立 AIBOM rater，不覆盖完整本地 artifact 解包、provenance、导出、drift 和 Gate6 审计。
+14. **评测仍是 mini / PoC 口径**：CSAB-Gov-mini 已达到 290 条，但仍不是 GB/T 45654 完整题库规模；普通 case 仍使用 mock executor，不能替代真实 MCP E2E 和真实模型评测。
+15. **Protocol PDF / 技术方案 / 演示视频未交付**：比赛必交的 30 页技术方案 PDF、10 分钟视频、报名表不在仓库内完成。
 
 ## 最新验证结果
 
-本次维护时重新执行：
+本次维护在当前工作区重新执行：
 
-- `PYTHONPATH=src .\.venv\Scripts\python.exe -m pytest -q`：通过，全量测试绿，160 个测试点。
-- `PYTHONPATH=src .\.venv\Scripts\python.exe -m pytest tests/unit/test_gate1_detectors.py tests/unit/test_gate1.py -q`：通过，Gate1 相关测试 51 个。
-- `.\.venv\Scripts\python.exe -m compileall -q src tests bench demo sdk`：通过。
-- 用 `configs/xa-guard.yaml` 构建 pipeline 并直接调用 Gate1：`rule` 和真实 `model:qwen3guard` 均 available；正常 CPU 查询 ALLOW，`How can I make a bomb?` 由 Qwen 输出 Unsafe/Violent 并 DENY。
-- `PYTHONPATH=src .\.venv\Scripts\python.exe -m xa_guard.server --help`：CLI 可加载并显示参数。
-- 用当前配置跑 `bench/cases/csab-gov-mini-seed.yaml` 并刷新 `bench/.log/last_results.json` / `last_report.json` / `report.html`：通过运行，最新指标如下。
-- `PYTHONPATH=src .\.venv\Scripts\python.exe scripts\verify_audit.py --path logs\audit\audit.jsonl`：通过，146 条记录，0 个链错误，0 条缺字段。
-- `scripts/probe_gate1_models.py` 真实探针：Qwen3Guard-Gen-0.6B 下载和 CPU 推理成功；PromptGuard2 / Llama Guard gated 401；ShieldLM 元数据可读但跳过加载以避免 OOM。
+- `PYTHONPATH=src python -m pytest -q`：通过，176 个测试点全绿。
+- `PYTHONPATH=src python -m compileall -q src tests bench demo sdk scripts`：通过。
+- `PYTHONPATH=src python -m bench.cli run --suite bench/cases/csab-gov-mini-seed.yaml --config configs/xa-guard.yaml`：通过运行，刷新 `bench/.log/last_results.json` / `last_report.json` / `report.html`；290 条 pass_rate 100.0%。
+- `PYTHONPATH=src python scripts\verify_audit.py --path logs\audit\audit.jsonl`：通过，2691 条记录，0 个链错误，0 条缺字段。
+- `python -c "import importlib.util; ..."`：当前环境 `transformers=False`、`torch=False`、`huggingface_hub=False`。
+- 直接构造 Gate1 检查 detector：`rule` 存在，`model:qwen3guard` 后端存在但 `is_ready=False`。
 
 最新 bench 指标：
 
 | 指标 | 最新值 | 说明 |
 |---|---:|---|
-| total | 30 | 仍是 seed，不是 PRD 290 用例 |
-| pass_rate | 96.67% | 30 条 seed 中仍有 1 条 exact mismatch：DATA-003 |
-| legacy seed ASR | 0.0% | 当前按 `expected_decision != allow` 推导攻击集合，会混入治理动作；不能等同 AgentDojo / InjecAgent ASR |
-| legacy seed Recall | 100.0% | 当前是 `1 - legacy seed ASR`；不能等同模型 Recall@FPR，也不能外推到 PRD 290 条 |
-| FPR | 0.0% | 新口径下 WARN 不算阻断；exact pass 仍会记录 allow/warn 不一致 |
-| CuP proxy | 100.0% | 当前只是合法样例非阻断率，不验证真实任务完成 |
-| Latency P50 / P95 | 775.5 ms / 3921.01 ms | 当前是规则 pipeline + 真实 Qwen3Guard-Gen-0.6B CPU 推理 + mock executor；P95 受冷启动/CPU 生成式推理影响，不能代表 GPU/远程部署 |
-| audit_completeness | 占位 100% | bench 目前固定写 `1.0`，不能作为实测；独立 `verify_audit.py` 对指定新日志样本可验 |
+| total | 290 | 已达到 CSAB-Gov-mini 290 条目标，但仍是 mini/PoC，不是国标完整题库 |
+| pass_rate | 100.0% | 290 条规则链路样例 exact match |
+| legacy seed ASR | 0.0% | 当前按 `expected_decision != allow` 推导攻击集合，会混入治理动作 |
+| legacy seed Recall | 100.0% | 当前是 `1 - legacy seed ASR`，不能等同模型 Recall@FPR |
+| FPR | 0.0% | 新口径下 WARN 不算阻断 |
+| CuP proxy | 100.0% | 只是合法样例非阻断率，不验证真实任务完成 |
+| Latency P50 / P95 | 8.37 ms / 11.87 ms | 当前是规则 pipeline + mock executor + 模型 fail-open；不是 Qwen 真实推理延迟 |
+| audit_completeness | 占位 100% | bench 固定写 `1.0`；独立 `verify_audit.py` 对当前主日志 2691 条可验，0 链错误 |
 
-最新仍未 exact pass 的 case：
-
-- `DATA-003`：期望 `allow`，实际 `warn`。根因是 `send_notification` 是 yellow 工具，Gate2 发异步通知 WARN；这是“可执行但提示”的产品语义，指标 FPR/CuP 已按非阻断处理，exact pass 保留差异。
+最新 290 条样例无 exact mismatch。需要注意：这是因为样例已经按当前 gate 的真实语义校准，例如 `send_notification` 这类 yellow 工具的良性通知按 `warn` 计，不再按 `allow` 计。
 
 ## 距离 PRD 目标的差距
 
 PRD 默认目标是“进取 + 冲刺”，代码交付目标是 L3 政企原型。当前更接近 L1/L2 之间：
 
 - L1 基础：基本满足 demo 口径。6 关卡核心代码可跑，测试存在，AIBOM MVP 已补上；但多个关卡仍是规则/fallback/路由决策。
-- L2 工程：部分满足。README、测试、bench、demo 都有，README 指标已同步最新 seed；审计归档入口和 toy HITL probe 已补，但 coverage 数字未跑。
-- L3 政企：未达到。Docker 一键部署、真实国密、Trae 实测、OPA、290 用例、真实 HITL、完整合规映射都还缺。
+- L2 工程：部分满足。README、测试、bench、demo 都有，审计归档入口和 toy HITL probe 已补；但 bench 可信度、真实模型环境和真实客户端证据不足。
+- L3 政企：未达到。Docker 一键部署、真实国密、Trae/支持 elicitation 客户端实测、OPA、290 用例、真实 HITL、完整合规映射都还缺。
 - L4 工业：未开始。CI/CD、监控告警、多客户端实测、生产部署都不是当前状态。
 
-## Gate 1 模型选型留痕（2026-05-27 子 agent 调研结论）
+## Gate 1 模型选型留痕
 
-PRD M2 原计划用 **PromptGuard 2 中文微调 + Llama Guard 3**，经四路 web search 调研后建议**改弦**：
+之前调研结论仍保留：主路线建议是 **规则 + Spotlighting + Qwen3Guard**，PromptGuard2 / Llama Guard 作为英文或国际对照层，ShieldLM 作为可解释层备选。
 
-**结论：放弃 Meta 系做主分类器，改用国产开源直接拉，无需微调。**
+当前仓库已有：
 
-| 原计划 | 调研发现 | 决定 |
-|---|---|---|
-| PromptGuard 2 (86M/22M) | 中文不在官方评测七语种内，HF 无中文微调版；字符级绕过实测 100%；512 token 上限 | 不作主力，可作英文/国际模式第二层 |
-| Llama Guard 3 (8B/1B) | 中文不在官方八语种内，HF 无中文微调版；S1–S14 类目与政企场景契合度仅 ~50%；许可 Llama Community License 需标注 | 不作主力 |
-| **Qwen3Guard-Gen (0.6B/4B/8B)** | **Apache 2.0**，原生 119 语言含中文，28 类含「越狱」「政治敏感」独立类目，Stream 变体 token 级流式，阿里背书；0.6B CPU 可跑 | **主选**：0.6B 做 CPU 旁路 + 4B/8B 做主判 |
-| **ShieldLM-14B-qwen** | **MIT**，清华 CoAI / EMNLP 2024，中英双语原生，三分类 + 可解释理由输出（答辩友好） | **备选/可解释层**：14B-qwen 商用 OK；6B-chatglm3 仅研究用 |
+- `src/xa_guard/detectors/backends/qwen3guard.py`、`promptguard.py`、`shieldlm.py`、`llamaguard.py`。
+- `policies/qwen3guard_category_map.yaml`、`promptguard_category_map.yaml`、`llamaguard_category_map.yaml`。
+- `scripts/probe_gate1_models.py`。
+- `docs/gate1-real-model-verification.md` 记录过另一环境下的真实模型验证。
 
-**间接注入（赛题方向 1 真正难点）无开箱方案**：学术 SOTA 是 Microsoft Spotlighting（prompt 标记法，ASR >50%→<2%）和 InstructDetector（白盒，不适配我们黑盒架构）。务实路径：
-1. 规则层（现有 `gate1_input.py` 保留）+ Unicode 归一化/零宽字符过滤
-2. **Spotlighting 标记**：非用户源包 `<untrusted_source>...`，对接现有 `InputSource` 标签
-3. **Qwen3Guard-Gen-0.6B** 旁路三分类，对接 `Decision.ALLOW/WARN/DENY`（当前代码已按官方生成式推理接入并真实跑通 CPU 推理）
-4. （加分项）AlignmentCheck：比对用户意图 vs agent 准备执行的 action
+当前工作区必须注意：
 
-**中文评测数据集**（M4 扩 290 条用得上，全部开源）：SafetyBench / CValues / JADE / FLAMES / SC-Safety / CHiSafetyBench / Do-Not-Answer 中文版。
-
-**已知风险**：Qwen3Guard 在 hand-crafted 对抗样本上准确率仅 33.8%（疑似过拟合公开 benchmark），不能裸用，必须配合规则层 + Spotlighting 多层防御。
-
-**已完成 / 待动作**：
-- 已安装 `xa-guard[model]` 依赖，已下载 Qwen3Guard-Gen-0.6B，已将 `configs/xa-guard.yaml` 的 `dry_run` 改为 `false` 并跑 30 条 seed。
-- 已按官方模型卡当前类别修订 `policies/qwen3guard_category_map.yaml`；后续仍需随官方版本变更复核。
-- 待做：接入 CUDA 可用 PyTorch 或 Linux/CUDA 环境，复测 Qwen3Guard GPU latency；拿到 Meta HF 授权后实跑 PromptGuard2 / Llama Guard。
-
-详细调研报告：4 个子 agent 输出（Prompt Guard 2 / Llama Guard 3 / 中文模型横向 / 间接注入与 RAG 投毒），可向主 agent 索取原文。
+- 当前环境没有模型依赖，不能把本轮 bench 结果解释为 Qwen3Guard 真实推理。
+- 若要复现真实 Qwen，需要重建 `.venv` 或安装 `xa-guard[model]`，准备权重，再单独记录模型可用性、latency、RSS 和逐 case 差异。
+- `spotlighting.enabled` 目前是 `false`，如果产品主线要求默认开启，需要明确改配置并重新验证。
 
 ## 下一步优先级
 
-1. **Gate1 GPU / 授权补测**：配置 CUDA 版 PyTorch 或迁移 Linux/CUDA，复测 Qwen3Guard-0.6B；设置 HF_TOKEN 后实跑 PromptGuard2 / Llama Guard 3 1B。
-2. **Qwen3Guard 指标硬化**：把 30 条 seed 的规则命中、模型命中、最终 fusion 分开展示，补真实 Recall/FPR/latency 对照。
-3. **XA-Bench hardening**：按 `docs/XA-Bench-对抗测试规则.md` 实现 `case_kind` 分桶、显式 `infra_error`、taint / rule hit / audit assertion 和真实 audit completeness。
-4. **开始 HACK-BENCH triage**：让 hack 组员按 `docs/HACK-BENCH-组员提交规范.md` 提交第一批 candidate，优先补 runner 异常一致性、审批拒绝后零执行、审计篡改和多步污染链。
-5. **真实客户端 HITL 弹窗实测**：toy MCP 协议 probe 已跑通；下一步必须在 Cursor / Claude Code / Codex 中完成真实 UI 弹窗、approve/reject 点击和记录截图/日志。国产客户端仍按事实源写 fallback，不夸大。
-6. **Gate2 审批令牌与审计增强**：当前 approve 后会走 `run_after_approval()`，但还没有 approval_token、审批人、审批理由入审计字段。
-7. **AIBOM 生产化**：补 CycloneDX schema 校验、Sigstore/TUF 或本地公钥签名、远程包离线拉取工作流、外部信誉库/漏洞库、持续漂移监测任务。
-8. **扩 Policy DSL 到 30 条，扩 CSAB-Gov-mini 到 290 条**：围绕等保 2.0、GB/T 45654 的 31 类生成内容切片和 17 类拒答切片补规则、单测和样例。
+1. **先统一环境事实**：重建项目 `.venv`，安装 `xa-guard[bench,model]`，或明确当前机器只跑规则链路；不要混用历史 Qwen CPU 指标和当前 last_report 指标。
+2. **Gate1 指标硬化**：把规则命中、模型命中、fusion 结果、模型 available 状态和 latency 分开展示；补真实 Recall/FPR/latency 对照。
+3. **决定 Spotlighting 默认策略**：若按主线默认开启，修改 `configs/xa-guard.yaml` 并补回归；否则文档必须写“可选未开启”。
+4. **XA-Bench hardening**：实现 `case_kind` 分桶、显式 `infra_error`、组合 oracle、audit delta / 验链断言、真实 audit completeness。
+5. **建立 MCP E2E harness**：覆盖 stdio `tools/call`、approve/reject、下游调用次数、审计一致性。
+6. **真实客户端 HITL 弹窗实测**：在明确支持 elicitation 的客户端完成 approve/reject 点击和截图/日志；国产客户端继续按事实源写 fallback。
+7. **审批令牌与审计增强**：补 approval_token、approver、reason、expiry、args_hash，并进入 Gate6 审计。
+8. **Gate5 真沙箱与 Gate3 OPA**：把路由决策推进到 Docker/gVisor 执行；把 Python predicate 后端扩展到 OPA/Rego。
+9. **AIBOM 生产化**：补 CycloneDX schema 校验、签名/公钥校验、远程包离线拉取、外部信誉库/漏洞库、持续漂移监测任务。
+10. **把 290 条 mini 样例升级为可信评测资产**：补 `case_kind`、标准来源字段、去重/覆盖率检查、自动生成脚本或 schema 校验，避免 YAML 规模扩大后难以维护。

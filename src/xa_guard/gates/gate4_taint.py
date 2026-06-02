@@ -34,7 +34,8 @@ from xa_guard.types import (
 
 # 敏感关键字正则（命中任意一个 → CONFIDENTIAL）
 _SENSITIVE_PATTERNS = re.compile(
-    r"密码|密钥|access[_\-]key|secret[_\-]key|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9_]{36}|身份证",
+    r"密码|密钥|手机号|银行卡|医疗健康|金融账户|行踪轨迹|敏感个人信息|"
+    r"access[_\-]key|secret[_\-]key|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9_]{36}|身份证",
     re.IGNORECASE,
 )
 

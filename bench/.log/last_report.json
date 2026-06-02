@@ -1,18 +1,18 @@
 {
-  "total": 30,
-  "attacks": 22,
-  "benign": 8,
+  "total": 290,
+  "attacks": 217,
+  "benign": 73,
   "asr": 0.0,
   "recall": 1.0,
   "fpr": 0.0,
   "cup": 1.0,
-  "latency_p50_ms": 2.91,
-  "latency_p95_ms": 6.02,
-  "pass_rate": 0.9667,
+  "latency_p50_ms": 5.71,
+  "latency_p95_ms": 6.94,
+  "pass_rate": 1.0,
   "audit_completeness": 1.0,
   "by_dimension": {
     "execution_safety": {
-      "total": 8,
+      "total": 60,
       "asr": 0.0,
       "fpr": 0.0,
       "recall": 1.0,
@@ -20,15 +20,15 @@
       "pass_rate": 1.0
     },
     "data_safety": {
-      "total": 5,
+      "total": 50,
       "asr": 0.0,
       "fpr": 0.0,
       "recall": 1.0,
       "cup": 1.0,
-      "pass_rate": 0.8
+      "pass_rate": 1.0
     },
     "content_safety": {
-      "total": 5,
+      "total": 60,
       "asr": 0.0,
       "fpr": 0.0,
       "recall": 1.0,
@@ -36,7 +36,7 @@
       "pass_rate": 1.0
     },
     "supply_chain": {
-      "total": 4,
+      "total": 25,
       "asr": 0.0,
       "fpr": 0.0,
       "recall": 1.0,
@@ -44,7 +44,7 @@
       "pass_rate": 1.0
     },
     "compliance": {
-      "total": 4,
+      "total": 50,
       "asr": 0.0,
       "fpr": 0.0,
       "recall": 1.0,
@@ -52,7 +52,7 @@
       "pass_rate": 1.0
     },
     "interpretability": {
-      "total": 2,
+      "total": 20,
       "asr": 0.0,
       "fpr": 0.0,
       "recall": 1.0,
@@ -60,7 +60,7 @@
       "pass_rate": 1.0
     },
     "traceability": {
-      "total": 2,
+      "total": 25,
       "asr": 0.0,
       "fpr": 0.0,
       "recall": 1.0,

@@ -1,5 +1,85 @@
 # 工作日志
 
+## 2026-06-02 +08:00 主 agent（Opus 4.8）
+
+按用户要求更新根目录 `status.md`。本轮只做状态核对与刷新，未改产品代码逻辑。
+
+本次具体做了：
+- 核对工作区事实：`git status` 显示 bench log / seed / policy / gate4 / 多个测试与 status/log 有未提交改动；最新提交为 `21045ea`（已回退 spotlighting 默认、标记 llamaguard map TODO）。
+- 重新执行验证：`PYTHONPATH=src python -m pytest` 通过，176 个测试点全绿；`compileall` 通过；bench 290 条 pass_rate 100.0%，指标与上一轮一致（ASR 0、Recall 100%、FPR 0、CuP 100%、P50/P95 8.37/11.87ms）。
+- `verify_audit.py` 对主日志通过，记录数从上一轮 1442 增长到 2691，0 链错误、0 缺字段。
+- 复核模型环境：仍无项目 `.venv`，全局 Python 未装 `transformers`/`torch`/`huggingface_hub`，确认本轮 bench 仍是规则链路 + mock executor + 模型 fail-open 口径。
+- 更新 `status.md`：刷新时间戳、测试点数（176）、审计记录数（2691），其余状态判断维持不变。
+
+未完成 / 客观限制：
+- 未重建 `.venv`、未复现真实 Qwen3Guard 推理；未推进 MCP E2E、OPA、Docker 真沙箱、审批令牌审计闭环等既有缺口。
+
+## 2026-06-01 23:39 +08:00 Codex 主 agent
+
+按用户要求先查看 `status.md`，并按指定流程派出多轮子 agent：第一轮 3 个 `gpt-5.5 medium` 子 agent 分别围绕等保 2.0 / GB/T 22239、GB/T 45654、TC260-003 做 web search 和事实源提炼；主 agent 随后用官方页面复核关键事实；第二轮 3 个 `gpt-5.5 medium` 子 agent 分别给出 Policy 规则候选、290 条 bench 生成矩阵、单测扩展建议。本轮没有读取或维护 `implementation-notes.html`。
+
+本次具体做了：
+- 读取 `status.md`、`AGENTS.md`、`policies/enterprise-l3.yaml`、`bench/cases/csab-gov-mini-seed.yaml`、Gate3/Gate4/bench runner 和相关测试，确认当前 Policy 为 10 条、bench 为 30 条 seed。
+- web 核验官方事实源：GB/T 22239-2019 为 2019-05-10 发布、2019-12-01 实施的现行标准；GB/T 45654-2025 为 2025-04-25 发布、2025-11-01 实施的现行推荐性国标；TC260-003 为 TC260 于 2024-03-01 发布并提供 PDF 的技术文件；同时核对网络安全法日志留存不少于六个月、生成式 AI 暂行办法和 AI 生成合成内容标识相关官方口径。
+- 先按 TDD 改测试制造红灯：`test_gate3.py` 期望 Policy 30 条并新增合规规则命中/未命中断言；`test_bench_smoke.py` 期望 CSAB-Gov-mini 290 条和 7 维度分布。
+- 扩展 `policies/enterprise-l3.yaml` 到 30 条规则，新增日志留存、审计删除、备份、加密降级、CII 外联、关键岗位权限、职责隔离、扩展要求、等保测评证据、训练数据授权、robots 禁采、商业来源证明、个人/敏感个人信息、第三方模型备案、模型更新评估、标注职责隔离、未成年人保护、AI 标识、连续诱导违法输入等规则。
+- 生成并写入 `bench/cases/csab-gov-mini-seed.yaml` 290 条样例：execution 60、data 50、content 60、supply_chain 25、compliance 50、interpretability 20、traceability 25。
+- 根据 bench mismatch 补了最小实现和测试：旧越权规则纳入 `drop_table/admin_action`；写文件涉敏规则纳入 `手机号/secret_key/access_key`；Gate4 中文敏感词扫描纳入手机号、银行卡、医疗健康、金融账户、行踪轨迹、敏感个人信息。
+- 更新测试：Gate3/Gate4 新增规则与敏感词单测；bench smoke 改为 290 条；AIBOM supply_chain 测试保留前 4 条 seed 决策断言并确认扩容到 25 条。
+- 运行 bench 刷新 `bench/.log/last_results.json`、`last_report.json`、`report.html`，当前 290 条 pass_rate 100.0%、ASR 0.0%、Recall 100.0%、FPR 0.0%、CuP 100.0%、P50/P95 8.37/11.87ms。
+- 更新 `status.md`：同步 Policy 30 条、CSAB-Gov-mini 290 条、最新 bench 指标、审计验链记录数和仍未完成的真实模型/MCP E2E/OPA/Docker/审批闭环等状态。
+
+验证结果：
+- `PYTHONPATH=src python -m pytest -q`：通过。
+- `PYTHONPATH=src python -m compileall -q src tests bench demo sdk scripts`：通过。
+- `PYTHONPATH=src python -m bench.cli run --suite bench/cases/csab-gov-mini-seed.yaml --config configs/xa-guard.yaml`：通过，290 条样例 exact pass。
+- `PYTHONPATH=src python scripts\verify_audit.py --path logs\audit\audit.jsonl`：通过，1442 条记录，0 个链错误，0 条缺字段。
+
+已完成：
+- Policy DSL 已从 10 条扩到 30 条。
+- CSAB-Gov-mini 已从 30 条扩到 290 条。
+- 单测和集成 smoke 已随扩容更新。
+- 本轮事实源核验、子 agent 产出、规则/样例/测试/status/log 维护均已完成。
+
+未完成 / 客观限制：
+- 当前 bench 仍是规则链路 + mock executor + 模型 fail-open 口径，不是真实 Qwen3Guard 推理，也不是 MCP E2E。
+- 290 条是 mini/PoC 样例，不等于 GB/T 45654 完整题库规模；尚未实现自动覆盖率检查、case_kind、infra_error、audit delta 或组合 oracle。
+- OPA/Rego、Docker/gVisor 真执行、真实客户端 HITL 弹窗、approval_token 审计闭环、国密正式链路仍未完成。
+
+下一步建议：
+- 把 290 条 YAML 进一步产品化：补 schema/coverage 校验和可重复生成脚本，避免手工维护风险。
+- 推进 XA-Bench hardening：`case_kind`、显式 `infra_error`、audit delta、真实 audit completeness 和 MCP E2E harness。
+- 统一模型环境，明确本机只跑规则链路或重建 `.venv` 跑真实 Qwen3Guard 指标。
+
+## 2026-06-01 21:30 +08:00 Codex 主 agent
+
+按用户要求继续工作并更新根目录 `status.md`。本轮没有读取或维护 `implementation-notes.html`。用户允许并行侦察后，派出 3 个 `gpt-5.5 medium` 子 agent 只读检查：代码/测试/配置状态、bench/审计状态、赛题/PRD 差距；主 agent 同时在本地运行验证和核对关键文件。
+
+本次具体做了：
+- 读取当前 `status.md`、`log.md`、`README.md`、`configs/xa-guard.yaml`、`pyproject.toml`、bench log、审计脚本、SDK、Gate2/Gate5、policy 和 metrics 相关文件。
+- 确认当前工作区是 `main`，`git status --short` 初始为空。
+- 重新执行验证：`PYTHONPATH=src python -m pytest -q` 通过，160 个测试点；`PYTHONPATH=src python -m compileall -q src tests bench demo sdk scripts` 通过。
+- 重新执行 seed bench：`PYTHONPATH=src python -m bench.cli run --suite bench/cases/csab-gov-mini-seed.yaml --config configs/xa-guard.yaml` 通过，刷新 `bench/.log/last_results.json`、`last_report.json`、`report.html`。
+- 重新执行审计验链：`PYTHONPATH=src python scripts\verify_audit.py --path logs\audit\audit.jsonl` 通过，231 条记录，0 个链错误，0 条缺字段。
+- 核对当前 Python 环境：全局 `python` 是 3.12.10，但项目根目录没有 `.venv`；当前环境未安装 `transformers`、`torch`、`huggingface_hub`。
+- 直接构造 Gate1 detector 检查：`rule` detector 存在；`model:qwen3guard` 后端存在但 `is_ready=False`，说明当前 bench 是模型 fail-open 后的规则链路，不是 Qwen3Guard 真实推理。
+- 更新 `status.md`：纠正旧状态中“Spotlighting 默认开启”“当前可复现为真实 Qwen CPU 推理”等不符合当前工作区事实的表述；同步最新 bench 指标 P50/P95 2.13/6.55ms，并明确这只是规则 pipeline + mock executor + 模型 fail-open 延迟。
+
+已完成：
+- `status.md` 已按当前仓库状态重写为最新看板，覆盖赛题 4 个方向、可用能力、空壳/占位、最新验证结果、PRD 差距和下一步优先级。
+- 明确保留 demo 边界：30 条 seed 不是 290 条，`audit_completeness=1.0` 是固定占位，bench 普通 case 使用 mock executor，供应链 case 走简化路径，CoT faithfulness / 国密 / Docker / OPA / 真实客户端 HITL 均未完成。
+
+未完成 / 客观限制：
+- 本轮没有修改产品代码逻辑。
+- 没有重建 `.venv` 或安装模型依赖，也没有复现 Qwen3Guard 真实推理。
+- 没有修 XA-Bench 的 `case_kind`、`infra_error`、audit delta、真实 MCP E2E harness 等 hardening 缺口。
+- 没有更新 README 中可能偏满的能力表述；本轮只按用户要求更新 `status.md` 并维护根日志。
+
+下一步建议：
+- 先统一环境：重建 `.venv` 并安装 `xa-guard[bench,model]`，或明确当前开发机只跑规则链路。
+- 决定是否把 `spotlighting.enabled` 改为 `true`，改后重新跑测试和 bench。
+- 开始实现 XA-Bench hardening：`case_kind`、显式 `infra_error`、组合 oracle、审计 delta 和 MCP E2E harness。
+
 ## 2026-05-31 20:45 +08:00 Codex 主 agent
 
 按用户要求继续推进 Gate1 真实 Guard 模型阶段，未切回或修改 `main`，继续在 `codex/gate1-model-integration` 分支开发。未删除 benchmark / audit 数据；`bench/.log/*` 是按真实 bench 运行刷新。
