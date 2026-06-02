@@ -1,7 +1,7 @@
 # 仓库状态 · XA-Guard / XA-202620
 
-更新时间：2026-06-02 +08:00
-维护者：Codex 主 agent
+更新时间：2026-06-02 +08:00（主 agent Opus 4.7 二次刷新，完成 290 条 mini 资产可信化）
+维护者：Codex 主 agent / 本轮 Opus 4.7 主 agent
 
 ## 总体判断
 
@@ -112,10 +112,10 @@ PRD 默认目标是“进取 + 冲刺”，代码交付目标是 L3 政企原型
 1. **先统一环境事实**：重建项目 `.venv`，安装 `xa-guard[bench,model]`，或明确当前机器只跑规则链路；不要混用历史 Qwen CPU 指标和当前 last_report 指标。
 2. **Gate1 指标硬化**：把规则命中、模型命中、fusion 结果、模型 available 状态和 latency 分开展示；补真实 Recall/FPR/latency 对照。
 3. **决定 Spotlighting 默认策略**：若按主线默认开启，修改 `configs/xa-guard.yaml` 并补回归；否则文档必须写“可选未开启”。
-4. **XA-Bench hardening**：实现 `case_kind` 分桶、显式 `infra_error`、组合 oracle、audit delta / 验链断言、真实 audit completeness。
+4. **XA-Bench hardening**：~~`case_kind` 分桶~~（2026-06-02 完成：290 条全部带 `case_kind` + `source_documents` + `fingerprint`，并由 enrich/validate 脚本 + 7 个 pytest 守护）；剩余空位：显式 `infra_error`、组合 oracle、audit delta / 验链断言、真实 audit completeness。
 5. **建立 MCP E2E harness**：覆盖 stdio `tools/call`、approve/reject、下游调用次数、审计一致性。
 6. **真实客户端 HITL 弹窗实测**：在明确支持 elicitation 的客户端完成 approve/reject 点击和截图/日志；国产客户端继续按事实源写 fallback。
 7. **审批令牌与审计增强**：补 approval_token、approver、reason、expiry、args_hash，并进入 Gate6 审计。
 8. **Gate5 真沙箱与 Gate3 OPA**：把路由决策推进到 Docker/gVisor 执行；把 Python predicate 后端扩展到 OPA/Rego。
 9. **AIBOM 生产化**：补 CycloneDX schema 校验、签名/公钥校验、远程包离线拉取、外部信誉库/漏洞库、持续漂移监测任务。
-10. **把 290 条 mini 样例升级为可信评测资产**：补 `case_kind`、标准来源字段、去重/覆盖率检查、自动生成脚本或 schema 校验，避免 YAML 规模扩大后难以维护。
+10. ~~**把 290 条 mini 样例升级为可信评测资产**~~ — 2026-06-02 完成。新增 `bench/schema/csab-gov-mini.schema.json`、`scripts/enrich_csab_gov_mini.py`（幂等，`--check` 给 CI）、`scripts/validate_csab_gov_mini.py`（必填字段 / ID & fingerprint 唯一 / policy_refs 白名单 / metadata 对账 / `--strict`）、`tests/test_csab_gov_mini_assets.py` 7 个用例；290 条全部带 `case_kind` + `source_documents` + `fingerprint`；`bench/.log/coverage.md` 输出覆盖率报告。后续若再扩量应换样本而不是堆 `variant_index`，并把 `source_documents` 的 fallback 引用对齐到附录小节级别。
