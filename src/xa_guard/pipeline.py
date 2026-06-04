@@ -179,6 +179,25 @@ class Pipeline:
                 final_reason=ctx.final_reason,
             )
 
+        # 审批令牌验签：令牌缺失 / 参数被改 / 签名错误 / 过期 → 拒绝执行。
+        # 让 approval_token 成为真正的执行闸门，而非审计装饰字段。
+        from xa_guard.approval import verify_approval
+
+        valid, why = verify_approval(
+            ctx.approval, trace_id=ctx.trace_id, tool_name=ctx.tool_name, arguments=ctx.arguments
+        )
+        if not valid:
+            ctx.final_decision = Decision.DENY
+            ctx.final_reason = f"approval_token_invalid: {why}"
+            self.gate6(ctx, GateStage.OUTBOUND)
+            return PipelineResult(
+                ctx=ctx,
+                allowed=False,
+                tool_result=None,
+                final_decision=ctx.final_decision,
+                final_reason=ctx.final_reason,
+            )
+
         ctx.final_decision = Decision.ALLOW
         ctx.final_reason = "hitl_approved"
 

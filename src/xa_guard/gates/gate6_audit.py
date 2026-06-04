@@ -64,13 +64,26 @@ class Gate6Audit(Gate):
         # 3. risk_tag：取所有 gate_results 中有 risks 的 note
         risk_tags = [g.note for g in ctx.gate_results if g.risks and g.note]
 
-        # 4. approval_token：从 gate2 metadata 取（若有）
-        approval_token = None
-        for g in ctx.gate_results:
-            tok = g.metadata.get("approval_token") if g.metadata else None
-            if tok:
-                approval_token = str(tok)
-                break
+        # 4. approval：优先取 ctx.approval（人工审批签发的可验证令牌），
+        #    回退到 gate2 metadata 里的历史 approval_token。
+        approval = ctx.approval
+        if approval is not None:
+            approval_token = approval.token or None
+            approval_approver = approval.approver
+            approval_reason = approval.reason
+            approval_expires_at = approval.expires_at
+            approval_args_hash = approval.args_hash
+        else:
+            approval_token = None
+            approval_approver = ""
+            approval_reason = ""
+            approval_expires_at = ""
+            approval_args_hash = ""
+            for g in ctx.gate_results:
+                tok = g.metadata.get("approval_token") if g.metadata else None
+                if tok:
+                    approval_token = str(tok)
+                    break
 
         # 5. 双层策略 bundle_sha（若 LayeredPolicySource 已实例化）
         layered = get_global_source()
@@ -89,6 +102,10 @@ class Gate6Audit(Gate):
             gen_ai_data_sensitivity_level=ctx.taint.value if ctx.taint else "PUBLIC",
             gen_ai_policy_hit_id=list(ctx.rule_hits),
             gen_ai_tool_approval_token=approval_token,
+            gen_ai_tool_approval_approver=approval_approver,
+            gen_ai_tool_approval_reason=approval_reason,
+            gen_ai_tool_approval_expires_at=approval_expires_at,
+            gen_ai_tool_approval_args_hash=approval_args_hash,
             gen_ai_evidence_hash_prev="",  # ChainStore.append 会写入
             gen_ai_classify_risk_tag=risk_tags,
             gen_ai_decision_faithfulness_score=1.0,

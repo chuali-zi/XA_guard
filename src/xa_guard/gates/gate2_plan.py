@@ -53,7 +53,10 @@ class Gate2Plan(Gate):
 
     def _request_approval(self, ctx: GateContext) -> GateResult:
         """RED 工具的 fallback 审批。真正 MCP elicitation 由 proxy/upstream.py 处理。
-        TODO: 签发 approval_token（trace_id + tool_name + args_hash + expiry）留待 upstream.py。
+
+        approval_token 的签发/验签已落在 xa_guard.approval（人工 approve 时由
+        upstream.py 签发，pipeline.run_after_approval 执行前验签，gate6 写审计）。
+        本关卡只负责出 REQUIRE_APPROVAL 决策，不签发令牌。
         """
         fallback = self.opt("elicitation_fallback", "stdout")
 

@@ -125,6 +125,25 @@ class PolicyRule:
 
 
 # ============================================================
+# 7b. 审批令牌（关卡 2 HITL → 关卡 6 审计闭环）
+# ============================================================
+@dataclass
+class Approval:
+    """人工审批的可验证凭据。
+
+    由 xa_guard.approval.issue_approval 在人工 approve 时签发，
+    pipeline.run_after_approval 执行前验签，gate6 写入审计。
+    """
+
+    approver: str                        # 审批人身份（客户端 client info / 运维账号）
+    reason: str = ""                     # 审批理由
+    args_hash: str = ""                  # 被审批的精确入参 sha256（防 TOCTOU 改参）
+    issued_at: str = ""                  # 签发时间 ISO8601
+    expires_at: str = ""                 # 过期时间 ISO8601
+    token: str = ""                      # HMAC-SHA256 签名
+
+
+# ============================================================
 # 8. 请求上下文（穿过 6 关卡的载体）
 # ============================================================
 @dataclass
@@ -148,6 +167,9 @@ class GateContext:
     risk_level: RiskLevel = RiskLevel.GREEN
     gate_results: list[GateResult] = field(default_factory=list)
     rule_hits: list[str] = field(default_factory=list)
+
+    # 审批凭据（REQUIRE_APPROVAL 经人工批准后挂载，run_after_approval 验签）
+    approval: "Approval | None" = None
 
     # 终态
     final_decision: Decision = Decision.ALLOW
@@ -197,6 +219,11 @@ class AuditRecord:
     gen_ai_data_sensitivity_level: str = "PUBLIC"
     gen_ai_policy_hit_id: list[str] = field(default_factory=list)
     gen_ai_tool_approval_token: str | None = None
+    # 审批闭环扩展：审批人 / 理由 / 过期 / 被审批入参哈希
+    gen_ai_tool_approval_approver: str = ""
+    gen_ai_tool_approval_reason: str = ""
+    gen_ai_tool_approval_expires_at: str = ""
+    gen_ai_tool_approval_args_hash: str = ""
     gen_ai_evidence_hash_prev: str = ""                           # 前一条审计记录的哈希
     gen_ai_classify_risk_tag: list[str] = field(default_factory=list)
     gen_ai_decision_faithfulness_score: float = 0.0
@@ -224,6 +251,10 @@ class AuditRecord:
             "gen_ai.data.sensitivity_level": self.gen_ai_data_sensitivity_level,
             "gen_ai.policy.hit_id": self.gen_ai_policy_hit_id,
             "gen_ai.tool.approval_token": self.gen_ai_tool_approval_token,
+            "gen_ai.tool.approval.approver": self.gen_ai_tool_approval_approver,
+            "gen_ai.tool.approval.reason": self.gen_ai_tool_approval_reason,
+            "gen_ai.tool.approval.expires_at": self.gen_ai_tool_approval_expires_at,
+            "gen_ai.tool.approval.args_hash": self.gen_ai_tool_approval_args_hash,
             "gen_ai.evidence.hash_prev": self.gen_ai_evidence_hash_prev,
             "gen_ai.classify.risk_tag": self.gen_ai_classify_risk_tag,
             "gen_ai.decision.faithfulness_score": self.gen_ai_decision_faithfulness_score,

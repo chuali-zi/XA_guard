@@ -21,6 +21,7 @@ from mcp.server import Server
 from mcp.server.models import InitializationOptions
 from mcp.server.stdio import stdio_server
 
+from xa_guard.approval import issue_approval
 from xa_guard.pipeline import Pipeline
 from xa_guard.proxy.downstream import DownstreamRouter
 from xa_guard.types import Decision, GateContext, InputSource
@@ -31,6 +32,18 @@ log = logging.getLogger("xa_guard.proxy.upstream")
 class _ApprovalResponse(BaseModel):
     approve: bool = Field(description="是否批准执行该高危工具调用")
     reason: str = Field(default="", description="审批理由，可留空")
+
+
+class _ApprovalOutcome(BaseModel):
+    """HITL 审批结果：是否批准 + 审批人 + 理由。
+
+    approved: True=批准 / False=拒绝 / None=无审批通道（无 request context 或
+              客户端不支持 elicitation 或 elicitation 失败）。
+    """
+
+    approved: bool | None = None
+    approver: str = ""
+    reason: str = ""
 
 
 def _build_app(pipeline: Pipeline, downstream_router: DownstreamRouter) -> Server:
@@ -64,8 +77,17 @@ def _build_app(pipeline: Pipeline, downstream_router: DownstreamRouter) -> Serve
         result = await pipeline.run(ctx, _executor)
 
         if result.final_decision == Decision.REQUIRE_APPROVAL:
-            approved = await _request_hitl_approval(app, ctx)
+            outcome = await _request_hitl_approval(app, ctx)
+            approved = outcome.approved
             if approved is True:
+                # 人工已批准：签发可验证审批令牌，挂到 ctx 供 pipeline 验签 + gate6 审计。
+                ctx.approval = issue_approval(
+                    trace_id=ctx.trace_id,
+                    tool_name=ctx.tool_name,
+                    arguments=ctx.arguments,
+                    approver=outcome.approver or "mcp-elicitation-user",
+                    reason=outcome.reason,
+                )
                 try:
                     resumed = await pipeline.run_after_approval(ctx, _executor)
                     if not resumed.allowed:
@@ -119,23 +141,32 @@ def _client_supports_elicitation(session: Any) -> bool:
     return elicitation is not None
 
 
-async def _request_hitl_approval(app: Server, ctx: GateContext) -> bool | None:
+def _approver_identity(session: Any) -> str:
+    """从客户端 client info 推断审批人身份，缺失时给占位。"""
+    client_params = getattr(session, "client_params", None)
+    client_info = getattr(client_params, "clientInfo", None)
+    name = getattr(client_info, "name", None)
+    return str(name) if name else "mcp-elicitation-user"
+
+
+async def _request_hitl_approval(app: Server, ctx: GateContext) -> _ApprovalOutcome:
     """Request approve/reject via MCP elicitation if the current client supports it.
 
-    Returns:
-        True: client accepted and approved.
-        False: client declined/cancelled or accepted with approve=False.
-        None: no request context, no elicitation capability, or elicitation failed.
+    Returns _ApprovalOutcome:
+        approved=True:  client accepted and approved (approver/reason filled).
+        approved=False: client declined/cancelled or accepted with approve=False.
+        approved=None:  no request context, no elicitation capability, or failed.
     """
     try:
         request_context = app.request_context
     except LookupError:
-        return None
+        return _ApprovalOutcome(approved=None)
 
     session = request_context.session
     if not _client_supports_elicitation(session):
-        return None
+        return _ApprovalOutcome(approved=None)
 
+    approver = _approver_identity(session)
     message = (
         "XA-Guard 需要人工审批高危工具调用。\n"
         f"tool: {ctx.tool_name}\n"
@@ -151,16 +182,16 @@ async def _request_hitl_approval(app: Server, ctx: GateContext) -> bool | None:
         )
     except Exception as exc:
         log.warning("MCP elicitation approval request failed: %s", exc)
-        return None
+        return _ApprovalOutcome(approved=None)
 
     if result.action != "accept":
-        return False
+        return _ApprovalOutcome(approved=False, approver=approver)
     try:
         response = _ApprovalResponse.model_validate(result.content or {})
     except Exception as exc:
         log.warning("MCP elicitation approval response invalid: %s", exc)
-        return False
-    return response.approve
+        return _ApprovalOutcome(approved=False, approver=approver)
+    return _ApprovalOutcome(approved=response.approve, approver=approver, reason=response.reason)
 
 
 def _to_text_contents(tool_result: Any) -> list[mtypes.TextContent]:

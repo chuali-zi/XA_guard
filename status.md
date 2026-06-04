@@ -1,6 +1,6 @@
 # 仓库状态 · XA-Guard / XA-202620
 
-更新时间：2026-06-04 +08:00（Claude 主 agent 复跑验证、落地 MCP E2E harness、刷新指标快照）
+更新时间：2026-06-04 +08:00（Claude 主 agent 落地 MCP E2E harness + 审批令牌审计闭环、刷新指标快照）
 维护者：Codex 主 agent / Claude 主 agent
 
 ## 总体判断
@@ -27,7 +27,7 @@
 | 赛题方向 | 当前仓库状态 | 空位 / 未完成 |
 |---|---|---|
 | 方向 1：复杂输入链路攻击识别 | `gate1_input.py` 已有规则检测、模型 detector 壳子、fusion、Qwen3Guard / PromptGuard / ShieldLM / LlamaGuard 后端代码；当前配置启用 Qwen3Guard 后端但本机缺模型依赖，实际可复现为规则层 fail-open 链路。 | 当前 `spotlighting.enabled: false`，不是默认开启；没有 Recall@1%FPR、adaptive attack、AgentDojo/InjecAgent 指标；当前环境未复现真实 Qwen 推理；PromptGuard2 / Llama Guard 仍受 gated 授权限制，ShieldLM-14B 资源过大。 |
-| 方向 2：工具调用与任务执行安全 | `gate2` 风险分级、`gate3` Python 策略、`gate4` 三色污点、`gate5` 沙箱路由决策已存在；pipeline 已能让 Gate3 DENY 覆盖 Gate2 REQUIRE_APPROVAL；Policy DSL 已扩到 30 条并覆盖等保/生成式 AI 治理主题；上游有最小 MCP elicitation approve/reject 逻辑和 toy probe。**Gate2/3/4 已落地 baseline+overlay 双层策略：项目自带 30 条规则 + 46 工具风险 + 46 工具能力 + 29 敏感模式为 baseline；企业可在 `policies/overlay/<tenant_id>/` 注入私有规则，单调性门控强制不得弱化国标，热加载经 watchfiles 落地，`bundle_sha` 进 audit。** | **真实 JSON-RPC `tools/call` + elicitation approve/reject + 下游调用计数 + 审计一致性已由 `test_mcp_e2e.py` E2E harness 端到端覆盖（进程内内存 transport）。** 真实 Cursor / Claude Code / Codex 弹窗 UI 未人工实测；国产客户端仍只能写 fallback；OPA/Rego 未实现（baseline+overlay 已为 M3 切 Rego 摆好包结构）；Docker/gVisor 只给路由决策不执行真实沙箱；approval_token / approver / reason 未进入审计闭环；统一工具目录仍未实现，当前靠测试保证 baseline 对齐。 |
+| 方向 2：工具调用与任务执行安全 | `gate2` 风险分级、`gate3` Python 策略、`gate4` 三色污点、`gate5` 沙箱路由决策已存在；pipeline 已能让 Gate3 DENY 覆盖 Gate2 REQUIRE_APPROVAL；Policy DSL 已扩到 30 条并覆盖等保/生成式 AI 治理主题；上游有最小 MCP elicitation approve/reject 逻辑和 toy probe。**Gate2/3/4 已落地 baseline+overlay 双层策略：项目自带 30 条规则 + 46 工具风险 + 46 工具能力 + 29 敏感模式为 baseline；企业可在 `policies/overlay/<tenant_id>/` 注入私有规则，单调性门控强制不得弱化国标，热加载经 watchfiles 落地，`bundle_sha` 进 audit。** | **真实 JSON-RPC `tools/call` + elicitation approve/reject + 下游调用计数 + 审计一致性已由 `test_mcp_e2e.py` E2E harness 端到端覆盖（进程内内存 transport）。** 真实 Cursor / Claude Code / Codex 弹窗 UI 未人工实测；国产客户端仍只能写 fallback；OPA/Rego 未实现（baseline+overlay 已为 M3 切 Rego 摆好包结构）；Docker/gVisor 只给路由决策不执行真实沙箱；**approval_token / approver / reason / expiry / args_hash 已进入审计闭环（`src/xa_guard/approval.py` HMAC 签发验签，`run_after_approval` 执行前验签做执行闸门）。** 统一工具目录仍未实现，当前靠测试保证 baseline 对齐。 |
 | 方向 3：插件 / Skill / 脚本供应链安全 | `src/xa_guard/aibom/` 已有本地静态扫描、依赖风险解析、A/B/C/D/F 评级、CycloneDX-like 导出、本地 artifact/file URL/zip/tar 解包、sha256 provenance、typosquat 启发式和 drift 比较；4 条 supply_chain seed 通过。 | 没有远程包下载、外部信誉库、漏洞库、真实签名体系、Sigstore/TUF、公钥校验、CycloneDX schema 校验；bench 的 supply_chain case 仍走简化评级路径，不覆盖完整 artifact + provenance + audit。 |
 | 方向 4：评测与审计溯源 | `Gate6Audit`、哈希链、OTel 字段、`bench` CLI、HTML report、前端时间线已存在；CSAB-Gov-mini 已扩到 290 条并刷新报告；旧损坏审计链已归档，当前主日志验链通过；**新增 `test_mcp_e2e.py` 在真实 `tools/call` 链路上断言审计 decision 序列与逐场景验链。** | 290 条仍是规则链路 + mock executor 口径，bench 自身尚不是真实 MCP E2E / 真实模型评测（E2E harness 已独立覆盖真链路审计一致性，但未并入 bench 指标）；`audit_completeness` 固定 1.0，不是逐 case 实测；pipeline 异常仍可能被 runner 吞掉；SM3/SM2 是 fallback，CoT faithfulness 是占位。 |
 
@@ -55,7 +55,7 @@
 5. **Streamable HTTP 未实现**：上游 `run_streamable_http()` 直接 `NotImplementedError`；下游也只支持 stdio。（注：stdio 链路的真 JSON-RPC `tools/call` + elicitation approve/reject + 下游调用计数 + 审计一致性已由 2026-06-04 新增的 `test_mcp_e2e.py` E2E harness 覆盖。）
 6. **OPA / Rego 未实现**：`gate3_policy.py` 的 `backend=rego` 会抛 `NotImplementedError`。
 7. **Docker / gVisor 未执行**：`gate5_sandbox.py` 只输出路由决策，不把工具调用放入真实容器。
-8. **审批闭环不完整**：Gate2 TODO 里仍缺 approval_token；审批人、审批理由、token 校验没有进 Gate6 审计字段。
+8. ~~**审批闭环不完整**~~ — 2026-06-04 完成。`src/xa_guard/approval.py` 用 HMAC-SHA256 签发/验签 approval_token，payload 绑定 `trace_id + tool_name + args_hash + approver + issued_at + expires_at`；`pipeline.run_after_approval` 执行前 `verify_approval`（缺令牌 / 改参 TOCTOU / 伪造签名 / 过期 → DENY 且下游不执行），令牌是真正的执行闸门而非审计装饰；`proxy/upstream.py` 在人工 approve 时 `issue_approval` 挂到 `ctx.approval`；Gate6 把 approval_token/approver/reason/expires_at/args_hash 写入审计。剩余：审批人身份目前取 MCP client info（非强认证）；HMAC demo 密钥，生产可换 SM2/RSA 非对称签名。
 9. **国密证据链不完整**：SM3/SM2 依赖 gmssl fallback；没有 TSA；签名不是正式 SM2 私钥流程。
 10. **CoT 忠实度未实做**：审计字段里有 `faithfulness_score=1.0`，但没有解释性/忠实度检测算法。
 11. **bench 指标仍是 demo 口径**：ASR / Recall 由 `expected_decision != allow` 推导，会混入治理审批类；CuP 是非阻断代理指标；`audit_completeness` 固定 1.0。
@@ -72,9 +72,13 @@
 - `python scripts/enrich_csab_gov_mini.py --check`：通过，290 条 bench YAML 元数据为最新。
 - `PYTHONPATH=src python -m bench.cli run --suite bench/cases/csab-gov-mini-seed.yaml --config configs/xa-guard.yaml`：通过运行，刷新 `bench/.log/last_results.json` / `last_report.json` / `report.html`；290 条 pass_rate 100.0%。
 - `PYTHONPATH=src python scripts/verify_audit.py --path logs/audit/audit.jsonl`：通过，12694 条记录，0 个链错误，0 条缺字段。
-- `PYTHONPATH=src python -m pytest tests/integration/test_mcp_e2e.py`：通过（新增 MCP E2E harness，全量从 230→231 passed）。
+- `PYTHONPATH=src python -m pytest tests/integration/test_mcp_e2e.py`：通过（新增 MCP E2E harness）。
+- `PYTHONPATH=src python -m pytest`：全量 **240 passed**（230 基线 + MCP E2E 1 + 审批令牌 9 例，并修订 test_upstream_elicitation / test_pipeline_smoke 适配新审批契约）。
+- `PYTHONPATH=src python scripts/verify_audit.py`（bench 重跑后）：**14605 条记录，0 链错误，0 缺字段**，新增审批字段未破坏哈希链。
 
-2026-06-04 新增 **MCP E2E harness**（`tests/integration/test_mcp_e2e.py` + `_fixture_e2e_server.py`）：用 mcp 进程内内存 transport 把真实 `ClientSession` 接到 `proxy.upstream._build_app` 构造的 guard `Server` 上，发起**真实 JSON-RPC `tools/call`**，弥补此前 `test_proxy_smoke` 绕过上游 MCP 协议层、从未走真 elicitation 的空缺。覆盖四场景并逐条断言：allow（echo，下游调用 1 次、审计 1 条 allow）、deny（exec_command rm -rf，Gate1 拦截、下游 0 次、审计 1 条 deny）、approve（grant_permission 触发 Gate2 REQUIRE_APPROVAL，客户端 elicitation 回 `approve=true` → 下游 1 次、审计 `require_approval`→`allow` 两条）、reject（elicitation `decline` → 下游 0 次、审计 1 条 require_approval）。`CountingRouter` 统计真正触达下游的次数，末尾 `ChainStore.verify()` 校验本场景 5 条审计记录哈希链完好。仍存空位：下游是 fixture echo 而非生产工具，`approval_token`/approver/reason 尚未进审计。
+2026-06-04 新增 **MCP E2E harness**（`tests/integration/test_mcp_e2e.py` + `_fixture_e2e_server.py`）：用 mcp 进程内内存 transport 把真实 `ClientSession` 接到 `proxy.upstream._build_app` 构造的 guard `Server` 上，发起**真实 JSON-RPC `tools/call`**，弥补此前 `test_proxy_smoke` 绕过上游 MCP 协议层、从未走真 elicitation 的空缺。覆盖四场景并逐条断言：allow（echo，下游调用 1 次、审计 1 条 allow）、deny（exec_command rm -rf，Gate1 拦截、下游 0 次、审计 1 条 deny）、approve（grant_permission 触发 Gate2 REQUIRE_APPROVAL，客户端 elicitation 回 `approve=true` → 下游 1 次、审计 `require_approval`→`allow` 两条）、reject（elicitation `decline` → 下游 0 次、审计 1 条 require_approval）。`CountingRouter` 统计真正触达下游的次数，末尾 `ChainStore.verify()` 校验本场景 5 条审计记录哈希链完好。
+
+2026-06-04 进一步落地 **审批令牌审计闭环**（status 第8条空壳清零）：新增 `src/xa_guard/approval.py`，用 HMAC-SHA256 对 `{trace_id, tool_name, args_hash, approver, issued_at, expires_at}` 签发 `approval_token`。关键是把令牌做成**执行闸门**而非审计装饰——`pipeline.run_after_approval` 在调用下游前 `verify_approval`，任一条件不满足（缺令牌 / 审批后篡改入参 TOCTOU / 伪造签名 / 过期）即 `DENY` 且下游绝不执行。`proxy/upstream.py` 的 `_request_hitl_approval` 改为返回 `_ApprovalOutcome(approved/approver/reason)`，在人工 approve 时 `issue_approval` 挂到 `ctx.approval`；Gate6 把 `approval_token` + 新增的 `approver/reason/expires_at/args_hash` 四字段写入 `AuditRecord`。新增 `tests/test_approval.py` 9 例覆盖验签各失败模式 + pipeline DENY/TOCTOU，E2E approve 场景加断言验证 allow 审计记录确带可验证令牌。仍存空位：下游是 fixture echo 而非生产工具；审批人身份取 MCP client info（非强认证）；HMAC demo 密钥，生产可换 SM2/RSA 非对称签名。
 
 最新 bench 指标：
 
@@ -125,7 +129,7 @@ PRD 默认目标是“进取 + 冲刺”，代码交付目标是 L3 政企原型
 4. **XA-Bench hardening**：~~`case_kind` 分桶~~（2026-06-02 完成：290 条全部带 `case_kind` + `source_documents` + `fingerprint`，并由 enrich/validate 脚本 + 7 个 pytest 守护）；剩余空位：显式 `infra_error`、组合 oracle、audit delta / 验链断言、真实 audit completeness。
 5. ~~**建立 MCP E2E harness**：覆盖 stdio `tools/call`、approve/reject、下游调用次数、审计一致性。~~ — 2026-06-04 完成。`tests/integration/test_mcp_e2e.py` 用 mcp 内存 transport 走真 JSON-RPC，四场景（allow/deny/approve/reject）逐条断言下游调用次数 + 审计 decision 序列 + 验链。后续可扩展：真实 stdio 下游生产工具、多步工具链、approval_token 进审计闭环。
 6. **真实客户端 HITL 弹窗实测**：在明确支持 elicitation 的客户端完成 approve/reject 点击和截图/日志；国产客户端继续按事实源写 fallback。
-7. **审批令牌与审计增强**：补 approval_token、approver、reason、expiry、args_hash，并进入 Gate6 审计。
+7. ~~**审批令牌与审计增强**：补 approval_token、approver、reason、expiry、args_hash，并进入 Gate6 审计。~~ — 2026-06-04 完成（`src/xa_guard/approval.py` + `pipeline.run_after_approval` 执行前验签 + Gate6 审计字段 + 9 个单测）。后续可做：把审批人接入强认证、HMAC 换 SM2 非对称签名、approval_token 在 verify_audit 里做跨记录一致性校验。
 8. **Gate5 真沙箱与 Gate3 OPA**：把路由决策推进到 Docker/gVisor 执行；把 Python predicate 后端扩展到 OPA/Rego。
 9. **AIBOM 生产化**：补 CycloneDX schema 校验、签名/公钥校验、远程包离线拉取、外部信誉库/漏洞库、持续漂移监测任务。
 10. ~~**把 290 条 mini 样例升级为可信评测资产**~~ — 2026-06-02 完成。新增 `bench/schema/csab-gov-mini.schema.json`、`scripts/enrich_csab_gov_mini.py`（幂等，`--check` 给 CI）、`scripts/validate_csab_gov_mini.py`（必填字段 / ID & fingerprint 唯一 / policy_refs 白名单 / metadata 对账 / `--strict`）、`tests/test_csab_gov_mini_assets.py` 7 个用例；290 条全部带 `case_kind` + `source_documents` + `fingerprint`；`bench/.log/coverage.md` 输出覆盖率报告。后续若再扩量应换样本而不是堆 `variant_index`，并把 `source_documents` 的 fallback 引用对齐到附录小节级别。

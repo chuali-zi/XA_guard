@@ -1,0 +1,22 @@
+2026-06-04 审批令牌进 Gate6 审计闭环（方向2/4）
+
+背景：Gate2 标 REQUIRE_APPROVAL 但从不签发 token，Gate6 读到空 token，
+upstream 拿到审批 reason 后直接丢弃。status 第8条空壳。
+
+落地（做成真闭环，token 是执行闸门而非装饰）：
+- src/xa_guard/approval.py：HMAC-SHA256 签发/验签，payload 绑定
+  trace_id+tool_name+args_hash+approver+issued_at+expires_at；
+  args_hash 防 TOCTOU 改参；secret 走 XA_GUARD_APPROVAL_SECRET。
+- types.py：新增 Approval 数据类 + GateContext.approval 字段；
+  AuditRecord 加 approver/reason/expires_at/args_hash 四字段 + to_dict 映射。
+- pipeline.run_after_approval：执行前 verify_approval，缺令牌/改参/伪造签名/
+  过期 → DENY，下游绝不执行。
+- proxy/upstream.py：_request_hitl_approval 改返回 _ApprovalOutcome
+  (approved/approver/reason)，approve 时 issue_approval 挂 ctx.approval。
+- gate6：优先从 ctx.approval 写审批字段。
+- gate2：更新 TODO 注释。
+
+测试：新增 tests/test_approval.py 9 例（验签各失败模式 + pipeline DENY/TOCTOU）；
+E2E approve 场景加断言（allow 记录带 token/approver/reason/args_hash）；
+修旧 test_upstream_elicitation（bool→_ApprovalOutcome）+ test_pipeline_smoke
+（resume 前签发令牌）。全量 240 passed。bench 14605 条验链 0 错。

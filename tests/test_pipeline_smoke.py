@@ -1,6 +1,7 @@
 """pipeline 烟雾测试 — 验证 6 关卡 stub 全部能跑通。"""
 import asyncio
 
+from xa_guard.approval import issue_approval
 from xa_guard.config import XAGuardConfig
 from xa_guard.gates.gate1_input import Gate1Input
 from xa_guard.gates.gate2_plan import Gate2Plan
@@ -213,6 +214,11 @@ def test_pipeline_after_approval_runs_gate5_executor_outbound_and_audit():
     assert first.final_decision == Decision.REQUIRE_APPROVAL
     assert executor_called == []
 
+    # 模拟人工批准：签发审批令牌（真实流程由 proxy/upstream 在 approve 时完成）。
+    ctx.approval = issue_approval(
+        trace_id=ctx.trace_id, tool_name=ctx.tool_name, arguments=ctx.arguments,
+        approver="ops-1", reason="smoke-approve",
+    )
     resumed = asyncio.run(pipe.run_after_approval(ctx, fake_executor))
 
     assert resumed.allowed is True

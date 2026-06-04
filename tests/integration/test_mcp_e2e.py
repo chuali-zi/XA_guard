@@ -26,6 +26,7 @@ import pytest
 from mcp.shared.memory import create_connected_server_and_client_session
 from mcp.types import ElicitResult
 
+from xa_guard.approval import args_hash as _args_hash
 from xa_guard.audit.merkle import ChainStore
 from xa_guard.config import DownstreamSpec, GateConfig, XAGuardConfig
 from xa_guard.gates.gate1_input import Gate1Input
@@ -189,6 +190,15 @@ def test_mcp_e2e_harness(tmp_path):
     assert "e2e:" in approve["text"]
     assert "alice" in approve["text"]
     assert _decisions(approve["audit_delta"]) == ["require_approval", "allow"]
+    # 审批闭环：批准后的 allow 审计记录必须带可验证令牌 + 审批人 + args_hash
+    granted = approve["audit_delta"][1]
+    assert granted["gen_ai.tool.approval_token"]
+    assert granted["gen_ai.tool.approval.approver"]
+    assert granted["gen_ai.tool.approval.reason"] == "e2e-approve"
+    assert granted["gen_ai.tool.approval.expires_at"]
+    assert granted["gen_ai.tool.approval.args_hash"] == _args_hash({"user": "alice"})
+    # require_approval 那条（执行前阻断）尚未签发令牌
+    assert not approve["audit_delta"][0]["gen_ai.tool.approval_token"]
 
     # 4) reject: 下游 0 次，返回拒绝提示；审计一条 require_approval
     reject = out["reject"]

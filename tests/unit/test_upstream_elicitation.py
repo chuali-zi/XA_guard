@@ -60,9 +60,11 @@ def test_request_hitl_approval_accept_true_returns_true():
     app = _FakeApp(SimpleNamespace(session=session, request_id="req-1"))
     ctx = GateContext(tool_name="exec_command", arguments={"cmd": "whoami"})
 
-    approved = asyncio.run(_request_hitl_approval(app, ctx))
+    outcome = asyncio.run(_request_hitl_approval(app, ctx))
 
-    assert approved is True
+    assert outcome.approved is True
+    assert outcome.approver == "pytest-client"
+    assert outcome.reason == "ok"
     assert session.calls
     call = session.calls[0]
     assert "exec_command" in call["message"]
@@ -76,9 +78,9 @@ def test_request_hitl_approval_decline_returns_false():
     )
     app = _FakeApp(SimpleNamespace(session=session, request_id="req-1"))
 
-    approved = asyncio.run(_request_hitl_approval(app, GateContext(tool_name="exec_command")))
+    outcome = asyncio.run(_request_hitl_approval(app, GateContext(tool_name="exec_command")))
 
-    assert approved is False
+    assert outcome.approved is False
 
 
 def test_request_hitl_approval_without_capability_returns_none():
@@ -88,9 +90,9 @@ def test_request_hitl_approval_without_capability_returns_none():
     )
     app = _FakeApp(SimpleNamespace(session=session, request_id="req-1"))
 
-    approved = asyncio.run(_request_hitl_approval(app, GateContext(tool_name="exec_command")))
+    outcome = asyncio.run(_request_hitl_approval(app, GateContext(tool_name="exec_command")))
 
-    assert approved is None
+    assert outcome.approved is None
     assert session.calls == []
 
 
@@ -141,7 +143,7 @@ class _FakeRouter:
 def test_upstream_calls_downstream_after_elicitation_approval(monkeypatch):
     async def approve(app, ctx):
         del app, ctx
-        return True
+        return upstream._ApprovalOutcome(approved=True, approver="pytest-client", reason="ok")
 
     monkeypatch.setattr(upstream, "_request_hitl_approval", approve)
     router = _FakeRouter()
@@ -162,7 +164,7 @@ def test_upstream_calls_downstream_after_elicitation_approval(monkeypatch):
 def test_upstream_does_not_call_downstream_after_elicitation_reject(monkeypatch):
     async def reject(app, ctx):
         del app, ctx
-        return False
+        return upstream._ApprovalOutcome(approved=False, approver="pytest-client")
 
     monkeypatch.setattr(upstream, "_request_hitl_approval", reject)
     router = _FakeRouter()
