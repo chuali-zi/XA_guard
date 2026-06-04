@@ -1,0 +1,18 @@
+2026-06-04 MCP E2E harness（方向2/4）
+
+背景：原 test_proxy_smoke 直接调 pipeline.run，绕过上游 MCP server 协议层，
+从未走真实 JSON-RPC tools/call + elicitation approve/reject。status 第5/12条空壳。
+
+落地：
+- tests/integration/_fixture_e2e_server.py：下游 stdio MCP fixture，多 grant_permission
+  红工具（干净触发 Gate2 REQUIRE_APPROVAL，不被 gate3 DENY）。
+- tests/integration/test_mcp_e2e.py：用 mcp create_connected_server_and_client_session
+  内存 transport 把真实 ClientSession 接到 proxy.upstream._build_app 的 guard Server，
+  发真 tools/call。CountingRouter 统计下游触达次数。
+- 4 场景：allow(echo,下游1次,审计allow)/deny(exec rm-rf,下游0次,deny)/
+  approve(elicitation approve=true,下游1次,require_approval→allow 两条审计)/
+  reject(elicitation decline,下游0次,require_approval)。末尾 ChainStore.verify 验链=5条。
+
+验证：新测试 1 passed；全量 231 passed（原230+1）。
+关键事实：上游真 JSON-RPC + elicitation 已端到端覆盖，下游调用计数与审计一致性
+有断言守护。下游仍是 fixture echo，非生产工具；审批令牌(approval_token)尚未进审计。

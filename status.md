@@ -1,7 +1,7 @@
 # 仓库状态 · XA-Guard / XA-202620
 
-更新时间：2026-06-02 +08:00（Codex 主 agent Gate2/3/4 baseline 错位补齐后刷新）
-维护者：Codex 主 agent
+更新时间：2026-06-04 +08:00（Claude 主 agent 复跑验证、落地 MCP E2E harness、刷新指标快照）
+维护者：Codex 主 agent / Claude 主 agent
 
 ## 总体判断
 
@@ -27,9 +27,9 @@
 | 赛题方向 | 当前仓库状态 | 空位 / 未完成 |
 |---|---|---|
 | 方向 1：复杂输入链路攻击识别 | `gate1_input.py` 已有规则检测、模型 detector 壳子、fusion、Qwen3Guard / PromptGuard / ShieldLM / LlamaGuard 后端代码；当前配置启用 Qwen3Guard 后端但本机缺模型依赖，实际可复现为规则层 fail-open 链路。 | 当前 `spotlighting.enabled: false`，不是默认开启；没有 Recall@1%FPR、adaptive attack、AgentDojo/InjecAgent 指标；当前环境未复现真实 Qwen 推理；PromptGuard2 / Llama Guard 仍受 gated 授权限制，ShieldLM-14B 资源过大。 |
-| 方向 2：工具调用与任务执行安全 | `gate2` 风险分级、`gate3` Python 策略、`gate4` 三色污点、`gate5` 沙箱路由决策已存在；pipeline 已能让 Gate3 DENY 覆盖 Gate2 REQUIRE_APPROVAL；Policy DSL 已扩到 30 条并覆盖等保/生成式 AI 治理主题；上游有最小 MCP elicitation approve/reject 逻辑和 toy probe。**Gate2/3/4 已落地 baseline+overlay 双层策略：项目自带 30 条规则 + 46 工具风险 + 46 工具能力 + 29 敏感模式为 baseline；企业可在 `policies/overlay/<tenant_id>/` 注入私有规则，单调性门控强制不得弱化国标，热加载经 watchfiles 落地，`bundle_sha` 进 audit。** | 真实 Cursor / Claude Code / Codex 弹窗 UI 未人工实测；国产客户端仍只能写 fallback；OPA/Rego 未实现（baseline+overlay 已为 M3 切 Rego 摆好包结构）；Docker/gVisor 只给路由决策不执行真实沙箱；approval_token / approver / reason 未进入审计闭环；统一工具目录仍未实现，当前靠测试保证 baseline 对齐。 |
+| 方向 2：工具调用与任务执行安全 | `gate2` 风险分级、`gate3` Python 策略、`gate4` 三色污点、`gate5` 沙箱路由决策已存在；pipeline 已能让 Gate3 DENY 覆盖 Gate2 REQUIRE_APPROVAL；Policy DSL 已扩到 30 条并覆盖等保/生成式 AI 治理主题；上游有最小 MCP elicitation approve/reject 逻辑和 toy probe。**Gate2/3/4 已落地 baseline+overlay 双层策略：项目自带 30 条规则 + 46 工具风险 + 46 工具能力 + 29 敏感模式为 baseline；企业可在 `policies/overlay/<tenant_id>/` 注入私有规则，单调性门控强制不得弱化国标，热加载经 watchfiles 落地，`bundle_sha` 进 audit。** | **真实 JSON-RPC `tools/call` + elicitation approve/reject + 下游调用计数 + 审计一致性已由 `test_mcp_e2e.py` E2E harness 端到端覆盖（进程内内存 transport）。** 真实 Cursor / Claude Code / Codex 弹窗 UI 未人工实测；国产客户端仍只能写 fallback；OPA/Rego 未实现（baseline+overlay 已为 M3 切 Rego 摆好包结构）；Docker/gVisor 只给路由决策不执行真实沙箱；approval_token / approver / reason 未进入审计闭环；统一工具目录仍未实现，当前靠测试保证 baseline 对齐。 |
 | 方向 3：插件 / Skill / 脚本供应链安全 | `src/xa_guard/aibom/` 已有本地静态扫描、依赖风险解析、A/B/C/D/F 评级、CycloneDX-like 导出、本地 artifact/file URL/zip/tar 解包、sha256 provenance、typosquat 启发式和 drift 比较；4 条 supply_chain seed 通过。 | 没有远程包下载、外部信誉库、漏洞库、真实签名体系、Sigstore/TUF、公钥校验、CycloneDX schema 校验；bench 的 supply_chain case 仍走简化评级路径，不覆盖完整 artifact + provenance + audit。 |
-| 方向 4：评测与审计溯源 | `Gate6Audit`、哈希链、OTel 字段、`bench` CLI、HTML report、前端时间线已存在；CSAB-Gov-mini 已扩到 290 条并刷新报告；旧损坏审计链已归档，当前主日志验链通过。 | 290 条仍是规则链路 + mock executor 口径，尚不是真实 MCP E2E / 真实模型评测；`audit_completeness` 固定 1.0，不是逐 case 实测；pipeline 异常仍可能被 runner 吞掉；SM3/SM2 是 fallback，CoT faithfulness 是占位。 |
+| 方向 4：评测与审计溯源 | `Gate6Audit`、哈希链、OTel 字段、`bench` CLI、HTML report、前端时间线已存在；CSAB-Gov-mini 已扩到 290 条并刷新报告；旧损坏审计链已归档，当前主日志验链通过；**新增 `test_mcp_e2e.py` 在真实 `tools/call` 链路上断言审计 decision 序列与逐场景验链。** | 290 条仍是规则链路 + mock executor 口径，bench 自身尚不是真实 MCP E2E / 真实模型评测（E2E harness 已独立覆盖真链路审计一致性，但未并入 bench 指标）；`audit_completeness` 固定 1.0，不是逐 case 实测；pipeline 异常仍可能被 runner 吞掉；SM3/SM2 是 fallback，CoT faithfulness 是占位。 |
 
 ## 当前可用能力
 
@@ -52,7 +52,7 @@
 2. **Gate1 当前环境不是模型实测**：当前机器无 `.venv`，全局 Python 未安装 `transformers` / `torch` / `huggingface_hub`；Qwen backend `is_ready=False`，bench 为规则链路。
 3. **Spotlighting 当前默认未开启**：`configs/xa-guard.yaml` 中 `spotlighting.enabled: false`。
 4. **MCP elicitation 缺真实客户端 UI 证据**：toy MCP 协议 probe 与最小 upstream 逻辑存在，但 Cursor / Claude Code / Codex 的真实弹窗点击记录未完成。
-5. **Streamable HTTP 未实现**：上游 `run_streamable_http()` 直接 `NotImplementedError`；下游也只支持 stdio。
+5. **Streamable HTTP 未实现**：上游 `run_streamable_http()` 直接 `NotImplementedError`；下游也只支持 stdio。（注：stdio 链路的真 JSON-RPC `tools/call` + elicitation approve/reject + 下游调用计数 + 审计一致性已由 2026-06-04 新增的 `test_mcp_e2e.py` E2E harness 覆盖。）
 6. **OPA / Rego 未实现**：`gate3_policy.py` 的 `backend=rego` 会抛 `NotImplementedError`。
 7. **Docker / gVisor 未执行**：`gate5_sandbox.py` 只输出路由决策，不把工具调用放入真实容器。
 8. **审批闭环不完整**：Gate2 TODO 里仍缺 approval_token；审批人、审批理由、token 校验没有进 Gate6 审计字段。
@@ -66,14 +66,15 @@
 
 ## 最新验证结果
 
-本次维护在当前工作区重新执行：
+本次维护在当前工作区重新执行（2026-06-04）：
 
-- `python -m pytest --collect-only -q -p no:cacheprovider`：收集到 230 个测试点。
-- `python -m pytest -q --basetemp pytest_tmp_final_p1_fixed -p no:cacheprovider`：通过，230 个测试点全绿。
-- `python scripts\enrich_csab_gov_mini.py --check`：通过，290 条 bench YAML 元数据为最新。
-- `$env:PYTHONPATH='src'; python -m compileall -q src tests bench demo sdk scripts`：通过。
-- `python -m bench.cli run --suite bench\cases\csab-gov-mini-seed.yaml --config configs\xa-guard.yaml`：通过运行，刷新 `bench/.log/last_results.json` / `last_report.json` / `report.html`；290 条 pass_rate 100.0%。
-- `$env:PYTHONPATH='src'; python scripts\verify_audit.py --path logs\audit\audit.jsonl`：通过，11773 条记录，0 个链错误，0 条缺字段。
+- `PYTHONPATH=src python -m pytest -p no:cacheprovider`：通过，230 个测试点全绿（19.32s）。
+- `python scripts/enrich_csab_gov_mini.py --check`：通过，290 条 bench YAML 元数据为最新。
+- `PYTHONPATH=src python -m bench.cli run --suite bench/cases/csab-gov-mini-seed.yaml --config configs/xa-guard.yaml`：通过运行，刷新 `bench/.log/last_results.json` / `last_report.json` / `report.html`；290 条 pass_rate 100.0%。
+- `PYTHONPATH=src python scripts/verify_audit.py --path logs/audit/audit.jsonl`：通过，12694 条记录，0 个链错误，0 条缺字段。
+- `PYTHONPATH=src python -m pytest tests/integration/test_mcp_e2e.py`：通过（新增 MCP E2E harness，全量从 230→231 passed）。
+
+2026-06-04 新增 **MCP E2E harness**（`tests/integration/test_mcp_e2e.py` + `_fixture_e2e_server.py`）：用 mcp 进程内内存 transport 把真实 `ClientSession` 接到 `proxy.upstream._build_app` 构造的 guard `Server` 上，发起**真实 JSON-RPC `tools/call`**，弥补此前 `test_proxy_smoke` 绕过上游 MCP 协议层、从未走真 elicitation 的空缺。覆盖四场景并逐条断言：allow（echo，下游调用 1 次、审计 1 条 allow）、deny（exec_command rm -rf，Gate1 拦截、下游 0 次、审计 1 条 deny）、approve（grant_permission 触发 Gate2 REQUIRE_APPROVAL，客户端 elicitation 回 `approve=true` → 下游 1 次、审计 `require_approval`→`allow` 两条）、reject（elicitation `decline` → 下游 0 次、审计 1 条 require_approval）。`CountingRouter` 统计真正触达下游的次数，末尾 `ChainStore.verify()` 校验本场景 5 条审计记录哈希链完好。仍存空位：下游是 fixture echo 而非生产工具，`approval_token`/approver/reason 尚未进审计。
 
 最新 bench 指标：
 
@@ -85,8 +86,8 @@
 | legacy seed Recall | 100.0% | 当前是 `1 - legacy seed ASR`，不能等同模型 Recall@FPR |
 | FPR | 0.0% | 新口径下 WARN 不算阻断 |
 | CuP proxy | 100.0% | 只是合法样例非阻断率，不验证真实任务完成 |
-| Latency P50 / P95 | 37.93 ms / 62.53 ms | 当前是规则 pipeline + mock executor + 模型 fail-open；不是 Qwen 真实推理延迟 |
-| audit_completeness | 占位 100% | bench 固定写 `1.0`；独立 `verify_audit.py` 对当前主日志 11773 条可验，0 链错误 |
+| Latency P50 / P95 | 29.93 ms / 34.02 ms | 当前是规则 pipeline + mock executor + 模型 fail-open；不是 Qwen 真实推理延迟 |
+| audit_completeness | 占位 100% | bench 固定写 `1.0`；独立 `verify_audit.py` 对当前主日志 12694 条可验，0 链错误 |
 
 最新 290 条样例无 exact mismatch。需要注意：这是因为样例已经按当前 gate 的真实语义校准，例如 `send_notification` 这类 yellow 工具的良性通知按 `warn` 计，不再按 `allow` 计。
 
@@ -122,7 +123,7 @@ PRD 默认目标是“进取 + 冲刺”，代码交付目标是 L3 政企原型
 2. **Gate1 指标硬化**：把规则命中、模型命中、fusion 结果、模型 available 状态和 latency 分开展示；补真实 Recall/FPR/latency 对照。
 3. **决定 Spotlighting 默认策略**：若按主线默认开启，修改 `configs/xa-guard.yaml` 并补回归；否则文档必须写“可选未开启”。
 4. **XA-Bench hardening**：~~`case_kind` 分桶~~（2026-06-02 完成：290 条全部带 `case_kind` + `source_documents` + `fingerprint`，并由 enrich/validate 脚本 + 7 个 pytest 守护）；剩余空位：显式 `infra_error`、组合 oracle、audit delta / 验链断言、真实 audit completeness。
-5. **建立 MCP E2E harness**：覆盖 stdio `tools/call`、approve/reject、下游调用次数、审计一致性。
+5. ~~**建立 MCP E2E harness**：覆盖 stdio `tools/call`、approve/reject、下游调用次数、审计一致性。~~ — 2026-06-04 完成。`tests/integration/test_mcp_e2e.py` 用 mcp 内存 transport 走真 JSON-RPC，四场景（allow/deny/approve/reject）逐条断言下游调用次数 + 审计 decision 序列 + 验链。后续可扩展：真实 stdio 下游生产工具、多步工具链、approval_token 进审计闭环。
 6. **真实客户端 HITL 弹窗实测**：在明确支持 elicitation 的客户端完成 approve/reject 点击和截图/日志；国产客户端继续按事实源写 fallback。
 7. **审批令牌与审计增强**：补 approval_token、approver、reason、expiry、args_hash，并进入 Gate6 审计。
 8. **Gate5 真沙箱与 Gate3 OPA**：把路由决策推进到 Docker/gVisor 执行；把 Python predicate 后端扩展到 OPA/Rego。
