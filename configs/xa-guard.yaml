@@ -71,7 +71,7 @@ xa_guard:
         #   fail_open: true
         #   category_map_file: policies/baseline/category_maps/llamaguard.yaml
       spotlighting:
-        enabled: false                  # false=不影响现有行为；true=非user来源加 <untrusted_source> 标记
+        enabled: true                   # 默认开启；非user来源加 <untrusted_source> 标记
       source_risk_weights:
         user: 1.0
         web: 1.5

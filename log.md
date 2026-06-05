@@ -1,5 +1,187 @@
 # 工作日志
 
+## 2026-06-05 +08:00 Claude 主 agent（+4 sonnet 子 agent）- AIBOM 生产化（方向 3）
+
+把 `src/xa_guard/aibom/` 从 demo 骨架推进到生产化，落地 status.md 下一步清单第 8 条的 5 项能力。
+派出 4 个 sonnet 子 agent 并行各建一个自包含模块（互不改共享文件），主 agent 自建漂移监测 + 总装 + 集成。
+
+本次具体做了什么：
+- **CycloneDX schema 校验**（子 agent A）：`schema_validator.py` + 手写 `schema/cyclonedx-1.6.subset.schema.json`；
+  jsonschema 优先、缺库走内建结构校验；额外做 bom-ref 引用完整性 / hash 内容 / vuln severity 校验。40 测试。
+- **签名/公钥校验**（子 agent B）：`signing.py`，JSF 风格 canonical-JSON 签名；Ed25519（cryptography，真实非对称）、
+  SM2（gmssl 缺失→HMAC 降级）、HMAC；trust store `<keyId>.pub`；篡改/未知 keyId fail-closed。21 测试。
+- **远程包离线拉取**（子 agent C）：`offline_fetch.py`，`OfflinePackageStore` 严格离线 fail-closed 缓存解析，
+  name/version/url 三类 key、sha256 流式校验、原子 index、路径穿越防护、零网络库。24 测试。
+- **外部信誉/漏洞库**（子 agent D）：`intel.py` + `data/vulndb.json`（7 包 10 真实 CVE 种子）+ `data/reputation.json`；
+  PEP440 版本区间匹配、affected vs potentially_affected、max_severity。26 测试。
+- **持续漂移监测**（主 agent）：`drift_monitor.py`，带持久化快照 + JSONL 漂移账本，严重度分级，复用 compare_drift。6 测试。
+- **总装**（主 agent）：`gateway.py::admit()` 串起"离线拉包→扫描→漏洞富化→导出→schema 校验→签名验签→漂移"，
+  输出 AdmissionResult(decision)；`cli.py` 提供 `xa-aibom admit/bom/validate/drift`（退出码 allow0/warn1/deny2）。
+- 集成共享文件改动：scanner.ScanReport 增 `vulnerabilities` 字段；exporter specVersion 1.5→1.6 + vulnerabilities 段；
+  rater 纳入 vuln_*/reputation_*/signature_invalid/schema_invalid；pyproject 增 `aibom` extra + `xa-aibom` script。
+- 同步把 test_aibom_schema_validator 里 `spec_version=="1.5"` 滞后常量改为 1.6（随 exporter 生产化升级，非业务 bug，已在 worklog 备查）。
+
+测试/验证：
+- 全量 `PYTHONPATH=src python -m pytest`：**391 passed / 1 skipped**（skip 为 docker sandbox 镜像缺失，预期）。
+  较上一快照 259 passed 净增约 128 条，无回归；supply_chain bench 4 条断言（SCM-001~004）不变。
+- 端到端 CLI smoke：urllib3==1.26.5+requests==2.31.0 命中 4 CVE（1 high/3 medium）、CycloneDX 1.6 schema 合规、
+  Ed25519 签名并验签 True、二次漂移 D→F 判 high、终判 deny / 退出码 2。
+
+未完成 / 下一步：
+- bench supply_chain 仍走旧 `rate_install_request` 简化口径未接 gateway——接入会因漏洞库命中翻转 SCM-003（requests==2.31.0）
+  等基线，需重新生成 seed fingerprint 与重判预期决策，列为后续单独一轮（避免本轮静默改评测基线）。
+- 真实 MCP 安装链路（gate 级）尚未把 install_plugin 路由到 gateway；漏洞库/信誉库为离线种子快照，非实时 feed；
+  SM2 仍是 gmssl 缺失下的 HMAC 降级。
+
+## 2026-06-05 +08:00 Codex 主 agent - 调整 Gate2/3/4 审核指南为策略合规审核导向
+
+按用户反馈“不是主要审核代码，主要审核策略是否合规”，修改 `docs/Gate2-3-4策略审核指南.md`。
+
+本次具体做了什么：
+- 将文档标题改为 `Gate2/3/4 策略合规审核指南`，开头明确“主要审核策略是否合规、依据是否充分、证据是否完整；代码只作为辅助验证”。
+- 重写审核重点：从“代码/测试/覆盖矩阵能不能跑”调整为“法规/标准/项目依据、risk_level 分级解释、工具能力边界、Gate3 正反例和 bench 证据、是否夸大宣传”。
+- 调整审核范围：Gate2 审核风险分级策略，Gate3 审核法规/企业规则策略，Gate4 审核工具能力和数据密级策略；代码文件降级为辅助理解运行语义。
+- 调整 Gate2/Gate3/Gate4 各节：要求审核人说明风险等级依据、规则 `source`、合规解释、工具能力是否漏标、机密数据是否可能外流。
+- 调整审核结果模板：新增“合规审核结论”，要求分别写 Gate2 风险分级、Gate3 规则来源、Gate4 能力边界、bench 证据是否足够。
+- 更新 `docs/README.md` 中该文档的说明，从“策略总账/测试结果”改为“策略合规性、依据和证据”。
+- 删除文档中旧的 `policy_count == 30` 测试红点说明，改为当前真实口径：Gate3 31 条 baseline 规则已有正/反例 fixtures 强约束，仍需关注 23 个 trigger 未进入 bench case 的合规证据缺口。
+- 同步修正 `status.md` 里 Gate3 状态的一句过时描述，避免继续显示“单测仍有 30 条断言滞后”。
+
+已完成：
+- 审核文档现在以策略合规性为主，代码和测试只作为辅助验证步骤。
+
+未完成 / 客观限制：
+- 没有修改业务策略、测试代码或运行时逻辑。
+- 没有重跑 pytest；本轮是文档口径修改。
+
+## 2026-06-05 +08:00 Codex 主 agent - Spotlighting 默认开启、Gate3 强约束、覆盖矩阵 overlay 总账
+
+按用户明确决策执行三项修改：Spotlighting 默认开启；Gate3 每条规则的正/反例升级为硬约束；覆盖矩阵纳入 baseline+overlay 合并视图，并将 `install_plugin` 纳入统一工具总账。本轮派出 3 个 gpt-5.5 medium 子 agent 做只读调查，分别覆盖 Spotlighting 配置、Gate3 fixtures/schema/validator 落点、覆盖矩阵/工具总账实现；子 agent 均未改文件。
+
+本次具体做了什么：
+- 修改 `configs/xa-guard.yaml`：`gate1.spotlighting.enabled` 从 `false` 改为 `true`，默认对非 user 来源加 `<untrusted_source>` 标记。
+- 新增 `bench/cases/gate3-rule-fixtures.yaml`：为当前 31 条 Gate3 baseline 规则各提供 1 个正例和 1 个反例。
+- 新增 `bench/schema/gate3-rule-fixtures.schema.json` 和 `scripts/validate_gate3_rule_fixtures.py`：validator 会真实执行 Gate3，要求正例命中目标 rule_id、反例不命中目标 rule_id，并校验可选 `expected_decision`。
+- 新增 `tests/test_gate3_rule_fixtures_assets.py`：守护 fixture 覆盖所有 baseline rule_id，并运行 validator 的 `--strict`。
+- 修改 `policies/baseline/gate3_rules.yaml`：新增 `AIBOM-INSTALL-PLUGIN-SUPPLY-CHAIN`，把 `install_plugin` 纳入 Gate3 trigger。
+- 修改 `policies/baseline/gate4_capabilities.yaml`：新增 `install_plugin` capability，能力包含 `NETWORK_EXTERNAL`、`DATA_INGEST`、`FS_WRITE`、`EXEC`，risk_level 为 `red`。
+- 修改 deprecated 兼容文件 `policies/baseline/gate2_tool_risks.yaml`：同步补 `install_plugin: red`，实际 layered 运行时仍由 Gate4 capabilities 派生 Gate2 risk。
+- 修改 `scripts/generate_tool_gate_coverage_matrix.py`：默认改为读取 `LayeredPolicySource` 的 baseline+accepted overlay 合并视图；显式传 `--gate2/--gate3/--gate4` 时仍保留 legacy 单文件模式。
+- 修改 `tests/test_tool_gate_coverage_matrix.py`：断言覆盖矩阵默认纳入 overlay 合并视图，且 `install_plugin` 不再是 bench-only。
+- 修改 `tests/unit/test_config.py` 和 `tests/unit/test_gate3.py`：补默认配置断言，并把 Gate3 policy_count 更新为当前 31 条规则。
+- 修改 `status.md`：删除“Spotlighting 默认未开”“Gate3 31 vs 30 测试仍失败”“规则正反例未强约束”等过时状态，改为当前仓库状态。
+- 修改 `README.md`：同步 Gate1/Spotlighting 当前口径。
+
+验证结果：
+- `python -m pytest -q --basetemp pytest_tmp_targeted -p no:cacheprovider tests\unit\test_config.py tests\test_tool_gate_coverage_matrix.py tests\test_gate3_rule_fixtures_assets.py tests\unit\test_gate3.py -x --tb=short`：通过，54 个测试点。
+- `python scripts\generate_tool_gate_coverage_matrix.py --strict --json`：通过，policy_view=`layered-merged`，tools=48，gate2=48，gate3_triggers=44，gate4=48，bench_only=0，missing_gate2=0，missing_gate4=0，risk_mismatches=0。
+- `python scripts\validate_gate3_rule_fixtures.py --strict --json`：通过，rules=31，fixtures=31，positive=31，negative=31，errors=0，warnings=0。
+- `python -m pytest -q --basetemp pytest_tmp_broad -p no:cacheprovider tests\unit\test_gate1.py tests\unit\test_gate1_detectors.py tests\unit\test_gate2.py tests\unit\test_gate3.py tests\unit\test_gate4.py tests\unit\test_layered_policy.py tests\test_tool_gate_coverage_matrix.py tests\test_gate3_rule_fixtures_assets.py tests\test_aibom_bench_supply_chain.py tests\integration\test_bench_smoke.py -x --tb=short`：通过，183 个测试点。
+- `python -m pytest -q --basetemp pytest_tmp_full_current -p no:cacheprovider -x --tb=short`：通过；`tests/integration/test_sandbox_runner.py` 因本机缺少 `xa-guard/sandbox:latest` 镜像按预期 skip 1 条。
+
+已完成：
+- Spotlighting 默认策略已定为默认开启，并有配置测试守护。
+- Gate3 正/反例不再只是文档约定，已变为 fixture/schema/validator/test 的硬约束。
+- 覆盖矩阵默认统计 overlay 合并后的有效策略视图。
+- `install_plugin` 已进入 Gate3/Gate4/Gate2 layered 派生总账，覆盖矩阵中不再是 bench-only。
+
+未完成 / 客观限制：
+- 尚未跑全量 bench、真实模型推理或真实客户端 HITL 弹窗测试。
+- Spotlighting 只完成默认开启和定向回归，尚未给出开启/关闭 ASR、Recall/FPR 或 AgentDojo/InjecAgent 对照指标。
+- `install_plugin` 的 supply-chain bench 仍主要走独立 AIBOM rater，尚未扩展到完整远程信誉库、签名验证、漏洞库和 provenance/审计闭环。
+- Gate3 layered/hot-reload 合并视图仍走 Python predicate，尚未统一接入 Rego engine。
+
+下一步建议：
+- 设计 Spotlighting 开关对照评测集，给出默认开启后的可量化收益和误报代价。
+- 继续补真实客户端 HITL、gVisor/runsc、AIBOM 生产化和 layered Rego。
+
+## 2026-06-05 +08:00 Codex 主 agent - 新增 Gate2/3/4 策略审核指南
+
+按用户要求，在 docs 下新增给组员使用的审核文档，要求写得傻瓜、清楚，说明怎么审核、审核什么、文件在哪、为什么审核、参考是什么、完成目标是什么。
+
+本次具体做了什么：
+- 新增 `docs/Gate2-3-4策略审核指南.md`，按“先记住结论 → 为什么审核 → 审核范围 → 先看哪些文件 → Gate2/Gate3/Gate4 分别怎么审 → 覆盖矩阵怎么用 → 测试怎么跑 → 审核结果模板 → 完成目标 → 红线 → 参考文档”的顺序写。
+- 文档里明确当前事实口径：Gate3 31 条规则 / 44 trigger，Gate2/Gate4 48 工具，bench-only 0，仍有 23 个 Gate3 trigger 无 bench case。
+- 文档里明确当前已知测试红点：`tests/unit/test_gate3.py::test_clean_call_allows` 仍断言 `policy_count == 30`，但实际已有 31 条规则；要求组员不要私自改测试，应先写入审核结论等负责人确认。
+- 更新 `docs/README.md`，把新文档加入目录树、用途表和顶层文档说明。
+
+已完成：
+- 组员现在可以按 `docs/Gate2-3-4策略审核指南.md` 逐项审核 Gate2/3/4 策略、覆盖矩阵、正反例和测试结果。
+- docs 目录索引已能指向该文档。
+
+未完成 / 客观限制：
+- 本轮没有修改业务策略和测试代码。
+- 本轮没有重跑 pytest；这是文档新增，不改变运行时能力。
+
+## 2026-06-05 +08:00 Codex 主 agent - Gate2/3/4 策略核查与分工建议准备
+
+按用户要求，客观核查当前 Gate2 / Gate3 / Gate4 策略是否需要继续增添，以便后续给组员分配任务和准备工作文档。本轮没有修改业务策略，也没有修改测试代码。
+
+本次具体做了什么：
+- 读取 `status.md`、`docs/PRD.md`、`docs/项目总览.md`、`docs/规则测试样例约定.md`，对照赛题 4 个方向、PRD L3 目标和当前仓库状态。
+- 检查 `policies/baseline/gate2_tool_risks.yaml`、`gate3_rules.yaml`、`gate4_capabilities.yaml`、`bench/.log/tool_gate_coverage.md`，确认当前策略事实源、工具总账和覆盖矩阵。
+- 检查 `src/xa_guard/gates/gate2_plan.py`、`gate3_policy.py`、`gate4_taint.py` 与 `tests/unit/test_gate3.py`，确认 Gate2 未登记默认 yellow、Gate4 未登记 fail-closed、Gate3 predicate 聚合与测试覆盖现状。
+- 运行 `python scripts/generate_tool_gate_coverage_matrix.py --strict`，通过；当前 layered-merged 视图为 tools=48 / gate2=48 / gate3_triggers=44 / gate4=48 / bench_only=0 / gate3_no_bench=23。
+- 运行 `python -m pytest -q --basetemp pytest_tmp_gate234_review -p no:cacheprovider tests\unit\test_gate2.py tests\unit\test_gate3.py tests\unit\test_gate4.py tests\test_tool_gate_coverage_matrix.py -x --tb=short`，失败 1 条：`tests/unit/test_gate3.py::test_clean_call_allows` 仍断言 `policy_count == 30`，但当前 Gate3 规则已是 31 条。
+- 更新 `status.md`：把策略规模修正为 Gate3 31 条 / 44 trigger、Gate2/Gate4 48 工具、`bench_only=0`，删除 `install_plugin` 仍未登记的过时描述，并记录当前 Gate3 测试断言滞后。
+
+已完成：
+- 确认当前 Gate2/3/4 广度基本足够，短期不建议继续盲目横向加策略。
+- 确认当前优先任务应转向测试口径修正、Gate3 正反例强约束、23 个无 bench case trigger 的证据补齐、真实客户端 HITL 和评测可信度。
+
+未完成 / 客观限制：
+- 没有修改 `tests/unit/test_gate3.py`，因为用户明确要求不能通过改测试来通过测试；该处是否属于陈旧断言需要人工审核后再改。
+- 没有运行全量 pytest；本次只跑 Gate2/3/4 相关子集和覆盖矩阵。
+- 工作区已有多处未提交改动，本轮未回退、未整理这些非本次产生的改动。
+
+下一步建议：
+- 先由负责人确认 `policy_count == 30` 是否可按实际 31 条规则修正；确认后再改测试并重跑 Gate2/3/4 子集。
+- 给组员的任务不要写成“继续补规则”，而应写成“补证据、补强约束、补真实演示与评测可信度”。
+
+## 2026-06-05 +08:00 Claude 主 agent - 修 fail-closed 回归：baseline 登记 demo fixture echo
+
+承接上一条：上一轮 status 标出的 2 个集成测试回归（`test_proxy_smoke` / `test_mcp_e2e`），按用户指示用"路线 1"修复——在 baseline 给 demo fixture 工具登记 Gate2/Gate4 capability，保持 fail-closed 不破窗。
+
+本次具体做了什么：
+- 定位 fixture 工具集：`tests/integration/_fixture_echo_server.py` 与 `_fixture_e2e_server.py` 用 `echo` / `exec_command` / `grant_permission`；其中 `exec_command`(red) / `grant_permission`(red) 已登记，仅 `echo` 缺登记，命中 Gate4 `_default_cap`（output=CONFIDENTIAL+NETWORK_EXTERNAL）→ OUTBOUND 必然 DENY。
+- `policies/baseline/gate4_capabilities.yaml`：新增 `echo`，`capabilities: []`、`input_max_taint: CONFIDENTIAL`、`output_taint: PUBLIC`、`risk_level: green`（无外网/通知能力，OUTBOUND 不再 DENY）。
+- `policies/baseline/gate2_tool_risks.yaml`：新增 `echo: green`，与 Gate4 登记保持一致（覆盖默认配置走的 legacy Gate2 路径）。
+- 同步更新 `status.md`：把"⚠️ 已知 broken"段改写为"测试状态：259 passed/1 skip 全绿 + 已修复说明"；baseline 规模 46→47 工具、矩阵 total 47→48；删掉下一步第 1 优先级"先修回归"并重排编号；订正 L2 段与 bench 表注释。
+
+验证结果：
+- `pytest tests/integration/test_proxy_smoke.py tests/integration/test_mcp_e2e.py tests/test_tool_gate_coverage_matrix.py`：6 passed。
+- 全量 `PYTHONPATH=src python -m pytest`：**259 passed / 1 skipped / 0 failed**（1 skip 为 sandbox 镜像未构建，预期）。
+- `python scripts/generate_tool_gate_coverage_matrix.py --strict`：通过，tools=48 / gate2=47 / gate4=47 / missing_gate2=0 / missing_gate4=0 / risk_mismatches=0。
+
+已完成：
+- 2 个 fail-closed 回归测试转绿；fail-closed 兜底语义保持不变（未登记工具仍一律从严），只是把 demo fixture 显式登记为良性绿工具。
+- Gate2/Gate4 对 echo 的登记一致，覆盖矩阵 strict 无漂移。
+
+未完成 / 客观限制：
+- 仅登记了 `echo` 一个 demo fixture；若后续新增 demo 工具仍需在 baseline 显式登记，否则会被 fail-closed 拒。
+- 没有重跑 bench / verify_audit（本次改动不影响 bench 已登记工具与审计链）。
+
+## 2026-06-05 +08:00 Claude 主 agent - 按 AGENTS.md 重写 status.md 为当前仓库状态
+
+按用户要求"按照 AGENTS.md 的要求更新 status"。AGENTS.md 明确 status.md 应描述**当前仓库状态**（差什么/要改什么/距 PRD 多远），不是顶层追加的日志，过时状态/日志不应留在 status.md。本轮没有读取或维护 implementation-notes.html（git 已删除）。
+
+本次具体做了什么：
+- 只读核对 Codex 主 agent 上一轮策略重构的真实落地：`policies/` 分层重构到 `policies/baseline/`（git mv 保留历史，旧平铺路径废弃）；risk_level 单一事实源收敛到 `gate4_capabilities.yaml`（`layered.py` 新增 `_derive_tool_risks_from_caps()`，manifest 移除 tool_risks 条目）；Gate2 fail-open 默认 GREEN→YELLOW；Gate4 `_default_cap` 改 fail-closed（input_max=PUBLIC / output=CONFIDENTIAL / NETWORK_EXTERNAL）；Gate4 OUTBOUND 死代码已清为单一 DENY 路径；新增 `docs/risk_classification_basis.md`。
+- 跑全量 `pytest`：**257 passed / 2 failed / 1 skipped**。定位 2 个失败为真实回归：`test_proxy_smoke` 与 `test_mcp_e2e` 用未登记的 `echo` fixture，fail-closed `_default_cap`（output=CONFIDENTIAL + NETWORK_EXTERNAL）导致任何未登记工具在 Gate4 OUTBOUND 必然 DENY，`benign_allowed` 由 True 变 False。已用脚本逐 gate 追踪确认（gate4_taint OUTBOUND DENY）。1 skip 为 sandbox 镜像未构建，预期。
+- 核对当前 baseline 规模与覆盖矩阵：Gate3 30 规则/43 trigger、Gate4 46 工具、Gate2 派生 46、敏感 29；矩阵 missing_gate2/4=0、risk_mismatches=0、bench_only=1、gate3_no_bench=23。bench last_report 290 条 pass_rate 100%。
+- **重写 status.md**：删掉全部带时间戳的"最新状态快照"日志段与旧平铺路径，改为当前状态文档：一句话定位、已知 broken（2 集成测试回归 + 根因 + 两条修复路线）、本轮已还工程债表（一档①②③/二档④⑤）、分层策略目录结构、逐关卡状态、4 方向贴合度、空壳清单、bench 指标、距 PRD 差距、下一步优先级。
+
+已完成：
+- status.md 已符合 AGENTS.md"描述当前状态、不留过时日志"的要求，路径与规模与当前代码一致。
+- 把 fail-closed 硬化引入的 2 个集成测试回归如实写进 status，未掩盖。
+
+未完成 / 客观限制：
+- 没有修复这 2 个回归测试（用户只要求更新 status；修复涉及"给 fixture 登记 capability vs 测试注入 capability"的产品决策，已列为 status 下一步第 1 优先级）。
+- 没有重跑 bench / verify_audit（沿用现有 last_report 与既有验链结论）；本机仍无模型依赖，未复现真实 Qwen。
+
+下一步建议：
+- 先修 fail-closed 回归（给 demo fixture 登记 baseline capability，或集成测试注入测试用 capability 表），让 E2E 重新证明 fail-closed 正确性。
+
 ## 2026-06-04 23:20:17 +08:00 Codex 主 agent - 补规则样例约定与工具覆盖矩阵
 
 按用户要求处理 `status.md` 顶部二档事项：“规则无逐条正/反例绑定”和“没有覆盖率矩阵”。本轮使用 3 个子 agent 做只读协助调查：分别检查 Gate3 规则正/反例现状、覆盖率矩阵口径、文档落点。未读取或维护 `implementation-notes.html`。

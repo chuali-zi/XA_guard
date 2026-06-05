@@ -9,6 +9,9 @@
 # 工具风险等级（关卡 2 办事大厅用）
 # green: 自动放行   yellow: 异步通知人审   red: 同步阻塞 HITL
 tool_risks:
+  # demo / 集成测试 fixture 工具（与 gate4_capabilities.yaml 的 echo 登记保持一致）
+  echo: green
+
   # 只读 / 内部查询
   list_servers: green
   get_cpu: green
@@ -67,6 +70,9 @@ tool_risks:
   enable_minor_service: yellow
   payment_action: red
   recommend_content: yellow
+
+  # 供应链入口
+  install_plugin: red
 
   # 合成 red 状态占位工具
   red_operation: red

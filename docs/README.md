@@ -21,6 +21,7 @@ docs/
 ├── HACK-BENCH-组员提交规范.md ← hack 组员必读：怎么提交可复现攻击样例
 ├── XA-Bench-对抗测试规则.md ← bench 维护者必读：怎么接入、验收和分层报告
 ├── 规则测试样例约定.md      ← Gate3 规则正/反例、bench 绑定和阳历日期样例约定
+├── Gate2-3-4策略审核指南.md ← 组员审核 Gate2/3/4 策略合规性、依据和证据的傻瓜手册
 ├── XA-202620…比赛方案.pdf   ← 赛题原文
 │
 ├── tutorials/               ← 教学文档：上手 / 学习类
@@ -56,6 +57,7 @@ docs/
 | `docs/HACK-BENCH-组员提交规范.md` | hack 组员提交攻击、误报和人工探索记录的统一格式 |
 | `docs/XA-Bench-对抗测试规则.md` | bench 维护者的接入层、oracle、指标和演进规则 |
 | `docs/规则测试样例约定.md` | Gate3 规则逐条正/反例、bench case 绑定和阳历日期样例口径 |
+| `docs/Gate2-3-4策略审核指南.md` | 组员审核 Gate2/3/4 策略合规性、风险分级依据、能力边界和证据样例的操作手册 |
 | `docs/XA-202620…比赛方案.pdf` | 赛题原文，遇到分歧以此为准 |
 | `docs/tutorials/` | 教学文档。当前只有 MCP 入门指南，未来加入沙盒、审计等手把手教程 |
 | `docs/references/product-forms/` | 产品形态可行性评估的 4 篇方案 + 横向对比 |
@@ -124,7 +126,7 @@ docs/
 
 ### 当前顶层文档（2026-05-31）
 
-顶层包含：赛题 PDF、事实源、PRD、产品架构、项目总览、Gate1 接入说明、HACK-BENCH 提交规范、XA-Bench 对抗测试规则和规则测试样例约定。研究资料和历史快照继续放在 `references/`。
+顶层包含：赛题 PDF、事实源、PRD、产品架构、项目总览、Gate1 接入说明、HACK-BENCH 提交规范、XA-Bench 对抗测试规则、规则测试样例约定和 Gate2/3/4 策略审核指南。研究资料和历史快照继续放在 `references/`。
 
 ---
 

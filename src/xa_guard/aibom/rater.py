@@ -54,17 +54,42 @@ def rate(report: ScanReport) -> tuple[Grade, str]:
         reasons.append("remote artifact requires manual/offline fetch")
     if any(key.startswith("drift_") for key in indicators):
         reasons.append("AIBOM drift detected")
+    if indicators.get("signature_invalid", 0):
+        reasons.append("BOM signature missing or failed verification")
+    if indicators.get("schema_invalid", 0):
+        reasons.append("BOM fails CycloneDX schema validation")
+    if indicators.get("reputation_malware", 0):
+        reasons.append("dependency flagged as known-malware by reputation feed")
+    if indicators.get("reputation_low", 0):
+        reasons.append("dependency has low reputation score")
+    for sev in ("critical", "high", "medium", "low"):
+        if indicators.get(f"vuln_{sev}", 0):
+            reasons.append(f"{indicators[f'vuln_{sev}']} confirmed {sev}-severity vulnerability(ies) in dependencies")
+        if indicators.get(f"vuln_potential_{sev}", 0):
+            reasons.append(f"{indicators[f'vuln_potential_{sev}']} potential {sev}-severity vulnerability(ies) (unpinned)")
 
-    if indicators.get("artifact_sha256_mismatch", 0) or (
-        "dynamic_code" in capabilities
-        or indicators.get("metadata_suspicious_url", 0)
-        or indicators.get("suspicious_network_endpoint", 0)
+    if (
+        indicators.get("artifact_sha256_mismatch", 0)
+        or indicators.get("vuln_critical", 0)
+        or indicators.get("reputation_malware", 0)
         or (
-            "process_exec" in capabilities and ("network" in capabilities or "filesystem_write" in capabilities)
+            "dynamic_code" in capabilities
+            or indicators.get("metadata_suspicious_url", 0)
+            or indicators.get("suspicious_network_endpoint", 0)
+            or (
+                "process_exec" in capabilities and ("network" in capabilities or "filesystem_write" in capabilities)
+            )
         )
     ):
         grade: Grade = "F"
-    elif "process_exec" in capabilities or "deserialization" in capabilities or indicators.get("metadata_suspicious_script", 0):
+    elif (
+        "process_exec" in capabilities
+        or "deserialization" in capabilities
+        or indicators.get("metadata_suspicious_script", 0)
+        or indicators.get("vuln_high", 0)
+        or indicators.get("signature_invalid", 0)
+        or indicators.get("schema_invalid", 0)
+    ):
         grade = "D"
     elif (
         indicators.get("metadata_overbroad_permission", 0)
@@ -74,10 +99,21 @@ def rate(report: ScanReport) -> tuple[Grade, str]:
         or indicators.get("dependency_editable", 0)
         or indicators.get("dependency_local_path", 0)
         or indicators.get("artifact_remote_fetch_required", 0)
+        or indicators.get("vuln_medium", 0)
+        or indicators.get("vuln_potential_critical", 0)
+        or indicators.get("vuln_potential_high", 0)
+        or indicators.get("reputation_low", 0)
         or any(key.startswith("drift_") for key in indicators)
     ):
         grade = "C"
-    elif indicators.get("dependency_unpinned", 0) or "network" in capabilities or "filesystem_write" in capabilities:
+    elif (
+        indicators.get("dependency_unpinned", 0)
+        or "network" in capabilities
+        or "filesystem_write" in capabilities
+        or indicators.get("vuln_low", 0)
+        or indicators.get("vuln_potential_medium", 0)
+        or indicators.get("vuln_potential_low", 0)
+    ):
         grade = "B"
     else:
         grade = "A"

@@ -16,6 +16,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import yaml
 
 from xa_guard.policy.layered import LayeredPolicySource, set_global_source
 from xa_guard.policy.monotonicity import (
@@ -30,6 +31,12 @@ from xa_guard.types import PolicyRule, RiskLevel, TaintLabel, ToolCapability, De
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+GATE3_RULES = PROJECT_ROOT / "policies" / "baseline" / "gate3_rules.yaml"
+
+
+def _baseline_rule_count() -> int:
+    data = yaml.safe_load(GATE3_RULES.read_text(encoding="utf-8")) or {}
+    return len(data.get("rules", []) or [])
 
 
 # ────────────────────────────────────────────────────────────
@@ -61,9 +68,9 @@ def _write_overlay(root: Path, tenant_id: str, **files: str) -> None:
 # ────────────────────────────────────────────────────────────
 # 1. baseline-only
 # ────────────────────────────────────────────────────────────
-def test_baseline_loads_30_rules(baseline_src):
+def test_baseline_loads_current_rules(baseline_src):
     rules = baseline_src.get_policy_rules()
-    assert len(rules) == 30
+    assert len(rules) == _baseline_rule_count()
     # baseline 规则 id 与现有测试一致（不带 tenant:: 前缀）
     assert any(r.id == "GBT-22239-8.1.4.5" for r in rules)
 
@@ -214,7 +221,7 @@ rules:
     assert "acme" in src.overlay_rejections
     assert "tenant::acme::" in src.overlay_rejections["acme"]
     # baseline 仍正常加载
-    assert len(src.get_policy_rules()) == 30
+    assert len(src.get_policy_rules()) == _baseline_rule_count()
 
 
 def test_overlay_cannot_override_baseline_rule_id(tmp_path: Path):
@@ -322,7 +329,7 @@ patterns:
     )
     assert "acme" not in src.overlay_rejections
     rules = src.get_policy_rules()
-    assert len(rules) == 31
+    assert len(rules) == _baseline_rule_count() + 1
     assert any(r.id == "tenant::acme::COMPETITOR-DENY" for r in rules)
 
     risks = src.get_tool_risks()

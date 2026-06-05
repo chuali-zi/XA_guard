@@ -1,28 +1,25 @@
 # Tool x Gate coverage matrix
 
-Baseline files:
+Policy view: **layered-merged**
 
-- Gate2: `policies/baseline/gate2_tool_risks.yaml`
-- Gate3: `policies/baseline/gate3_rules.yaml`
-- Gate4: `policies/baseline/gate4_capabilities.yaml`
+- Default Gate2/Gate3/Gate4 view: `LayeredPolicySource` baseline + accepted overlay merge
+- Legacy explicit file mode: pass `--gate2`, `--gate3`, or `--gate4`
 - Bench: `bench/cases/csab-gov-mini-seed.yaml`
 
 ## Summary
 
-- Total distinct tools: **47**
-- Gate2 registered tools: **46**
-- Gate3 trigger tools: **43**
-- Gate4 registered tools: **46**
+- Total distinct tools: **48**
+- Gate2 registered tools: **48**
+- Gate3 trigger tools: **44**
+- Gate4 registered tools: **48**
 - Bench tool names: **24**
 - Gate3 triggers missing Gate2 registration: **0**
 - Gate3 triggers missing Gate4 registration: **0**
 - Gate2/Gate4 risk mismatches: **0**
-- Bench-only tools: **1**
+- Bench-only tools: **0**
 - Gate3 trigger tools without bench case: **23**
 - Invalid risk values: **0**
 - Invalid taint values: **0**
-
-Bench-only tools: install_plugin
 
 Gate3 trigger tools without bench case: admin_action, append_file, approve_label, call_model, content_generation, crawl_url, cross_domain_call, export_database, fine_tune_model, ingest_labeled_data, ingest_training_data, jailbreak, log_cleanup, payment_action, prompt_leak, recommend_content, red_operation, shell, start_annotation, switch_model, tool_call_with_external_input, train_model, update_user_role
 
@@ -41,6 +38,7 @@ Gate3 trigger tools without bench case: admin_action, append_file, approve_label
 | deploy_model | red | 2 | red | MODEL_DEPLOY | INTERNAL / INTERNAL | 3 | require_approval | OK |
 | deploy_system | red | 2 | red | NETWORK_INTERNAL, MODEL_DEPLOY | INTERNAL / INTERNAL | 5 | require_approval | OK |
 | drop_table | red | 3 | red | NETWORK_INTERNAL, EXEC | INTERNAL / INTERNAL | 3 | deny, require_approval | OK |
+| echo | green | 0 | green | - | CONFIDENTIAL / PUBLIC | 0 | - | OK |
 | enable_minor_service | yellow | 1 | yellow | CONTENT_PUBLISH | INTERNAL / INTERNAL | 6 | require_approval | OK |
 | exec_command | red | 7 | red | EXEC, FS_WRITE | INTERNAL / INTERNAL | 40 | deny, require_approval | OK |
 | export_database | red | 1 | red | NETWORK_INTERNAL, FS_READ, DATA_EXPORT | INTERNAL / CONFIDENTIAL | 0 | - | NO_BENCH_CASE |
@@ -51,7 +49,7 @@ Gate3 trigger tools without bench case: admin_action, append_file, approve_label
 | import_training_data | red | 5 | red | FS_READ, DATA_INGEST | CONFIDENTIAL / CONFIDENTIAL | 15 | deny, require_approval | OK |
 | ingest_labeled_data | red | 1 | red | DATA_INGEST | CONFIDENTIAL / CONFIDENTIAL | 0 | - | NO_BENCH_CASE |
 | ingest_training_data | red | 5 | red | FS_READ, DATA_INGEST | CONFIDENTIAL / CONFIDENTIAL | 0 | - | NO_BENCH_CASE |
-| install_plugin | - | 0 | - | - | - / - | 25 | allow, deny, warn | BENCH_ONLY |
+| install_plugin | red | 1 | red | NETWORK_EXTERNAL, DATA_INGEST, FS_WRITE, EXEC | PUBLIC / INTERNAL | 25 | allow, deny, warn | OK |
 | jailbreak | yellow | 1 | yellow | - | PUBLIC / PUBLIC | 0 | - | NO_BENCH_CASE |
 | list_servers | green | 0 | green | NETWORK_INTERNAL, FS_READ | PUBLIC / INTERNAL | 28 | allow | NO_GATE3_RULE |
 | log_cleanup | red | 2 | red | AUDIT_ADMIN, FS_WRITE | INTERNAL / PUBLIC | 0 | - | NO_BENCH_CASE |
@@ -100,6 +98,7 @@ Gate3 trigger tools without bench case: admin_action, append_file, approve_label
 - import_training_data: GBT-45654-DATA-AUTH, GBT-45654-DATA-COMMERCIAL-PROOF, GBT-45654-DATA-PII-CONSENT, GBT-45654-DATA-ROBOTS, GBT-45654-DATA-SPI-CONSENT
 - ingest_labeled_data: GBT-45654-LABEL-DUTY-SEPARATION
 - ingest_training_data: GBT-45654-DATA-AUTH, GBT-45654-DATA-COMMERCIAL-PROOF, GBT-45654-DATA-PII-CONSENT, GBT-45654-DATA-ROBOTS, GBT-45654-DATA-SPI-CONSENT
+- install_plugin: AIBOM-INSTALL-PLUGIN-SUPPLY-CHAIN
 - jailbreak: GBT-45654-A.3.2
 - log_cleanup: CSL-LOG-RETENTION-6M, GBT-22239-AUDIT-DELETE
 - payment_action: GBT-45654-MINOR-PROTECTION

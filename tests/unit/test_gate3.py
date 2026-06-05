@@ -288,7 +288,7 @@ def test_clean_call_allows(gate):
     result = gate.evaluate(ctx)
     assert result.decision == Decision.ALLOW
     assert result.rule_hits == []
-    assert result.metadata["policy_count"] == 30
+    assert result.metadata["policy_count"] == 31
 
 
 # ---------- 新增合规规则抽样覆盖：等保 2.0 / GB/T 45654 / TC260-003 ----------

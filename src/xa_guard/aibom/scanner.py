@@ -44,6 +44,8 @@ class ScanReport:
     inferred_capabilities: list[str] = field(default_factory=list)
     dependencies: list[str] = field(default_factory=list)
     provenance: dict[str, Any] = field(default_factory=dict)
+    # 由 gateway 用离线漏洞库富化（CycloneDX vulnerabilities 条目）；扫描阶段默认空。
+    vulnerabilities: list[dict[str, Any]] = field(default_factory=list)
 
 
 _NETWORK_MODULES = {"socket", "urllib", "requests", "httpx"}

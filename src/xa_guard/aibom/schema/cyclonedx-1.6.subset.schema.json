@@ -1,0 +1,263 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://xa-guard.local/aibom/cyclonedx-1.6.subset",
+  "title": "CycloneDX 1.6 – XA-Guard AIBOM subset schema",
+  "$comment": "Hand-authored faithful subset of the official CycloneDX 1.6 schema. Source: https://cyclonedx.org/schema/bom-1.6.schema.json (Apache-2.0). Extension keys 'findings' and 'rating' are intentionally excluded from validation here; they are permitted by the wrapper validator as XA-Guard-specific extensions.",
+
+  "type": "object",
+  "required": ["bomFormat", "specVersion", "version"],
+  "properties": {
+    "bomFormat": {
+      "type": "string",
+      "const": "CycloneDX",
+      "description": "Must be exactly 'CycloneDX'"
+    },
+    "specVersion": {
+      "type": "string",
+      "enum": ["1.5", "1.6"],
+      "description": "CycloneDX spec version; XA-Guard accepts 1.5 and 1.6"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "BOM version, integer >= 1"
+    },
+    "serialNumber": {
+      "type": "string",
+      "description": "Optional UUID in urn:uuid: form"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "timestamp": {"type": "string"},
+        "tools": {"type": "array"},
+        "authors": {"type": "array"},
+        "component": {"$ref": "#/$defs/component"},
+        "manufacture": {"type": "object"},
+        "supplier": {"type": "object"},
+        "licenses": {"type": "array"},
+        "properties": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/property"}
+        }
+      },
+      "additionalProperties": true
+    },
+    "components": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/component"}
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/dependency"}
+    },
+    "vulnerabilities": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/vulnerability"}
+    },
+    "services": {
+      "type": "array",
+      "description": "Optional services list"
+    },
+    "externalReferences": {
+      "type": "array"
+    },
+    "compositions": {
+      "type": "array"
+    },
+    "properties": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/property"}
+    }
+  },
+  "additionalProperties": true,
+
+  "$defs": {
+    "component": {
+      "type": "object",
+      "required": ["type", "name"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "application",
+            "framework",
+            "library",
+            "container",
+            "platform",
+            "operating-system",
+            "device",
+            "device-driver",
+            "firmware",
+            "file",
+            "machine-learning-model",
+            "data",
+            "cryptographic-asset"
+          ],
+          "description": "CycloneDX component type enum"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string"
+        },
+        "bom-ref": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "purl": {
+          "type": "string"
+        },
+        "hashes": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/hash"}
+        },
+        "licenses": {
+          "type": "array"
+        },
+        "properties": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/property"}
+        },
+        "externalReferences": {
+          "type": "array"
+        },
+        "components": {
+          "type": "array",
+          "description": "Nested components"
+        },
+        "evidence": {
+          "type": "object"
+        },
+        "cpe": {
+          "type": "string"
+        },
+        "supplier": {
+          "type": "object"
+        },
+        "author": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "hash": {
+      "type": "object",
+      "required": ["alg", "content"],
+      "properties": {
+        "alg": {
+          "type": "string",
+          "enum": [
+            "MD5",
+            "SHA-1",
+            "SHA-256",
+            "SHA-384",
+            "SHA-512",
+            "SHA3-256",
+            "SHA3-384",
+            "SHA3-512",
+            "BLAKE2b-256",
+            "BLAKE2b-384",
+            "BLAKE2b-512",
+            "BLAKE3"
+          ],
+          "description": "CycloneDX hash algorithm enum"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Hex-encoded hash content"
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "property": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {"type": "string"},
+        "value": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+
+    "dependency": {
+      "type": "object",
+      "required": ["ref"],
+      "properties": {
+        "ref": {
+          "type": "string",
+          "description": "bom-ref of the component this entry describes"
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "bom-refs this component depends on"
+        },
+        "provides": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "vulnerability": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Vulnerability identifier, e.g. CVE-XXXX-XXXXX"
+        },
+        "source": {"type": "object"},
+        "references": {"type": "array"},
+        "ratings": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/vulnerabilityRating"}
+        },
+        "cwes": {"type": "array"},
+        "description": {"type": "string"},
+        "detail": {"type": "string"},
+        "recommendation": {"type": "string"},
+        "advisories": {"type": "array"},
+        "created": {"type": "string"},
+        "published": {"type": "string"},
+        "updated": {"type": "string"},
+        "analysis": {"type": "object"},
+        "affects": {"type": "array"},
+        "properties": {"type": "array"}
+      },
+      "additionalProperties": true
+    },
+
+    "vulnerabilityRating": {
+      "type": "object",
+      "properties": {
+        "source": {"type": "object"},
+        "score": {"type": "number"},
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "high", "medium", "low", "info", "none", "unknown"],
+          "description": "CycloneDX severity enum"
+        },
+        "method": {"type": "string"},
+        "vector": {"type": "string"},
+        "justification": {"type": "string"}
+      },
+      "additionalProperties": true
+    }
+  }
+}

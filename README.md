@@ -227,7 +227,7 @@ jiebang/
 
 | 项 | 现状 | 跟进 |
 |---|---|---|
-| Gate1 真实模型推理 + Spotlighting | 关卡 1 默认仍是规则版，模型 backend 为占位 | M2 接 Qwen3Guard + Spotlighting，保留英文对照层 |
+| Gate1 真实模型推理 + Spotlighting | 关卡 1 默认仍是规则链路，Spotlighting 已默认开启；模型 backend 需真实依赖/权重才可用 | M2 接真实 Qwen3Guard 指标，保留英文对照层 |
 | 双层 Policy DSL（baseline + overlay） | ✅ 已落地：baseline 走受限 eval、overlay 走 evalidate AST 白名单 + 单调性门控 + watchfiles 热加载 + bundle_sha 入审计 | M3 迁 OPA `base/tenant/decision` 三层包 |
 | gVisor / Docker 真沙箱 | 关卡 5 只输出 routing decision | M3 接 Docker |
 | 国密 SM2 真签名 | 默认 SHA-256 + HMAC 占位，gmssl 可启 | M5 gmssl |

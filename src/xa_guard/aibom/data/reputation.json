@@ -1,0 +1,119 @@
+{
+  "source": "XA-Guard offline reputation feed (seed) — NOT a live feed. Refresh out-of-band.",
+  "generated": "2026-06-05",
+  "note": "Manual seed based on public PyPI statistics and known malicious packages. Conservative scores.",
+  "packages": {
+    "requests": {
+      "score": 95,
+      "downloads": "very-high",
+      "maintained": true,
+      "flags": []
+    },
+    "urllib3": {
+      "score": 92,
+      "downloads": "very-high",
+      "maintained": true,
+      "flags": []
+    },
+    "httpx": {
+      "score": 90,
+      "downloads": "high",
+      "maintained": true,
+      "flags": []
+    },
+    "numpy": {
+      "score": 97,
+      "downloads": "very-high",
+      "maintained": true,
+      "flags": []
+    },
+    "pandas": {
+      "score": 96,
+      "downloads": "very-high",
+      "maintained": true,
+      "flags": []
+    },
+    "pyyaml": {
+      "score": 88,
+      "downloads": "very-high",
+      "maintained": true,
+      "flags": []
+    },
+    "pillow": {
+      "score": 88,
+      "downloads": "very-high",
+      "maintained": true,
+      "flags": []
+    },
+    "cryptography": {
+      "score": 91,
+      "downloads": "very-high",
+      "maintained": true,
+      "flags": []
+    },
+    "setuptools": {
+      "score": 90,
+      "downloads": "very-high",
+      "maintained": true,
+      "flags": []
+    },
+    "aiohttp": {
+      "score": 86,
+      "downloads": "high",
+      "maintained": true,
+      "flags": []
+    },
+    "flask": {
+      "score": 93,
+      "downloads": "very-high",
+      "maintained": true,
+      "flags": []
+    },
+    "django": {
+      "score": 94,
+      "downloads": "very-high",
+      "maintained": true,
+      "flags": []
+    },
+    "pytest": {
+      "score": 95,
+      "downloads": "very-high",
+      "maintained": true,
+      "flags": []
+    },
+    "evil-sdk": {
+      "score": 5,
+      "downloads": "very-low",
+      "maintained": false,
+      "flags": ["known-malware", "typosquat"]
+    },
+    "colourama": {
+      "score": 3,
+      "downloads": "very-low",
+      "maintained": false,
+      "flags": ["known-malware", "typosquat", "credential-harvester"]
+    },
+    "reqeusts": {
+      "score": 4,
+      "downloads": "very-low",
+      "maintained": false,
+      "flags": ["known-malware", "typosquat"]
+    },
+    "python-nmap2": {
+      "score": 20,
+      "downloads": "low",
+      "maintained": false,
+      "flags": ["suspicious", "unmaintained"]
+    },
+    "ctx": {
+      "score": 2,
+      "downloads": "low",
+      "maintained": false,
+      "flags": ["known-malware", "supply-chain-attack"]
+    }
+  },
+  "default": {
+    "score": 50,
+    "flags": ["unknown"]
+  }
+}

@@ -17,9 +17,9 @@ def export_cyclonedx(report: ScanReport) -> dict[str, Any]:
     dependencies = [_dependency_component(dep) for dep in sorted(set(report.dependencies))]
     component_hash = report.provenance.get("sha256") or _path_hash(report.plugin_path)
 
-    return {
+    bom: dict[str, Any] = {
         "bomFormat": "CycloneDX",
-        "specVersion": "1.5",
+        "specVersion": "1.6",
         "version": 1,
         "metadata": {
             "component": {
@@ -41,6 +41,9 @@ def export_cyclonedx(report: ScanReport) -> dict[str, Any]:
         "findings": [{"id": f"AIBOM-{index + 1:04d}", "detail": finding} for index, finding in enumerate(report.findings)],
         "rating": {"grade": grade, "reason": reason},
     }
+    if report.vulnerabilities:
+        bom["vulnerabilities"] = [dict(entry) for entry in report.vulnerabilities]
+    return bom
 
 
 def compare_drift(current: ScanReport, previous: ScanReport | dict[str, Any]) -> ScanReport:

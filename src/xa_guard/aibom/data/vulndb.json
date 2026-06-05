@@ -1,0 +1,120 @@
+{
+  "source": "XA-Guard offline vuln DB (OSV-style seed) — NOT a live feed. Refresh out-of-band.",
+  "generated": "2026-06-05",
+  "note": "Seed snapshot. Fixed-version ranges are conservative best-effort from public advisories.",
+  "packages": {
+    "urllib3": [
+      {
+        "id": "CVE-2024-37891",
+        "aliases": ["GHSA-34jh-p97f-mpxf"],
+        "severity": "medium",
+        "cvss": 4.4,
+        "affected": [{"introduced": "0", "fixed": "1.26.19"}],
+        "also_affected_ranges": [{"introduced": "2.0.0", "fixed": "2.2.2"}],
+        "summary": "proxy-authorization header leaked on redirect to different origin in urllib3"
+      },
+      {
+        "id": "CVE-2023-43804",
+        "aliases": ["GHSA-v845-jxx5-vc9f"],
+        "severity": "high",
+        "cvss": 8.1,
+        "affected": [{"introduced": "0", "fixed": "1.26.17"}],
+        "also_affected_ranges": [{"introduced": "2.0.0", "fixed": "2.0.6"}],
+        "summary": "urllib3 does not strip the Cookie header on cross-origin redirect"
+      },
+      {
+        "id": "CVE-2023-45803",
+        "aliases": ["GHSA-g4mx-q9vg-27p4"],
+        "severity": "medium",
+        "cvss": 4.2,
+        "affected": [{"introduced": "0", "fixed": "1.26.18"}],
+        "also_affected_ranges": [{"introduced": "2.0.0", "fixed": "2.0.7"}],
+        "summary": "urllib3 discards chunked encoding on method mutation (may expose request body)"
+      }
+    ],
+    "requests": [
+      {
+        "id": "CVE-2024-35195",
+        "aliases": ["GHSA-9wx4-h78v-vm56"],
+        "severity": "medium",
+        "cvss": 5.6,
+        "affected": [{"introduced": "0", "fixed": "2.32.2"}],
+        "also_affected_ranges": [],
+        "summary": "requests session mergetokens incorrectly trusts previously-used URLs — credential leak"
+      },
+      {
+        "id": "CVE-2023-32681",
+        "aliases": ["GHSA-j8r2-6x86-q33q"],
+        "severity": "medium",
+        "cvss": 6.1,
+        "affected": [{"introduced": "0", "fixed": "2.31.0"}],
+        "also_affected_ranges": [],
+        "summary": "requests forwards proxy-authorization header to destination on redirect"
+      }
+    ],
+    "pyyaml": [
+      {
+        "id": "CVE-2020-14343",
+        "aliases": ["GHSA-8q59-q68h-6hv4"],
+        "severity": "critical",
+        "cvss": 9.8,
+        "affected": [{"introduced": "0", "fixed": "5.4"}],
+        "also_affected_ranges": [],
+        "summary": "PyYAML full_load / yaml.load with arbitrary Loader allows arbitrary code execution"
+      },
+      {
+        "id": "CVE-2017-18342",
+        "aliases": [],
+        "severity": "critical",
+        "cvss": 9.8,
+        "affected": [{"introduced": "0", "fixed": "4.1"}],
+        "also_affected_ranges": [],
+        "summary": "PyYAML yaml.load() arbitrary Python object instantiation via !!python/object"
+      }
+    ],
+    "pillow": [
+      {
+        "id": "CVE-2023-44271",
+        "aliases": ["GHSA-j7hp-h8jx-5ppr"],
+        "severity": "high",
+        "cvss": 7.5,
+        "affected": [{"introduced": "0", "fixed": "10.0.1"}],
+        "also_affected_ranges": [],
+        "summary": "Pillow uncontrolled resource consumption in ImageFont when opening crafted font"
+      }
+    ],
+    "cryptography": [
+      {
+        "id": "CVE-2024-26130",
+        "aliases": ["GHSA-6vqw-3v5j-54x4"],
+        "severity": "high",
+        "cvss": 7.5,
+        "affected": [{"introduced": "0", "fixed": "42.0.4"}],
+        "also_affected_ranges": [],
+        "summary": "cryptography NULL pointer dereference in PKCS12 parsing"
+      }
+    ],
+    "setuptools": [
+      {
+        "id": "CVE-2024-6345",
+        "aliases": ["GHSA-cx63-2mw6-8hw5"],
+        "severity": "high",
+        "cvss": 8.8,
+        "affected": [{"introduced": "0", "fixed": "70.0.0"}],
+        "also_affected_ranges": [],
+        "summary": "setuptools path traversal via PackageIndex.download when processing package URLs"
+      }
+    ],
+    "aiohttp": [
+      {
+        "id": "CVE-2024-23334",
+        "aliases": ["GHSA-5h86-8mv2-5q98"],
+        "severity": "high",
+        "cvss": 7.5,
+        "affected": [{"introduced": "0", "fixed": "3.9.2"}],
+        "also_affected_ranges": [],
+        "summary": "aiohttp path traversal vulnerability via static file serving with follow_symlinks=True"
+      }
+    ]
+  }
+}

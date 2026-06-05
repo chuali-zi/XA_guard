@@ -29,6 +29,14 @@
 # risk_level:      green / yellow / red
 
 tools:
+  # demo / 集成测试 fixture 工具（tests/integration/_fixture_*_server.py）
+  # echo 仅回显入参，无外网 / 通知 / 执行能力，故 OUTBOUND 不会触发机密外泄 DENY。
+  - tool_name: echo
+    capabilities: []
+    input_max_taint: CONFIDENTIAL
+    output_taint: PUBLIC
+    risk_level: green
+
   - tool_name: list_servers
     capabilities: [NETWORK_INTERNAL, FS_READ]
     input_max_taint: PUBLIC
@@ -304,3 +312,10 @@ tools:
     input_max_taint: INTERNAL
     output_taint: PUBLIC
     risk_level: yellow
+
+  - tool_name: install_plugin
+    capabilities: [NETWORK_EXTERNAL, DATA_INGEST, FS_WRITE, EXEC]
+    input_max_taint: PUBLIC
+    output_taint: INTERNAL
+    risk_level: red
+    description: 插件安装会引入外部代码、依赖和运行权限，是智能体供应链入口，纳入统一工具总账。

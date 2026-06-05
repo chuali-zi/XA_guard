@@ -1,4 +1,4 @@
-"""Generate a tool x gate coverage matrix for baseline policies.
+"""Generate a tool x gate coverage matrix for the effective policy view.
 
 The matrix makes Gate2/Gate3/Gate4 registration drift visible:
   - Gate2: tool risk exists in gate2_tool_risks.yaml.
@@ -7,7 +7,8 @@ The matrix makes Gate2/Gate3/Gate4 registration drift visible:
   - Bench: tool appears in csab-gov-mini-seed.yaml input_payload.tool_name.
   - Gate2/Gate4 risk_level values match for tools registered in both.
 
-By default the script writes bench/.log/tool_gate_coverage.md and exits 0.
+By default the script reads the LayeredPolicySource baseline+overlay merged
+view, writes bench/.log/tool_gate_coverage.md, and exits 0.
 With --strict it exits non-zero on missing Gate2/Gate4 registrations for
 Gate3 triggers, Gate2/Gate4 risk mismatches, or invalid risk/taint values.
 """
@@ -22,12 +23,17 @@ from typing import Any
 
 import yaml
 
+from xa_guard.policy.layered import LayeredPolicySource
+from xa_guard.types import PolicyRule
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_GATE2 = ROOT / "policies" / "baseline" / "gate2_tool_risks.yaml"
 DEFAULT_GATE3 = ROOT / "policies" / "baseline" / "gate3_rules.yaml"
 DEFAULT_GATE4 = ROOT / "policies" / "baseline" / "gate4_capabilities.yaml"
 DEFAULT_BENCH = ROOT / "bench" / "cases" / "csab-gov-mini-seed.yaml"
 DEFAULT_REPORT = ROOT / "bench" / ".log" / "tool_gate_coverage.md"
+DEFAULT_MANIFEST = ROOT / "policies" / "baseline" / "manifest.yaml"
+DEFAULT_OVERLAY_ROOT = ROOT / "policies" / "overlay"
 RISKS = {"green", "yellow", "red"}
 TAINTS = {"PUBLIC", "INTERNAL", "CONFIDENTIAL"}
 
@@ -45,12 +51,21 @@ def _load_gate2(path: Path) -> dict[str, str]:
 
 def _load_gate3(path: Path) -> dict[str, list[str]]:
     data = _load_yaml(path)
+    return _gate3_by_tool_from_rules(data.get("rules", []) or [])
+
+
+def _gate3_by_tool_from_rules(rules: list[dict[str, Any]] | list[PolicyRule]) -> dict[str, list[str]]:
     by_tool: dict[str, list[str]] = defaultdict(list)
-    for rule in data.get("rules", []) or []:
-        rule_id = rule.get("id")
+    for rule in rules:
+        if isinstance(rule, PolicyRule):
+            rule_id = rule.id
+            triggers = rule.triggers
+        else:
+            rule_id = rule.get("id")
+            triggers = rule.get("triggers", []) or []
         if not rule_id:
             continue
-        for trigger in rule.get("triggers", []) or []:
+        for trigger in triggers:
             by_tool[str(trigger)].append(str(rule_id))
     return {tool: sorted(set(rules)) for tool, rules in by_tool.items()}
 
@@ -96,6 +111,31 @@ def _load_bench(path: Path) -> dict[str, dict[str, Any]]:
     return by_tool
 
 
+def _load_layered(
+    manifest_path: Path = DEFAULT_MANIFEST,
+    overlay_root: Path = DEFAULT_OVERLAY_ROOT,
+) -> tuple[dict[str, str], dict[str, list[str]], dict[str, dict[str, Any]], dict[str, Any]]:
+    source = LayeredPolicySource(
+        manifest_path=manifest_path,
+        overlay_root=overlay_root,
+        project_root=ROOT,
+    )
+    gate2 = {name: level.value for name, level in source.get_tool_risks().items()}
+    gate3 = _gate3_by_tool_from_rules(source.get_policy_rules())
+    gate4 = {
+        name: {
+            "tool_name": cap.tool_name,
+            "capabilities": list(cap.capabilities),
+            "input_max_taint": cap.input_max_taint.value,
+            "output_taint": cap.output_taint.value,
+            "risk_level": cap.risk_level.value,
+            "description": cap.description,
+        }
+        for name, cap in source.get_tool_capabilities().items()
+    }
+    return gate2, gate3, gate4, source.stats()
+
+
 def _status_for(
     *,
     gate2_risk: str | None,
@@ -132,14 +172,23 @@ def _status_for(
 
 
 def build_matrix(
-    gate2_path: Path = DEFAULT_GATE2,
-    gate3_path: Path = DEFAULT_GATE3,
-    gate4_path: Path = DEFAULT_GATE4,
+    gate2_path: Path | None = None,
+    gate3_path: Path | None = None,
+    gate4_path: Path | None = None,
     bench_path: Path = DEFAULT_BENCH,
+    manifest_path: Path = DEFAULT_MANIFEST,
+    overlay_root: Path = DEFAULT_OVERLAY_ROOT,
 ) -> dict[str, Any]:
-    gate2 = _load_gate2(gate2_path)
-    gate3 = _load_gate3(gate3_path)
-    gate4 = _load_gate4(gate4_path)
+    use_legacy_paths = gate2_path is not None or gate3_path is not None or gate4_path is not None
+    if use_legacy_paths:
+        gate2 = _load_gate2(gate2_path or DEFAULT_GATE2)
+        gate3 = _load_gate3(gate3_path or DEFAULT_GATE3)
+        gate4 = _load_gate4(gate4_path or DEFAULT_GATE4)
+        policy_view = "legacy-baseline-files"
+        layered_stats: dict[str, Any] = {}
+    else:
+        gate2, gate3, gate4, layered_stats = _load_layered(manifest_path, overlay_root)
+        policy_view = "layered-merged"
     bench = _load_bench(bench_path)
 
     tools = sorted(set(gate2) | set(gate3) | set(gate4) | set(bench))
@@ -207,6 +256,8 @@ def build_matrix(
         )
 
     summary = {
+        "policy_view": policy_view,
+        "layered_stats": layered_stats,
         "total_tools": len(tools),
         "gate2_tools": len(gate2),
         "gate3_trigger_tools": len(gate3),
@@ -229,11 +280,10 @@ def render_markdown(matrix: dict[str, Any]) -> str:
     lines: list[str] = []
     lines.append("# Tool x Gate coverage matrix")
     lines.append("")
-    lines.append("Baseline files:")
+    lines.append(f"Policy view: **{summary['policy_view']}**")
     lines.append("")
-    lines.append("- Gate2: `policies/baseline/gate2_tool_risks.yaml`")
-    lines.append("- Gate3: `policies/baseline/gate3_rules.yaml`")
-    lines.append("- Gate4: `policies/baseline/gate4_capabilities.yaml`")
+    lines.append("- Default Gate2/Gate3/Gate4 view: `LayeredPolicySource` baseline + accepted overlay merge")
+    lines.append("- Legacy explicit file mode: pass `--gate2`, `--gate3`, or `--gate4`")
     lines.append("- Bench: `bench/cases/csab-gov-mini-seed.yaml`")
     lines.append("")
     lines.append("## Summary")
@@ -302,16 +352,18 @@ def render_markdown(matrix: dict[str, Any]) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--gate2", type=Path, default=DEFAULT_GATE2)
-    parser.add_argument("--gate3", type=Path, default=DEFAULT_GATE3)
-    parser.add_argument("--gate4", type=Path, default=DEFAULT_GATE4)
+    parser.add_argument("--gate2", type=Path)
+    parser.add_argument("--gate3", type=Path)
+    parser.add_argument("--gate4", type=Path)
     parser.add_argument("--bench", type=Path, default=DEFAULT_BENCH)
+    parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    parser.add_argument("--overlay-root", type=Path, default=DEFAULT_OVERLAY_ROOT)
     parser.add_argument("--report", type=Path, default=DEFAULT_REPORT)
     parser.add_argument("--strict", action="store_true")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
-    matrix = build_matrix(args.gate2, args.gate3, args.gate4, args.bench)
+    matrix = build_matrix(args.gate2, args.gate3, args.gate4, args.bench, args.manifest, args.overlay_root)
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(render_markdown(matrix), encoding="utf-8")
 
@@ -322,7 +374,7 @@ def main() -> int:
         print(
             "[coverage-matrix] tools={total_tools} gate2={gate2_tools} gate3_triggers={gate3_trigger_tools} "
             "gate4={gate4_tools} bench={bench_tools} missing_gate2={m2} missing_gate4={m4} "
-            "risk_mismatches={rm} bench_only={bo} gate3_no_bench={g3nb}".format(
+            "risk_mismatches={rm} bench_only={bo} gate3_no_bench={g3nb} view={policy_view}".format(
                 **summary,
                 m2=len(summary["missing_gate2_for_gate3"]),
                 m4=len(summary["missing_gate4_for_gate3"]),

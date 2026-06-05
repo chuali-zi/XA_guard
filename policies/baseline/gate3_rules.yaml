@@ -302,3 +302,13 @@ rules:
     severity: high
     audit: required
     description: 连续多次诱导违法不良内容输入应触发暂停、人工复核或其他处置流程。
+
+  - id: AIBOM-INSTALL-PLUGIN-SUPPLY-CHAIN
+    name: 插件安装供应链审查
+    source: "OWASP AIBOM / Agentic AI supply-chain control"
+    triggers: [install_plugin]
+    predicate: "tool == 'install_plugin' and (risk == 'red' or not args.get('verified_publisher') or args.get('network_access') or args.get('exec_permission'))"
+    enforce: require_approval
+    severity: high
+    audit: required
+    description: 插件安装属于智能体供应链入口，应纳入统一工具总账并在高风险、未验证发布方、网络或执行权限场景触发审查。
