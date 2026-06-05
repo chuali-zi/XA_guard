@@ -11,7 +11,7 @@ from xa_guard.gates.gate4_taint import Gate4Taint
 from xa_guard.policy.layered import LayeredPolicySource, set_global_source
 from xa_guard.types import Decision, GateContext, InputSource, TaintLabel
 
-CAP_FILE = "policies/tool_capabilities.yaml"
+CAP_FILE = "policies/baseline/gate4_capabilities.yaml"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -35,7 +35,7 @@ def _gate(strict: bool = False) -> Gate4Taint:
 def _layered_gate() -> Gate4Taint:
     set_global_source(
         LayeredPolicySource(
-            manifest_path="policies/baseline_manifest.yaml",
+            manifest_path="policies/baseline/manifest.yaml",
             overlay_root=None,
             project_root=PROJECT_ROOT,
         )
@@ -165,9 +165,13 @@ def test_destructive_red_tools_have_explicit_capabilities(tool_name):
 
 
 # ──────────────────────────────────────────────
-# 6. 未登记工具默认 input_max=CONFIDENTIAL → PUBLIC 输入 ALLOW
+# 6. 未登记工具 fail-closed：
+#    6a. PUBLIC 来源 → ALLOW（input_max=PUBLIC，等级相等可流入）
+#    6b. INTERNAL 来源 → DENY（input_max=PUBLIC，INTERNAL > PUBLIC，拒绝）
+#    6c. OUTBOUND + unknown tool → CONFIDENTIAL 外发 DENY（capabilities 含 NETWORK_EXTERNAL）
 # ──────────────────────────────────────────────
-def test_unknown_tool_defaults_allow():
+def test_unknown_tool_public_input_allows():
+    """未登记工具 input_max_taint=PUBLIC，PUBLIC 来源仍 ALLOW（fail-closed 不过激）。"""
     gate = _gate()
     ctx = GateContext(
         tool_name="some_unregistered_tool_xyz",
@@ -177,6 +181,33 @@ def test_unknown_tool_defaults_allow():
     )
     result = gate.evaluate(ctx, GateStage.INBOUND)
     assert result.decision == Decision.ALLOW
+
+
+def test_unknown_tool_internal_input_denied():
+    """未登记工具 fail-closed：INTERNAL 数据流入未知工具 → DENY。"""
+    gate = _gate()
+    ctx = GateContext(
+        tool_name="some_unregistered_tool_xyz",
+        arguments={"q": "internal report"},
+        input_sources=[InputSource.DOCUMENT],  # DOCUMENT → INTERNAL
+        taint=TaintLabel.PUBLIC,
+    )
+    result = gate.evaluate(ctx, GateStage.INBOUND)
+    assert result.decision == Decision.DENY
+    assert result.metadata["taint"] == "INTERNAL"
+
+
+def test_unknown_tool_outbound_confidential_denied():
+    """未登记工具 fail-closed：OUTBOUND 时 output_taint=CONFIDENTIAL + NETWORK_EXTERNAL → DENY。"""
+    gate = _gate()
+    ctx = GateContext(
+        tool_name="some_unregistered_tool_xyz",
+        arguments={},
+        taint=TaintLabel.PUBLIC,
+    )
+    result = gate.evaluate(ctx, GateStage.OUTBOUND)
+    assert result.decision == Decision.DENY
+    assert any("CONFIDENTIAL" in r for r in result.risks)
 
 
 # ──────────────────────────────────────────────
@@ -272,13 +303,11 @@ def test_outbound_confidential_external_tool_denied():
 
 
 # ──────────────────────────────────────────────
-# 9. strict_mode: WARN 升级到 DENY
-#    (构造 OUTBOUND 场景: send_notification + ctx.taint=INTERNAL → output_taint=PUBLIC
-#     new_taint=INTERNAL, no NETWORK_EXTERNAL block normally → ALLOW in non-strict
-#     strict_mode doesn't change ALLOW, test actual DENY path with strict)
+# 9. strict_mode 配置项兼容性验证：gate4 的 OUTBOUND 机密外泄本身直接 DENY（无 WARN 路径），
+#    strict_mode=true 不改变决策结果，仅保留配置项读取兼容性。
 # ──────────────────────────────────────────────
 def test_strict_mode_confidential_outbound_denied():
-    """strict_mode=true 下，CONFIDENTIAL 走外网工具仍 DENY（验证 strict 路径）。"""
+    """strict_mode=true 时，CONFIDENTIAL 走外网工具仍 DENY（gate4 无 WARN 路径，直接 fail-closed）。"""
     gate = _gate(strict=True)
     ctx = GateContext(
         tool_name="send_email",

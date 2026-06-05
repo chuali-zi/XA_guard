@@ -32,15 +32,21 @@ class UpstreamSpec:
     port: int = 3000
 
 
+def _default_gates() -> dict[str, GateConfig]:
+    return {
+        "gate5": GateConfig(enabled=False),
+    }
+
+
 @dataclass
 class XAGuardConfig:
     upstream: UpstreamSpec = field(default_factory=UpstreamSpec)
     downstream: list[DownstreamSpec] = field(default_factory=list)
-    gates: dict[str, GateConfig] = field(default_factory=dict)
+    gates: dict[str, GateConfig] = field(default_factory=_default_gates)
     policy_default: str = "enterprise-l3"
     audit_dir: str = "./logs/audit"
     log_dir: str = "./logs/runtime"
-    tool_capabilities_file: str = "policies/tool_capabilities.yaml"
+    tool_capabilities_file: str = "policies/baseline/gate4_capabilities.yaml"
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "XAGuardConfig":
@@ -80,7 +86,7 @@ class XAGuardConfig:
             policy_default=root.get("policy_default", "enterprise-l3"),
             audit_dir=root.get("audit_dir", "./logs/audit"),
             log_dir=root.get("log_dir", "./logs/runtime"),
-            tool_capabilities_file=root.get("tool_capabilities_file", "policies/tool_capabilities.yaml"),
+            tool_capabilities_file=root.get("tool_capabilities_file", "policies/baseline/gate4_capabilities.yaml"),
         )
 
     def gate(self, name: str) -> GateConfig:

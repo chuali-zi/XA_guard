@@ -1,11 +1,12 @@
 """关卡 2 · 办事大厅（HITL 审批） — 赛题方向 2。
 
 工具调用风险等级判定：
-- 从 tool_risks.yaml 加载 green/yellow/red 映射
+- risk_level 唯一事实源：policies/baseline/gate4_capabilities.yaml（risk_level 字段）
+  由 layered.py 的 _derive_tool_risks_from_caps() 加载时派生；gate2_tool_risks.yaml 已废弃。
 - RED: 同步阻塞，走 elicitation fallback（stdout/deny/async_notify）
 - YELLOW: 异步通知，Decision.WARN + metadata["notify_async"]=True
 - GREEN: Decision.ALLOW
-- 未登记工具默认 GREEN
+- 未登记工具默认 YELLOW（fail-closed，暴露未知工具，可配置 default_risk 选项覆盖）
 
 事实源 F-3.4: 国产 IDE elicitation 全部未声明，必须 fallback。
 真正 MCP elicitation 由 proxy/upstream.py 实现，本关卡只出 Decision。
@@ -41,6 +42,8 @@ class Gate2Plan(Gate):
         """LayeredPolicySource（baseline+overlay 合并）opt-in；默认走单文件。
 
         prefer_layered: true 时优先 layered（生产推荐），否则保持 legacy（兼容单测）。
+        risk_level 唯一事实源：gate4_capabilities.yaml；layered 模式下由
+        _derive_tool_risks_from_caps() 自动派生，不依赖 gate2_tool_risks.yaml。
         """
         if bool(self.opt("prefer_layered", False)):
             layered = get_global_source()
@@ -48,7 +51,8 @@ class Gate2Plan(Gate):
                 risks = layered.get_tool_risks()
                 if risks:
                     return risks
-        risk_file = self.opt("tool_risk_file", "policies/tool_risks.yaml")
+        # legacy 路径：单文件直读（单测兼容；tool_risk_file 配置指向 gate2_tool_risks.yaml 仅作历史保留）
+        risk_file = self.opt("tool_risk_file", "policies/baseline/gate2_tool_risks.yaml")
         return _load_tool_risks(risk_file)
 
     def _request_approval(self, ctx: GateContext) -> GateResult:
@@ -98,7 +102,15 @@ class Gate2Plan(Gate):
 
     def evaluate(self, ctx: GateContext, stage: GateStage = GateStage.INBOUND) -> GateResult:
         risks = self._load_risks()
-        risk_level = risks.get(ctx.tool_name, RiskLevel.GREEN)
+        # 未登记工具 fail-closed：默认 YELLOW（warn + async_notify），而非 GREEN（静默放行）。
+        # 安全网关对未知工具应暴露而不应静默。可通过 opt("default_risk") 覆盖（"green"/"yellow"/"red"）。
+        # risk_level 唯一事实源：policies/baseline/gate4_capabilities.yaml。
+        _default_risk_str = str(self.opt("default_risk", "yellow")).lower()
+        try:
+            _default_risk = RiskLevel(_default_risk_str)
+        except ValueError:
+            _default_risk = RiskLevel.YELLOW
+        risk_level = risks.get(ctx.tool_name, _default_risk)
 
         if risk_level == RiskLevel.GREEN:
             return GateResult(

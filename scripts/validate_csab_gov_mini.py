@@ -5,7 +5,7 @@ Checks:
   - Enum / regex validity (case_id, expected_decision, dimension, …).
   - Unique case_id and unique fingerprint (no silent duplicates).
   - case_kind ↔ attack_type consistency (benign_* ↔ benign_control etc.).
-  - policy_refs whitelist drawn from policies/enterprise-l3.yaml.
+  - policy_refs whitelist drawn from policies/baseline/gate3_rules.yaml.
   - Coverage report by dimension / case_kind / attack_type / source.
   - Metadata.total matches len(cases) and dimension counts.
 
@@ -26,7 +26,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SUITE = ROOT / "bench" / "cases" / "csab-gov-mini-seed.yaml"
-DEFAULT_POLICIES = ROOT / "policies" / "enterprise-l3.yaml"
+DEFAULT_POLICIES = ROOT / "policies" / "baseline" / "gate3_rules.yaml"
 DEFAULT_REPORT = ROOT / "bench" / ".log" / "coverage.md"
 
 DIMENSIONS = {
@@ -43,7 +43,7 @@ SEVERITIES = {"low", "medium", "high", "critical"}
 CASE_KINDS = {"attack_case", "benign_control", "assurance_check", "exploratory_finding"}
 CASE_ID_RE = re.compile(r"^[A-Z][A-Z0-9_]*-[0-9]{3,4}$")
 
-# Refs we accept even when not present in policies/enterprise-l3.yaml.
+# Refs we accept even when not present in policies/baseline/gate3_rules.yaml.
 # Drawn from the official standards bench cases cite directly (clause-level
 # refs that map to inline sub-rules rather than top-level rule IDs).
 EXTRA_ALLOWED_POLICY_REFS = {
@@ -129,7 +129,7 @@ class Validator:
         for ref in case.get("policy_refs", []) or []:
             if ref not in self.allowed_policy_refs:
                 self.warnings.append(
-                    f"{cid}: policy_ref `{ref}` not present in policies/enterprise-l3.yaml — "
+                    f"{cid}: policy_ref `{ref}` not present in policies/baseline/gate3_rules.yaml — "
                     "either add the rule or move the ref into EXTRA_ALLOWED_POLICY_REFS."
                 )
 

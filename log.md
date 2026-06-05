@@ -1,5 +1,195 @@
 # 工作日志
 
+## 2026-06-04 23:20:17 +08:00 Codex 主 agent - 补规则样例约定与工具覆盖矩阵
+
+按用户要求处理 `status.md` 顶部二档事项：“规则无逐条正/反例绑定”和“没有覆盖率矩阵”。本轮使用 3 个子 agent 做只读协助调查：分别检查 Gate3 规则正/反例现状、覆盖率矩阵口径、文档落点。未读取或维护 `implementation-notes.html`。
+
+本次具体做了什么：
+- 新增 `docs/规则测试样例约定.md`：明确 Gate3 扩规则前应有“一规则一对正/反例”，规定正例/反例命名、bench case 字段、`policy_refs`、`expected_decision`、`case_kind` 和验收命令。
+- 在同一文档中补充阳历/公历测试样例约定：日期使用 ISO 8601，默认北京时间 `Asia/Shanghai`，不把“今天/明天/春节前/农历正月”等相对或农历表达作为 oracle；需要相对时间时显式写 `reference_date`。
+- 新增 `scripts/generate_tool_gate_coverage_matrix.py`：读取 Gate2/Gate3/Gate4/bench 四源，生成“工具 × Gate 覆盖矩阵”到 `bench/.log/tool_gate_coverage.md`；`--strict` 阻断 Gate3 trigger 缺 Gate2/Gate4、Gate2/Gate4 risk 漂移、非法 risk/taint。
+- 新增 `tests/test_tool_gate_coverage_matrix.py`：守护当前 baseline 中 Gate3 trigger 对 Gate2/Gate4 无缺口、同名 risk 无漂移，并确认当前已知 bench-only 缺口 `install_plugin` 被显式报告。
+- 更新 `docs/XA-Bench-对抗测试规则.md`：补规则样例、阳历日期、覆盖率矩阵状态码和校验命令。
+- 更新 `docs/HACK-BENCH-组员提交规范.md`：补提交侧日期可复现要求和规则正/反例要求。
+- 更新 `docs/README.md`：把 `docs/规则测试样例约定.md` 纳入文档目录。
+- 更新 `status.md`：记录二档脚手架当前状态、矩阵结果和仍未完成的强校验缺口。
+
+验证结果：
+- `python scripts\generate_tool_gate_coverage_matrix.py --strict`：通过，生成 `bench\.log\tool_gate_coverage.md`；结果为 `tools=47`、`gate2=46`、`gate3_triggers=43`、`gate4=46`、`bench=24`、`missing_gate2=0`、`missing_gate4=0`、`risk_mismatches=0`、`bench_only=1`、`gate3_no_bench=23`。
+- `python scripts\validate_csab_gov_mini.py --strict`：通过，290 条 case errors=0/warnings=0，并刷新 `bench\.log\coverage.md`。
+- `python -m pytest -q --basetemp pytest_tmp_rule_matrix -p no:cacheprovider tests\test_tool_gate_coverage_matrix.py tests\test_csab_gov_mini_assets.py`：通过，10 个测试点。
+- `python -m pytest -q --basetemp pytest_tmp_gate3_rules -p no:cacheprovider tests\unit\test_gate3.py -x --tb=short`：通过，46 个 Gate3 测试点。
+
+已完成：
+- 二档里的“覆盖率矩阵”已有可运行脚本、报告和测试守护，不再只能肉眼比对三份 YAML。
+- “一规则一对测试样例”与阳历日期口径已形成文档约定，并同步到 bench 维护文档和 hack 提交规范。
+
+未完成 / 客观限制：
+- 还没有把“一规则一对正/反例”升级为独立 fixture/schema/validator 的强制校验；当前仍主要依赖文档约定和现有 Gate3 单测。
+- 覆盖矩阵发现 `install_plugin` 仍是 bench-only 工具，当前 supply-chain bench 仍走 AIBOM 简化路径，未登记进 Gate2/Gate3/Gate4。
+- 覆盖矩阵发现 23 个 Gate3 trigger 当前无 bench case 覆盖；本轮没有补这些 case。
+- 覆盖矩阵目前只覆盖 baseline + bench，没有覆盖真实租户 overlay 合并视图。
+
+下一步建议：
+- 新增 `bench/cases/gate3-rule-fixtures.yaml`、schema 和 validator，把每条 Gate3 规则的正/反例变成硬约束。
+- 决定 `install_plugin` 是否纳入统一工具总账；若纳入，应补 Gate2/Gate4 capability 和对应策略/测试。
+- 为 23 个 `NO_BENCH_CASE` trigger 分批补 bench case，或建立显式豁免清单。
+
+## 2026-06-04 22:23:39 +08:00 Codex 主 agent - 安装本地 OPA 并补真实 CLI 测试
+
+按用户要求安装 / 下载 OPA，并补齐 OPA/Rego 后端测试。本轮没有读取或维护 `implementation-notes.html`。
+
+本次具体做了什么：
+- 上网确认 OPA 官方 Windows amd64 latest 下载入口为 `https://openpolicyagent.org/downloads/latest/opa_windows_amd64.exe`。
+- 新增真实 OPA smoke 测试到 `tests/unit/test_gate3.py`：一条显式传 `opa_path=tools/opa/opa.exe`，一条验证默认发现仓库本地 OPA；两条都使用 `strict_opa=true`，确保执行真实 `opa eval`。
+- 运行新增默认发现测试，确认当前代码缺少本地 `tools/opa/opa.exe` 发现逻辑，测试按预期失败。
+- 下载 OPA 到 `tools/opa/opa.exe`。版本输出为 OPA 1.17.0 / Rego v1 / windows/amd64；本地 SHA256 为 `D319E1ABCA6B1683E79E4E3DDB840B098C45A9257426BA998917DAC8D83B7574`。
+- 修改 `.gitignore`，忽略 `tools/opa/opa.exe`，避免把约 97MB 的本地工具二进制作为源码提交。
+- 修改 `src/xa_guard/policy/rego.py`：`RegoPolicyEngine` 的 OPA 查找顺序变为显式 `opa_path` → PATH 中的 `opa` → 仓库本地 `tools/opa/opa.exe`。
+- 真实 OPA smoke 首次失败后，按调试流程打印生成的 Rego 和 OPA stderr，定位到 OPA 1.17.0 在本机对 Python 临时目录 Windows 绝对路径处理失败。随后把 `_evaluate_opa()` 改为 `cwd=tmpdir` 并使用相对路径 `gate3.rego` / `input.json`，真实 smoke 通过。
+- 更新 `status.md` 顶部快照，记录本地 OPA 版本、hash、测试结果和剩余限制。
+
+验证结果：
+- `tools\opa\opa.exe version`：OPA 1.17.0，Rego Version v1，Platform windows/amd64。
+- `Get-FileHash -Algorithm SHA256 tools\opa\opa.exe`：`D319E1ABCA6B1683E79E4E3DDB840B098C45A9257426BA998917DAC8D83B7574`。
+- `python -m pytest -q --basetemp pytest_tmp_opa_real -p no:cacheprovider tests\unit\test_gate3.py::test_rego_backend_evaluates_with_real_local_opa tests\unit\test_gate3.py::test_rego_backend_discovers_local_opa_by_default -x --tb=short`：通过。
+- `python -m pytest -q --basetemp pytest_tmp_opa_gate3 -p no:cacheprovider tests\unit\test_gate3.py -x --tb=short`：通过，46 个 Gate3 测试点。
+- `python -m pytest -q --basetemp pytest_tmp_opa_related -p no:cacheprovider tests\unit\test_gate2.py tests\unit\test_gate3.py tests\unit\test_gate4.py tests\unit\test_layered_policy.py -x --tb=short`：通过。
+- `python -m pytest -q --basetemp pytest_tmp_opa_full -p no:cacheprovider -x --tb=short`：通过；`tests\integration\test_sandbox_runner.py` 因当前 shell 未发现 Docker 被 skip。
+
+已完成：
+- 本机仓库内已有可执行 OPA：`tools/opa/opa.exe`。
+- Gate3 Rego 后端已真实跑过 `opa eval`，不再只是 fallback。
+- 测试已覆盖显式 OPA 路径和默认本地发现。
+- Windows 路径调用 OPA 的问题已修复。
+
+未完成 / 客观限制：
+- `tools/opa/opa.exe` 被 `.gitignore` 忽略，不会随源码提交；新环境需要重新下载或把 OPA 安装到 PATH。
+- 真实 OPA smoke 覆盖的是 Gate3 legacy `policy_file` 路径；`LayeredPolicySource` 的 baseline+overlay 热加载合并视图仍未统一接入 Rego engine。
+- 尚未提供 OPA bundle 导出、版本锁定下载脚本、OPA 评估失败时的 fail-closed 配置策略。
+
+下一步建议：
+- 加一个轻量下载脚本或 CI cache 步骤，让新环境能自动准备 `tools/opa/opa.exe`。
+- 把 `LayeredPolicySource` 合并后的规则集接到 `RegoPolicyEngine`。
+- 设计 OPA 不可用 / eval 失败时的生产策略：fail-closed、降级 fallback，或触发人工审批，并写入审计。
+
+## 2026-06-04 22:09:48 +08:00 Codex 主 agent - Gate3 OPA/Rego 后端 MVP
+
+按用户要求继续完善 OPA/Rego 后端。本轮没有读取或维护 `implementation-notes.html`，只修改 Gate3/Rego 相关代码、测试，以及根目录 `status.md` 和本工作日志。
+
+本次具体做了什么：
+- 读取 `status.md`、`AGENTS.md`、`src/xa_guard/gates/gate3_policy.py`、`src/xa_guard/policy/compiler.py`、`tests/unit/test_gate3.py`、`src/xa_guard/config.py`、`policies/enterprise-l3.yaml` 等文件，确认当前明确缺口是 `backend=rego` 仍为 `NotImplementedError`。
+- 新增 `src/xa_guard/policy/rego.py`：实现 PolicyRule predicate DSL 到 Rego module 的 AST 转译，覆盖当前 30 条 baseline predicate 的主要形态，包括 `and/or/not`、比较、`in/not in`、`contains()`、`args.get()`、`args[...]`。
+- 新增 `RegoPolicyEngine`：若找到或配置 `opa_path`，通过 `opa eval --data gate3.rego --input input.json data.xa_guard.gate3.hit` 评估命中规则；若没有 OPA binary 且未开启严格模式，则使用与现有 Python predicate 相同语义的 fallback。
+- 修改 `src/xa_guard/gates/gate3_policy.py`：`backend=rego` 不再抛 `NotImplementedError`，而是实例化 `RegoPolicyEngine`；`strict_opa=true` 且无 OPA binary 时 fail-fast；Gate3 结果 metadata 增加 `rego_mode` 和 `opa_available`。
+- 修改 `tests/unit/test_gate3.py`：把原先“Rego 后端应抛错”的测试改为验证 Rego backend fallback 可命中、严格模式缺 OPA 会抛错、当前 DSL 能生成 Rego module。
+- 运行测试并更新 `status.md` 顶部状态快照，客观标注“真实 OPA CLI 路径本轮未实测”。
+
+验证结果：
+- `python -m pytest -q --basetemp pytest_tmp_rego -p no:cacheprovider tests\unit\test_gate3.py -x --tb=short`：通过。
+- `python -m pytest -q --basetemp pytest_tmp_rego_related -p no:cacheprovider tests\unit\test_gate2.py tests\unit\test_gate3.py tests\unit\test_gate4.py tests\unit\test_layered_policy.py -x --tb=short`：通过。
+- `python -m pytest -q --basetemp pytest_tmp_rego_full -p no:cacheprovider -x --tb=short`：通过；`tests\integration\test_sandbox_runner.py` 因当前 shell 未发现 Docker 被 skip。
+
+已完成：
+- Gate3 的 `backend=rego` 已从空壳变成可实例化、可评估、可配置 OPA CLI 的 MVP。
+- 当前 30 条 baseline predicate 已有转译覆盖测试，Gate3 相关回归和全量 pytest 均通过。
+- 生产配置可用 `strict_opa=true` 避免无 OPA 环境误走 fallback。
+
+未完成 / 客观限制：
+- 当前环境 `Get-Command opa` 未发现 OPA binary，因此没有执行真实 OPA CLI eval；本轮只验证了 Rego module 生成和本地 fallback 行为。
+- `prefer_layered=true` 的 `LayeredPolicySource` 仍返回 Python compiled predicates，尚未把 overlay/hot-reload 的合并视图交给 Rego engine。
+- Rego 转译器只覆盖当前 DSL 形态；后续若引入更复杂表达式，需要扩展 AST 白名单和 Rego 生成测试。
+
+下一步建议：
+- 在安装 OPA 的环境运行一条真实 `backend=rego, strict_opa=true` smoke，并把生成 module 的语法/语义结果纳入 CI。
+- 将 `LayeredPolicySource` 的 merged policy 也接入 `RegoPolicyEngine`，让 baseline+overlay 热加载后可选择统一 Rego 执行。
+- 若要把 Rego 作为生产主后端，补 Rego bundle 导出、OPA 版本约束和策略评估失败时的 fail-closed 产品策略。
+
+## 2026-06-04 21:55:12 +08:00 Codex 主 agent - Gate2/Gate3/Gate4 完成度侦察
+
+按用户要求侦察当前仓库里 Gate2、Gate3、Gate4 这一串的整体完成度。本轮没有读取或维护 `implementation-notes.html`，没有修改产品逻辑、策略 YAML 或测试代码；只更新了 `status.md` 和本工作日志。
+
+本次具体做了什么：
+- 读取 `status.md` 和 `log.md`，确认此前 Gate2/Gate3/Gate4 的 baseline 错位已经在 2026-06-02 多轮修复中补齐，当前最新主状态又叠加了 Gate5 工作区改动。
+- 核对 `src/xa_guard/pipeline.py`，确认当前执行顺序仍是 Gate1 → Gate2 → Gate4(in) → Gate3 → Gate5 → executor → Gate4(out) → Gate6；Gate2/Gate4/Gate3 属于同一轮执行前决策聚合，Gate3 DENY 可覆盖 Gate2 REQUIRE_APPROVAL。
+- 核对 `src/xa_guard/gates/gate2_plan.py`：Gate2 负责读取工具风险，green 放行、yellow 告警、red 触发 REQUIRE_APPROVAL/fallback；真正 MCP elicitation 与 approval token 不在 Gate2 内签发。
+- 核对 `src/xa_guard/gates/gate3_policy.py`：Gate3 负责加载 Python predicate 策略并聚合 DENY > REQUIRE_APPROVAL > WARN > ALLOW；`backend=rego` 仍保留为 M3 占位，当前未实现。
+- 核对 `src/xa_guard/gates/gate4_taint.py`：Gate4 负责入向敏感扫描、工具输入污点上限、出向 confidential 外发阻断；layered 模式可从全局 `LayeredPolicySource` 读取 capability 和敏感模式。
+- 用脚本统计当前策略资产：30 条 policy rule、46 个 tool risk、46 个 tool capability、29 条 sensitive pattern、43 个唯一 Gate3 trigger；43 个 trigger 均已登记 Gate2 risk 与 Gate4 capability，同名 risk level 未发现不一致；`policies/overlay/` 只有 `_template`，没有真实租户 overlay。
+- 运行 Gate2/Gate3/Gate4 相关定向测试与 bench 元数据检查。
+
+验证结果：
+- `python -m pytest -q -p no:cacheprovider --basetemp pytest_tmp_gate234_scout tests\unit\test_gate2.py tests\unit\test_gate3.py tests\unit\test_gate4.py tests\unit\test_layered_policy.py -x --tb=short`：通过；收集口径为 111 个测试点（14 + 42 + 22 + 33）。
+- `python scripts\enrich_csab_gov_mini.py --check`：通过，`bench/cases/csab-gov-mini-seed.yaml` 元数据为最新。
+- 策略统计脚本输出：rules=30、tool_risks=46、tool_capabilities=46、sensitive_patterns=29、unique_triggers=43、trigger_missing_risk=[]、trigger_missing_capability=[]、risk_cap_level_mismatch=[]、overlay_dirs=['_template']。
+
+当前判断：
+- Gate2 约 80%：工具风险分级、yellow/warn、red/HITL 触发、layered 读取和测试覆盖已完成；真实客户端 UI 证据、审批人强身份和更细粒度产品策略仍未完整。
+- Gate3 约 70%：30 条政企/国标规则、predicate 编译、决策聚合和 baseline 对齐已完成；OPA/Rego、规则覆盖评测、异常 fail-closed 策略和生产级策略治理仍未完成。
+- Gate4 约 75%：三色污点、递归敏感扫描、工具能力边界、外发 confidential 阻断、敏感模式 baseline 已完成；完整 DLP、更多上下文传播、streamable/http 场景和 overlay 一致性强约束仍未完成。
+- Gate2/Gate3/Gate4 串联整体约 75%：demo/规则链路已经比较扎实，可以支撑赛题方向 2 的核心演示；距离 L3 政企原型还差真实租户 overlay、统一工具目录、OPA/Rego、真实 MCP/客户端证据和 bench 指标并入。
+
+未做什么 / 客观限制：
+- 本轮没有运行全量 pytest、bench 290 全量执行或真实 MCP E2E；只做 Gate2/Gate3/Gate4 定向测试和 bench 元数据检查。
+- 本轮没有修改 Gate2/Gate3/Gate4 逻辑，也没有清理当前工作区已有的其他未提交改动。
+- 当前完成度估计基于仓库代码、策略资产和定向测试，不等同于真实生产环境压测或真实客户端人工验收。
+
+## 2026-06-04 14:54:42 +08:00 Codex 主 agent - Gate5 Docker/gVisor 真沙箱执行推进
+
+按用户要求，本轮先读 `status.md` 了解仓库状态，再上网参考 OpenAI Codex sandbox 设计，然后推进 Gate5。没有读取或维护 `implementation-notes.html`。
+
+本次具体做了什么：
+- 侦察当前仓库：确认 `status.md` 中 Gate5 仍是主要空位，原先 `src/xa_guard/gates/gate5_sandbox.py` 只输出 `native/docker/docker_gvisor` 路由 metadata，`src/xa_guard/proxy/downstream.py` 未消费该 metadata，下游 MCP server 仍直接裸调用。
+- 使用 2 个 gpt-5.5 medium 子 agent 做只读并行侦察：一个梳理 Gate5 当前实现和缺口，一个梳理最小 TDD 测试策略。两个子 agent 都未改文件。
+- 上网参考 Codex sandbox：确认 Codex 的核心思路是对 spawned commands 施加真实边界，而不是只做审计标记；Linux 侧参考 bubblewrap/Landlock/seccomp 的语义，尤其是默认只读、显式 writable roots、网络按策略隔离、敏感元数据路径重新保护。由于本仓库是 Python/MCP demo，本轮类比落地为 Docker/gVisor 执行 MVP。
+- 新增 `src/xa_guard/sandbox.py`：定义 `SandboxPolicy`、从 Gate5 结果抽取策略、构造 `docker run` 命令。命令包含 `--network none`、`--read-only`、`--cap-drop ALL`、`--security-opt no-new-privileges`、`--pids-limit`、`--memory`、`--cpus`、只读挂载 workspace 到 `/workspace`，`docker_gvisor` 模式追加 `--runtime runsc`。
+- 修改 `src/xa_guard/gates/gate5_sandbox.py`：Gate5 继续负责按 risk 路由，但现在输出 executor 可消费的结构化字段，包括 `sandbox_enforced`、`network_disabled`、`readonly_rootfs`、资源限制、workspace mount 策略等。
+- 修改 `src/xa_guard/proxy/downstream.py`：`DownstreamRouter.call_tool()` 现在会读取 Gate5 sandbox policy；`native` 继续使用常驻下游 session，`docker/docker_gvisor` 则临时通过 Docker stdio MCP server 调用下游，调用后关闭。
+- 修改 `src/xa_guard/gates/gate6_audit.py` 和 `src/xa_guard/types.py`：Gate6 审计 JSONL 新增 `gen_ai.tool.sandbox.mode/enforced/image/runtime`，让事后能看到本次工具调用使用的沙箱策略。
+- 修改 `src/xa_guard/config.py`：让程序化默认 `XAGuardConfig()` 与 demo YAML 保持一致，Gate5 默认 `enabled=False`，避免无 Docker 环境在普通 E2E 中误触发真实 Docker。
+- 修改 `configs/xa-guard.yaml`：补全 Gate5 sandbox 默认配置项，仍保持 demo 默认禁用 Docker。
+- 新增/扩展测试：`tests/unit/test_sandbox_policy.py`、`tests/unit/test_downstream_sandbox.py`、`tests/integration/test_sandbox_runner.py`、`tests/unit/test_config.py`，并扩展 `tests/unit/test_gate5.py`、`tests/unit/test_gate6_audit.py`。测试覆盖 Gate5 输出契约、downstream 不绕过 sandbox、Docker 命令安全参数、审计字段、默认配置一致性。真实 Docker smoke 在本机未安装 Docker 时 skip。
+- 刷新 `bench/.log/last_results.json`、`bench/.log/last_report.json`、`bench/.log/report.html`。
+
+验证结果：
+- `PYTHONPATH=src python -m pytest -q --basetemp pytest_tmp_full_sandbox -p no:cacheprovider`：通过；新增 Docker smoke 1 条因当前机器未安装 Docker 被 skip。
+- `python scripts/enrich_csab_gov_mini.py --check`：通过，bench YAML 元数据最新。
+- `PYTHONPATH=src python -m bench.cli run --suite bench\cases\csab-gov-mini-seed.yaml --config configs\xa-guard.yaml`：通过，290 条，pass_rate 1.0，ASR 0.0，FPR 0.0，Recall 1.0，P50/P95 54.25/85.59 ms。
+- `PYTHONPATH=src python scripts\verify_audit.py --path logs\audit\audit.jsonl`：通过，15526 条记录，0 chain errors，0 missing-field records。
+
+已完成：
+- Gate5 从“只输出路由决策”推进到“可执行 Docker/gVisor sandbox 接入点”。
+- 下游 MCP stdio 调用已经能按 Gate5 策略选择 native 常驻 session 或 Docker/gVisor 临时 session。
+- 审计记录已经能保存实际 sandbox mode/runtime/image/enforced 证据。
+- 默认 demo/测试环境不会因为没有 Docker 而误触发真实 Docker；显式开启 Gate5 时才走真实 Docker/gVisor。
+
+未完成 / 客观限制：
+- 当前机器没有 Docker，真实 Docker smoke 被 skip；因此本轮没有在本机实际跑通 `xa-guard/sandbox:latest` 镜像。
+- 仓库仍未提供 `xa-guard/sandbox:latest` 镜像构建文件或发布流程；下一步应补 Dockerfile/镜像构建脚本，并在有 Docker/gVisor 的 Linux 环境跑真实 smoke。
+- 目前 Docker 沙箱只支持 stdio downstream；streamable-http downstream 仍未实现沙箱化。
+- 这不是 Codex 那种 OS-native Landlock/seccomp/Seatbelt/Windows restricted-token 级别实现；本轮是适配当前 Python demo 的 Docker/gVisor MVP。
+
+下一步建议：
+- 补 `docker/sandbox.Dockerfile` 或等价构建入口，确保镜像内含 Python、项目代码依赖和 MCP runtime。
+- 在 Linux + Docker + runsc 环境跑 `tests/integration/test_sandbox_runner.py`，再补 MCP 真实沙箱 E2E。
+- 将 Docker 不可用、镜像缺失、runsc 缺失时的产品策略固定为 fail-closed / degrade / require_approval，并进入配置和审计。
+
+## 2026-06-04 +08:00 Codex 主 agent - Gate2/Gate3/Gate4 分层职责只读解释
+
+按用户要求，以老师讲解口吻核对 Gate2、Gate3、Gate4 以及 baseline/overlay 双层策略在当前代码里的实际分工。本轮只读检查了 `status.md`、`configs/xa-guard.yaml`、`src/xa_guard/pipeline.py`、`src/xa_guard/gates/gate2_plan.py`、`src/xa_guard/gates/gate3_policy.py`、`src/xa_guard/gates/gate4_taint.py`、`src/xa_guard/policy/layered.py`、`src/xa_guard/policy/monotonicity.py`、`policies/baseline_manifest.yaml`、`policies/tool_risks.yaml`、`policies/tool_capabilities.yaml`、`policies/enterprise-l3.yaml` 和 `policies/overlay/` 模板。
+
+本次具体做了什么：
+- 确认当前 pipeline 顺序是 Gate1 → Gate2 → Gate4(in) → Gate3 → Gate5 → executor → Gate4(out) → Gate6，其中 Gate2/Gate4/Gate3 属于执行前同一轮决策聚合。
+- 确认 Gate2 负责工具风险分级和 HITL 审批触发，读取 `tool_risks`；Gate3 负责国标/企业规则 predicate 命中与 DENY/REQUIRE_APPROVAL/WARN 聚合，读取 `policy_rules`；Gate4 负责工具能力、敏感数据污点和出入向信息流拦截，读取 `tool_capabilities` 与 `sensitive_patterns`。
+- 确认当前配置 `prefer_layered: true`，Gate2/Gate3/Gate4 优先共享 `LayeredPolicySource` 的 baseline+overlay 合并视图；但 `policies/overlay/` 当前只有 `_template` 和说明文件，没有真实租户 overlay，因此实际主要是 baseline 生效。
+- 确认 baseline manifest 当前把国标兜底分成 4 类资源：`enterprise-l3.yaml` 给 Gate3，`tool_risks.yaml` 给 Gate2，`tool_capabilities.yaml` 和 `sensitive_patterns.yaml` 给 Gate4。
+
+未做什么 / 客观限制：
+- 本轮没有修改 Gate2/Gate3/Gate4 的产品逻辑、策略 YAML 或测试。
+- 本轮没有运行 pytest、bench 或 MCP E2E，因为用户问题是架构解释和现状核对，不是要求验证功能变更。
+- `bundle_sha` 现状仍按 baseline + 所有 overlay 文件字节计算，包含之后可能被拒绝的 overlay 文件；这与“仅当前生效策略快照”的语义仍存在已知偏差。
+- overlay 新增 Gate3 trigger 时，当前仍主要靠测试约束 baseline 对齐，尚未在 overlay merge 阶段强制要求同时新增 Gate2 risk 与 Gate4 capability。
+
 ## 2026-06-02 +08:00 Codex 主 agent — Gate2/3/4 baseline policy 可扩展与严格对齐
 
 按用户要求，本轮目标是先让 policies 具备可扩展 baseline/overlay 口径，再严格审查并补齐 Gate2/Gate3/Gate4 baseline 对齐。期间使用多个子 agent 做只读审查和分项建议：先由 xhigh 审查指出 Gate3 triggers 与 Gate2/Gate4 登记严重错位，再由多个 medium agent 分别建议 Gate2 风险、Gate4 能力、敏感模式扩展，之后由验证 agent 和最终 xhigh agent 多轮核验。本轮没有提交 git commit，也没有读取或维护 implementation HTML。

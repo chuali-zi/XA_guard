@@ -13,12 +13,14 @@ from __future__ import annotations
 
 import logging
 from contextlib import AsyncExitStack
+from pathlib import Path
 from typing import Any
 
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
 from xa_guard.config import DownstreamSpec
+from xa_guard.sandbox import SandboxPolicy, build_docker_command, policy_from_context
 from xa_guard.types import GateContext
 
 log = logging.getLogger("xa_guard.proxy.downstream")
@@ -105,6 +107,24 @@ class DownstreamRouter:
         if ctx.tool_name not in self.tools_by_name:
             raise KeyError(f"unknown tool: {ctx.tool_name}")
         spec, session = self.tools_by_name[ctx.tool_name]
+        policy = policy_from_context(ctx)
+        if policy.enforced:
+            return await self._call_tool_sandboxed(spec, ctx, policy)
         log.debug("routing %s -> downstream %s", ctx.tool_name, spec.name)
         result = await session.call_tool(ctx.tool_name, ctx.arguments or {})
         return result
+
+    async def _call_tool_sandboxed(self, spec: DownstreamSpec, ctx: GateContext, policy: SandboxPolicy) -> Any:
+        """Run one downstream MCP call through an ephemeral Docker/gVisor server."""
+        if spec.transport != "stdio":
+            raise NotImplementedError("sandboxed downstream calls currently require stdio transport")
+
+        command = build_docker_command(spec.command, policy, workspace_root=Path.cwd())
+        params = StdioServerParameters(command=command[0], args=command[1:])
+        log.debug("sandbox routing %s -> downstream %s via %s", ctx.tool_name, spec.name, policy.mode)
+
+        async with AsyncExitStack() as stack:
+            read_stream, write_stream = await stack.enter_async_context(stdio_client(params))
+            session = await stack.enter_async_context(ClientSession(read_stream, write_stream))
+            await session.initialize()
+            return await session.call_tool(ctx.tool_name, ctx.arguments or {})

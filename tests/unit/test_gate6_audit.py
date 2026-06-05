@@ -147,6 +147,32 @@ def test_audit_record_carries_final_decision(tmp_path: Path):
     assert rec["gen_ai.decision.final_reason"] == "gate3: blocked"
 
 
+def test_audit_record_carries_sandbox_policy(tmp_path: Path):
+    g = Gate6Audit(GateConfig(enabled=True, options={"audit_dir": str(tmp_path), "hash_algo": "sha256"}))
+    ctx = _make_ctx()
+    ctx.append(
+        GateResult(
+            gate_name="gate5_sandbox",
+            decision=Decision.ALLOW,
+            metadata={
+                "sandbox_mode": "docker_gvisor",
+                "sandbox_enforced": True,
+                "docker_image": "xa-guard/sandbox:test",
+                "runtime": "runsc",
+            },
+        )
+    )
+
+    g(ctx, GateStage.OUTBOUND)
+
+    p = tmp_path / "audit.jsonl"
+    rec = json.loads(p.read_text(encoding="utf-8").strip())
+    assert rec["gen_ai.tool.sandbox.mode"] == "docker_gvisor"
+    assert rec["gen_ai.tool.sandbox.enforced"] is True
+    assert rec["gen_ai.tool.sandbox.image"] == "xa-guard/sandbox:test"
+    assert rec["gen_ai.tool.sandbox.runtime"] == "runsc"
+
+
 def test_gate6_outbound_stage_only(tmp_path: Path):
     """INBOUND 阶段不应写审计。"""
     g = Gate6Audit(GateConfig(enabled=True, options={"audit_dir": str(tmp_path), "hash_algo": "sha256"}))

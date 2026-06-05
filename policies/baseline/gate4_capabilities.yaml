@@ -1,5 +1,10 @@
-# 工具能力声明（关卡 4 用）
-# 子 agent G4 / D 扩展。每个新工具上线都要在这里登记。
+# 工具能力声明 — Gate4 / Gate2 / Gate3 共用
+#
+# ★ 本文件的 risk_level 字段是全项目 risk 分级的唯一事实源。
+#   Gate2 / Gate3 运行时 risk 均由此派生（由 src/xa_guard/policy/layered.py 的
+#   _derive_tool_risks_from_caps() 在加载时派生，不再读 gate2_tool_risks.yaml）。
+#   每个新工具上线只需在此登记一次，risk_level 由此字段统一控制。
+#   分级法规依据见 docs/risk_classification_basis.md。
 #
 # capabilities: 工具能做什么（信息流可达性）
 #   NETWORK_EXTERNAL  外网访问

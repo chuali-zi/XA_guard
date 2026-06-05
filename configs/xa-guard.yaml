@@ -24,7 +24,7 @@ xa_guard:
         - name: rule
           type: rule
           enabled: true
-          patterns_file: policies/dangerous_patterns.yaml
+          patterns_file: policies/baseline/gate1_input_patterns.yaml
         - name: model_qwen
           type: model
           enabled: true
@@ -34,7 +34,7 @@ xa_guard:
           threshold: 0.5
           timeout_ms: 200
           fail_open: true
-          category_map_file: policies/qwen3guard_category_map.yaml
+          category_map_file: policies/baseline/category_maps/qwen3guard.yaml
           options:
             # Real Qwen3Guard-Gen inference. Set dry_run:true only for CI
             # environments that intentionally skip model weights.
@@ -51,7 +51,7 @@ xa_guard:
         #   model_path: meta-llama/Llama-Prompt-Guard-2-86M
         #   threshold: 0.5
         #   fail_open: true
-        #   category_map_file: policies/promptguard_category_map.yaml
+        #   category_map_file: policies/baseline/category_maps/promptguard.yaml
         #   options:
         #     device: cpu
         # - name: model_shieldlm
@@ -61,7 +61,7 @@ xa_guard:
         #   model_path: thu-coai/ShieldLM-14B-qwen
         #   threshold: 0.5
         #   fail_open: true
-        # TODO: category_map currently collapses S1-S14 → unsafe; refine policies/llamaguard_category_map.yaml before enabling.
+        # TODO: category_map currently collapses S1-S14 → unsafe; refine policies/baseline/category_maps/llamaguard.yaml before enabling.
         # - name: model_llamaguard
         #   type: model
         #   enabled: false              # gated by Meta; 1B is ~5.6GB weights
@@ -69,7 +69,7 @@ xa_guard:
         #   model_path: meta-llama/Llama-Guard-3-1B
         #   threshold: 0.5
         #   fail_open: true
-        #   category_map_file: policies/llamaguard_category_map.yaml
+        #   category_map_file: policies/baseline/category_maps/llamaguard.yaml
       spotlighting:
         enabled: false                  # false=不影响现有行为；true=非user来源加 <untrusted_source> 标记
       source_risk_weights:
@@ -85,32 +85,40 @@ xa_guard:
       #   - jailbreak_zh
       #   - jailbreak_en
       #   ...
-      patterns_file: policies/dangerous_patterns.yaml  # 兼容旧 config 读取路径
+      patterns_file: policies/baseline/gate1_input_patterns.yaml  # 兼容旧 config 读取路径
 
     gate2:
       enabled: true
       hitl_required_for: [red]
       elicitation_fallback: stdout    # stdout | async_notify | deny
-      tool_risk_file: policies/tool_risks.yaml
+      tool_risk_file: policies/baseline/gate2_tool_risks.yaml
       approval_token_ttl_seconds: 300
       prefer_layered: true             # 生产模式：优先 baseline + overlay 合并视图
 
     gate3:
       enabled: true
       backend: python                  # python | rego
-      policy_file: policies/enterprise-l3.yaml
+      policy_file: policies/baseline/gate3_rules.yaml
       prefer_layered: true
 
     gate4:
       enabled: true
       strict_mode: false               # true 时连 WARN 都阻断
-      tool_capabilities_file: policies/tool_capabilities.yaml
+      tool_capabilities_file: policies/baseline/gate4_capabilities.yaml
       prefer_layered: true
 
     gate5:
       enabled: false                   # demo 默认禁用 Docker
       docker_image: xa-guard/sandbox:latest
       runtime: runc                    # runc | runsc(gVisor)
+      network_disabled: true
+      readonly_rootfs: true
+      memory: 256m
+      cpus: "1"
+      pids_limit: 128
+      workspace_mount: true
+      workspace_target: /workspace
+      workspace_readonly: true
 
     gate6:
       enabled: true
@@ -124,11 +132,11 @@ xa_guard:
     # + AWS SCP（Deny 不被 IAM Allow 推翻）+ Gatekeeper ConstraintTemplate
     policy_layered:
       enabled: true
-      baseline_manifest: policies/baseline_manifest.yaml
+      baseline_manifest: policies/baseline/manifest.yaml
       overlay_root: policies/overlay
       hot_reload: true                  # watchfiles 不可用时自动降级
 
   policy_default: enterprise-l3
   audit_dir: ./logs/audit
   log_dir: ./logs/runtime
-  tool_capabilities_file: policies/tool_capabilities.yaml
+  tool_capabilities_file: policies/baseline/gate4_capabilities.yaml

@@ -88,6 +88,11 @@ class Gate6Audit(Gate):
         # 5. 双层策略 bundle_sha（若 LayeredPolicySource 已实例化）
         layered = get_global_source()
         bundle_sha = layered.bundle_sha if layered is not None else ""
+        sandbox_metadata = {}
+        for gate_result in reversed(ctx.gate_results):
+            if gate_result.gate_name in ("gate5_sandbox", "gate5"):
+                sandbox_metadata = gate_result.metadata or {}
+                break
 
         record = AuditRecord(
             trace_id=ctx.trace_id,
@@ -112,6 +117,10 @@ class Gate6Audit(Gate):
             gen_ai_decision_final=ctx.final_decision.value,
             gen_ai_decision_final_reason=ctx.final_reason,
             gen_ai_policy_bundle_sha=bundle_sha,
+            gen_ai_tool_sandbox_mode=str(sandbox_metadata.get("sandbox_mode") or "native"),
+            gen_ai_tool_sandbox_enforced=bool(sandbox_metadata.get("sandbox_enforced", False)),
+            gen_ai_tool_sandbox_image=str(sandbox_metadata.get("docker_image") or ""),
+            gen_ai_tool_sandbox_runtime=str(sandbox_metadata.get("runtime") or ""),
         )
 
         # 6. 序列化 → ChainStore 追加（落盘并计算 record_hash）

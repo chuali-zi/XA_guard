@@ -97,7 +97,7 @@ class RuleDetector(Detector):
 
     name = "rule"
 
-    def __init__(self, patterns_file: str = "policies/dangerous_patterns.yaml") -> None:
+    def __init__(self, patterns_file: str = "policies/baseline/gate1_input_patterns.yaml") -> None:
         self.patterns_file = patterns_file
         self._patterns: dict[str, list[str]] = {}
         self._loaded = False

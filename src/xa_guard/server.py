@@ -42,7 +42,7 @@ def _init_layered_policy(cfg: XAGuardConfig) -> tuple[LayeredPolicySource | None
         return None, None
     opts = layered_cfg.options
     src = LayeredPolicySource(
-        manifest_path=opts.get("baseline_manifest", "policies/baseline_manifest.yaml"),
+        manifest_path=opts.get("baseline_manifest", "policies/baseline/manifest.yaml"),
         overlay_root=opts.get("overlay_root", "policies/overlay"),
     )
     set_global_source(src)

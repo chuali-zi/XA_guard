@@ -35,6 +35,47 @@ def test_gate5_routes_by_risk_level():
     assert r_red.metadata["sandbox_mode"] == "docker_gvisor"
 
 
+def test_gate5_records_executor_policy_for_yellow_and_red():
+    g = Gate5Sandbox(
+        GateConfig(
+            enabled=True,
+            options={
+                "runtime": "runsc",
+                "docker_image": "xa-guard/sandbox:test",
+                "memory": "512m",
+                "cpus": "0.5",
+                "pids_limit": 64,
+            },
+        )
+    )
+
+    r_yellow = g(_ctx(RiskLevel.YELLOW))
+    assert r_yellow.metadata["sandbox_mode"] == "docker"
+    assert r_yellow.metadata["sandbox_enforced"] is True
+    assert r_yellow.metadata["docker_image"] == "xa-guard/sandbox:test"
+    assert r_yellow.metadata["network_disabled"] is True
+    assert r_yellow.metadata["readonly_rootfs"] is True
+    assert r_yellow.metadata["memory"] == "512m"
+    assert r_yellow.metadata["cpus"] == "0.5"
+    assert r_yellow.metadata["pids_limit"] == 64
+
+    r_red = g(_ctx(RiskLevel.RED))
+    assert r_red.metadata["sandbox_mode"] == "docker_gvisor"
+    assert r_red.metadata["sandbox_enforced"] is True
+    assert r_red.metadata["runtime"] == "runsc"
+    assert r_red.metadata["network_disabled"] is True
+    assert r_red.metadata["readonly_rootfs"] is True
+
+
+def test_gate5_native_records_no_sandbox_runner_required():
+    g = Gate5Sandbox(GateConfig(enabled=True))
+
+    r = g(_ctx(RiskLevel.GREEN))
+
+    assert r.metadata["sandbox_mode"] == "native"
+    assert r.metadata["sandbox_enforced"] is False
+
+
 def test_gate5_red_degrades_when_runtime_not_gvisor():
     g = Gate5Sandbox(GateConfig(enabled=True, options={"runtime": "runc"}))
     r = g(_ctx(RiskLevel.RED))

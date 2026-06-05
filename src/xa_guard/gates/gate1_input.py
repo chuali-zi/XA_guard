@@ -126,7 +126,7 @@ class Gate1Input(Gate):
                 ))
         # 默认：至少有一个 rule 检测器
         if not specs:
-            pat_file: str = self.opt("patterns_file", "policies/dangerous_patterns.yaml")
+            pat_file: str = self.opt("patterns_file", "policies/baseline/gate1_input_patterns.yaml")
             specs.append(DetectorSpec(
                 name="rule",
                 type="rule",
@@ -159,7 +159,7 @@ class Gate1Input(Gate):
     def _make_detector(self, spec: DetectorSpec) -> Detector | None:
         if spec.type == "rule":
             patterns_file = spec.options.get(
-                "patterns_file", self.opt("patterns_file", "policies/dangerous_patterns.yaml")
+                "patterns_file", self.opt("patterns_file", "policies/baseline/gate1_input_patterns.yaml")
             )
             return RuleDetector(patterns_file=patterns_file)
 

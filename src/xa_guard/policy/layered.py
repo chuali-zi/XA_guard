@@ -143,6 +143,15 @@ def _load_sensitive_patterns_file(path: Path) -> list[str]:
     return [str(p) for p in pats]
 
 
+def _derive_tool_risks_from_caps(caps: dict[str, "ToolCapability"]) -> dict[str, RiskLevel]:
+    """从工具能力表派生 risk_level 映射。
+    gate4_capabilities.yaml 是全项目 risk_level 的唯一事实源；
+    gate2/gate3 运行时所需 risk 均由此派生，不再读独立的 gate2_tool_risks.yaml。
+    分级法规依据见 docs/risk_classification_basis.md。
+    """
+    return {name: cap.risk_level for name, cap in caps.items()}
+
+
 def _compile_layer(
     *,
     rules_path: Path | None,
@@ -162,11 +171,22 @@ def _compile_layer(
         rules, compiled = _load_rules(rules_path, tier)
         files.append(str(rules_path))
     if risks_path is not None and risks_path.exists():
+        # risks_path 仍接受 overlay 的独立 tool_risks.yaml（用于租户级单调性检验）
         risks = _load_tool_risks_file(risks_path)
         files.append(str(risks_path))
     if caps_path is not None and caps_path.exists():
         caps = _load_tool_caps_file(caps_path)
         files.append(str(caps_path))
+        # 若 caps 已加载且本层未提供独立 risks_path（即 baseline 层），
+        # 则用 caps 中的 risk_level 覆盖/补全 risks——实现单一事实源。
+        # 详见 docs/risk_classification_basis.md。
+        if not risks:
+            risks = _derive_tool_risks_from_caps(caps)
+        else:
+            # 即使提供了独立 risks_path（overlay 层），也用 caps 合并补全未覆盖工具
+            for name, cap in caps.items():
+                if name not in risks:
+                    risks[name] = cap.risk_level
     if patterns_path is not None and patterns_path.exists():
         pats = _load_sensitive_patterns_file(patterns_path)
         files.append(str(patterns_path))
@@ -219,7 +239,7 @@ def _compile_pattern(patterns: list[str], case_insensitive: bool = True) -> re.P
 class LayeredPolicySource:
     def __init__(
         self,
-        manifest_path: str | Path | None = "policies/baseline_manifest.yaml",
+        manifest_path: str | Path | None = "policies/baseline/manifest.yaml",
         overlay_root: str | Path | None = "policies/overlay",
         *,
         project_root: str | Path | None = None,

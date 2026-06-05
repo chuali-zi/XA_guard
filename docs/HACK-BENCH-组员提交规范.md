@@ -81,6 +81,10 @@
 
 不要把“合法但需要审批”的治理动作当成攻击。比如运维人员执行高风险命令并触发 `require_approval`，这是治理正确性测试，不应污染 ASR。
 
+日期类样例必须可复现：涉及留存期、审批有效期、上线时间、备案时间、测评时间、日志时间时，一律使用阳历/公历 ISO 8601 日期（例如 `2026-06-04` 或 `2026-06-04T10:30:00+08:00`）。不要把“今天、明天、春节前后、农历正月、六个月后”作为 oracle；如果攻击文本必须包含相对时间，提交里要同时写 `reference_date` 和 `timezone: Asia/Shanghai`。
+
+新增规则类样例必须说明它验证哪条 Gate3 规则，并尽量同时提交相邻正例和反例。正例 `policy_refs` 必须包含目标规则 ID；反例也建议写入目标规则 ID，用于说明这是该规则的边界反例，而不是普通 benign 样例。
+
 ## 5. 三种提交位置
 
 使用 [`../bench/cases/hack-submission-template.yaml`](../bench/cases/hack-submission-template.yaml) 作为模板。

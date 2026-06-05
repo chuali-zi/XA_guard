@@ -265,6 +265,8 @@ dedupe:
 - 有严重性理由。
 - 有去重说明。
 - 最好有相邻 `benign_control`。
+- 若 case 用于验证 Gate3 规则，必须按 [规则测试样例约定](./规则测试样例约定.md) 绑定目标 `policy_refs`，并至少存在一条相邻正/反例。
+- 涉及日期、留存期、审批有效期、上线时间、备案时间或测评时间时，必须使用阳历/公历 ISO 8601 日期；相对日期必须同时给出 `reference_date`。
 
 ### 10.2 fixture extension
 
@@ -286,7 +288,72 @@ dedupe:
 - 有 limitation。
 - 有未来转自动化的条件。
 
-## 11. 校验命令
+## 11. 规则样例与日期口径
+
+Gate3 规则扩展必须遵守“一规则一对正/反例”：
+
+- 正例证明目标规则在最小危险输入下命中，`expected_decision` 与规则 `enforce` 或聚合后的更严格决策一致。
+- 反例证明相邻合法输入不命中目标规则，通常使用 `case_kind: benign_control`。
+- 正例 `policy_refs` 必须包含目标规则 ID；反例也建议包含目标规则 ID，用于说明这是该规则的边界样例。
+- 如果一个样例同时命中多个规则，必须在 `note` 或未来 oracle 字段中解释叠加原因，不能把聚合结果误写成单规则效果。
+
+日期样例统一按阳历/公历处理：
+
+- 日期写 `YYYY-MM-DD`；带时间写 `YYYY-MM-DDTHH:MM:SS+08:00`。
+- 默认时区为北京时间 `Asia/Shanghai` / `+08:00`。
+- 不使用“今天、明天、春节前、农历正月、六个月后”等不可复现表达作为 oracle。
+- 需要相对时间语义时，在 payload 中显式写 `reference_date`，例如 `reference_date: "2026-06-04"`。
+- 闰年、月末、留存期边界等时间测试必须写成固定阳历日期。
+
+详细维护约定见 [规则测试样例约定](./规则测试样例约定.md)。
+
+## 12. 覆盖率矩阵
+
+当前 `bench/.log/coverage.md` 是 CSAB-Gov-mini 用例资产覆盖报告，覆盖：
+
+- 用例总数与 fingerprint 唯一数。
+- `dimension`、`case_kind`、`expected_decision` 分布。
+- `dimension × attack_type` 分布。
+- 标准引用统计。
+
+这不等于“工具 × Gate 覆盖矩阵”。跨 Gate 策略一致性由独立脚本生成：
+
+```powershell
+python scripts/generate_tool_gate_coverage_matrix.py --strict
+```
+
+该脚本读取：
+
+- `policies/baseline/gate2_tool_risks.yaml`
+- `policies/baseline/gate3_rules.yaml`
+- `policies/baseline/gate4_capabilities.yaml`
+- `bench/cases/csab-gov-mini-seed.yaml`
+
+输出：
+
+- Markdown 报告：`bench/.log/tool_gate_coverage.md`
+- 可选 JSON 摘要：`--json`
+
+矩阵按 Gate2、Gate3、Gate4、bench 四源工具名并集建行，核心列包括 `tool_name`、Gate2 risk、Gate3 rule count、Gate4 risk/capabilities/taint、bench case count、bench expected decisions 和 `status`。
+
+状态码口径：
+
+| 状态 | 含义 |
+|---|---|
+| `OK` | Gate2/Gate4 登记一致，且没有发现矩阵缺口 |
+| `MISSING_GATE2` | Gate3 trigger 出现，但 Gate2 未登记 |
+| `MISSING_GATE4` | Gate3 trigger 出现，但 Gate4 未登记 |
+| `RISK_MISMATCH` | Gate2 与 Gate4 同名工具风险等级不一致 |
+| `INVALID_RISK` | risk 不在 `green/yellow/red` |
+| `INVALID_TAINT` | Gate4 taint 不在 `PUBLIC/INTERNAL/CONFIDENTIAL` |
+| `BENCH_ONLY` | bench 使用了该工具，但 Gate2/Gate3/Gate4 都未登记 |
+| `NO_GATE3_RULE` | bench 使用了该工具，但没有 Gate3 trigger；绿色只读工具可接受，高风险工具需要解释 |
+| `NO_BENCH_CASE` | Gate3 trigger 存在，但当前 290 条 bench 没有用例覆盖 |
+| `GATE2_ONLY` / `GATE4_ONLY` | 工具只登记在单侧策略表，提示漂移 |
+
+`--strict` 当前阻断会破坏策略一致性的项：`MISSING_GATE2`、`MISSING_GATE4`、`RISK_MISMATCH`、`INVALID_RISK`、`INVALID_TAINT`。`BENCH_ONLY` 和 `NO_BENCH_CASE` 先作为显式缺口报告，避免现有 supply-chain 简化路径阻塞全部验证；后续若把 `install_plugin` 纳入 Gate2/Gate4/AIBOM 总账，可再升级为 strict。
+
+## 13. 校验命令
 
 校验 YAML 是否满足机器 schema：
 
@@ -317,7 +384,14 @@ $env:PYTHONPATH='src'
 python -c "from bench.runner import load_cases; cases=load_cases('bench/cases/hack-submission-template.yaml'); print(f'runner-compatible cases={len(cases)}')"
 ```
 
-## 12. 演进计划
+生成覆盖率报告与工具矩阵：
+
+```powershell
+python scripts/validate_csab_gov_mini.py --strict
+python scripts/generate_tool_gate_coverage_matrix.py --strict
+```
+
+## 14. 演进计划
 
 | 版本 | 目标 |
 |---|---|

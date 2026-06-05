@@ -231,6 +231,10 @@ class AuditRecord:
     gen_ai_decision_final_reason: str = ""
     # 策略版本号（双层 LayeredPolicySource 的 bundle_sha）；让监管可复现事故时刻的策略快照
     gen_ai_policy_bundle_sha: str = ""
+    gen_ai_tool_sandbox_mode: str = "native"
+    gen_ai_tool_sandbox_enforced: bool = False
+    gen_ai_tool_sandbox_image: str = ""
+    gen_ai_tool_sandbox_runtime: str = ""
 
     # 链式签名（关卡 6）
     record_hash: str = ""                                         # 本条记录的哈希
@@ -261,6 +265,10 @@ class AuditRecord:
             "gen_ai.decision.final": self.gen_ai_decision_final,
             "gen_ai.decision.final_reason": self.gen_ai_decision_final_reason,
             "gen_ai.policy.bundle_sha": self.gen_ai_policy_bundle_sha,
+            "gen_ai.tool.sandbox.mode": self.gen_ai_tool_sandbox_mode,
+            "gen_ai.tool.sandbox.enforced": self.gen_ai_tool_sandbox_enforced,
+            "gen_ai.tool.sandbox.image": self.gen_ai_tool_sandbox_image,
+            "gen_ai.tool.sandbox.runtime": self.gen_ai_tool_sandbox_runtime,
             "record_hash": self.record_hash,
             "signature": self.signature,
         }

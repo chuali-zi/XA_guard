@@ -2,6 +2,21 @@
 
 ---
 
+## 2026-06-04 layered.py risk_level 单一事实源
+
+**改动**：在 `layered.py` 新增 `_derive_tool_risks_from_caps()` 辅助函数，在 `_compile_layer` 中当无独立 risks_path（baseline 层）时，从 caps 的 risk_level 字段自动派生 tool_risks 映射；overlay 层若同时提供 tool_risks.yaml 则保留（用于单调性检验），并补全 caps 中未覆盖的工具。
+
+**manifest 变更**：移除 `tool_risks:` 资源条目，baseline 不再加载 gate2_tool_risks.yaml，risk_level 来源唯一化至 gate4_capabilities.yaml。
+
+**gate2_plan.py 改动**：
+1. fail-open 默认从 GREEN 改为 YELLOW（可配置 default_risk 选项）；
+2. 增加单一事实源注释；
+3. 新增 test_unknown_tool_green_when_configured 测试验证向后兼容。
+
+**测试**：94 passed，全绿。
+
+---
+
 ## 2026-05-25 agent-G3
 - loader.py / compiler.py 无需改动；签名稳定
 - 验证：load_policy_yaml 对 10 条 seed 规则全部解析通过；compile_predicate 在 builtins=None 沙箱内执行 risk/taint/role/sources/contains() 表达式正常

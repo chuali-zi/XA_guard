@@ -45,7 +45,7 @@ def _isolate_global_source():
 @pytest.fixture
 def baseline_src() -> LayeredPolicySource:
     return LayeredPolicySource(
-        manifest_path="policies/baseline_manifest.yaml",
+        manifest_path="policies/baseline/manifest.yaml",
         overlay_root=None,  # 不要加载 overlay 目录
         project_root=PROJECT_ROOT,
     )
@@ -206,7 +206,7 @@ rules:
         },
     )
     src = LayeredPolicySource(
-        manifest_path="policies/baseline_manifest.yaml",
+        manifest_path="policies/baseline/manifest.yaml",
         overlay_root=str(overlay_root),
         project_root=PROJECT_ROOT,
     )
@@ -235,7 +235,7 @@ rules:
         },
     )
     src = LayeredPolicySource(
-        manifest_path="policies/baseline_manifest.yaml",
+        manifest_path="policies/baseline/manifest.yaml",
         overlay_root=str(overlay_root),
         project_root=PROJECT_ROOT,
     )
@@ -316,7 +316,7 @@ patterns:
         },
     )
     src = LayeredPolicySource(
-        manifest_path="policies/baseline_manifest.yaml",
+        manifest_path="policies/baseline/manifest.yaml",
         overlay_root=str(overlay_root),
         project_root=PROJECT_ROOT,
     )
@@ -371,7 +371,7 @@ def test_bundle_sha_changes_when_overlay_added(tmp_path: Path):
     overlay_root = tmp_path / "overlay"
     overlay_root.mkdir()
     src = LayeredPolicySource(
-        manifest_path="policies/baseline_manifest.yaml",
+        manifest_path="policies/baseline/manifest.yaml",
         overlay_root=str(overlay_root),
         project_root=PROJECT_ROOT,
     )
@@ -402,7 +402,7 @@ def test_reload_keeps_old_snapshot_on_bad_overlay(tmp_path: Path):
     overlay_root = tmp_path / "overlay"
     overlay_root.mkdir()
     src = LayeredPolicySource(
-        manifest_path="policies/baseline_manifest.yaml",
+        manifest_path="policies/baseline/manifest.yaml",
         overlay_root=str(overlay_root),
         project_root=PROJECT_ROOT,
     )

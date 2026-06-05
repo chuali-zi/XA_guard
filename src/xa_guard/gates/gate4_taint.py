@@ -2,13 +2,13 @@
 
 子 agent 实施职责：
 - 维护 ctx.taint：根据输入来源（InputSource）+ 工具参数中的敏感词初始化
-- 加载 ToolCapability 元数据（policies/tool_capabilities.yaml）
+- 加载 ToolCapability 元数据（policies/baseline/gate4_capabilities.yaml）
 - INBOUND：检查 ctx.taint 是否能流到 tool.input_max_taint
 - OUTBOUND：根据 tool.output_taint 升级 ctx.taint；阻止机密回流公网
 - 标签传播规则：取最严格（PUBLIC < INTERNAL < CONFIDENTIAL）
 
 接口契约：
-- 输入：GateContext + tool_capabilities.yaml 路径
+- 输入：GateContext + gate4_capabilities.yaml 路径
 - 输出：GateResult.decision ∈ {ALLOW, DENY}（不会 REQUIRE_APPROVAL）
 - 副作用：metadata.input_taint, metadata.output_taint, metadata.tool_capability
 - 关键：进出向各跑一次（supported_stages=(INBOUND, OUTBOUND)）
@@ -34,7 +34,7 @@ from xa_guard.types import (
 )
 
 # 敏感关键字正则（命中任意一个 → CONFIDENTIAL）
-# 兜底：未启用 LayeredPolicySource 时直接用此 baseline 正则（与 policies/sensitive_patterns.yaml 一致）
+# 兜底：未启用 LayeredPolicySource 时直接用此 baseline 正则（与 policies/baseline/gate4_sensitive_patterns.yaml 一致）
 _SENSITIVE_PATTERNS = re.compile(
     r"密码|密钥|手机号|银行卡|医疗健康|金融账户|行踪轨迹|敏感个人信息|"
     r"password|passwd|pwd|access[_\-]key|secret[_\-]key|AKIA[0-9A-Z]{16}|"
@@ -150,18 +150,23 @@ class Gate4Taint(Gate):
 
     def __init__(self, cfg=None) -> None:
         super().__init__(cfg)
-        cap_file = self.opt("tool_capabilities_file", "policies/tool_capabilities.yaml")
+        cap_file = self.opt("tool_capabilities_file", "policies/baseline/gate4_capabilities.yaml")
         try:
             self.capabilities: dict[str, ToolCapability] = _load_capabilities(cap_file)
         except FileNotFoundError:
             self.capabilities = {}
 
     def _default_cap(self, tool_name: str) -> ToolCapability:
+        # Fail-closed 兜底：未登记工具视为最高风险来源。
+        # input_max_taint=PUBLIC：任何非 PUBLIC 数据（INTERNAL/CONFIDENTIAL）流入未知工具均触发 INBOUND DENY，
+        # 防止机密数据泄露给未经审查的工具。
+        # output_taint=CONFIDENTIAL：假设未知工具的输出可能携带机密，使 OUTBOUND 阶段对其外发严格审查。
+        # capabilities=["NETWORK_EXTERNAL"]：假设未知工具可能具有外网访问能力，确保 OUTBOUND 机密外泄检查生效。
         return ToolCapability(
             tool_name=tool_name,
-            capabilities=[],
-            input_max_taint=TaintLabel.CONFIDENTIAL,
-            output_taint=TaintLabel.PUBLIC,
+            capabilities=["NETWORK_EXTERNAL"],
+            input_max_taint=TaintLabel.PUBLIC,
+            output_taint=TaintLabel.CONFIDENTIAL,
         )
 
     def _current_caps(self) -> dict[str, ToolCapability]:
@@ -207,7 +212,10 @@ class Gate4Taint(Gate):
         return taint
 
     def evaluate(self, ctx: GateContext, stage: GateStage = GateStage.INBOUND) -> GateResult:
-        strict = bool(self.opt("strict_mode", False))
+        # strict_mode 保留读取以兼容 configs/xa-guard.yaml 的 strict_mode 配置项，
+        # 但 gate4 当前逻辑中 OUTBOUND 机密外泄直接 DENY，无 WARN 路径，故 strict 不影响实际决策。
+        # 如未来需要 WARN 升级语义，在此处重新引入逻辑。
+        _ = self.opt("strict_mode", False)  # 保留兼容，暂未使用（见上方注释）
         caps = self._current_caps()
         cap = caps.get(ctx.tool_name) or self._default_cap(ctx.tool_name)
 
@@ -242,13 +250,11 @@ class Gate4Taint(Gate):
             c in cap.capabilities for c in ("NETWORK_EXTERNAL", "NOTIFY")
         )
         if has_external and new_taint == TaintLabel.CONFIDENTIAL:
-            out_decision = Decision.DENY if not strict else Decision.DENY
+            # 机密数据通过外网/通知工具外发：直接 DENY（无 WARN 路径，fail-closed）
+            out_decision = Decision.DENY
             risks_out = [
                 f"CONFIDENTIAL data must not flow through {cap.capabilities} tool"
             ]
-
-        if strict and out_decision == Decision.WARN:
-            out_decision = Decision.DENY
 
         return GateResult(
             gate_name=self.name,

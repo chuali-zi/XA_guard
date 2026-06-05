@@ -27,6 +27,13 @@
 - 关键决策：路径解析用 Path(__file__) 向上四层定位项目根，避免 cwd 依赖；session_history 支持 content 为字符串或 list[dict] 两种格式；warn_source 仅在无 deny 命中时生效，保证 deny 优先
 - 已知问题：patterns_file 路径解析假设 gate1_input.py 位于 src/xa_guard/gates/，层级硬编码；M2 PromptGuard 推理未实现（按设计留 stub）
 
+## 2026-06-04 agent-B (gate4_taint fail-closed + 死代码清理)
+- Task A：_default_cap 收紧为 fail-closed：input_max_taint PUBLIC（未知工具拒绝 INTERNAL/CONFIDENTIAL 流入）、output_taint CONFIDENTIAL（假设未知工具输出可能携密）、capabilities=["NETWORK_EXTERNAL"]（确保 OUTBOUND 检查生效）。旧值 input_max=CONFIDENTIAL 是 fail-open 安全漏洞。
+- Task B：清理 OUTBOUND 死代码：`Decision.DENY if not strict else Decision.DENY` 恒等三元 → 直接 `Decision.DENY`；`if strict and out_decision == Decision.WARN` 不可达块已删除。strict_mode 读取保留为配置兼容占位（configs/xa-guard.yaml 有该字段，不改该文件），读取结果赋给 `_`，注释说明无实际语义。
+- test_gate4.py：更新 test 6 注释，拆分旧 test_unknown_tool_defaults_allow 为三个用例（PUBLIC ALLOW / INTERNAL DENY / OUTBOUND CONFIDENTIAL DENY），补充 strict_mode 注释。
+- 测试结果：24 passed in 0.43s，全绿。
+- 牵连文件：configs/xa-guard.yaml 的 `strict_mode: false` 注释说"连 WARN 都阻断"，与 gate4 无 WARN 路径不符，建议主 agent 更新注释，但无功能影响。
+
 ## 2026-05-25 G4 (gate4_taint)
 - 实现 Gate4Taint：INBOUND 推断污点（input_sources merge + arguments/session_history 敏感关键字扫描）→ can_flow_to 检查；OUTBOUND merge output_taint → CONFIDENTIAL+EXTERNAL/NOTIFY 阻断
 - 加载 policies/tool_capabilities.yaml；未登记工具默认 input_max=CONFIDENTIAL（宽松通行）

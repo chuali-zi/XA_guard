@@ -18,14 +18,17 @@ metadata:
     - "GB/T 45654-2025 网络安全技术 生成式人工智能服务安全基本要求"
     - "TC260-003 生成式人工智能服务安全基本要求"
 
-# 4 类资源，对应 Gate2 / Gate3 / Gate4 的需求
+# 3 类资源，对应 Gate2 / Gate3 / Gate4 的需求
+# 注意：gate2_tool_risks.yaml 已废弃——risk_level 的唯一事实源见
+#       policies/baseline/gate4_capabilities.yaml（risk_level 字段）
+#       和 docs/risk_classification_basis.md（法规分级依据）。
+# Gate2 运行时 risk 由 layered.py 从 tool_capabilities 中的 risk_level 派生，
+# 不再单独声明 tool_risks 资源。
 resources:
-  policy_rules:                  # Gate3 用：enterprise-l3 30 条
-    file: policies/enterprise-l3.yaml
+  policy_rules:                  # Gate3 用：gate3_rules 30 条
+    file: policies/baseline/gate3_rules.yaml
     rule_id_namespace: ""        # baseline 无前缀，历史 id 不动
-  tool_risks:                    # Gate2 用：工具风险分级
-    file: policies/tool_risks.yaml
-  tool_capabilities:             # Gate4 用：工具能力 + 污点上限
-    file: policies/tool_capabilities.yaml
+  tool_capabilities:             # Gate4 / Gate2 用：工具能力 + 污点上限 + risk_level（唯一源）
+    file: policies/baseline/gate4_capabilities.yaml
   sensitive_patterns:            # Gate4 用：敏感词正则
-    file: policies/sensitive_patterns.yaml
+    file: policies/baseline/gate4_sensitive_patterns.yaml

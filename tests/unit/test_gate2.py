@@ -9,7 +9,7 @@ from xa_guard.gates.gate2_plan import Gate2Plan
 from xa_guard.types import Decision, GateContext, RiskLevel
 
 
-RISK_FILE = "policies/tool_risks.yaml"
+RISK_FILE = "policies/baseline/gate2_tool_risks.yaml"
 
 
 def _make_gate(fallback: str = "stdout") -> Gate2Plan:
@@ -103,16 +103,34 @@ class TestGate2RedFallbackAsyncNotify:
 
 
 class TestGate2Unknown:
-    def test_unknown_tool_allow(self):
+    def test_unknown_tool_warns(self):
+        """未登记工具 fail-closed：默认 YELLOW，出 WARN + async_notify，不静默放行。"""
         gate = _make_gate()
+        result = gate.evaluate(_ctx("some_unregistered_tool"))
+        assert result.decision == Decision.WARN
+        assert result.metadata["risk_level"] == RiskLevel.YELLOW.value
+        assert result.metadata.get("notify_async") is True
+
+    def test_empty_tool_name_warns(self):
+        """空工具名也视为未登记，触发 YELLOW 默认。"""
+        gate = _make_gate()
+        result = gate.evaluate(_ctx(""))
+        assert result.decision == Decision.WARN
+
+    def test_unknown_tool_green_when_configured(self):
+        """显式配置 default_risk=green 时，未登记工具仍可放行（兼容旧行为）。"""
+        cfg = GateConfig(
+            enabled=True,
+            options={
+                "tool_risk_file": RISK_FILE,
+                "elicitation_fallback": "stdout",
+                "default_risk": "green",
+            },
+        )
+        gate = Gate2Plan(cfg)
         result = gate.evaluate(_ctx("some_unregistered_tool"))
         assert result.decision == Decision.ALLOW
         assert result.metadata["risk_level"] == RiskLevel.GREEN.value
-
-    def test_empty_tool_name_allow(self):
-        gate = _make_gate()
-        result = gate.evaluate(_ctx(""))
-        assert result.decision == Decision.ALLOW
 
 
 class TestGate2NoMutate:

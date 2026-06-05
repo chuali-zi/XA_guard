@@ -1,3 +1,11 @@
+# ⚠ 已废弃（DEPRECATED）——本文件不再是 risk_level 的事实源。
+#
+# risk_level 的唯一事实源：policies/baseline/gate4_capabilities.yaml（risk_level 字段）
+# Gate2 / Gate3 运行时 risk 均由 layered.py 从 gate4_capabilities.yaml 派生，
+# 不再读本文件。本文件保留仅供历史参考；新增工具请仅在 gate4_capabilities.yaml 登记。
+# 分级法规依据见 docs/risk_classification_basis.md。
+#
+# 原始注释保留 ↓
 # 工具风险等级（关卡 2 办事大厅用）
 # green: 自动放行   yellow: 异步通知人审   red: 同步阻塞 HITL
 tool_risks:

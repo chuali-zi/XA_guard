@@ -11,7 +11,7 @@
 
   DetectionLabel 的 category 分组：
 
-    Deny categories (来自 dangerous_patterns.yaml):
+    Deny categories (来自 baseline/gate1_input_patterns.yaml):
       shell_dangerous, jailbreak_zh, jailbreak_en, system_leak,
       privacy_leak, pii_leak, sql_injection, indirect_injection
 

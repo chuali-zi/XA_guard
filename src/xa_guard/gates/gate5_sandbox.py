@@ -57,7 +57,12 @@ class Gate5Sandbox(Gate):
             return GateResult(
                 gate_name=self.name,
                 decision=Decision.ALLOW,
-                metadata={"sandbox_mode": "native"},
+                metadata={
+                    "sandbox_mode": "native",
+                    "sandbox_enforced": False,
+                    "network_disabled": False,
+                    "readonly_rootfs": False,
+                },
                 note="docker disabled in demo",
             )
 
@@ -78,9 +83,18 @@ class Gate5Sandbox(Gate):
             decision=Decision.ALLOW,
             metadata={
                 "sandbox_mode": mode,
+                "sandbox_enforced": mode != "native",
                 "docker_image": self.opt("docker_image", "xa-guard/sandbox:latest"),
                 "runtime": runtime,
                 "risk_level": risk.value,
+                "network_disabled": self.opt("network_disabled", True) if mode != "native" else False,
+                "readonly_rootfs": self.opt("readonly_rootfs", True) if mode != "native" else False,
+                "memory": self.opt("memory", "256m"),
+                "cpus": self.opt("cpus", "1"),
+                "pids_limit": int(self.opt("pids_limit", 128)),
+                "workspace_mount": self.opt("workspace_mount", True),
+                "workspace_target": self.opt("workspace_target", "/workspace"),
+                "workspace_readonly": self.opt("workspace_readonly", True),
             },
             note=note,
         )

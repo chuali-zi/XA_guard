@@ -1,6 +1,6 @@
 """关卡 3 · 规则引擎（中文 Policy DSL） — 赛题方向 2 + 应用价值核心。
 
-加载 policies/enterprise-l3.yaml（>=10 条 seed 规则）→ 编译每条 predicate →
+加载 policies/baseline/gate3_rules.yaml（>=10 条 seed 规则）→ 编译每条 predicate →
 针对 GateContext 逐条评估命中 → 聚合 enforce 决策。
 
 聚合优先级（高 → 低）：DENY > REQUIRE_APPROVAL > WARN > ALLOW。
@@ -19,6 +19,7 @@ from xa_guard.gates.base import Gate, GateStage
 from xa_guard.policy.compiler import compile_predicate
 from xa_guard.policy.layered import get_global_source
 from xa_guard.policy.loader import load_policy_yaml
+from xa_guard.policy.rego import RegoPolicyEngine
 from xa_guard.types import Decision, GateContext, GateResult, PolicyRule
 
 _SEVERITY_RANK = {"low": 0, "medium": 1, "high": 2, "critical": 3}
@@ -31,12 +32,14 @@ class Gate3Policy(Gate):
     rules: list[PolicyRule]
     compiled: dict[str, Callable[[GateContext], bool]]
     backend: str
+    rego: RegoPolicyEngine | None
 
     def __init__(self, cfg=None) -> None:
         super().__init__(cfg)
         self.backend = str(self.opt("backend", "python")).lower()
         self.rules = []
         self.compiled = {}
+        self.rego = None
         policy_file = self.opt("policy_file")
         if policy_file:
             self._load(policy_file)
@@ -48,7 +51,9 @@ class Gate3Policy(Gate):
         if self.backend == "python":
             self.compiled = {r.id: compile_predicate(r.predicate) for r in self.rules}
         elif self.backend == "rego":
-            raise NotImplementedError("rego backend reserved for M3 (OPA)")
+            self.rego = RegoPolicyEngine(self.rules, opa_path=self.opt("opa_path"))
+            if bool(self.opt("strict_opa", False)) and not self.rego.opa_available:
+                raise RuntimeError("gate3 rego backend requires an OPA binary when strict_opa=true")
         else:
             raise ValueError(f"unknown gate3 backend: {self.backend}")
 
@@ -89,19 +94,23 @@ class Gate3Policy(Gate):
             )
 
         hits: list[PolicyRule] = []
-        for rule in rules:
-            if not self._triggered(rule, ctx.tool_name):
-                continue
-            fn = compiled.get(rule.id)
-            if fn is None:
-                continue
-            try:
-                matched = fn(ctx)
-            except Exception:
-                # predicate 异常视为未命中，避免单条规则崩 gate
-                matched = False
-            if matched:
-                hits.append(rule)
+        if self.backend == "rego" and self.rego is not None and rules is self.rules:
+            hit_ids = set(self.rego.evaluate_hits(ctx))
+            hits = [rule for rule in rules if rule.id in hit_ids and self._triggered(rule, ctx.tool_name)]
+        else:
+            for rule in rules:
+                if not self._triggered(rule, ctx.tool_name):
+                    continue
+                fn = compiled.get(rule.id)
+                if fn is None:
+                    continue
+                try:
+                    matched = fn(ctx)
+                except Exception:
+                    # predicate 异常视为未命中，避免单条规则崩 gate
+                    matched = False
+                if matched:
+                    hits.append(rule)
 
         decision = self._aggregate([r.enforce for r in hits])
         severity_max = "low"
@@ -119,5 +128,7 @@ class Gate3Policy(Gate):
                 "policy_hit_count": len(hits),
                 "policy_severity_max": severity_max if hits else "none",
                 "backend": self.backend,
+                "rego_mode": self.rego.mode if self.rego is not None else "",
+                "opa_available": self.rego.opa_available if self.rego is not None else False,
             },
         )

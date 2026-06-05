@@ -13,7 +13,7 @@ def _gate() -> Gate1Input:
     cfg = GateConfig(
         enabled=True,
         options={
-            "patterns_file": "policies/dangerous_patterns.yaml",
+            "patterns_file": "policies/baseline/gate1_input_patterns.yaml",
             "source_risk_weights": {
                 "user": 1.0,
                 "web": 1.5,

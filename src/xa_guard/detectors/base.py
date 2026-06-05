@@ -53,7 +53,7 @@ class DetectionInput:
 class DetectionLabel:
     """一条检测命中。
 
-    category : 风险类目，跨检测器统一命名空间。规则类目沿用 dangerous_patterns.yaml
+    category : 风险类目，跨检测器统一命名空间。规则类目沿用 baseline/gate1_input_patterns.yaml
                的 key（shell_dangerous / jailbreak_zh / pii_leak / indirect_injection ...）；
                模型类目用 backend 自己的 taxonomy（如 Qwen3Guard 的 "jailbreak" /
                "political_sensitive"），由配置的 category_map 归一到统一类目。

@@ -7,6 +7,7 @@ import pytest
 
 from xa_guard.config import GateConfig
 from xa_guard.gates.gate3_policy import Gate3Policy
+from xa_guard.policy.rego import build_rego_module, predicate_to_rego
 from xa_guard.types import (
     Decision,
     GateContext,
@@ -15,8 +16,9 @@ from xa_guard.types import (
     TaintLabel,
 )
 
-POLICY_FILE = "policies/enterprise-l3.yaml"
+POLICY_FILE = "policies/baseline/gate3_rules.yaml"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+LOCAL_OPA = PROJECT_ROOT / "tools" / "opa" / "opa.exe"
 
 
 def _gate() -> Gate3Policy:
@@ -429,12 +431,105 @@ rules:
     assert "catch-all" not in g.evaluate(ctx_miss).rule_hits
 
 
-def test_rego_backend_raises(tmp_path):
+def test_rego_backend_evaluates_with_python_fallback(tmp_path):
     p = tmp_path / "empty.yaml"
-    p.write_text("rules: []\n", encoding="utf-8")
+    p.write_text(
+        """
+rules:
+  - id: rego-red-command
+    name: Rego red command
+    source: test
+    triggers: [exec_command]
+    predicate: "tool == 'exec_command' and risk == 'red'"
+    enforce: deny
+    severity: critical
+    audit: required
+""",
+        encoding="utf-8",
+    )
     cfg = GateConfig(
         enabled=True,
         options={"backend": "rego", "policy_file": str(p)},
     )
-    with pytest.raises(NotImplementedError):
+    g = Gate3Policy(cfg)
+    result = g.evaluate(_ctx(tool_name="exec_command", risk_level=RiskLevel.RED))
+    assert result.decision == Decision.DENY
+    assert result.rule_hits == ["rego-red-command"]
+    assert result.metadata["backend"] == "rego"
+    assert result.metadata["rego_mode"] in ("opa_cli", "python_fallback")
+
+
+def test_rego_backend_strict_opa_requires_binary(tmp_path):
+    p = tmp_path / "empty.yaml"
+    p.write_text("rules: []\n", encoding="utf-8")
+    cfg = GateConfig(
+        enabled=True,
+        options={"backend": "rego", "policy_file": str(p), "strict_opa": True, "opa_path": str(tmp_path / "missing-opa")},
+    )
+    with pytest.raises(RuntimeError):
         Gate3Policy(cfg)
+
+
+def test_rego_transpiler_covers_current_dsl_shapes(gate):
+    module = build_rego_module(gate.rules)
+    assert "package xa_guard.gate3" in module
+    assert "hit contains \"GBT-22239-8.1.4.5\"" in module
+    assert predicate_to_rego("tool == 'exec_command' and args.get('retention_days', 180) < 180")
+
+
+def test_rego_backend_evaluates_with_real_local_opa(tmp_path):
+    if not LOCAL_OPA.exists():
+        pytest.skip("local OPA binary is not installed at tools/opa/opa.exe")
+    p = tmp_path / "policy.yaml"
+    p.write_text(
+        """
+rules:
+  - id: opa-real-red-command
+    name: OPA real red command
+    source: test
+    triggers: [exec_command]
+    predicate: "tool == 'exec_command' and risk == 'red'"
+    enforce: deny
+    severity: critical
+    audit: required
+""",
+        encoding="utf-8",
+    )
+    cfg = GateConfig(
+        enabled=True,
+        options={"backend": "rego", "policy_file": str(p), "strict_opa": True, "opa_path": str(LOCAL_OPA)},
+    )
+    g = Gate3Policy(cfg)
+    result = g.evaluate(_ctx(tool_name="exec_command", risk_level=RiskLevel.RED))
+    assert result.decision == Decision.DENY
+    assert result.rule_hits == ["opa-real-red-command"]
+    assert result.metadata["rego_mode"] == "opa_cli"
+    assert result.metadata["opa_available"] is True
+
+
+def test_rego_backend_discovers_local_opa_by_default(tmp_path):
+    if not LOCAL_OPA.exists():
+        pytest.skip("local OPA binary is not installed at tools/opa/opa.exe")
+    p = tmp_path / "policy.yaml"
+    p.write_text(
+        """
+rules:
+  - id: opa-default-discovery
+    name: OPA default discovery
+    source: test
+    triggers: [exec_command]
+    predicate: "tool == 'exec_command' and risk == 'red'"
+    enforce: deny
+    severity: critical
+    audit: required
+""",
+        encoding="utf-8",
+    )
+    cfg = GateConfig(
+        enabled=True,
+        options={"backend": "rego", "policy_file": str(p), "strict_opa": True},
+    )
+    g = Gate3Policy(cfg)
+    result = g.evaluate(_ctx(tool_name="exec_command", risk_level=RiskLevel.RED))
+    assert result.decision == Decision.DENY
+    assert result.metadata["rego_mode"] == "opa_cli"

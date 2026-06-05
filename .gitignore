@@ -31,3 +31,6 @@ logs/
 *.jsonl
 !bench/.log/.gitkeep
 !**/.log/worklog.md
+
+# Local tool binaries downloaded for verification.
+tools/opa/opa.exe
