@@ -185,6 +185,29 @@ class TestModelDetector:
         assert r.available is False
         assert "model_load_failed" == r.metadata["reason"]
 
+    def test_load_failed_fail_closed_marks_metadata(self):
+        from xa_guard.detectors.model_detector import ModelDetector
+        from xa_guard.detectors.base import ModelBackend
+
+        class FailingBackend(ModelBackend):
+            name = "failing"
+
+            def load(self):
+                raise RuntimeError("boom")
+
+            def is_ready(self):
+                return False
+
+            def classify(self, texts, categories=None):
+                return [[] for _ in texts]
+
+        backend = FailingBackend({})
+        md = ModelDetector(backend=backend, fail_open=False)
+        r = md.detect(_inp("hello"))
+        assert r.available is False
+        assert r.metadata["reason"] == "model_load_failed"
+        assert r.metadata["fail_open"] is False
+
     def test_qwen3guard_dry_run_keyword_match(self):
         from xa_guard.detectors.model_detector import ModelDetector
         from xa_guard.detectors.backends import get_backend
@@ -233,6 +256,20 @@ class TestFusion:
         dec, _, _ = fuse([r_rule, r_model])
         # model:qwen 不可用 → 忽略它的jailbreak标签 → 只有 rule（空）→ ALLOW
         assert dec == Decision.ALLOW
+
+    def test_fail_closed_unavailable_detector_denies(self):
+        r_rule = DetectionResult(labels=[], detector_name="rule", available=True)
+        r_model = DetectionResult(
+            labels=[],
+            detector_name="model:qwen",
+            available=False,
+            metadata={"reason": "model_unavailable", "fail_open": False},
+        )
+        dec, risks, meta = fuse([r_rule, r_model])
+        assert dec == Decision.DENY
+        assert risks == ["deny: detector_unavailable:model:qwen"]
+        assert meta["fusion"] == "deny_by_fail_closed_detector"
+        assert meta["failed_detectors"] == ["model:qwen"]
 
     def test_deny_vs_warn_deny_wins(self):
         r_deny = DetectionResult(
@@ -398,6 +435,17 @@ class TestGate1InputV2:
         # 即便 stub not-ready，规则仍然拦截
         assert result.decision == Decision.DENY
 
+    def test_model_detector_fail_closed_blocks_when_unavailable(self):
+        g = _gate({"detectors": [
+            {"name": "rule", "type": "rule", "enabled": True, "patterns_file": "policies/baseline/gate1_input_patterns.yaml"},
+            {"name": "model_stub", "type": "model", "enabled": True, "backend": "stub", "fail_open": False},
+        ]})
+        ctx = _ctx(tool_name="read_file", arguments={"path": "/tmp/notes.txt"})
+        result = g(ctx)
+        assert result.decision == Decision.DENY
+        assert result.metadata["fusion"]["fusion"] == "deny_by_fail_closed_detector"
+        assert result.metadata["fusion"]["failed_detectors"] == ["model:stub"]
+
     def test_unknown_backend_skipped(self):
         """配置了一个不存在的后端名 → 跳过，不崩 pipeline。"""
         g = _gate({"detectors": [
@@ -445,3 +493,24 @@ class TestGate1InputV2:
         result = g(ctx)
         # WEB 来源 + 有 tool 内容 → WARN（来源不可信）
         assert result.decision == Decision.WARN
+        assert result.metadata["spotlighting"]["enabled"] is True
+        assert result.metadata["spotlighting"]["applied"] is True
+        assert result.metadata["spotlighting"]["untrusted_sources"] == ["web"]
+        assert result.metadata["spotlighting"]["has_untrusted_source_marker"] is True
+
+    def test_spotlighting_metadata_user_only_not_applied(self):
+        g = _gate({
+            "detectors": [
+                {"name": "rule", "type": "rule", "enabled": True, "patterns_file": "policies/baseline/gate1_input_patterns.yaml"},
+            ],
+            "spotlighting": {"enabled": True},
+        })
+        ctx = _ctx(
+            tool_name="read_file",
+            arguments={"path": "/tmp/notes.txt"},
+            input_sources=[InputSource.USER],
+        )
+        result = g(ctx)
+        assert result.metadata["spotlighting"]["enabled"] is True
+        assert result.metadata["spotlighting"]["applied"] is False
+        assert result.metadata["spotlighting"]["untrusted_sources"] == []

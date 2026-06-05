@@ -255,6 +255,13 @@ class Gate1Input(Gate):
         metadata: dict[str, Any] = {
             "detected_patterns": [f"{l['category']}:{l['term']}" for l in all_labels if l["term"]],
             "source_risk_score": source_risk,
+            "spotlighting": {
+                "enabled": self.spotlight_enabled,
+                "applied": bool(inp.meta.get("spotlighted")),
+                "untrusted_sources": list(inp.meta.get("untrusted_sources", [])),
+                "marked_text_length": len(str(inp.meta.get("spotlighted_text", ""))),
+                "has_untrusted_source_marker": "<untrusted_source" in str(inp.meta.get("spotlighted_text", "")),
+            },
             "detectors": [
                 {
                     "name": r.detector_name,
