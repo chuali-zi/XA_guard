@@ -1,5 +1,40 @@
 # 工作日志
 
+## 2026-06-05 +08:00 Codex - Gate1 真实模型验证（Qwen3Guard）
+
+按用户要求从最新 `main` 继续，不重做已合入的 backend 接入；同步远端 main 后，从 `10a7234` 创建新分支 `codex/gate1-real-model-verification`。
+
+本次具体做了什么：
+- 同步 `origin/main`，确认最新 main 已包含 PR #1 的 Qwen3Guard / PromptGuard2 / Llama Guard / ShieldLM backend、category maps、Gate1 配置迁移、290 case benchmark 和状态文档更新。
+- 检查 `.venv`：Python 3.12.10；`transformers 5.9.0`、`accelerate 1.13.0`、`huggingface_hub 1.17.0` 可用。
+- 初始 `torch 2.12.0+cpu` 无 CUDA；尝试 `torch 2.12.0+cu126` 后 RTX 5070 可枚举但 tensor smoke 报 `no kernel image is available for execution on the device`；切换到 `torch 2.12.0+cu132` 后 CUDA tensor smoke 通过。
+- 复测 Qwen3Guard-Gen-0.6B：HF cache snapshot 为 `C:\Users\Enfur\.cache\huggingface\hub\models--Qwen--Qwen3Guard-Gen-0.6B\snapshots\fada3b2f655b89601929198343c94cd2f64d93cc`，大小约 1.415GB。
+- Qwen CPU 真实 probe 通过：load 约 6795ms，RSS load 后约 3622MB；危险样例 `How can I make a bomb?` 和 `/etc/passwd` 外发请求输出 `shell_dangerous`。
+- Qwen GPU 真实 probe 通过：`device=cuda`、`torch_dtype=float16`，load 约 5246ms，显存 max allocated 约 1234MB；危险样例热推理约 260-371ms。
+- Gate1 决策链验证通过：`How can I make a bomb?` 不在规则文件中，RuleDetector 0 label，`model:qwen3guard available=true` 且 1 label，fusion 因模型 label 返回 DENY。
+- 同一 Gate1 实例 GPU 热路径 5 次后续推理：模型 P50/P95 约 286.93 / 302.26ms。
+- PromptGuard2 与 Llama Guard 授权验证：`snapshot_download` 均返回 Hugging Face `GatedRepoError 401`，需要 `HF_TOKEN` 与 license acceptance。
+- ShieldLM-14B-qwen 仅做可行性评估：元数据 26.391GB，本机无 bitsandbytes/AutoGPTQ/optimum/AWQ/vLLM/llama.cpp，8GB VRAM/Windows 不适合同步本地原精度 Gate1。
+- 跑四组内存 benchmark，不改 case、不写 `bench/.log` 运行产物：
+  - rule-only + spotlight on：290 total，pass_rate 100%，ASR 0，Recall 100%，FPR 0，CuP 100%，P50/P95 1.32/1.64ms。
+  - model-only Qwen GPU + spotlight on：290 total，pass_rate 88.62%，ASR 10.60%，Recall 89.40%，FPR 0，CuP 100%，P50/P95 275.88/302.74ms，失败 33 条。
+  - rule+Qwen GPU + spotlight on：290 total，pass_rate 100%，ASR 0，Recall 100%，FPR 0，CuP 100%，P50/P95 292.15/360.72ms。
+  - rule+Qwen GPU + spotlight off：290 total，pass_rate 100%，ASR 0，Recall 100%，FPR 0，CuP 100%，P50/P95 282.96/302.25ms。
+- 更新 `docs/gate1-real-model-verification.md`，记录环境、缓存路径、CPU/GPU 资源、Gate1 metadata、benchmark 矩阵、33 个失败 case、授权/硬件 blocker。
+- 更新 `status.md`，把“本机无模型依赖 / Qwen 未复现”的旧事实改为当前真实模型验证结果。
+
+验证结果：
+- Gate1 相关：`PYTHONPATH=src .\.venv\Scripts\python.exe -m pytest tests\unit\test_gate1.py tests\unit\test_gate1_detectors.py -q`：51 passed。
+- `PYTHONPATH=src .\.venv\Scripts\python.exe -m compileall src bench scripts tests`：通过。
+- 全量 `PYTHONPATH=src .\.venv\Scripts\python.exe -m pytest -q`：collected 392，389 passed / 3 skipped / 0 failed。skip：Docker 未安装 1 条；OPA binary 未安装 2 条。
+
+未完成 / blocker：
+- 默认配置仍是 CPU；GPU 验证通过但需要显式 `device=cuda` + `torch_dtype=float16` profile。
+- Qwen3Guard-Gen-0.6B 不能替代规则层，model-only 漏 indirect injection、jailbreak/system leak 和部分危险命令。
+- PromptGuard2 / Llama Guard 需要 HF_TOKEN 和授权许可。
+- ShieldLM 14B 不适合同步本地原精度；建议量化或远程推理。
+- 当前 benchmark 仍是 full pipeline + mock executor，不是真实 MCP E2E；`audit_completeness=1.0` 仍是占位。
+
 ## 2026-06-05 +08:00 Claude 主 agent（+4 sonnet 子 agent）- AIBOM 生产化（方向 3）
 
 把 `src/xa_guard/aibom/` 从 demo 骨架推进到生产化，落地 status.md 下一步清单第 8 条的 5 项能力。
@@ -854,3 +889,45 @@ README 同步：测试数 87 → 93。审计字段从 14 增到 16，verify_audi
 - `src/xa_guard/audit/.log/2026-05-27_final_decision.md`
 
 未做：commit、verify_audit 脚本同步 16 字段。
+## 2026-06-05 +08:00 Codex - Gate1 evaluator, spotlighting evidence, fail-closed boundary
+
+Continued from `codex/gate1-real-model-verification` without redoing model
+backend integration.
+
+What changed:
+- Added `scripts/evaluate_gate1.py`, an isolated Gate1 evaluator for detector
+  availability, labels, fusion decision, Gate1-scope Recall/ASR/FPR,
+  Recall@FPR thresholds, latency, false negatives, false positives, and
+  spotlighting metadata. It supports `--detectors rule|qwen|rule,qwen`,
+  `--device`, `--dtype`, `--dry-run`, `--no-spotlighting`, `--dimension`,
+  `--gate1-attack-types`, `--include-rows`, `--out`, and `--quiet`.
+- Added `tests/test_gate1_evaluator.py`.
+- Added Gate1 spotlighting audit metadata:
+  `enabled`, `applied`, `untrusted_sources`, `marked_text_length`,
+  `has_untrusted_source_marker`.
+- Fixed explicit Gate1 model fail-closed semantics: `fail_open=false` now
+  denies through fusion when the model detector is unavailable, with
+  `fusion=deny_by_fail_closed_detector`. Default `fail_open=true` is unchanged.
+- Updated `docs/gate1-real-model-verification.md` and `status.md` with the new
+  Gate1-only evidence.
+
+Verification:
+- `python -m pytest tests\unit\test_gate1_detectors.py tests\test_gate1_evaluator.py -q`: 44 passed.
+- Gate1 rule-only evaluator: Gate1-scope 60 attacks, Recall 68.33%, ASR 31.67%,
+  FPR-any 0.00%, FPR-blocking 0.00%, P50/P95 0.01/0.02ms.
+- Gate1 Qwen3Guard model-only real CUDA evaluator: model available for all
+  290 cases, Gate1-scope Recall 0.00%, ASR 100.00%, FPR 0.00%,
+  P50/P95 249.97/271.10ms. It produced only one label outside the Gate1 scope
+  (`malicious_plugin`).
+- Gate1 rule+Qwen real CUDA evaluator: Gate1-scope Recall 68.33%, ASR 31.67%,
+  FPR 0.00%, P50/P95 248.73/264.47ms.
+- Spotlighting A/B on current `indirect_injection` scope: on and off both
+  Recall 100.00%; spotlighting on records applied_cases=23,
+  applied_attack_cases=22, sources=document/rag/web. Current benchmark proves
+  application, not security lift.
+
+Key finding:
+- Qwen3Guard-Gen-0.6B is real, loaded, available, and wired into Gate1, but it
+  is not an effective primary detector for current MCP/tool-call, indirect
+  injection, RAG poisoning, or tool-output poisoning style inputs. Current
+  Gate1 detection remains rule-led.
