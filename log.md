@@ -1,5 +1,25 @@
 # 工作日志
 
+## 2026-06-16 +08:00 Codex - 补齐 Gate5 本机沙箱镜像并消除 pytest skip
+
+本次具体做了什么：
+- 复查 `docker/sandbox.Dockerfile`、`scripts/build_sandbox_image.sh` 和 `tests/integration/test_sandbox_runner.py`，确认此前 skip 的直接原因是本机缺少 `xa-guard/sandbox:latest` 镜像且 Docker Desktop daemon 未运行。
+- 启动 Docker Desktop，等待 `docker info` 成功后，执行 `docker build -f docker/sandbox.Dockerfile -t xa-guard/sandbox:latest .` 构建 Gate5 下游沙箱镜像。
+- 使用 `docker image inspect xa-guard/sandbox:latest` 确认镜像存在，用户为 `sandbox`，工作目录为 `/workspace`。
+- 运行 `tests/integration/test_sandbox_runner.py`，原本 skip 的沙箱测试已真实执行并通过，验证 Docker 沙箱禁网与只读 rootfs 生效。
+- 运行全量 pytest，确认当前不再有 sandbox skip。
+- 更新 `status.md`：L2 Competition-trusted 证据闭合；全量测试状态改为 394 passed / 0 skipped；Gate5 沙箱镜像状态改为已构建并实测。
+
+验证：
+- `docker build -f docker/sandbox.Dockerfile -t xa-guard/sandbox:latest .`：成功。
+- `docker image inspect xa-guard/sandbox:latest --format '{{.Id}} {{.Config.User}} {{.Config.WorkingDir}}'`：成功，输出包含 `sandbox /workspace`。
+- `python -m pytest -q --basetemp pytest_tmp_sandbox_recheck -p no:cacheprovider tests\integration\test_sandbox_runner.py -x --tb=short`：1 passed。
+- `python -m pytest -q --basetemp pytest_tmp_full_after_sandbox -p no:cacheprovider -x --tb=short`：全量通过，进度 100%，无 skip 行；按上一状态 393 passed / 1 skipped 加本次 sandbox 实测通过，当前为 394 passed / 0 skipped。
+
+未完成 / 下一步：
+- 本次只补齐本机 Docker sandbox smoke；没有做 Linux `runsc`/gVisor 实测，也没有做 Docker Compose 一键部署，这两项仍属于 L3。
+- 没有重新跑覆盖率、bench 或 Gate1 evaluator；沿用上一轮 L2 复查的覆盖率 82% 与 bench/Gate1 结果。
+
 ## 2026-06-16 +08:00 Cursor subagent - L2 完成计划 P0/P1/P2/P4/P5 端到端
 
 本次具体做了什么：

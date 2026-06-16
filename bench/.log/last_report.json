@@ -6,8 +6,8 @@
   "recall": 1.0,
   "fpr": 0.0,
   "cup": 1.0,
-  "latency_p50_ms": 65.99,
-  "latency_p95_ms": 77.58,
+  "latency_p50_ms": 74.59,
+  "latency_p95_ms": 629.08,
   "pass_rate": 1.0,
   "audit_completeness": 1.0,
   "by_dimension": {

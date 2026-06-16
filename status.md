@@ -8,7 +8,7 @@
 
 ## 一句话定位
 
-**L2 工程完成（Hard + Competition-trusted 口径）**：6 关卡 pipeline 可跑、393 pytest 全绿（1 skip 为沙箱镜像）、**覆盖率 82%**（≥50% L2 Hard）、290 条 XA-Bench、Gate1-only evaluator、覆盖矩阵、Gate3 fixtures、审计验链、**bench `audit_completeness` 由 Gate6 记录实测**。仍是 demo MVP，**不是 PRD L3 政企原型**。
+**L2 工程完成（Hard + Competition-trusted 口径）**：6 关卡 pipeline 可跑、394 pytest 全绿（0 skip）、**覆盖率 82%**（≥50% L2 Hard）、290 条 XA-Bench、Gate1-only evaluator、覆盖矩阵、Gate3 fixtures、Gate5 Docker sandbox smoke、审计验链、**bench `audit_completeness` 由 Gate6 记录实测**。仍是 demo MVP，**不是 PRD L3 政企原型**。
 
 ---
 
@@ -17,22 +17,22 @@
 | 维度 | 状态 | 证据 |
 |---|---|---|
 | **Hard L2（PRD §4.2）** | ✅ | LOC ≈ 7900+（src+bench）；README 已对齐当前策略目录与命令；`pytest --cov` **82%**；6 关单元测试齐全 |
-| **全量 pytest** | ✅ 393 passed / 1 skipped | `PYTHONPATH=src python -m pytest -q` |
+| **全量 pytest** | ✅ 394 passed / 0 skipped | `PYTHONPATH=src python -m pytest -q` |
 | **XA-Bench 290** | ✅ | `python -m bench.cli run …` → pass_rate 100%，`audit_completeness=1.0`（265 条走 pipeline 写审计） |
 | **Gate1-only evaluator** | ✅ | `python scripts/evaluate_gate1.py --detectors rule`；Gate1-scope 60 attack：Recall **68.33%**，FPR blocking **0**；含 `recall_at_fpr` |
 | **覆盖矩阵** | ✅ | `--strict`：tools=48 / gate2=48 / gate4=48 / bench_only=0 |
 | **Gate3 fixtures** | ✅ | 31 规则 × 正/反例，`validate_gate3_rule_fixtures.py --strict` errors=0 |
 | **审计完整率** | ✅ 已实测 | `bench/metrics.py` 聚合 Gate6 `audit_completeness`；非固定占位 |
-| **Gate5 沙箱镜像** | ⚠ 脚本就绪 / 本机未跑通 | `scripts/build_sandbox_image.sh`；本机 Docker Desktop 未运行 → `test_sandbox_runner` skip |
+| **Gate5 沙箱镜像** | ✅ 本机已构建并实测 | Docker Desktop 已启动；`docker build -f docker/sandbox.Dockerfile -t xa-guard/sandbox:latest .`；`tests/integration/test_sandbox_runner.py` 真实执行通过 |
 
-**Competition-trusted 缺口（仍属 L2 增强，非 Hard）**：真实 Qwen GPU 复跑 Gate1、真实 IDE HITL 截图——见 L3 段。
+**Competition-trusted L2 当前已闭合**：真实 Qwen GPU 复跑 Gate1、真实 IDE HITL 截图归入 L3/冲刺证据——见 L3 段。
 
 ---
 
 ## 测试状态
 
-- `PYTHONPATH=src python -m pytest -q`：**393 passed / 1 skipped / 0 failed**
-- Skip：`tests/integration/test_sandbox_runner.py`（本机无 `xa-guard/sandbox:latest` 且 Docker daemon 未启动）
+- `PYTHONPATH=src python -m pytest -q --basetemp pytest_tmp_full_after_sandbox -p no:cacheprovider -x --tb=short`：**394 passed / 0 skipped / 0 failed**
+- Gate5 sandbox：已构建本机镜像 `xa-guard/sandbox:latest`；`tests/integration/test_sandbox_runner.py` 真实执行通过，验证禁网 + 只读 rootfs
 - OPA：`tools/opa/opa.exe` 若存在则 Gate3 OPA 测试不 skip（视本机是否已下载）
 - 覆盖率：`PYTHONPATH=src python -m pytest --cov=xa_guard --cov=bench --cov-report=term -q` → **TOTAL 82%**
 
@@ -52,7 +52,7 @@
 | 级别 | 状态 |
 |---|---|
 | **L1 基础** | ✅ 满足 |
-| **L2 工程** | ✅ **Hard 项满足**；Competition-trusted 除本机沙箱 smoke 外可复现 |
+| **L2 工程** | ✅ **Hard 项满足**；Competition-trusted 证据闭合 |
 | **L3 政企** | ❌ 未达——见下节 |
 | **L4 工业** | ❌ 未开始 |
 
@@ -83,7 +83,7 @@
 
 ## 下一步（L3 导向）
 
-1. 启动 Docker Desktop → 构建 `xa-guard/sandbox:latest` → 消除 sandbox skip
-2. Gate1：Recall@1%FPR 达标路径（更大模型 / 专门 MCP 分类器 / 扩充规则）
-3. 真实 Trae HITL 证据链
+1. Gate1：Recall@1%FPR 达标路径（更大模型 / 专门 MCP 分类器 / 扩充规则）
+2. 真实 Trae HITL 证据链
+3. Docker Compose 一键部署与 Linux/gVisor 实测
 4. 交付物：PDF / 视频 / 报名
