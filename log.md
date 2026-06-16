@@ -1,5 +1,47 @@
 # 工作日志
 
+## 2026-06-16 +08:00 Cursor subagent - L2 完成计划 P0/P1/P2/P4/P5 端到端
+
+本次具体做了什么：
+- **P0**：新增 `docs/L2-acceptance-checklist.md`，冻结 Hard L2（PRD：LOC/README/覆盖率/6关测试）与 Competition-trusted L2（bench/Gate1/HITL/沙箱），明确排除 L3 项。
+- **P1**：`pyproject.toml` 的 `bench` extra 加入 `pytest-cov`；配置 `[tool.coverage.*]`；全量覆盖率 **82%**（≥50% L2 Hard）；更新 `README.md`（策略目录、命令、audit 口径、L2 文档链接）。
+- **P2**：从 PR #2 恢复 `scripts/evaluate_gate1.py` + `tests/test_gate1_evaluator.py`；补回 Gate1 spotlighting metadata、fusion fail-closed、model_detector fail_open 标记及对应单测；Gate1 rule-only 复现：Gate1-scope 60 attack Recall 68.33%、FPR blocking 0、`recall_at_fpr` 输出。
+- **P4**：新增 `src/xa_guard/audit/completeness.py`；Gate6/bench 改为实测 `audit_completeness`（非固定 1.0）；bench 290 跑后 `audit_completeness=1.0`（265 条 pipeline 写审计）。沙箱：`scripts/build_sandbox_image.sh` 就绪；**本机 Docker Desktop 未运行**，未能 build `xa-guard/sandbox:latest`，sandbox 集成测试仍 skip。
+- **P5**：新增 `docs/L2-verification-commands.md`（pytest/bench/coverage/Gate1/验链/矩阵/fixtures/沙箱一键链）；重写 `status.md` 为 L2 工程完成 + L3 差距分离。
+
+验证：
+- `PYTHONPATH=src python -m pytest -q` → 393 passed / 1 skipped
+- `pytest --cov=xa_guard --cov=bench` → **82%**
+- `python scripts/evaluate_gate1.py --detectors rule` → Gate1-scope recall 0.6833
+- `generate_tool_gate_coverage_matrix.py --strict` / `validate_gate3_rule_fixtures.py --strict` → 通过
+- `python -m bench.cli run …` → pass_rate 1.0，audit_completeness 1.0
+
+未完成 / 需用户动作：
+- 本机启动 Docker Desktop 后执行 `bash scripts/build_sandbox_image.sh` 并重跑 `tests/integration/test_sandbox_runner.py`（期望 0 skip）。
+- L3：Trae 实测、AgentDojo、国密、Compose 一键部署、PDF/视频等见 `status.md` L3 段。
+
+## 2026-06-16 20:36 +08:00 Codex - 审核并合并 PR #2 Gate1 真实模型验证
+
+本次具体做了什么：
+- 按用户要求审核 GitHub PR `chuali-zi/agent_safety#2`（`codex/gate1-real-model-verification`），重点检查“是否只是空壳、没有接入实际模型”的风险。
+- 使用 GitHub connector 拉取 PR 元数据、diff 和评论；PR 无评论线程，GitHub 显示 `MERGEABLE/CLEAN`，无 CI 状态上报。
+- 在独立 worktree `D:\race\jiebang-pr2-review` 拉取 PR 分支，避免覆盖主工作区已有 `status.md` 未提交改动。
+- 检查核心实现：新增 `scripts/evaluate_gate1.py`，Gate1 fusion 对显式 `fail_open=false` 的不可用模型 detector 改为真实 fail-closed DENY，Gate1 metadata 增加 spotlighting 可审计字段。
+- 重点核实真实模型问题：PR 不是把 Qwen3Guard 当成空壳宣传；文档和 evaluator 记录 Qwen3Guard-Gen-0.6B 真实加载、真实进入 Gate1，同时明确 model-only 对 MCP/tool-call 风格输入效果很弱，不能替代规则层。
+- 本地验证通过：`PYTHONPATH=src python -m pytest tests\unit\test_gate1_detectors.py tests\test_gate1_evaluator.py -q` 44 passed；`python -m compileall src bench scripts tests` 通过；`git diff --check origin/main..HEAD` 无输出；全量 `PYTHONPATH=src python -m pytest -q` 389 passed / 3 skipped（Docker sandbox 镜像 1 条、OPA binary 2 条）。
+- 额外运行新增 Gate1 evaluator rule-only 口径，Gate1-scope 结果与 PR 文档一致：60 个 Gate1-scope attack，Recall 68.33%，ASR 31.67%，FPR blocking 0。
+- 已通过 GitHub merge 合并 PR #2，merge commit 为 `262ff24a5c3a488ff1e368cb5ff64d6b14fe262e`。
+
+完成情况：
+- PR 审核完成，未发现阻断合并的问题。
+- PR 已合入远端 `main`。
+- 本地 `origin/main` 已 fetch 到合并后的远端状态；当前主工作区仍保留合并前已有的 `status.md` 未提交改动，未强行覆盖。
+
+未完成 / 风险：
+- 本次没有重新跑真实 Qwen CUDA 推理；评审依据是 PR 记录、代码路径、Gate1 evaluator 和本地规则口径回归。
+- GitHub PR 没有 CI status check，上述结论依赖本地 worktree 验证。
+- Qwen3Guard-Gen-0.6B 虽真实接入，但当前证据显示它不能作为 MCP/tool-call、间接注入、RAG/tool-output poisoning 的主检测器；仍需专门 A/B 集、Recall@FPR、AgentDojo/InjecAgent 和自适应攻击评测。
+
 ## 2026-06-05 +08:00 Claude 主 agent（+4 sonnet 子 agent）- AIBOM 生产化（方向 3）
 
 把 `src/xa_guard/aibom/` 从 demo 骨架推进到生产化，落地 status.md 下一步清单第 8 条的 5 项能力。

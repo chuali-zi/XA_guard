@@ -76,6 +76,8 @@ class ModelDetector(Detector):
         meta: dict[str, Any] = {"reason": reason}
         if self.timeout_ms is not None:
             meta["timeout_ms_config"] = self.timeout_ms
+        if not self.fail_open:
+            meta["fail_open"] = False
         if extra:
             meta.update(extra)
         return DetectionResult(

@@ -112,6 +112,11 @@ def fuse(
     all_labels = _collect_labels(results)
     denied: list[str] = []
     warned: list[str] = []
+    fail_closed_unavailable = [
+        r.detector_name
+        for r in results
+        if not r.available and r.metadata.get("fail_open") is False
+    ]
 
     if ctx is not None:
         input_sources = [s.value for s in ctx.input_sources] if ctx.input_sources else ["user"]
@@ -119,6 +124,21 @@ def fuse(
         input_sources = ["user"]
 
     # ── 1. 判断 DENY ──
+    if fail_closed_unavailable:
+        decision = Decision.DENY
+        risks = [f"deny: detector_unavailable:{name}" for name in fail_closed_unavailable]
+        return (
+            decision,
+            risks,
+            {
+                "fusion": "deny_by_fail_closed_detector",
+                "failed_detectors": fail_closed_unavailable,
+                "total_labels": len(all_labels),
+                "detectors_available": available_count,
+                "detectors_total": len(results),
+            },
+        )
+
     for lbl in all_labels:
         if _label_matches_deny(lbl, deny_categories, input_sources):
             denied.append(f"{lbl.category}:{lbl.term}" if lbl.term else lbl.category)

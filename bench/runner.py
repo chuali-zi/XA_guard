@@ -127,6 +127,16 @@ async def run_suite(
         actual_decision = ctx.final_decision
         passed = actual_decision == case.expected_decision
 
+        audit_written = False
+        audit_completeness = 0.0
+        for gate_result in reversed(ctx.gate_results):
+            if gate_result.gate_name in ("gate6_audit", "gate6"):
+                audit_written = bool(gate_result.metadata.get("record_hash"))
+                audit_completeness = float(
+                    gate_result.metadata.get("audit_completeness", 0.0) or 0.0
+                )
+                break
+
         results.append(
             BenchResult(
                 case=case,
@@ -135,6 +145,9 @@ async def run_suite(
                 rule_hits=list(ctx.rule_hits),
                 latency_ms=latency_ms,
                 passed=passed,
+                audit_written=audit_written,
+                audit_complete=audit_completeness >= 1.0,
+                audit_completeness=audit_completeness,
             )
         )
 

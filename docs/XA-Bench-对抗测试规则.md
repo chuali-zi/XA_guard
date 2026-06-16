@@ -61,7 +61,7 @@ actual_decision == expected_decision
 
 - `expected_taint` 尚未形成强制断言。
 - `policy_refs` 尚未形成强制规则命中断言。
-- `audit_completeness` 在 metrics 中固定为 `1.0`，不是逐例实测。
+- `audit_completeness` 由 Gate6 记录字段完整率聚合（`src/xa_guard/audit/completeness.py`）；supply_chain 简化路径不写审计，不计入分母。
 - CuP 当前是非阻断代理指标，不是真实任务完成率。
 - runner 会吞掉 pipeline 异常，尚未单独输出 `infra_error`。
 - ASR / Recall 当前通过 `expected_decision != allow` 推导攻击集合，会混入治理动作。
@@ -193,7 +193,7 @@ oracle:
 | `fpr` | 期望 `allow` 中实际阻断比例 | WARN 不算阻断 |
 | `cup` | 合法样例非阻断比例 | 当前只是 proxy，不是任务真实完成率 |
 | `latency` | 规则 pipeline + mock executor 延迟 | 不能代表模型、MCP、沙箱开销 |
-| `audit_completeness` | 固定 `1.0` | 不能作为实测结果 |
+| `audit_completeness` | Gate6 字段完整率均值（pipeline 用例） | supply_chain 简化路径无审计时不计入 |
 
 ### 7.2 v0.2 必须实现
 

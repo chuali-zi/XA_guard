@@ -56,10 +56,14 @@
 # 1. 环境
 python -m venv .venv && source .venv/Scripts/activate    # Windows Git Bash
 # source .venv/bin/activate                              # macOS/Linux
-pip install -e ".[bench]"
+pip install -e ".[bench,dev,policy,aibom]"
 
-# 2. 跑测试（204 个全过）
-PYTHONPATH=src pytest -q
+# 2. 跑测试（全量 pytest，详见 docs/L2-verification-commands.md）
+set PYTHONPATH=src
+python -m pytest -q
+
+# 2b. 覆盖率（L2 Hard ≥ 50%）
+python -m pytest --cov=xa_guard --cov=bench --cov-report=term -q
 
 # 3. 跑 3 个演示场景（无需 LLM）
 PYTHONPATH=src python -m demo.scenarios.scenario_01_indirect_injection
@@ -67,10 +71,14 @@ PYTHONPATH=src python -m demo.scenarios.scenario_02_data_exfil
 PYTHONPATH=src python -m demo.scenarios.scenario_03_hitl_approval
 
 # 4. 跑评测 + 出 HTML 报告
-PYTHONPATH=src python -m bench.cli run \
+set PYTHONPATH=src
+python -m bench.cli run \
     --suite bench/cases/csab-gov-mini-seed.yaml \
     --config configs/xa-guard.yaml
-# → bench/.log/report.html
+# → bench/.log/report.html（含实测 audit_completeness）
+
+# 4b. Gate1-only 评测（rule/model/fusion/Recall@FPR）
+python scripts/evaluate_gate1.py --detectors rule
 
 # 5. 验证审计哈希链
 PYTHONPATH=src python scripts/verify_audit.py --path logs/audit/audit.jsonl
@@ -129,14 +137,9 @@ jiebang/
 ├── configs/
 │   └── xa-guard.yaml               运行时配置
 │
-├── policies/                       策略 YAML（双层：baseline 不可变 + overlay 企业可写）
-│   ├── baseline_manifest.yaml      baseline 层清单（注册下列 4 类国标兜底资源）
-│   ├── enterprise-l3.yaml          30 条 baseline 规则（等保 2.0 + GB/T 45654 + TC260-003）
-│   ├── tool_capabilities.yaml      工具能力声明（关卡 4 用）
-│   ├── tool_risks.yaml             工具风险等级（关卡 2 用）
-│   ├── sensitive_patterns.yaml     敏感词正则（关卡 4 用，从硬编码外置）
-│   ├── dangerous_patterns.yaml     危险模式库（关卡 1 用）
-│   └── overlay/<tenant_id>/        企业私有策略叠加层（单调性约束，不得弱化 baseline）
+├── policies/                       策略 YAML（双层：baseline + overlay）
+│   ├── baseline/                   国标兜底（manifest + gate1/2/3/4 YAML）
+│   └── overlay/<tenant_id>/        企业可写 overlay（单调性门控）
 │
 ├── src/xa_guard/                   主产品 — XA-Guard MCP Server
 │   ├── server.py / cli.py / pipeline.py / config.py / types.py
@@ -165,8 +168,11 @@ jiebang/
 │   └── .log/
 │
 ├── scripts/
-│   ├── verify_audit.py             审计哈希链 + 14 字段校验
-│   └── build_overview_docx.js
+│   ├── verify_audit.py             审计哈希链 + 字段校验
+│   ├── evaluate_gate1.py           Gate1-only 评测（Recall@FPR / 子指标拆分）
+│   ├── generate_tool_gate_coverage_matrix.py
+│   ├── validate_gate3_rule_fixtures.py
+│   └── build_sandbox_image.sh      Gate5 沙箱镜像 xa-guard/sandbox:latest
 │
 ├── tests/
 │   ├── unit/                       各 gate 单元测试
@@ -219,7 +225,7 @@ jiebang/
 
 > 完整数字 + 命中规则细节见 `bench/.log/report.html`。
 >
-> **限制**：当前 ASR / Recall 由 `expected_decision != allow` 推导，会混入治理动作；CuP 是非阻断代理指标；latency 是规则 pipeline + mock executor 延迟；`audit_completeness` 仍是硬编码占位值。它们只用于 290 条 seed 回归，不等同 AgentDojo / InjecAgent、模型 Recall@FPR 或审计完整率实测。详细规则见 `docs/XA-Bench-对抗测试规则.md`。
+> **限制**：当前 ASR / Recall 由 `expected_decision != allow` 推导，会混入治理动作；CuP 是非阻断代理指标；latency 是规则 pipeline + mock executor 延迟；`audit_completeness` 由 Gate6 记录字段完整率聚合（supply_chain 简化路径不写审计，不计入分母）。它们只用于 290 条 seed 回归，不等同 AgentDojo / InjecAgent 或 Recall@FPR 主检测能力。详细规则见 `docs/XA-Bench-对抗测试规则.md` 与 `docs/L2-verification-commands.md`。
 
 ---
 
@@ -249,6 +255,8 @@ jiebang/
 | **`docs/事实源.md`** | 事实源 v1.1 — 关键数字 / 日期 / 产品名的唯一权威 |
 | `docs/产品架构.md` | 三件套 + 6 关卡详细设计 |
 | `docs/PRD.md` | 量化 KPI + 验收标准 + MoSCoW |
+| `docs/L2-acceptance-checklist.md` | **L2 Hard / Competition-trusted 冻结清单** |
+| `docs/L2-verification-commands.md` | L2 一键验证命令（pytest / bench / Gate1 / 覆盖矩阵） |
 | `docs/项目总览.md` | 项目全员手册 |
 | `docs/HACK-BENCH-组员提交规范.md` | hack / red-team 组员提交格式 |
 | `docs/XA-Bench-对抗测试规则.md` | bench 接入、oracle、指标和演进规则 |

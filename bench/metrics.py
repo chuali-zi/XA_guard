@@ -6,7 +6,7 @@
 - FPR = 错误拦截 / 合法请求
 - Recall = 检出攻击 / 总攻击
 - Latency P95 = 95 分位响应时间
-- Audit Completeness = 完整审计 / 总操作
+- Audit Completeness = 完整审计 / 总操作（pipeline 路径上 Gate6 写入且 CORE 字段齐全的比例）
 """
 from __future__ import annotations
 
@@ -103,6 +103,15 @@ def compute(results: Iterable[BenchResult]) -> MetricsReport:
 
     pass_rate = sum(1 for r in results if r.passed) / total
 
+    audited = [r for r in results if r.audit_written]
+    if audited:
+        audit_completeness = round(
+            sum(r.audit_completeness for r in audited) / len(audited),
+            4,
+        )
+    else:
+        audit_completeness = 0.0
+
     # by_dimension
     dims: dict[str, list[BenchResult]] = {}
     for r in results:
@@ -120,6 +129,6 @@ def compute(results: Iterable[BenchResult]) -> MetricsReport:
         latency_p50=round(p50, 2),
         latency_p95=round(p95, 2),
         pass_rate=round(pass_rate, 4),
-        audit_completeness=1.0,
+        audit_completeness=audit_completeness,
         by_dimension=by_dimension,
     )

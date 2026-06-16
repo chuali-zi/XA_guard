@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from xa_guard.audit.completeness import record_completeness_score
 from xa_guard.audit.merkle import ChainStore, canonical_json
 from xa_guard.audit.otel import to_otel_dict
 from xa_guard.audit.sm_crypto import sm2_sign, sm3_hash
@@ -130,6 +131,7 @@ class Gate6Audit(Gate):
         record_dict.pop("signature", None)
         appended = self.chain.append(record_dict)
         record_hash = appended.get("record_hash", "")
+        audit_completeness = record_completeness_score(appended)
 
         # 7. 可选 SM2 签名（demo HMAC-SHA256 fallback）
         signature: Any = None
@@ -145,7 +147,7 @@ class Gate6Audit(Gate):
             metadata={
                 "audit_path": str(self.audit_path),
                 "record_hash": record_hash,
-                "audit_completeness": 1.0,
+                "audit_completeness": audit_completeness,
                 "hash_algo": self.hash_algo,
                 "signature": signature,
             },

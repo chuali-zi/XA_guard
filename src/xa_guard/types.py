@@ -307,3 +307,6 @@ class BenchResult:
     latency_ms: float
     passed: bool                              # actual == expected
     note: str = ""
+    audit_written: bool = False
+    audit_complete: bool = False
+    audit_completeness: float = 0.0
