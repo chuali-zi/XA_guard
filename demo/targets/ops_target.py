@@ -126,6 +126,19 @@ async def list_tools() -> list[types.Tool]:
                 "additionalProperties": False,
             },
         ),
+        types.Tool(
+            name="pending_approval_op",
+            description="红区运维操作 demo：用于演示 Gate2 HITL 人工审批 pending（不真正执行）；"
+            "已在 gate2/gate4 登记为 red，不命中 Gate3 deny 规则，故会进入 pending approval 队列。",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "operation": {"type": "string", "description": "拟执行的高危运维操作描述"},
+                },
+                "required": ["operation"],
+                "additionalProperties": False,
+            },
+        ),
     ]
 
 
@@ -160,6 +173,8 @@ def _dispatch(name: str, args: dict) -> object:
             return {"sent": True, "to": args.get("to", "")}
         case "install_plugin":
             return {"installed": False, "simulated": True, "name": args.get("name", "")}
+        case "pending_approval_op":
+            return {"executed": False, "simulated": True, "operation": args.get("operation", "")}
         case _:
             return {"error": f"unknown tool: {name}"}
 

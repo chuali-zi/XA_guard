@@ -8,10 +8,10 @@ Policy view: **layered-merged**
 
 ## Summary
 
-- Total distinct tools: **48**
-- Gate2 registered tools: **48**
+- Total distinct tools: **49**
+- Gate2 registered tools: **49**
 - Gate3 trigger tools: **44**
-- Gate4 registered tools: **48**
+- Gate4 registered tools: **49**
 - Bench tool names: **24**
 - Gate3 triggers missing Gate2 registration: **0**
 - Gate3 triggers missing Gate4 registration: **0**
@@ -54,6 +54,7 @@ Gate3 trigger tools without bench case: admin_action, append_file, approve_label
 | list_servers | green | 0 | green | NETWORK_INTERNAL, FS_READ | PUBLIC / INTERNAL | 28 | allow | NO_GATE3_RULE |
 | log_cleanup | red | 2 | red | AUDIT_ADMIN, FS_WRITE | INTERNAL / PUBLIC | 0 | - | NO_BENCH_CASE |
 | payment_action | red | 1 | red | NETWORK_EXTERNAL, PAYMENT | PUBLIC / PUBLIC | 0 | - | NO_BENCH_CASE |
+| pending_approval_op | red | 0 | red | AUTHZ_ADMIN | INTERNAL / INTERNAL | 0 | - | OK |
 | post_url | yellow | 4 | yellow | NETWORK_EXTERNAL | PUBLIC / PUBLIC | 14 | require_approval | OK |
 | prompt_leak | yellow | 1 | yellow | - | PUBLIC / PUBLIC | 0 | - | NO_BENCH_CASE |
 | publish_system | red | 2 | red | NETWORK_INTERNAL, MODEL_DEPLOY | INTERNAL / INTERNAL | 5 | require_approval | OK |
