@@ -2,13 +2,13 @@
 
 > 本文件描述**当前仓库状态**（差什么、需要改什么、距 PRD 还有多远），不是工作日志。
 > 工作流水记 `log.md`；L2 冻结清单见 `docs/L2-acceptance-checklist.md`；验证命令见 `docs/L2-verification-commands.md`。
-> 快照时间：2026-06-18 01:00 +08:00
+> 快照时间：2026-06-18 01:10 +08:00
 
 ---
 
 ## 一句话定位
 
-**L2 工程完成（Hard + Competition-trusted 口径）**：6 关卡 pipeline 可跑、**覆盖率 82%**（≥50% L2 Hard）、290 条 XA-Bench、Gate1-only evaluator、覆盖矩阵、Gate3 fixtures、Gate5 Docker sandbox smoke、审计验链。bench 已改为全样本审计分母，infra error 不再混入安全指标，290 条最新运行均有唯一 trace/record hash 且可离线复算。L3 政企原型已多 git checkpoint（本地 `d741209`/`3893813`/`565d82e`/`2da3839`/`4d3b686`，未 push）：Docker Compose、Streamable HTTP 上游、docker profile 静态工具发现、HITL pending approval fallback、bench supply_chain 与真实 MCP `install_plugin` 离线 preflight 接 AIBOM gateway、可复现性能基准、SDK/LangChain Tool preflight、本地文件 TSA anchor、外部 benchmark adapter skeleton、OPA merged-view 导出、**`opencode run` 真实 LLM→MCP→AIBOM F 级 deny 端到端实测证据**、**真实 SM3 国密哈希链（GB/T 32905-2016，纯 Python 无依赖，不再降级 SHA-256）**、**Docker 一键部署 runtime 已验收（`docker compose build/up` 实跑，容器 healthy，`/healthz` 200，部署 verifier 6/6 pass）**；PRD L3 三要件中 Docker 一键部署与性能基准已闭合，国密支持仅闭合 SM3 哈希链；但 **PRD L3 仍未整体达成**（SM2 真实签名、外部 TSA、真实 Trae HITL、官方外部 benchmark 仍缺）。
+**L2 工程完成（Hard + Competition-trusted 口径）**：6 关卡 pipeline 可跑、**覆盖率 82%**（≥50% L2 Hard）、290 条 XA-Bench、Gate1-only evaluator、覆盖矩阵、Gate3 fixtures、Gate5 Docker sandbox smoke、审计验链。bench 已改为全样本审计分母，infra error 不再混入安全指标，290 条最新运行均有唯一 trace/record hash 且可离线复算。L3 政企原型已多 git checkpoint（本地 `d741209`/`3893813`/`565d82e`/`2da3839`/`4d3b686`/`3c386db`/`29b614e`，未 push）：Docker Compose、Streamable HTTP 上游、docker profile 静态工具发现、HITL pending approval fallback、bench supply_chain 与真实 MCP `install_plugin` 离线 preflight 接 AIBOM gateway、可复现性能基准、SDK/LangChain Tool preflight、本地文件 TSA anchor、外部 benchmark adapter skeleton、OPA merged-view 导出、**`opencode run` 真实 LLM→MCP→AIBOM F 级 deny 端到端实测证据**、**真实 SM3 国密哈希链（GB/T 32905-2016，纯 Python 无依赖，不再降级 SHA-256）**、**Docker 一键部署 runtime 已验收（`docker compose build/up` 实跑，容器 healthy，`/healthz` 200，部署 verifier 6/6 pass）**、**真实 SM2 签名（GB/T 32918）+ TSA 时间戳证据（SM2-with-SM3 token，可嵌入公钥自验，证据 `docs/evidence/l3-sm2-tsa-evidence-2026-06-18.json`）**；PRD L3 三要件（Docker 一键部署 / 国密支持 / 性能基准）**均已闭合**；但 **PRD L3 仍未整体达成**（真实 Trae HITL 弹窗、官方外部 benchmark、gVisor Linux、500+ 题库、完整 LangChain wrapper、Gate1 Recall@1%FPR、faithfulness 算法仍缺）。
 
 ---
 
@@ -91,7 +91,7 @@
 - **双层策略**：`policies/baseline/` + `overlay/`；`LayeredPolicySource` 合并；risk_level 唯一源 `gate4_capabilities.yaml`；merged-view Rego engine/export 已有原型
 - **Gate1**：规则 + 可选模型；Spotlighting metadata 可审计；Gate1-only evaluator 拆分 rule/model/fusion/spotlighting
 - **Gate2–5**：风险分级 / 31 条 Gate3 / 污点 / 沙箱路由（Docker 命令构造已实现）
-- **Gate6**：OTel JSONL + 哈希链；`audit_completeness` 按 CORE 字段完整率计算；`hash_algo=sm3` 现产出真实 GB/T 32905-2016 SM3（纯 Python，无依赖，不再降级 SHA-256）；本地文件 TSA anchor/index 可锚定 audit 文件字节与链摘要；SM2 真实签名仍是 HMAC fallback
+- **Gate6**：OTel JSONL + 哈希链；`audit_completeness` 按 CORE 字段完整率计算；国密三件套已闭合——`hash_algo=sm3` 产出真实 GB/T 32905-2016 SM3（纯 Python，无依赖，不再降级 SHA-256），`sm2_sign(prefer_gm=True)` 产出真实 GB/T 32918 SM2-with-SM3 签名（128 hex r||s），TSA 时间戳 token 可锚定 audit anchor_hash→签名 UTC 时间；本地文件 TSA anchor/index 可锚定 audit 文件字节与链摘要
 - **L3 部署/接入**：Streamable HTTP 上游最小实现；Docker Compose 原型配置已补 sandbox 镜像默认构建、容器内 Docker CLI、静态工具 discovery；部署 verifier 已能区分静态配置通过、产品失败和 Docker daemon 外部不可用；无 elicitation 客户端的 pending approval fallback 已有协议内控制工具、本地 JSONL pending ledger、拒绝审计和 token one-shot；AIBOM gateway 已进入 supply_chain bench 与真实 MCP `install_plugin` 离线 preflight，并完成 OpenCode 真实 LLM 客户端调用/拦截/验链（`opencode run` 可复现，证据 `docs/evidence/opencode-smoke-audit-2026-06-18.jsonl`）；SDK `@protect` 和 LangChain `protect_tool()` 具备最小非透传 preflight
 - **外部 benchmark**：AgentDojo/InjecAgent 当前有 adapter + evidence archive + 本地 XA-Guard projection 原型，能规范化用户导出、校验、生成 hash manifest，并可选写隔离 projection audit；不能作为官方 benchmark 分数
 
@@ -103,14 +103,14 @@
 |---|---|
 | **L1 基础** | ✅ 满足 |
 | **L2 工程** | ✅ **Hard 项满足**；Competition-trusted 证据闭合 |
-| **L3 政企** | 🟡 原型推进中——PRD L3 三要件：①Docker 一键部署 ✅ runtime 已验收（compose build/up 实跑、容器 healthy、healthz 200、部署 verifier 6/6 pass）②国密支持 部分（SM3 哈希链已真实落地 GB/T 32905；SM2 真实签名仍 HMAC fallback、外部 TSA 仍缺）③性能基准 ✅ 中等档已达（P50 20.3ms/P95 168ms/53.5 QPS/63MB）；供应链与 MCP 离线安装准入、opencode 真实链路证据已补；真实 Trae HITL、官方外部 benchmark、gVisor Linux 仍缺 |
+| **L3 政企** | 🟡 原型推进中——PRD L3 三要件：①Docker 一键部署 ✅ runtime 已验收（compose build/up 实跑、容器 healthy、healthz 200、部署 verifier 6/6 pass）②国密支持 ✅ 三件套闭合（SM3 GB/T 32905 哈希链 + SM2 GB/T 32918 真实签名 + TSA 时间戳 token，证据 `docs/evidence/l3-sm2-tsa-evidence-2026-06-18.json`）③性能基准 ✅ 中等档已达（P50 20.3ms/P95 168ms/53.5 QPS/63MB）；供应链与 MCP 离线安装准入、opencode 真实链路证据已补；真实 Trae HITL、官方外部 benchmark、gVisor Linux 仍缺 |
 | **L4 工业** | ❌ 未开始 |
 
 ---
 
 ## L3 差距（与 L2 清单明确分离）
 
-1. **生产级国密 SM2 签名 + 外部 TSA**；SM3 哈希链已落地真实 GB/T 32905-2016（纯 Python 无依赖，不再降级 SHA-256，与 gmssl 口径一致，详见 `tests/unit/test_sm3_pure.py`）；SM2 真实签名仍是 HMAC-SHA256 fallback（需 gmssl PEM 私钥或 cryptography SM2 插件）；本地文件 anchor/index 原型已有，但非外部可信 TSA；Docker Compose 一键部署 runtime 已验收（见上表 L3 部署入口 ✅），未做长期运行/soak 验收
+1. ~~生产级国密 SM2 签名 + 外部 TSA~~ **已闭合**：SM3 哈希链（GB/T 32905-2016，纯 Python 无依赖）+ SM2 真实签名（GB/T 32918，gmssl `sign_with_sm3`/`verify_with_sm3`，128 hex r||s）+ TSA 时间戳 token（SM2 签名 anchor_hash→UTC 时间，可嵌入公钥自验，可选外部 RFC 3161 查询）；证据 `docs/evidence/l3-sm2-tsa-evidence-2026-06-18.json`；详见 `tests/unit/test_sm2_sign.py`、`test_tsa_client.py`、`test_sm3_pure.py`；本地 SM2 TSA 非第三方可信 TSA，但满足 PRD「SM2+TSA」证据形态且可离线复验；Docker Compose 一键部署 runtime 已验收，未做长期运行/soak 验收
 2. **Trae / 国产 IDE 真实 HITL 弹窗**实测与截图；当前已有 MCP elicitation、pending approval fallback 和本地 pending ledger 的进程内/E2E 证据，但不等同真实客户端 UI；pending 参数脱敏支持 schema 标注优先 + 字段名回退的 L3 原型，不覆盖自由文本 DLP、完整 JSON Schema 组合关键字、KMS/DPAPI/国密加密恢复或生产 RBAC
 3. **AgentDojo / InjecAgent** 官方环境复现与指标对照；当前只有离线 adapter + evidence archive + 本地 projection 原型，不能声称官方 ASR
 4. **OPA/Rego 生产化**：merged-view Rego engine/export 原型已补；仍需真实 OPA CLI/服务化部署、性能评估和三层 Rego 包硬化；gVisor Linux 实测仍缺

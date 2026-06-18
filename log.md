@@ -1,5 +1,48 @@
 # 工作日志
 
+## 2026-06-18 ZCode 主 agent - L3 国密 SM2 签名 + TSA 时间戳证据闭合
+
+本次具体做了什么：
+- 继续推进 PRD §4.2 L3 三要件中的「国密支持」（Docker 一键部署与性能基准两腿已闭合；SM3 哈希链上一轮已闭合；本轮闭合 SM2 真实签名 + TSA）。按用户「多 git 方便回滚」commit。
+- 审计现状：`sm_crypto.py` 的 `sm2_sign/sm2_verify` 在 prefer_gm 时走 gmssl 但用了 `sign(data, "0"*64)` 简化 nonce 且 `verify` 对无效 keypair 返回 None，且无 keypair 生成；`tsa.py` 只有本地文件 anchor，无外部 TSA、无 SM2 时间戳。
+- 验证 gmssl SM2 真实可用：用 gmssl `_kg(priv, G)` 生成合法曲线 keypair 后 `sign_with_sm3`/`verify_with_sm3` roundtrip 正确（True/篡改 False/伪造 False），之前 verify 失败是因为测试用 keypair 非合法曲线点。
+- 修改 `src/xa_guard/audit/sm_crypto.py`：
+  - 新增 `generate_sm2_keypair()`：用 gmssl 点乘 `priv*G` 产合法 SM2 keypair（priv 64 hex / pub 128 hex），gmssl 不可用时抛错（不降级，避免伪签名）。
+  - 新增 `write_sm2_keyfile()` + `_load_sm2_keyfile()`：keyfile 键值格式 `private: <hex>` / `public: <hex>`，兼容单行 hex 旧格式。
+  - 重写 `sm2_sign(prefer_gm=True)`：真实 SM2-with-SM3（gmssl `sign_with_sm3`，含 ZA 摘要、默认 ID 1234567812345678，GB/T 32918），输出 128 hex r||s；公钥缺失时从私钥推导。
+  - 重写 `sm2_verify(prefer_gm=True)`：真实 SM2 `verify_with_sm3`；prefer_gm=False 仍走 HMAC demo（向后兼容）。
+- 新增 `src/xa_guard/audit/tsa_client.py`：TSA 时间戳证据。
+  - `create_timestamp_token()`：SM2 签名 `(tsa_id||anchor_hash||utc_time)`，产可验时间戳 token；`verify_timestamp_token()` 验签 + anchor_hash 绑定。
+  - `query_external_tsa()`：可选外部 RFC 3161-style TSA 查询（best-effort，网络），诚实记录 pass/fail，不伪造成功。
+  - `create_timestamp_token_with_external(extra=)`：本地 SM2 token + 可选外部 TSA 响应；token 可嵌入 TSA 公钥实现无私钥自验。
+- 修改 `src/xa_guard/audit/tsa.py` `create_file_anchor()`：新增可选 `tsa_key_path`/`tsa_token_path`/`external_tsa_url`，产 SM2 TSA token 并在 manifest 记 `sm2_tsa_token_path`/`sm2_tsa_signature_algo`。
+- 修改 `scripts/anchor_audit.py`：新增 `--tsa-key`/`--gen-tsa-key`/`--tsa-token-path`/`--external-tsa-url`，一条命令出完整国密证据链（SM3 anchor + SM2 TSA token）。
+- 新增测试 `tests/unit/test_sm2_sign.py`（6 passed）：keypair 生成、keyfile roundtrip、真实 SM2 sign/verify roundtrip、篡改/伪造拒绝、private-only keyfile、prefer_gm=False HMAC 路径。
+- 新增测试 `tests/unit/test_tsa_client.py`（7 passed）：真实 SM2 token、verify roundtrip、wrong anchor/forged sig/tampered time 拒绝、persist+reload、外部 TSA 失败诚实记录。
+- 生成持久证据 `docs/evidence/l3-sm2-tsa-evidence-2026-06-18.json`：SM2-with-SM3 TSA token 绑定 opencode-smoke audit record_hash（trace 8301978d），嵌入 TSA 公钥，无私钥提交（`.gitignore` 排除 `docs/evidence/**/*.key`）；用嵌入公钥验签通过。
+- commit `29b614e`。
+
+验证：
+- SM2 roundtrip：`generate_sm2_keypair` → `sm2_sign(prefer_gm=True)` 产 128 hex（非 HMAC 64 hex）→ `sm2_verify` True；篡改数据/伪造签名/错误 key 均 False。
+- `tests/unit/test_sm2_sign.py`：6 passed；`tests/unit/test_tsa_client.py`：7 passed。
+- anchor 脚本端到端：`anchor_audit.py --algo sm3 --tsa-key … --gen-tsa-key --tsa-token-path …` exit 0，生成 SM3 anchor + SM2 TSA token（signature_algo=SM2-with-SM3，sig 128 hex）。
+- 证据 token：`docs/evidence/l3-sm2-tsa-evidence-2026-06-18.json`，嵌入公钥验签通过，无私钥提交。
+- 宽回归（sm2/tsa/sm3/gate6/merkle/tsa/archive/pipeline/verify_cli/aibom/bench_truth）：59 passed；`test_gate6_sm2_signature_optional` 与 `test_audit_tsa` 仍通过（仅加可选参数，未改测试契约）。
+- git commit `29b614e`。
+
+未完成 / 客观限制：
+- **未 push 远端**：7 个本地 checkpoint 都在本地 `main`，是否 push 待用户确认。
+- SM2 用 gmssl 作为后端（合法开源国密库）；纯 Python SM3 仍是无依赖的 SM3 路径。SM2 真实签名需要 gmssl 曲线运算（已文档化）。
+- TSA 是「SM2 签名的时间戳证据 token」+ 可选外部 RFC 3161 查询；本地 SM2 TSA 不是第三方可信 TSA，但满足 PRD 要求的「SM2 + TSA」证据形态且可离线复验；外部 TSA 完整 ASN.1 验证（需 TSA 证书链）超出 L3 范围。
+- gmssl 仅本机作为 SM2/SM3 后端与交叉验证 oracle 安装；不是新引入的运行时硬依赖（SM3 有纯 Python 路径，SM2 需 gmssl，已在 status/log 标明）。
+- PRD L3 仍未整体完成：真实 Trae/国产 IDE HITL 弹窗截图、AgentDojo/InjecAgent 官方复现、gVisor Linux、500+ 题库、完整 LangChain wrapper、Gate1 Recall@1%FPR、faithfulness 算法（仍固定 1.0，涉及既有测试契约，需用户审核后再改）。
+- faithfulness 固定 1.0 涉及既有测试契约，按 AGENTS.md 未单方面改测试。
+
+下一步：
+- 真实 Trae HITL 弹窗实测与截图（PRD 硬承诺，最后一个高价值 L3 runtime 证据）。
+- 与用户确认是否 push 7 个本地 checkpoint 到远端。
+- faithfulness 算法需用户审核测试契约后再实现。
+
 ## 2026-06-18 ZCode 主 agent - L3 Docker 一键部署 runtime 证据闭环
 
 本次具体做了什么：
