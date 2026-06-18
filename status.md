@@ -2,13 +2,13 @@
 
 > 本文件描述**当前仓库状态**（差什么、需要改什么、距 PRD 还有多远），不是工作日志。
 > 工作流水记 `log.md`；L2 冻结清单见 `docs/L2-acceptance-checklist.md`；验证命令见 `docs/L2-verification-commands.md`。
-> 快照时间：2026-06-18 01:10 +08:00
+> 快照时间：2026-06-18 09:25 +08:00
 
 ---
 
 ## 一句话定位
 
-**L2 工程完成（Hard + Competition-trusted 口径）**：6 关卡 pipeline 可跑、**覆盖率 82%**（≥50% L2 Hard）、290 条 XA-Bench、Gate1-only evaluator、覆盖矩阵、Gate3 fixtures、Gate5 Docker sandbox smoke、审计验链。bench 已改为全样本审计分母，infra error 不再混入安全指标，290 条最新运行均有唯一 trace/record hash 且可离线复算。L3 政企原型已多 git checkpoint（本地 `d741209`/`3893813`/`565d82e`/`2da3839`/`4d3b686`/`3c386db`/`29b614e`，未 push）：Docker Compose、Streamable HTTP 上游、docker profile 静态工具发现、HITL pending approval fallback、bench supply_chain 与真实 MCP `install_plugin` 离线 preflight 接 AIBOM gateway、可复现性能基准、SDK/LangChain Tool preflight、本地文件 TSA anchor、外部 benchmark adapter skeleton、OPA merged-view 导出、**`opencode run` 真实 LLM→MCP→AIBOM F 级 deny 端到端实测证据**、**真实 SM3 国密哈希链（GB/T 32905-2016，纯 Python 无依赖，不再降级 SHA-256）**、**Docker 一键部署 runtime 已验收（`docker compose build/up` 实跑，容器 healthy，`/healthz` 200，部署 verifier 6/6 pass）**、**真实 SM2 签名（GB/T 32918）+ TSA 时间戳证据（SM2-with-SM3 token，可嵌入公钥自验，证据 `docs/evidence/l3-sm2-tsa-evidence-2026-06-18.json`）**；PRD L3 三要件（Docker 一键部署 / 国密支持 / 性能基准）**均已闭合**；但 **PRD L3 仍未整体达成**（真实 Trae HITL 弹窗、官方外部 benchmark、gVisor Linux、500+ 题库、完整 LangChain wrapper、Gate1 Recall@1%FPR、faithfulness 算法仍缺）。
+**L2 工程完成（Hard + Competition-trusted 口径）**：6 关卡 pipeline 可跑、**覆盖率 82%**（≥50% L2 Hard）、290 条 XA-Bench、Gate1-only evaluator、覆盖矩阵、Gate3 fixtures、Gate5 Docker sandbox smoke、审计验链。bench 已改为全样本审计分母，infra error 不再混入安全指标，290 条最新运行均有唯一 trace/record hash 且可离线复算。L3 政企原型已多 git checkpoint（本地 9 个，未 push）：Docker Compose、Streamable HTTP 上游、docker profile 静态工具发现、HITL pending approval fallback + **真实 `opencode run` 端到端闭环证据（trace `2eed0319`，`require_approval → allow`，approver ops-lead，审计链 2 records 0 errors，详见 `docs/evidence/l3-hitl-pending-approval-2026-06-18.md`）**、bench supply_chain 与真实 MCP `install_plugin` 离线 preflight 接 AIBOM gateway、可复现性能基准、SDK/LangChain Tool preflight、本地文件 TSA anchor、外部 benchmark adapter skeleton、OPA merged-view 导出、**`opencode run` 真实 LLM→MCP→AIBOM F 级 deny 端到端实测证据**、**真实 SM3 国密哈希链（GB/T 32905-2016，纯 Python 无依赖，不再降级 SHA-256）**、**Docker 一键部署 runtime 已验收（`docker compose build/up` 实跑，容器 healthy，`/healthz` 200，部署 verifier 6/6 pass）**、**真实 SM2 签名（GB/T 32918）+ TSA 时间戳证据（SM2-with-SM3 token，可嵌入公钥自验，证据 `docs/evidence/l3-sm2-tsa-evidence-2026-06-18.json`）**；PRD L3 三要件（Docker 一键部署 / 国密支持 / 性能基准）**均已闭合**；但 **PRD L3 仍未整体达成**（真实 Trae 弹窗截图、官方外部 benchmark、gVisor Linux、500+ 题库、完整 LangChain wrapper、Gate1 Recall@1%FPR、faithfulness 算法仍缺）。
 
 ---
 
@@ -32,7 +32,7 @@
 | **L3 审计锚定** | 🟡 原型 | `scripts/anchor_audit.py` 生成本地文件 TSA anchor；manifest 覆盖 audit 文件 SHA-256、字节数、记录数、首尾 record_hash，并写 `anchors/index.jsonl` 串联；这不是外部可信 TSA |
 | **L3 外部 benchmark** | 🟡 证据包原型 | `bench.external` 可离线 normalize/validate/smoke-metrics/archive AgentDojo/InjecAgent 用户导出文件；archive 生成 normalized、validation、smoke metrics、report、manifest 和 README，记录 input/normalized/schema hash；`--run-projection` 可把 normalized projection payload 跑本地 XA-Guard pipeline 并生成隔离 audit + audit-verify；强制 `official_claim=false`；不运行官方环境、不产生官方成绩 |
 | **L3 OPA/Rego** | 🟡 原型 | `Gate3 backend=rego + prefer_layered` 可使用 LayeredPolicySource merged rules；`scripts/export_opa_policy.py` 可导出 OPA `data.json` + `gate3.rego` + manifest；真实 OPA CLI 运行视本机 binary |
-| **L3 HITL fallback** | 🟡 原型 | 上游 MCP 内置 `xa_guard_list_pending_approvals` / `xa_guard_approve_pending`；无 elicitation 客户端会暂存红色工具调用；`pending_approvals_path` / `XA_GUARD_PENDING_APPROVAL_STORE` 可启用本地 JSONL pending ledger，支持单机重启恢复未过期非敏感 pending 项；ledger/list 优先按工具 `inputSchema` 的 `x-xa-guard-sensitive` / `x-sensitive` / `writeOnly` / `format: password` 标注脱敏，并回退到 `password/token/secret/api_key/authorization/cookie` 等常见敏感键；重启后脱敏参数 approve fail-closed 并追加 `deny` 审计；真实国产 IDE 弹窗证据仍待补 |
+| **L3 HITL fallback** | 🟡 原型 → ✅ `opencode run` 实测闭环 | 上游 MCP 内置 `xa_guard_list_pending_approvals` / `xa_guard_approve_pending`；无 elicitation 客户端会暂存红色工具调用；`pending_approvals_path` / `XA_GUARD_PENDING_APPROVAL_STORE` 可启用本地 JSONL pending ledger，支持单机重启恢复未过期非敏感 pending 项；ledger/list 优先按工具 `inputSchema` 的敏感标注脱敏并字段名回退；**真实 `opencode run` 端到端闭环已验证**：glm-5.2 调用 `pending_approval_op` → Gate2 REQUIRE_APPROVAL → pending staging → `xa_guard_approve_pending(approve=true, approver=ops-lead)` → 下游执行 → 审计链 `require_approval → allow`（2 records, 0 errors, trace `2eed0319`），证据 `docs/evidence/l3-hitl-pending-approval-2026-06-18.md`；真实国产 IDE Trae 弹窗截图仍待补 |
 
 **Competition-trusted L2 当前已闭合**：真实 Qwen GPU 复跑 Gate1、真实 IDE HITL 截图归入 L3/冲刺证据——见 L3 段。
 

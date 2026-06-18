@@ -1,5 +1,38 @@
 # 工作日志
 
+## 2026-06-18 ZCode 主 agent - L3 HITL pending approval 端到端闭环证据（opencode run）
+
+本次具体做了什么：
+- 继续推进 PRD §4.2 Must「至少 1 个国产 MCP 客户端（Trae）实测通过」。本机未安装 Trae，按用户测试指令用 `opencode run`（真实 MCP 客户端）产 HITL runtime 证据。
+- 在 `demo/targets/ops_target.py` 新增 `pending_approval_op` 红区工具（已在 gate2/gate4 登记 red，不命中 Gate3 deny 规则 → 干净到达 Gate2 REQUIRE_APPROVAL → 上游 pending staging），dispatch 返回模拟结果（`executed=false, simulated=true`，演示安全）。
+- 排查 HITL pending 路径：原因根因为 smoke config `elicitation_fallback: deny` 导致 Gate2 直接 DENY 红色工具，永远不到达 REQUIRE_APPROVAL→pending。修改 smoke config 为 `stdout` 后发现 `tests/unit/test_config.py::test_opencode_smoke_config_uses_safe_stdio_fixture_and_separate_audit_dir` 断言 `elicitation_fallback == "deny"`。按 AGENTS.md「不能靠改测试通过测试」，回退 smoke config 的修改，新建专用 HITL profile：`configs/xa-guard.opencode-hitl.yaml`（`elicitation_fallback: stdout`，规范 smoke config 保持 `deny` 受测试保护）。
+- 根 `opencode.json`（本地 gitignored）改指向 HITL profile，`opencode mcp list` 确认 `xa_guard_l3_smoke connected`。
+- 真实 LLM 端到端 HITL 闭环（glm-5.2 via opencode run）：
+  1. `opencode run` → glm-5.2 调用 `pending_approval_op(operation='重启生产数据库主节点')` → Gate2 REQUIRE_APPROVAL → opencode 无 elicitation → 上游暂存 pending（trace `2eed0319-ab57-...`，risk red，有过期时间）。glm-5.2 随后调用 `xa_guard_list_pending_approvals` 返回 pending 项。
+  2. `opencode run` → glm-5.2 调用 `xa_guard_approve_pending(trace_id=2eed0319…, approve=true, approver=ops-lead, reason=维护窗口已确认)` → 审批令牌验签通过 → 下游执行（模拟，executed=false）→ pending 队列清空。
+  3. `verify_audit.py --path logs/opencode-hitl/audit.jsonl`：2 records, 0 chain/hash errors, 0 missing-field。审计链：`require_approval (gate2_plan: approval required)` → `allow (hitl_approved, approver=ops-lead)`，同一 trace_id。Ledger：`pending_added → pending_removed(approved)`。
+- 证据归档：`docs/evidence/l3-hitl-pending-approval-2026-06-18.md`（可复现命令+结果），`l3-hitl-pending-approval-audit-2026-06-18.jsonl`（2 条审计链），`l3-hitl-pending-ledger-2026-06-18.jsonl`（生命周期账本）。
+- commit `5940af7`。
+
+验证：
+- HITL 端到端：opencode run 真实 LLM → 真实 MCP → 真实 pending+approve+审计链闭环。
+- `tests/integration/test_mcp_e2e.py` + `test_upstream_elicitation` + `test_pending_ledger` + `test_gate2` + `test_config` + `coverage_matrix` + `gate3/gate4/pipeline/aibom`：135 passed。
+- 覆盖矩阵 strict：tools=49（原 48，+pending_approval_op），missing_gate2=0、missing_gate4=0、risk_mismatches=0、bench_only=0。
+- `tests/unit/test_config.py` 中 `elicitation_fallback == "deny"` 断言未破坏（规范 smoke config 未变）。
+- git commit `5940af7`。
+
+未完成 / 客观限制：
+- **未 push 远端**：9 个本地 checkpoint 都在本地 `main`，是否 push 待用户确认。
+- Trae GUI 弹窗截图未产（本机无 Trae）；real client evidence 是 opencode run（用户指定的实测客户端）。HITL fallback 是协议级（MCP tools/call + xa_guard_approve_pending），不绑定特定客户端，Trae 会走同一回路。
+- 下游 `pending_approval_op` 运行在模拟模式（executed=false）——演示安全；审批令牌验签+审计链是真实的。
+- 审批令牌防重放是进程内 one-shot（已文档化 gap）。
+- **PRD L3 仍未整体完成**：真实 Trae 弹窗截图、AgentDojo/InjecAgent 官方复现、gVisor Linux、500+ 题库、完整 LangChain wrapper、Gate1 Recall@1%FPR、faithfulness 算法（仍固定 1.0）仍缺。
+
+下一步：
+- Gate1 Recall@1%FPR 达标（PRD 保底 85%，当前 68.33%）。
+- 完整 LangChain SDK 集成（Callback Handler + Tool 全链路）。
+- 与用户确认是否 push 9 个本地 checkpoint 到远端。
+
 ## 2026-06-18 ZCode 主 agent - L3 国密 SM2 签名 + TSA 时间戳证据闭合
 
 本次具体做了什么：
