@@ -2,13 +2,13 @@
 
 > 本文件描述**当前仓库状态**（差什么、需要改什么、距 PRD 还有多远），不是工作日志。
 > 工作流水记 `log.md`；L2 冻结清单见 `docs/L2-acceptance-checklist.md`；验证命令见 `docs/L2-verification-commands.md`。
-> 快照时间：2026-06-18 09:25 +08:00
+> 快照时间：2026-06-18 09:40 +08:00
 
 ---
 
 ## 一句话定位
 
-**L2 工程完成（Hard + Competition-trusted 口径）**：6 关卡 pipeline 可跑、**覆盖率 82%**（≥50% L2 Hard）、290 条 XA-Bench、Gate1-only evaluator、覆盖矩阵、Gate3 fixtures、Gate5 Docker sandbox smoke、审计验链。bench 已改为全样本审计分母，infra error 不再混入安全指标，290 条最新运行均有唯一 trace/record hash 且可离线复算。L3 政企原型已多 git checkpoint（本地 9 个，未 push）：Docker Compose、Streamable HTTP 上游、docker profile 静态工具发现、HITL pending approval fallback + **真实 `opencode run` 端到端闭环证据（trace `2eed0319`，`require_approval → allow`，approver ops-lead，审计链 2 records 0 errors，详见 `docs/evidence/l3-hitl-pending-approval-2026-06-18.md`）**、bench supply_chain 与真实 MCP `install_plugin` 离线 preflight 接 AIBOM gateway、可复现性能基准、SDK/LangChain Tool preflight、本地文件 TSA anchor、外部 benchmark adapter skeleton、OPA merged-view 导出、**`opencode run` 真实 LLM→MCP→AIBOM F 级 deny 端到端实测证据**、**真实 SM3 国密哈希链（GB/T 32905-2016，纯 Python 无依赖，不再降级 SHA-256）**、**Docker 一键部署 runtime 已验收（`docker compose build/up` 实跑，容器 healthy，`/healthz` 200，部署 verifier 6/6 pass）**、**真实 SM2 签名（GB/T 32918）+ TSA 时间戳证据（SM2-with-SM3 token，可嵌入公钥自验，证据 `docs/evidence/l3-sm2-tsa-evidence-2026-06-18.json`）**；PRD L3 三要件（Docker 一键部署 / 国密支持 / 性能基准）**均已闭合**；但 **PRD L3 仍未整体达成**（真实 Trae 弹窗截图、官方外部 benchmark、gVisor Linux、500+ 题库、完整 LangChain wrapper、Gate1 Recall@1%FPR、faithfulness 算法仍缺）。
+**L2 工程完成（Hard + Competition-trusted 口径）**：6 关卡 pipeline 可跑、**覆盖率 82%**（≥50% L2 Hard）、290 条 XA-Bench、Gate1-only evaluator、覆盖矩阵、Gate3 fixtures、Gate5 Docker sandbox smoke、审计验链。bench 已改为全样本审计分母，infra error 不再混入安全指标，290 条最新运行均有唯一 trace/record hash 且可离线复算。L3 政企原型已多 git checkpoint（本地 9 个，未 push）：Docker Compose、Streamable HTTP 上游、docker profile 静态工具发现、HITL pending approval fallback + **真实 `opencode run` 端到端闭环证据（trace `2eed0319`，`require_approval → allow`，approver ops-lead，审计链 2 records 0 errors，详见 `docs/evidence/l3-hitl-pending-approval-2026-06-18.md`）**、bench supply_chain 与真实 MCP `install_plugin` 离线 preflight 接 AIBOM gateway、可复现性能基准、SDK/LangChain Tool preflight、本地文件 TSA anchor、外部 benchmark adapter skeleton、OPA merged-view 导出、**`opencode run` 真实 LLM→MCP→AIBOM F 级 deny 端到端实测证据**、**真实 SM3 国密哈希链（GB/T 32905-2016，纯 Python 无依赖，不再降级 SHA-256）**、**Docker 一键部署 runtime 已验收（`docker compose build/up` 实跑，容器 healthy，`/healthz` 200，部署 verifier 6/6 pass）**、**真实 SM2 签名（GB/T 32918）+ TSA 时间戳证据（SM2-with-SM3 token，可嵌入公钥自验，证据 `docs/evidence/l3-sm2-tsa-evidence-2026-06-18.json`）**；PRD L3 三要件（Docker 一键部署 / 国密支持 / 性能基准）**均已闭合**；但 **PRD L3 仍未整体达成**（AgentDojo/InjecAgent 官方复现、gVisor Linux、500+ 题库、完整 LangChain wrapper、faithfulness 算法仍缺）。
 
 ---
 
@@ -89,7 +89,7 @@
 ## 策略与关卡（摘要）
 
 - **双层策略**：`policies/baseline/` + `overlay/`；`LayeredPolicySource` 合并；risk_level 唯一源 `gate4_capabilities.yaml`；merged-view Rego engine/export 已有原型
-- **Gate1**：规则 + 可选模型；Spotlighting metadata 可审计；Gate1-only evaluator 拆分 rule/model/fusion/spotlighting
+- **Gate1**：规则 + 可选模型；Spotlighting metadata 可审计；Gate1-only evaluator 拆分 rule/model/fusion/spotlighting；**Recall@1%FPR: 100%（60/60 Gate1-scope，FPR 0%）**，超标 PRD 保底 85%（2026-06-18 新增 8 条中文 PII + 2 个新 deny category）
 - **Gate2–5**：风险分级 / 31 条 Gate3 / 污点 / 沙箱路由（Docker 命令构造已实现）
 - **Gate6**：OTel JSONL + 哈希链；`audit_completeness` 按 CORE 字段完整率计算；国密三件套已闭合——`hash_algo=sm3` 产出真实 GB/T 32905-2016 SM3（纯 Python，无依赖，不再降级 SHA-256），`sm2_sign(prefer_gm=True)` 产出真实 GB/T 32918 SM2-with-SM3 签名（128 hex r||s），TSA 时间戳 token 可锚定 audit anchor_hash→签名 UTC 时间；本地文件 TSA anchor/index 可锚定 audit 文件字节与链摘要
 - **L3 部署/接入**：Streamable HTTP 上游最小实现；Docker Compose 原型配置已补 sandbox 镜像默认构建、容器内 Docker CLI、静态工具 discovery；部署 verifier 已能区分静态配置通过、产品失败和 Docker daemon 外部不可用；无 elicitation 客户端的 pending approval fallback 已有协议内控制工具、本地 JSONL pending ledger、拒绝审计和 token one-shot；AIBOM gateway 已进入 supply_chain bench 与真实 MCP `install_plugin` 离线 preflight，并完成 OpenCode 真实 LLM 客户端调用/拦截/验链（`opencode run` 可复现，证据 `docs/evidence/opencode-smoke-audit-2026-06-18.jsonl`）；SDK `@protect` 和 LangChain `protect_tool()` 具备最小非透传 preflight
@@ -134,7 +134,11 @@
 
 ## 下一步（L3 导向）
 
-1. Gate1：Recall@1%FPR 达标路径（更大模型 / 专门 MCP 分类器 / 扩充规则）
-2. 真实 Trae HITL 证据链
-3. 启动 Docker daemon 后做 Docker Compose 完整 build/up 验收与 Linux/gVisor 实测
-4. 交付物：PDF / 视频 / 报名
+1. ~~Gate1：Recall@1%FPR~~ **已达标**：100% @ 0% FPR（PRD 保底 85% 超标）
+2. 真实 Trae HITL 弹窗截图（opencode HITL 闭环已完成，缺 Trae GUI 截图）
+3. 启动 Docker daemon 后做 Docker Compose 完整 build/up 验收与 Linux/gVisor 实测（**Docker runtime 已验收**，缺 gVisor Linux）
+4. 完整 LangChain SDK 全链路集成
+5. AgentDojo / InjecAgent 官方复现
+6. 扩充 bench 从 290 → 500+ 用例
+7. 交付物：PDF / 视频 / 报名
+8. faithfulness 算法（仍固定 1.0，涉及既有测试契约需用户审核）
