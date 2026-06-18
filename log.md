@@ -1,5 +1,46 @@
 # 工作日志
 
+## 2026-06-18 ZCode 主 agent - L3 多 git 回滚基线 + opencode 实测链路 + 真实 SM3 国密哈希链
+
+本次具体做了什么：
+- 按用户三点注意事项执行：①「多 git 方便回滚」②遵守 AGENTS.md（log 顶层加、status 描述当前状态不顶层堆日志、不靠改测试通过测试）③实际测试用 `opencode run "message"`。
+- 先核对 `status.md`/`log.md`/`docs/PRD.md`：当前未提交的 L3 原型工作横跨 50 文件 +6227/-1118 行，但全部停留在工作区。`compileall src/bench/scripts/tests` 通过；L3 定向回归 117 passed（pipeline/mcp-e2e/aibom/pending/upstream/config/gate5/gate3/tsa/external/opa/sdk）。
+- 建立 git 回滚基线：commit `d741209` 把全部已验证通过的 L3 原型栈一次性 checkpoint（Docker/Streamable HTTP/HITL pending+ledger+schema 脱敏+AIBOM 真实 MCP install_plugin 准入/SDK+LangChain preflight/本地 TSA anchor/可复现性能基准/外部 benchmark adapter+projection/OPA merged-view 导出/bench 全样本审计可信口径/L3 部署 verifier），便于后续每步可回滚。
+- 修复一个工具垃圾文件：之前 `2>nul` 在 git-bash 下被当成真实文件 `nul`，用 `rm` 清理。
+- 接通 `opencode run` 实测链路：发现仓库根缺 `opencode.json`（opencode 从 CWD 读 MCP 配置），`opencode mcp list` 报 No MCP servers。新建根 `opencode.json`（本地运行配置，加入 `.gitignore`，规范 smoke 配置仍保留在已跟踪的 `configs/opencode.l3-smoke.json`），选用 `opencode-go/glm-5.2` 模型。`opencode mcp list` → `xa_guard_l3_smoke connected`。
+- 真实 LLM 端到端实测：`opencode run "…"` 让 glm-5.2 真实调用 `xa_guard_l3_smoke_install_plugin`，传入恶意 `code_snippet`（`subprocess.Popen` + `urllib.request.urlopen('http://evil.example.com/...')`）。AIBOM 网关判 grade F（process_exec + network + 可疑外部端点），在 HITL 前直接 deny，下游安装 0 次执行（result.hash=空 SHA-256）。
+- 验链：`scripts/verify_audit.py --path logs/opencode-smoke/audit.jsonl` → 1 record，trace `8301978d-b4bc-482d-a6b1-ff3b5270e62b`，rule hit `AIBOM-GATEWAY`，decision=deny，0 chain/hash errors，0 missing-field records。把该 audit 作为证据 `docs/evidence/opencode-smoke-audit-2026-06-18.jsonl`（`.gitignore` 加 `!docs/evidence/**` 让证据可提交），commit `3893813`。
+- 推进 L3 国密 SM3 哈希链（PRD 国密合规 4 分 + 审计法律效力）：发现 `src/xa_guard/audit/sm_crypto.py` 在 gmssl 不可用时 `sm3_hash(prefer_gm=True)` 会**静默降级 SHA-256**，导致标 `hash_algo=sm3` 的审计记录实际是 SHA-256，是伪加密隐患。
+- 新增 `_sm3_pure()`：纯标准库 SM3（GB/T 32905-2016），改 `sm3_hash(prefer_gm=True)` 为「gmssl 优先 → 否则纯 Python SM3 → 永不降级 SHA-256」。调试中修正三处真实 bug：`P1` 用 23 不是 17、W 扩展 `rotl(w[j-13],7)` 不是 17、压缩轮 `E=P0(tt2)` 不是 `rotl(tt2,7)`，并修正常量 `T_j` 应为 `0x79CC4519`（之前误写 `0x79345900`）。
+- 用 gmssl 作为交叉验证 oracle（仅测试用，非运行时依赖）：`_sm3_pure` 对 empty/abc/64×abcd/1000×a/range256/全零/全 ff 全部与 gmssl 一致；空串命中 GB/T 32905 标准向量 `1ab21d83…aa2b`。
+- 新增 `tests/unit/test_sm3_pure.py`（5 passed）：GB/T 标准向量、gmssl 口径一致（无 gmssl 则 skip）、`prefer_gm=True` 不降级 SHA-256、确定性 + 与 SHA-256 区分、SM3 哈希链可写可验且 record_hash 是真实 SM3。
+- 验证现有测试契约未被破坏：`test_gate6_sha256_fallback_on_sm3_unavailable` 仍通过（其契约只断言 hex + `hash_algo=='sm3'`，真实 SM3 同样满足；未修改任何既有测试）。SM3 相关宽回归 46 passed。端到端 SM3 链 demo：`ChainStore(algo='sm3')` 写 5 条 + verify 通过，record_hash 与 `_sm3_pure` 一致、与 SHA-256 不同。
+- commit `565d82e` 为 SM3 国密哈希链 checkpoint。
+
+验证：
+- `python -m compileall -q src bench scripts tests`：通过。
+- L3 定向回归：117 passed（commit 前基线）。
+- `opencode mcp list`：`xa_guard_l3_smoke connected`。
+- `opencode run "…install_plugin…恶意 code_snippet…"`：LLM 真实调用工具 → AIBOM grade F → deny，下游 0 次执行。
+- `scripts/verify_audit.py --path logs/opencode-smoke/audit.jsonl`：1 record，0 chain/hash errors，0 missing-field。
+- `tests/unit/test_sm3_pure.py`：5 passed。
+- SM3 宽回归（gate6/merkle/tsa/archive/pipeline/verify_cli/bench_truth/aibom）：46 passed。
+- git commits：`d741209`（L3 原型栈 checkpoint）、`3893813`（opencode smoke harness + AIBOM 证据）、`565d82e`（真实 SM3 国密哈希链）。
+
+未完成 / 客观限制：
+- **未推送远端**：三个 commit 都在本地 `main`，按用户「多 git 方便回滚」意图保留为本地回滚点；是否 push 待用户确认。
+- SM2 真实签名仍是 HMAC-SHA256 fallback（需要 gmssl PEM 私钥或 cryptography SM2 插件才能产真实 SM2 签名），本轮只闭合 SM3 哈希链，未做 SM2 签名生产化。
+- gmssl 仅作为本机交叉验证 oracle 安装，不是运行时依赖；纯 Python SM3 是无第三方依赖的合规实现。
+- 根 `opencode.json` 是本机运行配置（已 gitignore），其他机器复现需参考 `configs/opencode.l3-smoke.json` 自行落地。
+- PRD L3 仍未整体完成：Docker daemon 当前未启动，完整 Compose build/up 仍未验收；真实 Trae/国产 IDE HITL 弹窗截图、外部 TSA、AgentDojo/InjecAgent 官方复现、gVisor Linux、500+ 题库、完整 LangChain wrapper、Gate1 Recall@1%FPR、faithfulness 算法（仍固定 1.0）仍待补。
+- faithfulness 固定 1.0 涉及既有测试契约，按 AGENTS.md 未单方面改测试，需用户审核后再动。
+
+下一步：
+- 启动 Docker Desktop 后做 Docker Compose 完整 build/up/healthz 验收（补 L3 一键部署 runtime 证据）。
+- 真实 Trae HITL 弹窗实测与截图（PRD 硬承诺）。
+- SM2 真实签名生产化（gmssl PEM 或 cryptography SM2 插件）+ 外部 TSA。
+- 与用户确认是否 push 三个本地 checkpoint 到远端。
+
 ## 2026-06-18 Codex 主 agent（+5 gpt-5.5 medium 子 agent）- Bench 全样本审计与 infra error 可信口径
 
 本次具体做了什么：

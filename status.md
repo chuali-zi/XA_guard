@@ -2,13 +2,13 @@
 
 > 本文件描述**当前仓库状态**（差什么、需要改什么、距 PRD 还有多远），不是工作日志。
 > 工作流水记 `log.md`；L2 冻结清单见 `docs/L2-acceptance-checklist.md`；验证命令见 `docs/L2-verification-commands.md`。
-> 快照时间：2026-06-17 +08:00
+> 快照时间：2026-06-18 +08:00
 
 ---
 
 ## 一句话定位
 
-**L2 工程完成（Hard + Competition-trusted 口径）**：6 关卡 pipeline 可跑、**覆盖率 82%**（≥50% L2 Hard）、290 条 XA-Bench、Gate1-only evaluator、覆盖矩阵、Gate3 fixtures、Gate5 Docker sandbox smoke、审计验链。bench 已改为全样本审计分母，infra error 不再混入安全指标，290 条最新运行均有唯一 trace/record hash 且可离线复算。当前正在补 L3 政企原型地基：Docker Compose、Streamable HTTP 上游、docker profile 静态工具发现、HITL pending approval fallback、bench supply_chain 与真实 MCP `install_plugin` 离线 preflight 接 AIBOM gateway、可复现性能基准、SDK/LangChain Tool preflight、本地文件 TSA anchor、外部 benchmark adapter skeleton、OPA merged-view 导出；但 **PRD L3 仍未整体达成**。
+**L2 工程完成（Hard + Competition-trusted 口径）**：6 关卡 pipeline 可跑、**覆盖率 82%**（≥50% L2 Hard）、290 条 XA-Bench、Gate1-only evaluator、覆盖矩阵、Gate3 fixtures、Gate5 Docker sandbox smoke、审计验链。bench 已改为全样本审计分母，infra error 不再混入安全指标，290 条最新运行均有唯一 trace/record hash 且可离线复算。L3 政企原型已多 git checkpoint（本地 `d741209`/`3893813`/`565d82e`，未 push）：Docker Compose、Streamable HTTP 上游、docker profile 静态工具发现、HITL pending approval fallback、bench supply_chain 与真实 MCP `install_plugin` 离线 preflight 接 AIBOM gateway、可复现性能基准、SDK/LangChain Tool preflight、本地文件 TSA anchor、外部 benchmark adapter skeleton、OPA merged-view 导出、**`opencode run` 真实 LLM→MCP→AIBOM F 级 deny 端到端实测证据**、**真实 SM3 国密哈希链（GB/T 32905-2016，纯 Python 无依赖，不再降级 SHA-256）**；但 **PRD L3 仍未整体达成**。
 
 ---
 
@@ -91,8 +91,8 @@
 - **双层策略**：`policies/baseline/` + `overlay/`；`LayeredPolicySource` 合并；risk_level 唯一源 `gate4_capabilities.yaml`；merged-view Rego engine/export 已有原型
 - **Gate1**：规则 + 可选模型；Spotlighting metadata 可审计；Gate1-only evaluator 拆分 rule/model/fusion/spotlighting
 - **Gate2–5**：风险分级 / 31 条 Gate3 / 污点 / 沙箱路由（Docker 命令构造已实现）
-- **Gate6**：OTel JSONL + 哈希链；`audit_completeness` 按 CORE 字段完整率计算；本地文件 TSA anchor/index 可锚定 audit 文件字节与链摘要
-- **L3 部署/接入**：Streamable HTTP 上游最小实现；Docker Compose 原型配置已补 sandbox 镜像默认构建、容器内 Docker CLI、静态工具 discovery；部署 verifier 已能区分静态配置通过、产品失败和 Docker daemon 外部不可用；无 elicitation 客户端的 pending approval fallback 已有协议内控制工具、本地 JSONL pending ledger、拒绝审计和 token one-shot；AIBOM gateway 已进入 supply_chain bench 与真实 MCP `install_plugin` 离线 preflight，并完成一次 OpenCode 真实 LLM 客户端调用/拦截/验链；SDK `@protect` 和 LangChain `protect_tool()` 具备最小非透传 preflight
+- **Gate6**：OTel JSONL + 哈希链；`audit_completeness` 按 CORE 字段完整率计算；`hash_algo=sm3` 现产出真实 GB/T 32905-2016 SM3（纯 Python，无依赖，不再降级 SHA-256）；本地文件 TSA anchor/index 可锚定 audit 文件字节与链摘要；SM2 真实签名仍是 HMAC fallback
+- **L3 部署/接入**：Streamable HTTP 上游最小实现；Docker Compose 原型配置已补 sandbox 镜像默认构建、容器内 Docker CLI、静态工具 discovery；部署 verifier 已能区分静态配置通过、产品失败和 Docker daemon 外部不可用；无 elicitation 客户端的 pending approval fallback 已有协议内控制工具、本地 JSONL pending ledger、拒绝审计和 token one-shot；AIBOM gateway 已进入 supply_chain bench 与真实 MCP `install_plugin` 离线 preflight，并完成 OpenCode 真实 LLM 客户端调用/拦截/验链（`opencode run` 可复现，证据 `docs/evidence/opencode-smoke-audit-2026-06-18.jsonl`）；SDK `@protect` 和 LangChain `protect_tool()` 具备最小非透传 preflight
 - **外部 benchmark**：AgentDojo/InjecAgent 当前有 adapter + evidence archive + 本地 XA-Guard projection 原型，能规范化用户导出、校验、生成 hash manifest，并可选写隔离 projection audit；不能作为官方 benchmark 分数
 
 ---
@@ -103,14 +103,14 @@
 |---|---|
 | **L1 基础** | ✅ 满足 |
 | **L2 工程** | ✅ **Hard 项满足**；Competition-trusted 证据闭合 |
-| **L3 政企** | 🟡 原型推进中——性能基准中等档已达，部署/HTTP/供应链与 MCP 离线安装准入已补；Docker runtime、正式国密与关键外部证据仍缺 |
+| **L3 政企** | 🟡 原型推进中——性能基准中等档已达，部署/HTTP/供应链与 MCP 离线安装准入已补，SM3 国密哈希链已真实落地；Docker runtime、SM2 真实签名、外部 TSA 与关键外部证据仍缺 |
 | **L4 工业** | ❌ 未开始 |
 
 ---
 
 ## L3 差距（与 L2 清单明确分离）
 
-1. **生产级国密 SM2/SM3 + 外部 TSA**；当前只有本地文件 anchor/index 原型；Docker Compose 已有原型和部署 verifier，但未做完整镜像构建/长期运行验收
+1. **生产级国密 SM2 签名 + 外部 TSA**；SM3 哈希链已落地真实 GB/T 32905-2016（纯 Python 无依赖，不再降级 SHA-256，与 gmssl 口径一致，详见 `tests/unit/test_sm3_pure.py`）；SM2 真实签名仍是 HMAC-SHA256 fallback（需 gmssl PEM 私钥或 cryptography SM2 插件）；本地文件 anchor/index 原型已有，但非外部可信 TSA；Docker Compose 已有原型和部署 verifier，但未做完整镜像构建/长期运行验收
 2. **Trae / 国产 IDE 真实 HITL 弹窗**实测与截图；当前已有 MCP elicitation、pending approval fallback 和本地 pending ledger 的进程内/E2E 证据，但不等同真实客户端 UI；pending 参数脱敏支持 schema 标注优先 + 字段名回退的 L3 原型，不覆盖自由文本 DLP、完整 JSON Schema 组合关键字、KMS/DPAPI/国密加密恢复或生产 RBAC
 3. **AgentDojo / InjecAgent** 官方环境复现与指标对照；当前只有离线 adapter + evidence archive + 本地 projection 原型，不能声称官方 ASR
 4. **OPA/Rego 生产化**：merged-view Rego engine/export 原型已补；仍需真实 OPA CLI/服务化部署、性能评估和三层 Rego 包硬化；gVisor Linux 实测仍缺
