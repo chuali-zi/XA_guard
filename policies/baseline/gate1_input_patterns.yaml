@@ -10,7 +10,9 @@ patterns:
     - "dd if=/dev/zero"
     - ":(){ :|:& };:"
     - "format c:"
+    - "format d:"
     - "shutdown -h"
+    - "sudo rm"
 
   sql_injection:
     - "drop table"
@@ -51,6 +53,30 @@ patterns:
     - ".ssh/"
     - "AKIA"                # AWS Access Key 前缀
     - "ghp_"                # GitHub PAT 前缀
+    # --- 中文 PII（GB/T 35273 敏感个人信息类别）---
+    - "身份证"
+    - "手机号"
+    - "银行卡"
+    - "密码"
+    - "敏感个人信息"
+    - "行踪轨迹"
+    - "金融账户"
+    - "医疗健康"
+
+  secret_exfil:
+    - "secret_key"
+    - "access_key"
+    - "密钥"
+    - "access token"
+    - "api_key"
+
+  forbidden_generation:
+    - "密码列表"
+    - "secret_key"
+    - "access_key"
+    - "密钥"
+    - "phone number"
+    - "身份证"
 
   indirect_injection:
     - "[SYSTEM_INSTRUCTION]"

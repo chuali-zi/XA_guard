@@ -36,6 +36,8 @@ _DENY_CATEGORIES = frozenset({
     "indirect_injection",
     "pii_leak",
     "sql_injection",
+    "secret_exfil",
+    "forbidden_generation",
 })
 
 # 根据角色决定是否降级（RAG 来源的 indirect_injection → 不构成 deny）
