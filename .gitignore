@@ -33,6 +33,12 @@ logs/
 *.jsonl
 !bench/.log/.gitkeep
 !**/.log/worklog.md
+# Committed evidence artifacts (audit samples, benchmark results) under docs/evidence/
+!docs/evidence/**
 
 # Local tool binaries downloaded for verification.
 tools/opa/opa.exe
+
+# Local opencode run config (per-machine MCP/model wiring; canonical smoke config is configs/opencode.l3-smoke.json)
+/opencode.json
+/opencode.jsonc
