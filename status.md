@@ -2,13 +2,13 @@
 
 > 本文件描述**当前仓库状态**（差什么、需要改什么、距 PRD 还有多远），不是工作日志。
 > 工作流水记 `log.md`；L2 冻结清单见 `docs/L2-acceptance-checklist.md`；验证命令见 `docs/L2-verification-commands.md`。
-> 快照时间：2026-06-18 +08:00
+> 快照时间：2026-06-18 01:00 +08:00
 
 ---
 
 ## 一句话定位
 
-**L2 工程完成（Hard + Competition-trusted 口径）**：6 关卡 pipeline 可跑、**覆盖率 82%**（≥50% L2 Hard）、290 条 XA-Bench、Gate1-only evaluator、覆盖矩阵、Gate3 fixtures、Gate5 Docker sandbox smoke、审计验链。bench 已改为全样本审计分母，infra error 不再混入安全指标，290 条最新运行均有唯一 trace/record hash 且可离线复算。L3 政企原型已多 git checkpoint（本地 `d741209`/`3893813`/`565d82e`，未 push）：Docker Compose、Streamable HTTP 上游、docker profile 静态工具发现、HITL pending approval fallback、bench supply_chain 与真实 MCP `install_plugin` 离线 preflight 接 AIBOM gateway、可复现性能基准、SDK/LangChain Tool preflight、本地文件 TSA anchor、外部 benchmark adapter skeleton、OPA merged-view 导出、**`opencode run` 真实 LLM→MCP→AIBOM F 级 deny 端到端实测证据**、**真实 SM3 国密哈希链（GB/T 32905-2016，纯 Python 无依赖，不再降级 SHA-256）**；但 **PRD L3 仍未整体达成**。
+**L2 工程完成（Hard + Competition-trusted 口径）**：6 关卡 pipeline 可跑、**覆盖率 82%**（≥50% L2 Hard）、290 条 XA-Bench、Gate1-only evaluator、覆盖矩阵、Gate3 fixtures、Gate5 Docker sandbox smoke、审计验链。bench 已改为全样本审计分母，infra error 不再混入安全指标，290 条最新运行均有唯一 trace/record hash 且可离线复算。L3 政企原型已多 git checkpoint（本地 `d741209`/`3893813`/`565d82e`/`2da3839`/`4d3b686`，未 push）：Docker Compose、Streamable HTTP 上游、docker profile 静态工具发现、HITL pending approval fallback、bench supply_chain 与真实 MCP `install_plugin` 离线 preflight 接 AIBOM gateway、可复现性能基准、SDK/LangChain Tool preflight、本地文件 TSA anchor、外部 benchmark adapter skeleton、OPA merged-view 导出、**`opencode run` 真实 LLM→MCP→AIBOM F 级 deny 端到端实测证据**、**真实 SM3 国密哈希链（GB/T 32905-2016，纯 Python 无依赖，不再降级 SHA-256）**、**Docker 一键部署 runtime 已验收（`docker compose build/up` 实跑，容器 healthy，`/healthz` 200，部署 verifier 6/6 pass）**；PRD L3 三要件中 Docker 一键部署与性能基准已闭合，国密支持仅闭合 SM3 哈希链；但 **PRD L3 仍未整体达成**（SM2 真实签名、外部 TSA、真实 Trae HITL、官方外部 benchmark 仍缺）。
 
 ---
 
@@ -25,7 +25,7 @@
 | **审计完整率** | ✅ 已实测 | `bench/metrics.py` 聚合 Gate6 `audit_completeness`；非固定占位 |
 | **Bench 证据可信度** | ✅ 全样本闭环 | 缺审计按 0 进入总分母；infra error 单列且不进入 ASR/FPR/CuP；CLI 对 infra/缺审计/不完整审计非 0；`last_results.json` 保留 trace、record hash、审计与错误字段，可离线复算同一报告 |
 | **Gate5 沙箱镜像** | 🟡 代码与历史证据可用，当前环境待恢复 | 历史已在本机构建 `xa-guard/sandbox:latest` 并通过真实沙箱测试；本轮 Docker Desktop daemon 未启动，本地镜像不可用导致集成测试 skip |
-| **L3 部署入口** | 🟡 原型 | `docker-compose.yml` + Dockerfiles + `configs/xa-guard.docker.yaml`；Streamable HTTP `/healthz` 和 MCP client `list_tools` smoke 通过；docker profile 使用静态 downstream manifest，不在 `list_tools` 阶段裸启动 stdio 下游；`scripts/verify_l3_deployment.py` 可生成文件/hash、Compose config、静态 Gate5/HTTP 摘要与可选 build/up/healthz 证据；完整 build/up 因本机 Docker daemon 未启动仍待验收 |
+| **L3 部署入口** | ✅ runtime 已验收 | `docker-compose.yml` + Dockerfiles + `configs/xa-guard.docker.yaml`；本机 Docker Desktop 29.5.2 实跑 `docker compose build sandbox-image` + `up --build -d xa-guard`，容器 `Up (healthy)`，`/healthz` 返回 `{"status":"ok","transport":"streamable-http"}`；`scripts/verify_l3_deployment.py --run-build --run-up` 6/6 steps pass，证据 `docs/evidence/l3-deployment-verification.json`；docker profile 使用静态 downstream manifest；host 端口用 13000:3000 规避 Windows 保留端口 2924–3023，探 healthz 需 `NO_PROXY=127.0.0.1,localhost` |
 | **L3 性能基准** | ✅ 本地规则链证据 | `scripts/benchmark_l3_performance.py` 测真实六关卡 + Gate6 落盘；500 请求/并发 10 实测 P50 20.305ms、P95 168.273ms、53.486 QPS、峰值 RSS 62.996MB，达到 PRD 中等档；范围不含 MCP 传输、模型推理、真实工具和多机压测 |
 | **L3 供应链准入** | 🟡 原型 | bench supply_chain 与真实 MCP `tools/call install_plugin` 均走 AIBOM gateway；本地目录/归档和 hash 可扫描，服务端离线缓存命中的远程引用可扫描，未镜像远程引用 fail-closed；仍非真实 marketplace/IDE 安装器 |
 | **L3 SDK 非透传** | 🟡 原型 | `xa_guard.protect` / `xa_guard.sdk.protect` 已在调用原函数前跑 pipeline preflight；`xa_guard.integrations.langchain.protect_tool()` 支持单个 BaseTool 强阻断 wrapper；当前环境未安装 langchain-core，集成测试 skip |
@@ -103,14 +103,14 @@
 |---|---|
 | **L1 基础** | ✅ 满足 |
 | **L2 工程** | ✅ **Hard 项满足**；Competition-trusted 证据闭合 |
-| **L3 政企** | 🟡 原型推进中——性能基准中等档已达，部署/HTTP/供应链与 MCP 离线安装准入已补，SM3 国密哈希链已真实落地；Docker runtime、SM2 真实签名、外部 TSA 与关键外部证据仍缺 |
+| **L3 政企** | 🟡 原型推进中——PRD L3 三要件：①Docker 一键部署 ✅ runtime 已验收（compose build/up 实跑、容器 healthy、healthz 200、部署 verifier 6/6 pass）②国密支持 部分（SM3 哈希链已真实落地 GB/T 32905；SM2 真实签名仍 HMAC fallback、外部 TSA 仍缺）③性能基准 ✅ 中等档已达（P50 20.3ms/P95 168ms/53.5 QPS/63MB）；供应链与 MCP 离线安装准入、opencode 真实链路证据已补；真实 Trae HITL、官方外部 benchmark、gVisor Linux 仍缺 |
 | **L4 工业** | ❌ 未开始 |
 
 ---
 
 ## L3 差距（与 L2 清单明确分离）
 
-1. **生产级国密 SM2 签名 + 外部 TSA**；SM3 哈希链已落地真实 GB/T 32905-2016（纯 Python 无依赖，不再降级 SHA-256，与 gmssl 口径一致，详见 `tests/unit/test_sm3_pure.py`）；SM2 真实签名仍是 HMAC-SHA256 fallback（需 gmssl PEM 私钥或 cryptography SM2 插件）；本地文件 anchor/index 原型已有，但非外部可信 TSA；Docker Compose 已有原型和部署 verifier，但未做完整镜像构建/长期运行验收
+1. **生产级国密 SM2 签名 + 外部 TSA**；SM3 哈希链已落地真实 GB/T 32905-2016（纯 Python 无依赖，不再降级 SHA-256，与 gmssl 口径一致，详见 `tests/unit/test_sm3_pure.py`）；SM2 真实签名仍是 HMAC-SHA256 fallback（需 gmssl PEM 私钥或 cryptography SM2 插件）；本地文件 anchor/index 原型已有，但非外部可信 TSA；Docker Compose 一键部署 runtime 已验收（见上表 L3 部署入口 ✅），未做长期运行/soak 验收
 2. **Trae / 国产 IDE 真实 HITL 弹窗**实测与截图；当前已有 MCP elicitation、pending approval fallback 和本地 pending ledger 的进程内/E2E 证据，但不等同真实客户端 UI；pending 参数脱敏支持 schema 标注优先 + 字段名回退的 L3 原型，不覆盖自由文本 DLP、完整 JSON Schema 组合关键字、KMS/DPAPI/国密加密恢复或生产 RBAC
 3. **AgentDojo / InjecAgent** 官方环境复现与指标对照；当前只有离线 adapter + evidence archive + 本地 projection 原型，不能声称官方 ASR
 4. **OPA/Rego 生产化**：merged-view Rego engine/export 原型已补；仍需真实 OPA CLI/服务化部署、性能评估和三层 Rego 包硬化；gVisor Linux 实测仍缺

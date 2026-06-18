@@ -1,5 +1,41 @@
 # 工作日志
 
+## 2026-06-18 ZCode 主 agent - L3 Docker 一键部署 runtime 证据闭环
+
+本次具体做了什么：
+- 继续推进 PRD §4.2 L3 三要件中的「Docker 一键部署」runtime 验收（此前仅静态 config + 部署 verifier，daemon 未启动故 runtime 未验收）。按用户「多 git 方便回滚」每步 commit。
+- 启动 Docker Desktop：`docker info` 确认 Server 29.5.2 / Docker Desktop / x86_64 / 0 containers 就绪。
+- `docker compose build sandbox-image`：成功构建 `xa-guard/sandbox:latest`（python:3.12-slim + 项目依赖 + sandbox 用户）。
+- `docker compose up --build -d xa-guard`：首次失败，报 `ports are not available: exposing port TCP 0.0.0.0:3000`。排查 `netsh interface ipv4 show excludedportrange protocol=tcp` 发现 Windows 保留 TCP 2924–3023（Hyper-V/WSL 动态端口排除），host :3000 无法绑定。
+- 修复 1：`docker-compose.yml` host 端口 `3000:3000` → `13000:3000`（容器内仍 3000，符合 `configs/xa-guard.docker.yaml`；13000 不在 Windows 保留范围）。
+- 修复 2：`scripts/verify_l3_deployment.py` `_health_check` 原为单次 `urlopen`，与容器 `start_period: 20s` 竞态导致刚 `up` 就报 `RemoteDisconnected` spurious fail。改为在 timeout 预算内每 2s 轮询重试，让新容器完成启动。单元测试 monkeypatch 了 `_health_check`，契约不变，仍 4 passed。
+- 修复 3：本机有 `http_proxy=127.0.0.1:7899`（clash-chain-proxy），`urllib` 会把 `127.0.0.1:13000` 走代理拿到 502；验证器需用 `NO_PROXY=127.0.0.1,localhost` 运行（curl `--noproxy '*'` 同样 200）。
+- 重跑：`docker compose down` 后 `up --build -d xa-guard` 成功，容器 `Up (healthy)`，容器内 healthcheck 日志显示 `GET /healthz 200 OK`。
+- `NO_PROXY=127.0.0.1,localhost python scripts/verify_l3_deployment.py --run-build --run-up --health-url http://127.0.0.1:13000/healthz --timeout 60 --output docs/evidence/l3-deployment-verification.json`：`summary.status=pass`，6/6 steps passed（required_files / docker_version / docker_compose_config / docker_compose_build / docker_compose_up / healthz），healthz `http_status=200`、`attempts=2`、`body={"status":"ok","transport":"streamable-http"}`；static 确认 docker_socket_mounted=true、healthcheck_present=true、config_transport=streamable-http、gate5_sandbox_all_tools=true、images=[xa-guard/sandbox:latest, xa-guard:latest]。
+- 验证 verifier 单元测试 + compose config smoke 未被破坏：4 passed。
+- commit `4d3b686` 为 Docker runtime 证据 checkpoint。
+
+验证：
+- `docker info`：Server 29.5.2 就绪。
+- `docker compose build sandbox-image`：`xa-guard/sandbox:latest Built`。
+- `docker compose up --build -d xa-guard`：两容器 Started，`docker ps` → `jiebang-xa-guard-1 | Up (healthy) | 0.0.0.0:13000->3000/tcp`。
+- `curl --noproxy '*' http://127.0.0.1:13000/healthz`：`HTTP/1.1 200 OK`，`{"status":"ok","transport":"streamable-http"}`。
+- verifier：`summary {blocked:0, failed:0, passed:6, status:pass}`，证据落 `docs/evidence/l3-deployment-verification.json`（schema `xa-l3-deployment-verification/v0.1`）。
+- `tests/unit/test_l3_deployment_verifier.py tests/integration/test_l3_compose_config_smoke.py`：4 passed。
+- git commit `4d3b686`。
+
+未完成 / 客观限制：
+- **未 push 远端**：5 个本地 checkpoint（d741209/3893813/565d82e/2da3839/4d3b686）都在本地 `main`，是否 push 待用户确认。
+- 本轮只闭合 PRD L3 三要件中的「Docker 一键部署 runtime」；**国密支持**只闭合 SM3 哈希链，SM2 真实签名仍 HMAC fallback、外部 TSA 仍缺；**性能基准**此前已达标（P50 20.3ms/P95 168ms/53.5 QPS/63MB）。
+- 本机运行环境特殊项需复现者注意：①Windows 保留端口 2924–3023（host 用 13000）②本机 HTTP 代理需 `NO_PROXY=127.0.0.1,localhost` 才能探 healthz；这两点已在 commit message 与 docker-compose 注释中记录。
+- verifier 的 `_health_check` 重试是真实 bug 修复（非改测试通过测试）；既有测试 monkeypatch `_health_check` 故未受影响。
+- 仍未完成：真实 Trae/国产 IDE HITL 弹窗截图、AgentDojo/InjecAgent 官方复现、gVisor Linux、500+ 题库、完整 LangChain wrapper、Gate1 Recall@1%FPR、faithfulness 算法（仍固定 1.0，涉及既有测试契约，需用户审核后再改）。
+
+下一步：
+- 真实 Trae HITL 弹窗实测与截图（PRD 硬承诺，下一个高价值 L3 证据）。
+- SM2 真实签名生产化（gmssl PEM 或 cryptography SM2 插件）+ 外部 TSA。
+- 与用户确认是否 push 5 个本地 checkpoint 到远端。
+
 ## 2026-06-18 ZCode 主 agent - L3 多 git 回滚基线 + opencode 实测链路 + 真实 SM3 国密哈希链
 
 本次具体做了什么：
