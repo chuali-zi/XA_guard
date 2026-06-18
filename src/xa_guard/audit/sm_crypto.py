@@ -127,42 +127,125 @@ def _read_key(key_path: str) -> bytes:
         return _DEMO_HMAC_KEY
 
 
-def sm2_sign(data: bytes, key_path: str = "", *, prefer_gm: bool = False) -> str:
-    """SM2 签名（hex）。
+def _load_sm2_keyfile(key_path: str) -> dict[str, str]:
+    """读取 SM2 密钥文件，返回 {"private": hex, "public": hex}。
 
-    优先级：
-    1. prefer_gm=True 且 gmssl 可用 → 尝试 SM2（占位：gmssl SM2 需 PEM 私钥，demo 不强求）
-    2. fallback：HMAC-SHA256(key, data) → hex 字符串（demo 真实可验签）
+    支持两种格式：
+    1. 多行键值：第一行可读 `private: <hex>` / `public: <hex>`（顺序不限）。
+    2. 单行 hex：视为 private hex（兼容旧 demo 文件）；public 留空，签名仍可用，
+       验签需要单独的 public key 文件。
+    hex 为 64 字符（private scalar）或 128 字符（public point，可带 04 前缀）。
+    """
+    out = {"private": "", "public": ""}
+    if not key_path:
+        return out
+    p = Path(key_path)
+    if not p.exists():
+        return out
+    text = p.read_text(encoding="utf-8").strip()
+    if not text:
+        return out
+    has_kv = any(line.split(":", 1)[0].strip().lower() in ("private", "public") for line in text.splitlines() if ":" in line)
+    if has_kv:
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or ":" not in line:
+                continue
+            k, v = line.split(":", 1)
+            k = k.strip().lower()
+            v = v.strip()
+            if k == "private" and v:
+                out["private"] = v
+            elif k == "public" and v:
+                out["public"] = v
+    else:
+        # 单行 hex：兼容旧格式，按长度判定 private(64)/public(128/130)
+        first = text.splitlines()[0].strip()
+        if len(first) in (128, 130):
+            out["public"] = first[2:] if first.startswith("04") else first
+        else:
+            out["private"] = first
+    return out
+
+
+def generate_sm2_keypair() -> tuple[str, str]:
+    """生成 SM2 密钥对，返回 (private_hex, public_hex)。
+
+    使用 gmssl 椭圆曲线点乘 priv*G 得到公钥点。private_hex 为 64 字符标量，
+    public_hex 为 128 字符 (x||y)，不含 04 前缀（gmssl CryptSM2 内部会按需处理）。
+    gmssl 不可用时抛 RuntimeError——SM2 真实签名需要曲线运算，不再降级。
+    """
+    from gmssl import func, sm2 as gm_sm2  # type: ignore
+
+    priv_hex = func.random_hex(64)
+    # 用 gmssl 的点乘算公钥：构造一个占位实例借用 _kg
+    tmp = gm_sm2.CryptSM2(private_key=priv_hex, public_key="0" * 128)
+    pub = tmp._kg(int(priv_hex, 16), tmp.ecc_table["g"])
+    if not pub or len(pub) < 128:
+        raise RuntimeError("SM2 keypair generation failed: invalid public point")
+    return priv_hex, pub[:128]
+
+
+def write_sm2_keyfile(key_path: str | Path, private_hex: str, public_hex: str) -> None:
+    """把 SM2 密钥对写成可读键值文件（private/public 各一行 hex）。"""
+    p = Path(key_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(f"private: {private_hex}\npublic: {public_hex}\n", encoding="utf-8")
+
+
+def sm2_sign(data: bytes, key_path: str = "", *, prefer_gm: bool = False) -> str:
+    """SM2 签名（hex，r||s 各 64 字符，共 128）。
+
+    prefer_gm=True 且 gmssl 可用 → 真实 SM2（sign_with_sm3，含 ZA 摘要，
+    默认 ID "1234567812345678"，符合 GB/T 32918）。
+    否则 fallback HMAC-SHA256（demo 稳定，但非国密签名，会记 warning）。
     """
     if prefer_gm:
         try:
-            from gmssl import sm2 as gm_sm2  # type: ignore
+            from gmssl import func, sm2 as gm_sm2  # type: ignore
 
-            # gmssl SM2 需要私钥 hex；这里只在 key_path 文件里第一行可读时尝试
-            priv_hex = Path(key_path).read_text(encoding="utf-8").strip() if key_path else ""
+            keys = _load_sm2_keyfile(key_path)
+            priv_hex = keys["private"]
             if priv_hex:
-                sm2_crypt = gm_sm2.CryptSM2(public_key="", private_key=priv_hex)
-                sig = sm2_crypt.sign(data, "0" * 64)  # 简化 nonce
-                return sig
+                # 公钥可从 keyfile 读；若缺则用 priv 推导，保证签名可被对应公钥验
+                pub_hex = keys["public"]
+                if not pub_hex:
+                    tmp = gm_sm2.CryptSM2(private_key=priv_hex, public_key="0" * 128)
+                    pub_hex = (tmp._kg(int(priv_hex, 16), tmp.ecc_table["g"]) or "")[:128]
+                sm2_crypt = gm_sm2.CryptSM2(private_key=priv_hex, public_key=pub_hex)
+                sig = sm2_crypt.sign_with_sm3(data)
+                if sig:
+                    return sig
         except Exception as exc:
-            log.warning("SM2 sign unavailable, fallback HMAC-SHA256: %s", exc)
+            log.warning("SM2 sign unavailable, fallback HMAC-SHA256 (non-GM): %s", exc)
 
     key = _read_key(key_path)
     return hmac.new(key, data, hashlib.sha256).hexdigest()
 
 
 def sm2_verify(data: bytes, sig: str, pub_path: str = "", *, prefer_gm: bool = False) -> bool:
-    """SM2 验签；fallback HMAC-SHA256 常数时间比对。"""
+    """SM2 验签（与 sm2_sign 对应）。
+
+    prefer_gm=True 且 gmssl 可用 → 真实 SM2 验签（verify_with_sm3）。
+    否则 fallback HMAC-SHA256 常数时间比对（demo，非国密）。
+    pub_path 可以是含 `public: <hex>` 的 keyfile，也可以是单行 public hex 文件。
+    """
     if prefer_gm:
         try:
             from gmssl import sm2 as gm_sm2  # type: ignore
 
-            pub_hex = Path(pub_path).read_text(encoding="utf-8").strip() if pub_path else ""
-            if pub_hex:
-                sm2_crypt = gm_sm2.CryptSM2(public_key=pub_hex, private_key="")
-                return bool(sm2_crypt.verify(sig, data))
+            keys = _load_sm2_keyfile(pub_path)
+            pub_hex = keys["public"]
+            if not pub_hex:
+                # 单行 public hex 文件
+                raw = Path(pub_path).read_text(encoding="utf-8").strip() if pub_path else ""
+                pub_hex = raw[2:] if raw.startswith("04") else raw
+            if pub_hex and len(pub_hex) >= 128:
+                pub_hex = pub_hex[:128]
+                sm2_crypt = gm_sm2.CryptSM2(private_key="", public_key=pub_hex)
+                return bool(sm2_crypt.verify_with_sm3(sig, data))
         except Exception as exc:
-            log.warning("SM2 verify unavailable, fallback HMAC: %s", exc)
+            log.warning("SM2 verify unavailable, fallback HMAC (non-GM): %s", exc)
 
     key = _read_key(pub_path)  # demo：对称密钥，对应同一份 key 文件
     expected = hmac.new(key, data, hashlib.sha256).hexdigest()

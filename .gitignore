@@ -35,6 +35,9 @@ logs/
 !**/.log/worklog.md
 # Committed evidence artifacts (audit samples, benchmark results) under docs/evidence/
 !docs/evidence/**
+# but never commit private key material even inside evidence
+docs/evidence/**/*.key
+docs/evidence/**/tsa-demo.key
 
 # Local tool binaries downloaded for verification.
 tools/opa/opa.exe

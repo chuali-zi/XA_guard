@@ -1,0 +1,11 @@
+{
+  "anchor_hash": "9cba3adec9a213201c05cba3be188a1ec7a78fc28427a7b789b910384569da1d",
+  "evidence_note": "SM2-with-SM3 TSA timestamp token bound to opencode-smoke audit record_hash (trace 8301978d). Verify with tsa_public_key_hex via xa_guard.audit.tsa_client.verify_timestamp_token using a keyfile whose public line equals tsa_public_key_hex. Demo TSA keypair; not a production trusted TSA.",
+  "hash_algo": "sm3",
+  "signature": "a21ebb2de040a86ed5ec766396e217185c859d03ea9a35422e7e788725506036e8da65dd02c4623d7fbfd3a34da6f187e7a57207255f5b1cd318badc67adca79",
+  "signature_algo": "SM2-with-SM3",
+  "tsa_id": "xa-guard-local-tsa",
+  "tsa_public_key_hex": "cc08521cee78a47fd1ea33fc4fe7ed9224b29f120898df9af44fd43ec56ee4845c53845eeb4957f6662b77803545cbbb2ae8b7dfc099802f266b916f02bd0df0",
+  "utc_time": "2026-06-18T01:10:12Z",
+  "version": "xa-guard-tsa-token-v1"
+}

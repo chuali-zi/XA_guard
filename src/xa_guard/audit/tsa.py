@@ -128,8 +128,19 @@ def create_file_anchor(
     index_path: str | Path | None = None,
     algo: str = "sha256",
     update_index: bool = True,
+    tsa_key_path: str | None = None,
+    tsa_token_path: str | Path | None = None,
+    external_tsa_url: str | None = None,
 ) -> FileAnchorResult:
-    """Create a local timestamp-anchor manifest for a verified audit JSONL file."""
+    """Create a local timestamp-anchor manifest for a verified audit JSONL file.
+
+    When ``tsa_key_path`` is provided (an SM2 keyfile), also produce an
+    SM2-signed TSA timestamp token (GB/T 32918) binding ``anchor_hash`` to a
+    signed UTC time, satisfying the PRD §2.2/§4.5 'SM3 + SM2 + TSA' evidence
+    shape. The token is written to ``tsa_token_path`` (default: next to the
+    anchor as ``<stem>.tsa.token.json``) and its path + signature algo are
+    recorded in the manifest.
+    """
     source = Path(audit_path).resolve()
     if not source.exists():
         raise FileNotFoundError(source)
@@ -178,6 +189,33 @@ def create_file_anchor(
     anchor_hash = _anchor_hash(manifest, algo)
     manifest["anchor_hash"] = anchor_hash
     manifest["tsa_token"] = _expected_token(algo, anchor_hash)
+
+    # Optional 国密 SM2 TSA timestamp token (PRD §2.2/§4.5 'SM2 + TSA')
+    if tsa_key_path:
+        try:
+            from xa_guard.audit.tsa_client import (
+                create_timestamp_token_with_external,
+                write_token,
+            )
+
+            prefer_gm = algo == "sm3"
+            token = create_timestamp_token_with_external(
+                anchor_hash,
+                tsa_key_path=tsa_key_path,
+                external_tsa_url=external_tsa_url,
+                prefer_gm=prefer_gm,
+            )
+            token_path = (
+                Path(tsa_token_path).resolve()
+                if tsa_token_path is not None
+                else target.parent / f"{target.stem}.tsa.token.json"
+            )
+            write_token(token, token_path)
+            manifest["sm2_tsa_token_path"] = str(token_path)
+            manifest["sm2_tsa_signature_algo"] = token.token.get("signature_algo", "")
+            manifest["sm2_tsa_utc_time"] = token.token.get("utc_time", "")
+        except Exception as exc:  # pragma: no cover - defensive
+            manifest["sm2_tsa_error"] = f"{type(exc).__name__}: {exc}"
 
     target.write_text(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     if update_index:
