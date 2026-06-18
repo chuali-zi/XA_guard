@@ -19,12 +19,15 @@ import hashlib
 import hmac
 import json
 import os
+import threading
 from datetime import datetime, timedelta, timezone
 
 from xa_guard.types import Approval
 
 _DEFAULT_SECRET = "xa-guard-demo-approval-secret"
 _DEFAULT_TTL_SECONDS = 300
+_CONSUMED_LOCK = threading.Lock()
+_CONSUMED_TOKENS: dict[str, datetime] = {}
 
 
 def _secret() -> bytes:
@@ -113,4 +116,44 @@ def verify_approval(
         return False, "bad_expiry"
     if (now or datetime.now(timezone.utc)) > exp:
         return False, "expired"
+    return True, "ok"
+
+
+def verify_and_consume_approval(
+    approval: Approval | None,
+    *,
+    trace_id: str,
+    tool_name: str,
+    arguments: dict | None,
+    now: datetime | None = None,
+) -> tuple[bool, str]:
+    """验签并把 approval token 标记为已消费，防止进程内重放执行。
+
+    这是 L3 原型级的执行闸门：同一 token 在当前进程内只能通过一次。
+    多实例/重启后的全局防重放需要外部审批存储或审计索引配合。
+    """
+    checked_at = now or datetime.now(timezone.utc)
+    ok, why = verify_approval(
+        approval,
+        trace_id=trace_id,
+        tool_name=tool_name,
+        arguments=arguments,
+        now=checked_at,
+    )
+    if not ok:
+        return False, why
+    assert approval is not None  # for type checkers; verify_approval already proved it
+
+    try:
+        exp = datetime.strptime(approval.expires_at, "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError):
+        return False, "bad_expiry"
+
+    with _CONSUMED_LOCK:
+        expired = [token for token, expires_at in _CONSUMED_TOKENS.items() if expires_at <= checked_at]
+        for token in expired:
+            _CONSUMED_TOKENS.pop(token, None)
+        if approval.token in _CONSUMED_TOKENS:
+            return False, "approval_token_replay"
+        _CONSUMED_TOKENS[approval.token] = exp
     return True, "ok"

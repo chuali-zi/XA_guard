@@ -9,7 +9,8 @@
 2. deny    —— exec_command(rm -rf)：Gate1 拦截，下游 0 次调用。
 3. approve —— grant_permission：Gate2 REQUIRE_APPROVAL，客户端 elicitation
               回 approve=true → 下游被调用一次，返回下游内容。
-4. reject  —— grant_permission：客户端 elicitation 回 decline → 下游 0 次调用。
+4. reject  —— grant_permission：客户端 elicitation 回 decline → 下游 0 次调用，
+              审计 require_approval → deny。
 
 每个场景都断言：返回内容、下游调用次数 delta、以及 Gate6 审计 JSONL
 新增的记录数与 final decision。最后整体校验审计哈希链完好。
@@ -18,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -74,6 +76,12 @@ def _text(result: mtypes.CallToolResult) -> str:
     return "".join(
         b.text for b in (result.content or []) if isinstance(b, mtypes.TextContent)
     )
+
+
+def _trace_id(text: str) -> str:
+    match = re.search(r"trace_id=([0-9a-f-]+)", text)
+    assert match, text
+    return match.group(1)
 
 
 def _read_audit(path: Path) -> list[dict]:
@@ -155,8 +163,154 @@ async def _scenario(tmp_path: Path) -> dict:
             "audit_delta": _read_audit(audit_path)[before_n:],
         }
 
+        # ---- 5) AIBOM deny: malicious install request never reaches downstream ----
+        before = router.downstream_calls
+        before_n = len(_read_audit(audit_path))
+        r = await _call(
+            server,
+            "install_plugin",
+            {"name": "bad-plugin", "code_snippet": "import subprocess\nsubprocess.run(['evil'])"},
+        )
+        out["install_deny"] = {
+            "text": _text(r),
+            "downstream_delta": router.downstream_calls - before,
+            "audit_delta": _read_audit(audit_path)[before_n:],
+        }
+
+        # ---- 6) AIBOM allow + red-tool HITL: clean local artifact executes once ----
+        clean_plugin = tmp_path / "clean-plugin"
+        clean_plugin.mkdir()
+        (clean_plugin / "main.py").write_text("print('clean')\n", encoding="utf-8")
+        install_args = {"name": "clean-plugin", "artifact_path": str(clean_plugin)}
+        before = router.downstream_calls
+        before_n = len(_read_audit(audit_path))
+        r = await _call(server, "install_plugin", install_args, _approve_cb)
+        out["install_approve"] = {
+            "text": _text(r),
+            "arguments": install_args,
+            "downstream_delta": router.downstream_calls - before,
+            "audit_delta": _read_audit(audit_path)[before_n:],
+        }
+
+        # ---- 7) pending fallback: no elicitation channel, approve via control tool ----
+        before = router.downstream_calls
+        before_n = len(_read_audit(audit_path))
+        r = await _call(server, "pending_approval_op", {"ticket": "PA-1"})
+        pending_trace_id = _trace_id(_text(r))
+        listed = await _call(server, "xa_guard_list_pending_approvals", {})
+        approved = await _call(
+            server,
+            "xa_guard_approve_pending",
+            {
+                "trace_id": pending_trace_id,
+                "approve": True,
+                "approver": "pytest-operator",
+                "reason": "pending-ok",
+            },
+        )
+        replay = await _call(
+            server,
+            "xa_guard_approve_pending",
+            {"trace_id": pending_trace_id, "approve": True, "reason": "again"},
+        )
+        out["pending_approve"] = {
+            "pending_text": _text(r),
+            "listed": json.loads(_text(listed)),
+            "text": _text(approved),
+            "replay_text": _text(replay),
+            "downstream_delta": router.downstream_calls - before,
+            "audit_delta": _read_audit(audit_path)[before_n:],
+        }
+
         out["audit_path"] = audit_path
         return out
+    finally:
+        await router.stop()
+
+
+async def _pending_restart_scenario(tmp_path: Path) -> dict:
+    audit_path = tmp_path / "audit.jsonl"
+    router = CountingRouter(
+        [DownstreamSpec(name="e2e", command=[sys.executable, str(_FIXTURE)], transport="stdio")]
+    )
+    await router.start()
+    try:
+        first_pipeline, _ = _build_pipeline(tmp_path)
+        first_server = _build_app(first_pipeline, router)
+        before = router.downstream_calls
+        r = await _call(first_server, "pending_approval_op", {"ticket": "PA-restart"})
+        trace_id = _trace_id(_text(r))
+
+        second_pipeline, _ = _build_pipeline(tmp_path)
+        second_server = _build_app(second_pipeline, router)
+        listed = await _call(second_server, "xa_guard_list_pending_approvals", {})
+        approved = await _call(
+            second_server,
+            "xa_guard_approve_pending",
+            {
+                "trace_id": trace_id,
+                "approve": True,
+                "approver": "pytest-restart-operator",
+                "reason": "restart-ok",
+            },
+        )
+        replay = await _call(
+            second_server,
+            "xa_guard_approve_pending",
+            {"trace_id": trace_id, "approve": True},
+        )
+        return {
+            "trace_id": trace_id,
+            "pending_text": _text(r),
+            "listed": json.loads(_text(listed)),
+            "approved_text": _text(approved),
+            "replay_text": _text(replay),
+            "downstream_delta": router.downstream_calls - before,
+            "audit_records": _read_audit(audit_path),
+            "audit_path": audit_path,
+        }
+    finally:
+        await router.stop()
+
+
+async def _pending_redacted_restart_scenario(tmp_path: Path) -> dict:
+    audit_path = tmp_path / "audit.jsonl"
+    router = CountingRouter(
+        [DownstreamSpec(name="e2e", command=[sys.executable, str(_FIXTURE)], transport="stdio")]
+    )
+    await router.start()
+    try:
+        first_pipeline, _ = _build_pipeline(tmp_path)
+        first_server = _build_app(first_pipeline, router)
+        before = router.downstream_calls
+        r = await _call(
+            first_server,
+            "pending_approval_op",
+            {"ticket": "PA-redacted", "api_key": "sk-redacted"},
+        )
+        trace_id = _trace_id(_text(r))
+
+        second_pipeline, _ = _build_pipeline(tmp_path)
+        second_server = _build_app(second_pipeline, router)
+        listed = await _call(second_server, "xa_guard_list_pending_approvals", {})
+        approved = await _call(
+            second_server,
+            "xa_guard_approve_pending",
+            {
+                "trace_id": trace_id,
+                "approve": True,
+                "approver": "pytest-restart-operator",
+                "reason": "restart-ok",
+            },
+        )
+        return {
+            "trace_id": trace_id,
+            "listed": json.loads(_text(listed)),
+            "approved_text": _text(approved),
+            "downstream_delta": router.downstream_calls - before,
+            "audit_records": _read_audit(audit_path),
+            "audit_path": audit_path,
+        }
     finally:
         await router.stop()
 
@@ -200,14 +354,120 @@ def test_mcp_e2e_harness(tmp_path):
     # require_approval 那条（执行前阻断）尚未签发令牌
     assert not approve["audit_delta"][0]["gen_ai.tool.approval_token"]
 
-    # 4) reject: 下游 0 次，返回拒绝提示；审计一条 require_approval
+    # 4) reject: 下游 0 次，返回拒绝提示；审计 require_approval -> deny
     reject = out["reject"]
     assert reject["downstream_delta"] == 0
     assert "拒绝" in reject["text"]
-    assert _decisions(reject["audit_delta"]) == ["require_approval"]
+    assert _decisions(reject["audit_delta"]) == ["require_approval", "deny"]
+    rejected = reject["audit_delta"][1]
+    assert rejected["gen_ai.decision.final_reason"] == "hitl_rejected"
+    assert rejected["gen_ai.tool.approval.approver"]
+    assert not rejected["gen_ai.tool.approval_token"]
 
-    # 5) 审计哈希链整体可验
+    # 5) AIBOM deny: 恶意插件在真实 tools/call 路径阻断，下游 0 次。
+    install_deny = out["install_deny"]
+    assert install_deny["downstream_delta"] == 0
+    assert "拦截" in install_deny["text"]
+    assert _decisions(install_deny["audit_delta"]) == ["deny"]
+    denied_install = install_deny["audit_delta"][0]
+    assert denied_install["gen_ai.tool.name"] == "install_plugin"
+    assert "AIBOM-GATEWAY" in denied_install["gen_ai.policy.hit_id"]
+    assert "aibom_gateway" in denied_install["gen_ai.decision.final_reason"]
+
+    # 6) 干净本地 artifact 先过 AIBOM，再经红色工具 HITL 批准后执行一次。
+    install_approve = out["install_approve"]
+    assert install_approve["downstream_delta"] == 1
+    assert "e2e:" in install_approve["text"]
+    assert "clean-plugin" in install_approve["text"]
+    assert _decisions(install_approve["audit_delta"]) == ["require_approval", "allow"]
+    blocked_install, granted_install = install_approve["audit_delta"]
+    assert "AIBOM-GATEWAY" in blocked_install["gen_ai.policy.hit_id"]
+    assert "AIBOM-GATEWAY" in granted_install["gen_ai.policy.hit_id"]
+    assert granted_install["gen_ai.tool.approval_token"]
+    assert granted_install["gen_ai.tool.approval.args_hash"] == _args_hash(
+        install_approve["arguments"]
+    )
+
+    # 7) pending fallback: 无 elicitation 时进入 pending，人工工具批准后才执行一次
+    pending_approve = out["pending_approve"]
+    assert "等待人工审批" in pending_approve["pending_text"]
+    assert pending_approve["downstream_delta"] == 1
+    assert "e2e:" in pending_approve["text"]
+    assert "pending_approval_op" in pending_approve["text"]
+    assert "不存在或已过期" in pending_approve["replay_text"]
+    assert len(pending_approve["listed"]["pending_approvals"]) == 1
+    assert _decisions(pending_approve["audit_delta"]) == ["require_approval", "allow"]
+    blocked, granted = pending_approve["audit_delta"]
+    assert blocked["trace_id"] == granted["trace_id"]
+    assert blocked["gen_ai.tool.name"] == "pending_approval_op"
+    assert granted["gen_ai.tool.name"] == "pending_approval_op"
+    assert blocked["gen_ai.tool.parameters"] == granted["gen_ai.tool.parameters"]
+    assert not blocked["gen_ai.tool.approval_token"]
+    assert granted["gen_ai.decision.final_reason"] == "hitl_approved"
+    assert granted["gen_ai.tool.approval_token"]
+    assert granted["gen_ai.tool.approval.approver"] == "pytest-operator"
+    assert granted["gen_ai.tool.approval.reason"] == "pending-ok"
+    assert granted["gen_ai.tool.approval.args_hash"] == _args_hash({"ticket": "PA-1"})
+
+    # 6) 审计哈希链整体可验
     chain = ChainStore(out["audit_path"], algo="sha256")
     ok, bad_line = chain.verify()
     assert ok, f"audit chain broken at line {bad_line}"
-    assert len(_read_audit(out["audit_path"])) == 5
+    assert len(_read_audit(out["audit_path"])) == 11
+
+
+def test_mcp_pending_ledger_recovers_after_app_restart(tmp_path, monkeypatch):
+    if not _FIXTURE.exists():
+        pytest.skip("e2e fixture server missing")
+    ledger = tmp_path / "pending_approvals.jsonl"
+    monkeypatch.setenv("XA_GUARD_PENDING_APPROVAL_STORE", str(ledger))
+
+    out = asyncio.run(_pending_restart_scenario(tmp_path))
+
+    assert "等待人工审批" in out["pending_text"]
+    assert [item["trace_id"] for item in out["listed"]["pending_approvals"]] == [out["trace_id"]]
+    assert out["downstream_delta"] == 1
+    assert "e2e:" in out["approved_text"]
+    assert "不存在或已过期" in out["replay_text"]
+    assert _decisions(out["audit_records"]) == ["require_approval", "allow"]
+    blocked, granted = out["audit_records"]
+    assert blocked["trace_id"] == granted["trace_id"] == out["trace_id"]
+    assert not blocked["gen_ai.tool.approval_token"]
+    assert granted["gen_ai.tool.approval_token"]
+    assert granted["gen_ai.tool.approval.approver"] == "pytest-restart-operator"
+    assert granted["gen_ai.tool.approval.reason"] == "restart-ok"
+    assert granted["gen_ai.tool.approval.args_hash"] == _args_hash({"ticket": "PA-restart"})
+    ledger_text = ledger.read_text(encoding="utf-8")
+    assert "approval_token" not in ledger_text
+    assert granted["gen_ai.tool.approval_token"] not in ledger_text
+
+    chain = ChainStore(out["audit_path"], algo="sha256")
+    ok, bad_line = chain.verify()
+    assert ok, f"audit chain broken at line {bad_line}"
+
+
+def test_mcp_pending_ledger_redacted_restart_approve_fails_closed(tmp_path, monkeypatch):
+    if not _FIXTURE.exists():
+        pytest.skip("e2e fixture server missing")
+    ledger = tmp_path / "pending_approvals.jsonl"
+    monkeypatch.setenv("XA_GUARD_PENDING_APPROVAL_STORE", str(ledger))
+
+    out = asyncio.run(_pending_redacted_restart_scenario(tmp_path))
+
+    listed_args = out["listed"]["pending_approvals"][0]["arguments"]
+    assert listed_args["ticket"] == "PA-redacted"
+    assert listed_args["api_key"].startswith("[REDACTED]:sha256:")
+    assert "参数已在本地 ledger 中脱敏" in out["approved_text"]
+    assert out["downstream_delta"] == 0
+    assert _decisions(out["audit_records"]) == ["require_approval", "deny"]
+    blocked, denied = out["audit_records"]
+    assert blocked["trace_id"] == denied["trace_id"] == out["trace_id"]
+    assert denied["gen_ai.decision.final_reason"] == "hitl_rejected: pending_arguments_redacted_after_restart"
+    assert not denied["gen_ai.tool.approval_token"]
+    ledger_text = ledger.read_text(encoding="utf-8")
+    assert "sk-redacted" not in ledger_text
+    assert "approval_token" not in ledger_text
+
+    chain = ChainStore(out["audit_path"], algo="sha256")
+    ok, bad_line = chain.verify()
+    assert ok, f"audit chain broken at line {bad_line}"

@@ -7,6 +7,7 @@ import pytest
 
 from xa_guard.config import GateConfig
 from xa_guard.gates.gate3_policy import Gate3Policy
+from xa_guard.policy.layered import LayeredPolicySource, set_global_source
 from xa_guard.policy.rego import build_rego_module, predicate_to_rego
 from xa_guard.types import (
     Decision,
@@ -34,6 +35,12 @@ def _ctx(**kw) -> GateContext:
     for k, v in kw.items():
         setattr(ctx, k, v)
     return ctx
+
+
+@pytest.fixture(autouse=True)
+def _isolate_layered_source():
+    yield
+    set_global_source(None)
 
 
 # 复用一个 gate（编译只发生一次）
@@ -533,3 +540,47 @@ rules:
     result = g.evaluate(_ctx(tool_name="exec_command", risk_level=RiskLevel.RED))
     assert result.decision == Decision.DENY
     assert result.metadata["rego_mode"] == "opa_cli"
+
+
+def test_rego_backend_uses_layered_merged_view(tmp_path):
+    overlay_root = tmp_path / "overlay"
+    tenant_dir = overlay_root / "acme"
+    tenant_dir.mkdir(parents=True)
+    (tenant_dir / "policy.yaml").write_text(
+        """
+rules:
+  - id: "tenant::acme::ECHO-BLOCK"
+    name: Echo block
+    source: acme
+    triggers: [echo]
+    predicate: "tool == 'echo' and contains('text', 'blocked')"
+    enforce: deny
+    severity: high
+    audit: required
+""",
+        encoding="utf-8",
+    )
+    source = LayeredPolicySource(
+        manifest_path="policies/baseline/manifest.yaml",
+        overlay_root=str(overlay_root),
+        project_root=PROJECT_ROOT,
+    )
+    set_global_source(source)
+    gate = Gate3Policy(
+        GateConfig(
+            enabled=True,
+            options={
+                "backend": "rego",
+                "prefer_layered": True,
+                "policy_file": str(PROJECT_ROOT / POLICY_FILE),
+            },
+        )
+    )
+
+    result = gate.evaluate(_ctx(tool_name="echo", arguments={"text": "please blocked"}))
+
+    assert result.decision == Decision.DENY
+    assert "tenant::acme::ECHO-BLOCK" in result.rule_hits
+    assert result.metadata["backend"] == "rego"
+    assert result.metadata["rego_mode"] in ("opa_cli", "python_fallback")
+    assert result.metadata["policy_bundle_sha"] == source.bundle_sha

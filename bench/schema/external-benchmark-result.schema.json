@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "XA-Guard external benchmark normalized result",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "benchmark",
+    "adapter",
+    "case",
+    "observed",
+    "xa_guard_projection",
+    "metrics",
+    "raw_ref",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": { "const": "xa-external-bench-result/v0.1" },
+    "benchmark": {
+      "type": "object",
+      "required": ["name", "official_claim"],
+      "properties": {
+        "name": { "enum": ["agentdojo", "injecagent"] },
+        "official_claim": { "const": false }
+      }
+    },
+    "adapter": {
+      "type": "object",
+      "required": ["name", "version", "normalized_at", "input_sha256", "input_record_index"]
+    },
+    "case": {
+      "type": "object",
+      "required": ["case_id"]
+    },
+    "observed": {
+      "type": "object",
+      "required": ["attack_success", "benign_success"]
+    },
+    "limitations": {
+      "type": "array",
+      "contains": { "const": "not_official_reproduction" }
+    }
+  }
+}

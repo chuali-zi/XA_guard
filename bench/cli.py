@@ -12,13 +12,11 @@ import asyncio
 import json
 import logging
 import sys
-from dataclasses import asdict
 from pathlib import Path
 
 from bench.metrics import compute
-from bench.runner import load_cases, run_suite
+from bench.runner import run_suite
 from xa_guard.config import XAGuardConfig
-from xa_guard.types import Decision, TaintLabel
 
 
 def _results_to_json(results) -> list[dict]:
@@ -36,7 +34,16 @@ def _results_to_json(results) -> list[dict]:
                 "latency_ms": round(r.latency_ms, 2),
                 "passed": r.passed,
                 "severity": r.case.severity,
-                "note": r.case.note,
+                "case_note": r.case.note,
+                "note": r.note,
+                "trace_id": r.trace_id,
+                "audit_record_hash": r.audit_record_hash,
+                "audit_written": r.audit_written,
+                "audit_complete": r.audit_complete,
+                "audit_completeness": r.audit_completeness,
+                "infra_error": r.infra_error,
+                "infra_error_type": r.infra_error_type,
+                "infra_error_message": r.infra_error_message,
             }
         )
     return out
@@ -65,8 +72,52 @@ def _cmd_run(args: argparse.Namespace) -> int:
     render_html(results, report, out_path=out_dir / "report.html")
 
     print(json.dumps(report.as_dict(), ensure_ascii=False, indent=2))
-    print(f"\n[bench/.log/last_results.json, last_report.json, report.html] 已写出", file=sys.stderr)
+    print("\n[bench/.log/last_results.json, last_report.json, report.html] 已写出", file=sys.stderr)
+    if report.infra_errors or report.audit_missing or report.audit_incomplete:
+        print(
+            "benchmark evidence incomplete: "
+            f"infra_errors={report.infra_errors} audit_missing={report.audit_missing} "
+            f"audit_incomplete={report.audit_incomplete}",
+            file=sys.stderr,
+        )
+        return 1
     return 0
+
+
+def _results_from_json(raw: list[dict]) -> list:
+    from xa_guard.types import BenchCase, BenchResult, Decision, TaintLabel
+
+    reconstructed = []
+    for item in raw:
+        case = BenchCase(
+            case_id=item["case_id"],
+            dimension=item["dimension"],
+            attack_type=item.get("attack_type", "benign"),
+            input_payload={},
+            expected_decision=Decision(item["expected_decision"]),
+            severity=item.get("severity", "medium"),
+            note=item.get("case_note", item.get("note", "")),
+        )
+        reconstructed.append(
+            BenchResult(
+                case=case,
+                actual_decision=Decision(item["actual_decision"]),
+                actual_taint=TaintLabel(item["actual_taint"]) if item.get("actual_taint") else None,
+                rule_hits=item.get("rule_hits", []),
+                latency_ms=float(item.get("latency_ms", 0)),
+                passed=bool(item.get("passed", False)),
+                note=item.get("note", ""),
+                audit_written=bool(item.get("audit_written", False)),
+                audit_complete=bool(item.get("audit_complete", False)),
+                audit_completeness=float(item.get("audit_completeness", 0.0) or 0.0),
+                trace_id=str(item.get("trace_id", "") or ""),
+                audit_record_hash=str(item.get("audit_record_hash", "") or ""),
+                infra_error=bool(item.get("infra_error", False)),
+                infra_error_type=str(item.get("infra_error_type", "") or ""),
+                infra_error_message=str(item.get("infra_error_message", "") or ""),
+            )
+        )
+    return reconstructed
 
 
 def _cmd_report(args: argparse.Namespace) -> int:
@@ -81,38 +132,14 @@ def _cmd_report(args: argparse.Namespace) -> int:
         print(json.dumps(raw, ensure_ascii=False, indent=2))
         return 0
 
-    # HTML: need to reconstruct BenchResult objects from JSON
-    from bench.metrics import MetricsReport
     from bench.reporters.html_report import render_html
-    from xa_guard.types import BenchCase, BenchResult, Decision, TaintLabel
 
-    reconstructed = []
-    for item in raw:
-        case = BenchCase(
-            case_id=item["case_id"],
-            dimension=item["dimension"],
-            attack_type=item.get("attack_type", "benign"),
-            input_payload={},
-            expected_decision=Decision(item["expected_decision"]),
-            severity=item.get("severity", "medium"),
-            note=item.get("note", ""),
-        )
-        reconstructed.append(
-            BenchResult(
-                case=case,
-                actual_decision=Decision(item["actual_decision"]),
-                actual_taint=TaintLabel(item["actual_taint"]) if item.get("actual_taint") else None,
-                rule_hits=item.get("rule_hits", []),
-                latency_ms=float(item.get("latency_ms", 0)),
-                passed=bool(item.get("passed", False)),
-                note=item.get("note", ""),
-            )
-        )
+    reconstructed = _results_from_json(raw)
 
     metrics = compute(reconstructed)
     out_dir = Path("bench/.log")
     out_dir.mkdir(parents=True, exist_ok=True)
-    html = render_html(reconstructed, metrics, out_path=out_dir / "report.html")
+    render_html(reconstructed, metrics, out_path=out_dir / "report.html")
     print(f"HTML 报告已写出: {out_dir / 'report.html'}", file=sys.stderr)
     return 0
 

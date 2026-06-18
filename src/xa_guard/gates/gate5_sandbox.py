@@ -68,6 +68,8 @@ class Gate5Sandbox(Gate):
 
         risk = self._resolve_risk(ctx)
         mode = _RISK_TO_MODE.get(risk, "native")
+        if mode == "native" and self.opt("sandbox_all_tools", False):
+            mode = "docker"
 
         # 若配置中要求 gVisor 但仅在 RED 时启用；非 RED 即使 runtime=runsc 也不强制
         runtime = self.opt("runtime", "runc")

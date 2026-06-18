@@ -1,0 +1,20 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "xa_guard_l3_smoke": {
+      "type": "local",
+      "command": [
+        "python",
+        "-m",
+        "xa_guard.server",
+        "--config",
+        "configs/xa-guard.opencode-smoke.yaml"
+      ],
+      "environment": {
+        "PYTHONPATH": "src"
+      },
+      "enabled": true,
+      "timeout": 10000
+    }
+  }
+}

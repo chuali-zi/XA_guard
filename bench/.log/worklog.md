@@ -2,6 +2,33 @@
 
 ---
 
+## 2026-06-17 Codex 主 agent — external archive projection evidence
+
+- `xa_guard_projection.input_payload` 现在优先从 normalized 外部记录的首个 tool call/action 中提取 tool name 和 arguments，增强本地投影价值。
+- 新增 `bench.external.projection.run_projection()`：把 normalized records 送入本地 XA-Guard pipeline，使用 mock executor，生成 projection decisions，并把 Gate6 audit 写到 archive 内部隔离目录。
+- `bench.external.cli archive --run-projection` 新增 `xa-guard-projection/results.json`、`summary.json`、`audit/audit.jsonl`、`audit-verify.json`；manifest 记录 projection hash、audit hash、audit verify、config hash 和非官方 claim scope。
+- 单测覆盖 projection 不污染 smoke metrics、summary 不使用官方分数字段、audit 隔离与验链。
+
+---
+
+## 2026-06-17 Codex 主 agent — external evidence archive
+
+- 新增 `bench.external.report.build_report()`，对 normalized external JSONL 生成非官方 report：输入 hash、schema/adapter 版本、validation errors、benchmark/task 分布、label 覆盖、smoke metrics、limitations。
+- 扩展 `bench.external.cli`：`normalize` / `validate` / `smoke-metrics` 输出包含更完整的 hash、schema/adapter 版本和非官方声明；新增 `report` 与 `archive` 子命令。
+- `archive` 会生成 `normalized.jsonl`、`validation.json`、`smoke-metrics.json`、`report.json`、`manifest.json`、`README.md`，manifest 固定 `official_claim=false` 并记录 input/normalized/schema sha256。
+- 新增单测覆盖 AgentDojo/InjecAgent archive 产物和 manifest hash；保持“不运行官方环境、不冒充官方成绩”的口径。
+
+---
+
+## 2026-06-17 Codex 主 agent — 外部 benchmark adapter skeleton
+
+- 新增 `bench/external/`：AgentDojo/InjecAgent 用户导出文件离线 normalize / validate / smoke-metrics，纯标准库实现，不下载官方仓库/数据集。
+- 新增统一 schema 文档 `bench/schema/external-benchmark-result.schema.json`、synthetic smoke fixtures 和 `tests/unit/test_external_benchmarks.py`。
+- 决策：所有 normalized record 强制 `official_claim=false`，并写 `not_official_reproduction` 等 limitation；smoke metrics 只叫 `attack_success_rate_if_labeled`，不冒充官方 ASR。
+- 验证：external 单测和 CLI normalize/validate/smoke-metrics smoke 通过。
+
+---
+
 ## 2026-06-02 主 agent（Opus 4.7） — 290 条 mini 升级为可信评测资产
 
 把 `bench/cases/csab-gov-mini-seed.yaml` 从「裸列表」升级到「可审计资产」。
@@ -42,3 +69,11 @@
 - 30 条 seed 用例 csab-gov-mini-seed.yaml 写入 4 方向 + 7 维度
 - 决策：metrics.compute 已实现基础 ASR/FPR/CuP/Recall/Latency p50/p95
 - TODO（agent-B）：扩展 290 条；按 dimension 细分；HTML 报告
+## 2026-06-18 Codex 主 agent（+2 gpt-5.5 medium 测试子 agent）
+- 修正 `audit_completeness`：按全部操作为分母，未写审计贡献 0；新增 `evaluated_total`、`infra_errors/rate`、`audit_missing`、`audit_incomplete`。
+- runner 不再吞异常：异常 fail-closed 为 deny、`passed=False`、单列 infra error，并尽力写 Gate6；Gate6 自身失败会显式保留 `audit_written=False`。
+- supply-chain AIBOM 特殊路径通过 `Pipeline.finalize_preflight()` 写 Gate6，不运行通用 Gate1-5 改写 AIBOM oracle；25/25 均有 trace 与 record hash。
+- `last_results.json` 新增 trace、audit hash/完整率、infra error 与真实 result note；离线重建可得到与在线完全一致的 metrics。
+- 290 条 CLI 实测：0 infra、0 缺审计、0 不完整审计，290 唯一 trace/hash，audit completeness 1.0；累计 28,095 条审计验链 0 错误。
+
+---

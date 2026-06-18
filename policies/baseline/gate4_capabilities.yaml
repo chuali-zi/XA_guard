@@ -199,6 +199,12 @@ tools:
     output_taint: INTERNAL
     risk_level: red
 
+  - tool_name: pending_approval_op
+    capabilities: [AUTHZ_ADMIN]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: red
+
   - tool_name: update_user_role
     capabilities: [AUTHZ_ADMIN]
     input_max_taint: INTERNAL

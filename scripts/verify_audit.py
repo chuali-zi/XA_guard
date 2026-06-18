@@ -1,7 +1,8 @@
-"""验证审计 JSONL 文件的哈希链 + 14 字段完整性。
+"""验证审计 JSONL 文件的哈希链 + 字段完整性。
 
 用法：
-    python scripts/verify_audit.py --path logs/audit/audit.jsonl
+    PYTHONPATH=src python scripts/verify_audit.py --path logs/audit/audit.jsonl
+    PYTHONPATH=src python scripts/verify_audit.py --path logs/audit/audit.jsonl --anchor logs/audit/anchor.json
 """
 from __future__ import annotations
 
@@ -9,6 +10,9 @@ import argparse
 import json
 import sys
 from pathlib import Path
+
+from xa_guard.audit.archive import verify_audit_jsonl
+from xa_guard.audit.tsa import verify_file_anchor
 
 REQUIRED_FIELDS = [
     "trace_id",
@@ -25,9 +29,16 @@ REQUIRED_FIELDS = [
 ]
 
 
+def _reject_nonfinite(value: str) -> None:
+    raise ValueError(f"non-finite JSON constant is not allowed: {value}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--path", default="logs/audit/audit.jsonl")
+    parser.add_argument("--algo", choices=["sha256", "sm3"], default="sha256")
+    parser.add_argument("--anchor", help="optional local file TSA anchor manifest to verify")
+    parser.add_argument("--verify-anchor-index", action="store_true", help="also require the anchor index entry")
     args = parser.parse_args()
 
     p = Path(args.path)
@@ -35,9 +46,8 @@ def main() -> int:
         print(f"file not found: {p}", file=sys.stderr)
         return 2
 
-    prev = ""
     ok = 0
-    failed = 0
+    parse_errors = 0
     missing_fields = 0
     with open(p, encoding="utf-8") as f:
         for i, line in enumerate(f, 1):
@@ -45,10 +55,10 @@ def main() -> int:
             if not line:
                 continue
             try:
-                rec = json.loads(line)
+                rec = json.loads(line, parse_constant=_reject_nonfinite)
             except Exception as exc:
                 print(f"line {i}: JSON parse error: {exc}")
-                failed += 1
+                parse_errors += 1
                 continue
 
             # 字段完整性
@@ -57,16 +67,34 @@ def main() -> int:
                 print(f"line {i}: missing fields: {missing}")
                 missing_fields += 1
 
-            # 哈希链
-            actual_prev = rec.get("gen_ai.evidence.hash_prev", "")
-            if i > 1 and actual_prev != prev:
-                print(f"line {i}: hash_prev mismatch (expected {prev[:16]}, got {actual_prev[:16]})")
-                failed += 1
-            prev = rec.get("record_hash", "")
             ok += 1
 
-    print(f"\nverified {ok} records, {failed} chain errors, {missing_fields} missing-field records")
-    return 0 if failed == 0 and missing_fields == 0 else 1
+    chain = verify_audit_jsonl(p, algo=args.algo)
+    if not chain["ok"]:
+        print(
+            "hash-chain verification failed: "
+            f"{chain['error_count']} error record(s), first at line {chain['first_error_line']}"
+        )
+
+    anchor_errors = 0
+    if args.anchor:
+        try:
+            anchor = verify_file_anchor(p, args.anchor, algo=args.algo, verify_index=args.verify_anchor_index)
+        except Exception as exc:
+            anchor_errors = 1
+            print(f"anchor verification failed: {exc}")
+        else:
+            print(
+                "anchor verified: "
+                f"{anchor.anchor_path} -> {anchor.manifest['anchored_record_hash'][:16]}"
+            )
+
+    print(
+        f"\nverified {ok} records, {chain['error_count']} chain/hash errors, "
+        f"{parse_errors} JSON parse errors, {missing_fields} missing-field records, "
+        f"{anchor_errors} anchor errors"
+    )
+    return 0 if chain["ok"] and parse_errors == 0 and missing_fields == 0 and anchor_errors == 0 else 1
 
 
 if __name__ == "__main__":

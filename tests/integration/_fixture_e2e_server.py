@@ -1,6 +1,6 @@
 """E2E harness 用的下游 MCP stdio server fixture。
 
-比 _fixture_echo_server 多一个 grant_permission 工具，用于触发 Gate2
+比 _fixture_echo_server 多 grant_permission / pending_approval_op 工具，用于触发 Gate2
 REQUIRE_APPROVAL（红工具，同步阻塞 HITL）。所有工具都把入参原样回显为
 JSON 文本，便于上游断言"下游确实被调用且拿到了正确参数"。
 
@@ -27,6 +27,12 @@ def _build_app() -> Server:
             mtypes.Tool(name="echo", description="echo back arguments as text", inputSchema=obj),
             mtypes.Tool(name="exec_command", description="pretend to run a shell command", inputSchema=obj),
             mtypes.Tool(name="grant_permission", description="grant a permission (red / HITL)", inputSchema=obj),
+            mtypes.Tool(name="install_plugin", description="install a plugin (red / AIBOM + HITL)", inputSchema=obj),
+            mtypes.Tool(
+                name="pending_approval_op",
+                description="red fixture op for pending HITL fallback",
+                inputSchema=obj,
+            ),
         ]
 
     @app.call_tool()

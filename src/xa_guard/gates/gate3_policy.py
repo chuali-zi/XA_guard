@@ -19,7 +19,7 @@ from xa_guard.gates.base import Gate, GateStage
 from xa_guard.policy.compiler import compile_predicate
 from xa_guard.policy.layered import get_global_source
 from xa_guard.policy.loader import load_policy_yaml
-from xa_guard.policy.rego import RegoPolicyEngine
+from xa_guard.policy.rego import RegoCompileError, RegoPolicyEngine
 from xa_guard.types import Decision, GateContext, GateResult, PolicyRule
 
 _SEVERITY_RANK = {"low": 0, "medium": 1, "high": 2, "critical": 3}
@@ -33,6 +33,8 @@ class Gate3Policy(Gate):
     compiled: dict[str, Callable[[GateContext], bool]]
     backend: str
     rego: RegoPolicyEngine | None
+    _layered_rego: RegoPolicyEngine | None
+    _layered_rego_bundle_sha: str
 
     def __init__(self, cfg=None) -> None:
         super().__init__(cfg)
@@ -40,6 +42,8 @@ class Gate3Policy(Gate):
         self.rules = []
         self.compiled = {}
         self.rego = None
+        self._layered_rego = None
+        self._layered_rego_bundle_sha = ""
         policy_file = self.opt("policy_file")
         if policy_file:
             self._load(policy_file)
@@ -73,18 +77,32 @@ class Gate3Policy(Gate):
             return True
         return tool_name in rule.triggers
 
-    def _current_view(self) -> tuple[list[PolicyRule], dict[str, Callable[[GateContext], bool]]]:
+    def _current_view(self) -> tuple[list[PolicyRule], dict[str, Callable[[GateContext], bool]], str]:
         """LayeredPolicySource opt-in（cfg.gate3.prefer_layered: true）；默认 legacy。"""
         if bool(self.opt("prefer_layered", False)):
             layered = get_global_source()
             if layered is not None:
                 rules = layered.get_policy_rules()
                 if rules:
-                    return rules, layered.get_compiled_predicates()
-        return self.rules, self.compiled
+                    return rules, layered.get_compiled_predicates(), layered.bundle_sha
+        return self.rules, self.compiled, ""
+
+    def _layered_rego_engine(self, rules: list[PolicyRule], bundle_sha: str) -> RegoPolicyEngine | None:
+        if not bundle_sha:
+            return None
+        if self._layered_rego is not None and self._layered_rego_bundle_sha == bundle_sha:
+            return self._layered_rego
+        try:
+            self._layered_rego = RegoPolicyEngine(rules, opa_path=self.opt("opa_path"))
+        except RegoCompileError:
+            self._layered_rego = None
+            self._layered_rego_bundle_sha = ""
+            return None
+        self._layered_rego_bundle_sha = bundle_sha
+        return self._layered_rego
 
     def evaluate(self, ctx: GateContext, stage: GateStage = GateStage.INBOUND) -> GateResult:
-        rules, compiled = self._current_view()
+        rules, compiled, bundle_sha = self._current_view()
         if not rules:
             return GateResult(
                 gate_name=self.name,
@@ -94,8 +112,14 @@ class Gate3Policy(Gate):
             )
 
         hits: list[PolicyRule] = []
-        if self.backend == "rego" and self.rego is not None and rules is self.rules:
-            hit_ids = set(self.rego.evaluate_hits(ctx))
+        active_rego = None
+        if self.backend == "rego":
+            if rules is self.rules:
+                active_rego = self.rego
+            elif bundle_sha:
+                active_rego = self._layered_rego_engine(rules, bundle_sha)
+        if active_rego is not None:
+            hit_ids = set(active_rego.evaluate_hits(ctx))
             hits = [rule for rule in rules if rule.id in hit_ids and self._triggered(rule, ctx.tool_name)]
         else:
             for rule in rules:
@@ -128,7 +152,8 @@ class Gate3Policy(Gate):
                 "policy_hit_count": len(hits),
                 "policy_severity_max": severity_max if hits else "none",
                 "backend": self.backend,
-                "rego_mode": self.rego.mode if self.rego is not None else "",
-                "opa_available": self.rego.opa_available if self.rego is not None else False,
+                "rego_mode": active_rego.mode if active_rego is not None else "",
+                "opa_available": active_rego.opa_available if active_rego is not None else False,
+                "policy_bundle_sha": bundle_sha,
             },
         )

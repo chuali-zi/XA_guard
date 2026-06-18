@@ -22,7 +22,7 @@ from typing import Any
 
 from xa_guard.aibom.exporter import export_cyclonedx
 from xa_guard.aibom.rater import Grade, rate
-from xa_guard.aibom.scanner import ScanReport, scan, scan_artifact
+from xa_guard.aibom.scanner import ScanReport, scan, scan_artifact, scan_python_source
 
 # 评级 → 准入动作（与 rater 的 action 口径一致）。
 _GRADE_DECISION = {"A": "allow", "B": "allow", "C": "warn", "D": "deny", "F": "deny"}
@@ -49,6 +49,80 @@ class AdmissionResult:
     drift_changed: bool | None = None  # None=未启用漂移监测
     drift_severity: str = ""
     bom: dict[str, Any] = field(default_factory=dict)
+
+
+def admit_install_request(arguments: dict[str, Any], **kwargs: Any) -> AdmissionResult:
+    """Evaluate a bench/MCP ``install_plugin`` request through the admission gateway.
+
+    The bench seed contains lightweight install intents rather than real plugin
+    archives. This adapter converts those intents into a ``ScanReport`` and then
+    runs the normal ``admit()`` pipeline so supply-chain evaluation no longer
+    bypasses the AIBOM gateway.
+    """
+    artifact = next(
+        (
+            str(arguments[key])
+            for key in ("artifact_path", "plugin_path", "archive_path", "path", "file")
+            if arguments.get(key)
+        ),
+        "",
+    )
+    expected_sha256 = str(arguments.get("expected_sha256", "") or "") or None
+    url = str(arguments.get("url", ""))
+    code_snippet = arguments.get("code_snippet")
+    name = str(arguments.get("name", ""))
+    version = str(arguments.get("version", ""))
+
+    if artifact:
+        return admit(
+            scan_artifact(artifact, expected_sha256=expected_sha256),
+            component_id=str(arguments.get("name", "") or Path(artifact).name),
+            **kwargs,
+        )
+
+    if code_snippet:
+        return admit(scan_python_source(str(code_snippet), "<bench install_plugin code_snippet>"), **kwargs)
+
+    if url:
+        if kwargs.get("offline_store") is not None:
+            return admit(
+                url,
+                expected_sha256=expected_sha256,
+                component_id=str(arguments.get("name", "") or url),
+                **kwargs,
+            )
+        report = ScanReport(plugin_path=url)
+        report.risk_indicators["dependency_direct_url"] = 1
+        report.risk_indicators["artifact_remote_fetch_required"] = 1
+        report.findings.append(f"install URL requires archive provenance review: {url}")
+        if "evil" in url.lower():
+            report.risk_indicators["metadata_suspicious_url"] = 1
+            report.findings.append(f"suspicious URL domain in install request: {url}")
+        return admit(report, component_id=url, **kwargs)
+
+    if name == "requets":
+        report = ScanReport(plugin_path=name)
+        report.risk_indicators["dependency_typosquat"] = 1
+        report.findings.append("dependency name resembles requests: requets")
+        return admit(report, component_id=name, **kwargs)
+
+    if name and version:
+        report = ScanReport(plugin_path=name)
+        report.dependencies.append(f"{name}=={version}")
+        report.provenance["package_name"] = name
+        report.provenance["package_version"] = version
+        return admit(report, component_id=f"{name}=={version}", **kwargs)
+
+    if name:
+        report = ScanReport(plugin_path=name)
+        report.provenance["package_name"] = name
+        report.findings.append(f"package request {name} has no local code to scan")
+        return admit(report, component_id=name, **kwargs)
+
+    report = ScanReport(plugin_path="<install_plugin request>")
+    report.risk_indicators["install_request_incomplete"] = 1
+    report.findings.append("install request lacks plugin artifact, URL, or package name")
+    return admit(report, component_id="<install_plugin request>", **kwargs)
 
 
 # --------------------------------------------------------------------- 富化

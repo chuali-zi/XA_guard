@@ -23,6 +23,7 @@ class DownstreamSpec:
     command: list[str]
     transport: Literal["stdio", "streamable-http"] = "stdio"
     url: str | None = None
+    tools: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -46,6 +47,7 @@ class XAGuardConfig:
     policy_default: str = "enterprise-l3"
     audit_dir: str = "./logs/audit"
     log_dir: str = "./logs/runtime"
+    pending_approvals_path: str = ""
     tool_capabilities_file: str = "policies/baseline/gate4_capabilities.yaml"
 
     @classmethod
@@ -67,6 +69,7 @@ class XAGuardConfig:
                 command=list(item.get("command", [])),
                 transport=item.get("transport", "stdio"),
                 url=item.get("url"),
+                tools=list(item.get("tools") or []),
             )
             for item in root.get("downstream", [])
         ]
@@ -86,6 +89,7 @@ class XAGuardConfig:
             policy_default=root.get("policy_default", "enterprise-l3"),
             audit_dir=root.get("audit_dir", "./logs/audit"),
             log_dir=root.get("log_dir", "./logs/runtime"),
+            pending_approvals_path=root.get("pending_approvals_path", ""),
             tool_capabilities_file=root.get("tool_capabilities_file", "policies/baseline/gate4_capabilities.yaml"),
         )
 

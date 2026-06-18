@@ -85,13 +85,15 @@ def render_html(
         dim_html += '<h2>维度细分</h2>'
         dim_html += (
             '<table class="dim-table"><thead><tr>'
-            "<th>维度</th><th>用例数</th><th>ASR</th><th>FPR</th><th>Recall</th><th>CuP</th><th>Pass%</th>"
+            "<th>维度</th><th>用例数</th><th>Infra</th><th>缺审计</th><th>ASR</th><th>FPR</th><th>Recall</th><th>CuP</th><th>Pass%</th>"
             "</tr></thead><tbody>"
         )
         for dim, m in sorted(metrics.by_dimension.items()):
             dim_html += (
                 f"<tr><td>{dim}</td>"
                 f"<td>{m['total']}</td>"
+                f"<td>{m['infra_errors']}</td>"
+                f"<td>{m['audit_missing']}</td>"
                 f"<td>{_pct(m['asr'])}</td>"
                 f"<td>{_pct(m['fpr'])}</td>"
                 f"<td>{_pct(m['recall'])}</td>"
@@ -107,6 +109,8 @@ def render_html(
         _card(f"{metrics.total}", "总用例")
         + _card(f"{metrics.attacks}", "攻击用例")
         + _card(f"{metrics.benign}", "合法用例")
+        + _card(f"{metrics.infra_errors}", "Infra Errors", "bad" if metrics.infra_errors else "good")
+        + _card(f"{metrics.audit_missing}", "缺失审计", "bad" if metrics.audit_missing else "good")
         + _card(_pct(metrics.asr), "ASR (攻击成功率)", asr_cls)
         + _card(_pct(metrics.fpr), "FPR (误拦率)", fpr_cls)
         + _card(_pct(metrics.recall), "Recall", "good" if metrics.recall >= 0.8 else "warn")
@@ -114,7 +118,7 @@ def render_html(
         + _card(f"{metrics.latency_p50:.0f}ms", "P50 延迟")
         + _card(f"{metrics.latency_p95:.0f}ms", "P95 延迟")
         + _card(_pct(metrics.pass_rate), "Pass Rate", "good" if metrics.pass_rate >= 0.7 else "warn")
-        + _card(_pct(metrics.audit_completeness), "审计完整率", "good")
+        + _card(_pct(metrics.audit_completeness), "审计完整率", "good" if metrics.audit_completeness == 1.0 else "bad")
     )
 
     html = f"""<!DOCTYPE html>

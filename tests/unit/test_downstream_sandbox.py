@@ -85,3 +85,76 @@ def test_downstream_gvisor_mode_uses_sandboxed_stdio_session(monkeypatch):
     assert result == {"via": "sandbox", "mode": "docker_gvisor", "runtime": "runsc"}
     assert native.calls == []
     assert sandbox_modes == ["docker_gvisor"]
+
+
+def test_downstream_static_manifest_does_not_start_native_session():
+    spec = DownstreamSpec(
+        name="fixture",
+        command=["python", "-m", "demo.targets.ops_target"],
+        tools=[
+            {
+                "name": "echo",
+                "description": "Echo a value",
+                "inputSchema": {"type": "object", "properties": {"value": {"type": "string"}}},
+            }
+        ],
+    )
+    router = DownstreamRouter([spec])
+
+    asyncio.run(router.start())
+    try:
+        assert router.list_tools() == [
+            {
+                "name": "echo",
+                "description": "Echo a value",
+                "inputSchema": {"type": "object", "properties": {"value": {"type": "string"}}},
+            }
+        ]
+        assert router._sessions == {}
+        assert router.tools_by_name["echo"][1] is None
+    finally:
+        asyncio.run(router.stop())
+
+
+def test_downstream_static_manifest_requires_sandbox_for_call():
+    spec = DownstreamSpec(
+        name="fixture",
+        command=["python", "-m", "demo.targets.ops_target"],
+        tools=[{"name": "echo", "description": "Echo a value", "inputSchema": {"type": "object"}}],
+    )
+    router = DownstreamRouter([spec])
+    asyncio.run(router.start())
+    try:
+        try:
+            asyncio.run(router.call_tool(_ctx_with_gate5("native")))
+        except RuntimeError as exc:
+            assert "static tool discovery" in str(exc)
+        else:
+            raise AssertionError("static manifest native call should fail closed")
+    finally:
+        asyncio.run(router.stop())
+
+
+def test_downstream_static_manifest_sandboxed_call(monkeypatch):
+    spec = DownstreamSpec(
+        name="fixture",
+        command=["python", "-m", "demo.targets.ops_target"],
+        tools=[{"name": "echo", "description": "Echo a value", "inputSchema": {"type": "object"}}],
+    )
+    router = DownstreamRouter([spec])
+    sandbox_calls = []
+
+    async def fake_sandboxed_call(captured_spec, ctx, policy):
+        sandbox_calls.append((captured_spec, ctx.tool_name, policy.mode))
+        return {"via": "sandbox"}
+
+    monkeypatch.setattr(router, "_call_tool_sandboxed", fake_sandboxed_call)
+
+    asyncio.run(router.start())
+    try:
+        result = asyncio.run(router.call_tool(_ctx_with_gate5("docker")))
+    finally:
+        asyncio.run(router.stop())
+
+    assert result == {"via": "sandbox"}
+    assert sandbox_calls == [(spec, "echo", "docker")]

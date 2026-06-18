@@ -47,3 +47,18 @@ def test_build_docker_command_uses_runsc_for_gvisor_mode(tmp_path: Path):
     command = build_docker_command(["python", "-m", "demo.targets.ops_target"], policy, tmp_path)
 
     assert ["--runtime", "runsc"] == command[command.index("--runtime") : command.index("--runtime") + 2]
+
+
+def test_build_docker_command_can_use_image_workspace_without_bind_mount(tmp_path: Path):
+    policy = SandboxPolicy(
+        mode="docker",
+        docker_image="xa-guard/sandbox:test",
+        workspace_mount=False,
+    )
+
+    command = build_docker_command(["python", "-m", "demo.targets.ops_target"], policy, tmp_path)
+
+    assert "-v" not in command
+    assert "--workdir" not in command
+    assert all(not item.startswith("PYTHONPATH=") for item in command)
+    assert command[-4:] == ["xa-guard/sandbox:test", "python", "-m", "demo.targets.ops_target"]

@@ -2,6 +2,15 @@
 
 ---
 
+## 2026-06-18 — MCP install_plugin 离线准入（Codex 主 agent）
+- `gateway.admit_install_request()` 新增本地目录/归档参数别名与 `expected_sha256`，本地 artifact 走真实解包/静态扫描；远程引用只在服务端离线缓存命中时扫描。
+- `proxy.upstream` 在真实 MCP `tools/call install_plugin` 进入 6 关卡前注入 `aibom_gateway` 结果；D/F 或未镜像远程引用直接拒绝，A/B/C 继续服从既有策略/HITL，Gate6 记录 `AIBOM-GATEWAY`。
+- E2E 验证恶意安装下游 0 次，干净本地 artifact 经 HITL 后下游 1 次并形成 `require_approval -> allow` 审计链。
+- OpenCode 真实 LLM smoke 已连接 XA-Guard MCP 并实际调用 `install_plugin`；恶意源码被 AIBOM F 级阻断，Gate6 trace `e4abab76-9b3d-4556-8d08-06be6bcc77ce` 验链通过。
+- 边界：不是 marketplace 下载器、IDE 商店拦截、实时漏洞 feed 或生产签名信任链。
+
+---
+
 ## 2026-05-24 23:55 主助手
 - scanner.py / rater.py 骨架
 - 赛题方向 3 加分项；demo 阶段轻量实现

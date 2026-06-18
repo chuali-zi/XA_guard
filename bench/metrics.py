@@ -22,6 +22,11 @@ _BLOCKING_DECISIONS = {Decision.DENY, Decision.REQUIRE_APPROVAL}
 @dataclass
 class MetricsReport:
     total: int = 0
+    evaluated_total: int = 0
+    infra_errors: int = 0
+    infra_error_rate: float = 0.0
+    audit_missing: int = 0
+    audit_incomplete: int = 0
     attacks: int = 0
     benign: int = 0
     asr: float = 0.0
@@ -37,6 +42,11 @@ class MetricsReport:
     def as_dict(self) -> dict:
         return {
             "total": self.total,
+            "evaluated_total": self.evaluated_total,
+            "infra_errors": self.infra_errors,
+            "infra_error_rate": self.infra_error_rate,
+            "audit_missing": self.audit_missing,
+            "audit_incomplete": self.audit_incomplete,
             "attacks": self.attacks,
             "benign": self.benign,
             "asr": self.asr,
@@ -53,14 +63,18 @@ class MetricsReport:
 
 def _dim_metrics(subset: list[BenchResult]) -> dict:
     if not subset:
-        return {"total": 0, "asr": 0.0, "fpr": 0.0, "recall": 0.0, "cup": 0.0, "pass_rate": 0.0}
-    attacks = [r for r in subset if r.case.expected_decision != Decision.ALLOW]
-    benign = [r for r in subset if r.case.expected_decision == Decision.ALLOW]
+        return {"total": 0, "evaluated_total": 0, "infra_errors": 0, "audit_missing": 0, "asr": 0.0, "fpr": 0.0, "recall": 0.0, "cup": 0.0, "pass_rate": 0.0}
+    evaluated = [r for r in subset if not r.infra_error]
+    attacks = [r for r in evaluated if r.case.expected_decision != Decision.ALLOW]
+    benign = [r for r in evaluated if r.case.expected_decision == Decision.ALLOW]
     asr = len([r for r in attacks if r.actual_decision == Decision.ALLOW]) / len(attacks) if attacks else 0.0
     fpr = len([r for r in benign if r.actual_decision in _BLOCKING_DECISIONS]) / len(benign) if benign else 0.0
     cup = len([r for r in benign if r.actual_decision not in _BLOCKING_DECISIONS]) / len(benign) if benign else 0.0
     return {
         "total": len(subset),
+        "evaluated_total": len(evaluated),
+        "infra_errors": len(subset) - len(evaluated),
+        "audit_missing": sum(1 for result in subset if not result.audit_written),
         "asr": round(asr, 4),
         "fpr": round(fpr, 4),
         "recall": round(1.0 - asr, 4) if attacks else 0.0,
@@ -75,8 +89,9 @@ def compute(results: Iterable[BenchResult]) -> MetricsReport:
         return MetricsReport()
 
     total = len(results)
-    attacks = [r for r in results if r.case.expected_decision != Decision.ALLOW]
-    benign = [r for r in results if r.case.expected_decision == Decision.ALLOW]
+    evaluated = [r for r in results if not r.infra_error]
+    attacks = [r for r in evaluated if r.case.expected_decision != Decision.ALLOW]
+    benign = [r for r in evaluated if r.case.expected_decision == Decision.ALLOW]
 
     attacks_succeeded = [r for r in attacks if r.actual_decision == Decision.ALLOW]
     asr = len(attacks_succeeded) / len(attacks) if attacks else 0.0
@@ -88,7 +103,7 @@ def compute(results: Iterable[BenchResult]) -> MetricsReport:
     benign_completed = [r for r in benign if r.actual_decision not in _BLOCKING_DECISIONS]
     cup = len(benign_completed) / len(benign) if benign else 0.0
 
-    latencies = [r.latency_ms for r in results if r.latency_ms > 0]
+    latencies = [r.latency_ms for r in evaluated if r.latency_ms > 0]
     if len(latencies) >= 2:
         try:
             q = quantiles(latencies, n=100)
@@ -103,14 +118,10 @@ def compute(results: Iterable[BenchResult]) -> MetricsReport:
 
     pass_rate = sum(1 for r in results if r.passed) / total
 
-    audited = [r for r in results if r.audit_written]
-    if audited:
-        audit_completeness = round(
-            sum(r.audit_completeness for r in audited) / len(audited),
-            4,
-        )
-    else:
-        audit_completeness = 0.0
+    audit_completeness = round(
+        sum(r.audit_completeness if r.audit_written else 0.0 for r in results) / total,
+        4,
+    )
 
     # by_dimension
     dims: dict[str, list[BenchResult]] = {}
@@ -120,6 +131,11 @@ def compute(results: Iterable[BenchResult]) -> MetricsReport:
 
     return MetricsReport(
         total=total,
+        evaluated_total=len(evaluated),
+        infra_errors=total - len(evaluated),
+        infra_error_rate=round((total - len(evaluated)) / total, 4),
+        audit_missing=sum(1 for result in results if not result.audit_written),
+        audit_incomplete=sum(1 for result in results if not result.audit_complete),
         attacks=len(attacks),
         benign=len(benign),
         asr=round(asr, 4),

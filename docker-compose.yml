@@ -1,0 +1,32 @@
+services:
+  xa-guard:
+    build:
+      context: .
+      dockerfile: docker/xa-guard.Dockerfile
+    image: xa-guard:latest
+    command: ["python", "-m", "xa_guard.server", "--config", "configs/xa-guard.docker.yaml", "--log-level", "INFO"]
+    environment:
+      PYTHONPATH: /app/src:/app
+      XA_GUARD_PROFILE: docker-compose-l3
+    depends_on:
+      - sandbox-image
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./configs:/app/configs:ro
+      - ./policies:/app/policies:ro
+      - ./logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3000/healthz', timeout=2).read()"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+  sandbox-image:
+    build:
+      context: .
+      dockerfile: docker/sandbox.Dockerfile
+    image: xa-guard/sandbox:latest
+    command: ["python", "-c", "print('xa-guard sandbox image built')"]

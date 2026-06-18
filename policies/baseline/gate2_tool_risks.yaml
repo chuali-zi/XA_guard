@@ -47,6 +47,7 @@ tool_risks:
 
   # 权限 / 系统上线
   grant_permission: red
+  pending_approval_op: red
   update_user_role: red
   admin_action: red
   publish_system: red

@@ -1,6 +1,6 @@
 """靶子运维助手 MCP server — demo 用。
 
-6 个假工具，不执行真实操作。
+8 个假工具，不执行真实操作。
 入口：python -m demo.targets.ops_target  (stdio 模式)
 """
 from __future__ import annotations
@@ -110,6 +110,22 @@ async def list_tools() -> list[types.Tool]:
                 "required": ["to", "body"],
             },
         ),
+        types.Tool(
+            name="install_plugin",
+            description="模拟安装插件；XA-Guard 应先执行 AIBOM 准入和 HITL，不真正安装",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "version": {"type": "string"},
+                    "artifact_path": {"type": "string"},
+                    "url": {"type": "string"},
+                    "code_snippet": {"type": "string"},
+                    "expected_sha256": {"type": "string"},
+                },
+                "additionalProperties": False,
+            },
+        ),
     ]
 
 
@@ -142,6 +158,8 @@ def _dispatch(name: str, args: dict) -> object:
             return {"sent": True, "channel": args.get("channel", "")}
         case "send_email":
             return {"sent": True, "to": args.get("to", "")}
+        case "install_plugin":
+            return {"installed": False, "simulated": True, "name": args.get("name", "")}
         case _:
             return {"error": f"unknown tool: {name}"}
 

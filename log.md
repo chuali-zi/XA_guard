@@ -1,5 +1,358 @@
 # 工作日志
 
+## 2026-06-18 Codex 主 agent（+5 gpt-5.5 medium 子 agent）- Bench 全样本审计与 infra error 可信口径
+
+本次具体做了什么：
+- 继续 L3 目标，派出 5 个 `gpt-5.5 medium` 子 agent：3 个只读审查 bench/runner/Gate6，2 个在互不冲突的新测试文件中补回归测试。审查确认 audit completeness 分母、异常吞掉、supply-chain 绕 Gate6、结果不可离线复算和 verifier 非法 JSON 崩溃均为真实问题。
+- 修改 `Pipeline`：新增集中 `_audit()`，所有预置 deny、Gate1/Gate2-4/Gate5 短路、executor 异常、approval token 失败、审批后异常和 reject 路径都将 Gate6 结果 append 到共享上下文；新增 `finalize_preflight()` 供 AIBOM 等领域预检只写审计、不重跑通用 gate。
+- 修复 executor 异常时 `PipelineResult` 为 deny 但 `ctx.final_decision` 仍为 allow 的不一致，现统一 fail-closed 为 deny。
+- 修改 bench runner：supply-chain AIBOM 路径写 Gate6；任何 pipeline/AIBOM 异常都标记 `infra_error`、deny、`passed=False`，并尽力写异常审计；Gate6 本身失败时明确留作缺审计，不能伪装为正常安全决策。
+- 扩展 `BenchResult` 与 CLI 结果：保存 trace_id、audit record hash、审计完整率、infra error 类型/消息和真实 result note；旧 JSON 缺字段时仍按默认值兼容。离线 report 重建后可复算完全相同 metrics。
+- 修正 metrics：审计完整率按所有操作为分母；infra error 不进入 ASR/FPR/CuP 正常样本分母；新增 evaluated/infra/audit missing/incomplete 指标。CLI 发现 infra error、缺审计或不完整审计时非 0 退出。
+- 修复 `scripts/verify_audit.py` 非法 JSON 导致未定义变量崩溃；verifier/archive 统一拒绝 NaN/Infinity。
+- 新增 `tests/unit/test_bench_runner_evidence.py`、`test_bench_evidence_truth.py`、`test_verify_audit_cli.py`，并更新 README/status/bench/scripts worklog。
+
+验证：
+- 证据可信度定向/宽回归共 27 passed，Ruff 通过。
+- `python -m bench.cli run --suite bench\cases\csab-gov-mini-seed.yaml --config configs\xa-guard.yaml`：退出 0；290 total/evaluated，0 infra error，0 audit missing/incomplete，audit completeness 1.0，pass rate 1.0。
+- `bench/.log/last_results.json`：290 行、290 唯一 trace、290 audit record hash；离线重建 metrics 与 `last_report.json` 完全一致。
+- `python scripts\verify_audit.py --path logs\audit\audit.jsonl`：28,095 records，0 chain/hash errors，0 JSON parse errors，0 missing-field records。
+- `python -m pytest -q --basetemp pytest_tmp_l3_truth_full -p no:cacheprovider -x --tb=short`：全量 100% 通过；2 skip（未安装 `langchain_core`、本机无 Docker sandbox 镜像）。
+
+未完成 / 客观限制：
+- Gate6 的 `gen_ai.decision.faithfulness_score` 仍固定为 1.0，是未实现算法的占位，不能作为忠实度已验证证据；现有测试也固定断言 1.0，按项目规则本轮未擅自改测试契约。
+- 当前 evidence 可证明每个 case 与审计记录一一关联并离线复算 metrics，但尚未保存足够的逐 gate 输入/metadata/策略快照做完整 decision replay。
+- Gate1 Recall@1%FPR 仍未达 PRD 保底；Docker runtime、生产 SM2/SM3 与外部 TSA 仍未完成。
+
+## 2026-06-18 Codex 主 agent（+4 gpt-5.5 medium 子 agent）- L3 可复现性能基准
+
+本次具体做了什么：
+- 对照 `docs/PRD.md` 的 L3 定义重新审计缺口：L3 核心为 Docker 一键部署、国密支持、性能基准。派出 4 个 `gpt-5.5 medium` 子 agent 分别审查 PRD、LangChain、审计可信度和性能测试；3 个只读审查，1 个仅新增性能测试文件。
+- 新增 `scripts/benchmark_l3_performance.py`：运行真实六关卡 pipeline 与 Gate6 JSONL 落盘，混合 allow/deny/approval 三类 workload；输出 `xa-l3-performance-benchmark/v0.1` JSON，包含脚本/config SHA-256、环境、P50/P95/P99/QPS、Windows Working Set/Peak RSS、决策分布、审计记录数和哈希链校验。
+- benchmark 每次创建独立 audit run 目录，不覆盖历史证据；支持 `--require-targets`，未达到 PRD 中等档时非 0 退出。
+- 子 agent 新增 `tests/unit/test_l3_performance_benchmark.py`，覆盖报告 schema、延迟/吞吐/内存字段、decision counts、CLI JSON 输出和非法参数。
+- 生成可版本化证据 `docs/evidence/l3-performance-benchmark-2026-06-18.json`，并更新 README、status 与 scripts worklog。
+
+验证：
+- `python scripts\benchmark_l3_performance.py --config configs\xa-guard.opencode-smoke.yaml --requests 500 --warmup 30 --concurrency 10 --audit-dir logs\performance --output docs\evidence\l3-performance-benchmark-2026-06-18.json --require-targets`：P50 20.305ms、P95 168.273ms、QPS 53.486、峰值 RSS 62.996MB；四项 PRD 中等档 target 全部通过；530 条含 warmup 的 Gate6 审计记录验链通过。
+- `python -m pytest -q --basetemp pytest_tmp_l3_perf_tests -p no:cacheprovider tests\unit\test_l3_performance_benchmark.py -x --tb=short`：7 passed。
+- `python -m pytest -q --basetemp pytest_tmp_l3_perf_broad -p no:cacheprovider tests\unit\test_l3_performance_benchmark.py tests\test_pipeline_smoke.py tests\unit\test_gate6_audit.py tests\unit\test_config.py tests\integration\test_mcp_e2e.py tests\unit\test_aibom_gateway.py -x --tb=short`：37 passed；`compileall`、Ruff、evidence 脚本 hash/targets 校验和 `git diff --check` 通过。
+
+未完成 / 客观限制：
+- 该性能证据是 Windows 本机、单进程、规则模式、in-process pipeline + Gate6 落盘；不包含 MCP stdio/HTTP、真实模型推理、真实工具耗时、Docker 网络或多机 soak，不能外推为生产部署性能。
+- PRD L3 仍未整体完成：Docker daemon 当前不可用，完整 Compose build/up/healthz 尚未验收；国密实现仍有 fallback/演示密钥，未形成生产 SM2/SM3 + 外部 TSA 可信链。
+- 子 agent 另发现 Gate1 Recall@1%FPR、bench 审计分母/faithfulness 口径和 LangChain 真实执行纳管仍有实质缺口，后续应继续修复，不能因本轮性能达标而忽略。
+
+## 2026-06-18 Codex 主 agent（+3 gpt-5.5 medium 子 agent）- L3 AIBOM 真实 MCP 安装前准入
+
+本次具体做了什么：
+- 继续 L3 目标，派出/复用 3 个 `gpt-5.5 medium` 子 agent 做只读审查；结论一致建议把 AIBOM 从 bench 旁路前移到真实 MCP `tools/call install_plugin`，子 agent 未修改文件。
+- 修改 `src/xa_guard/aibom/gateway.py`：`admit_install_request()` 支持 `artifact_path/plugin_path/archive_path/path/file` 本地目录或归档和 `expected_sha256`，通过 `scan_artifact()` 做真实解包、AST/依赖扫描与摘要校验；远程 URL 只有传入服务端离线缓存时才解析缓存字节。
+- 修改 `src/xa_guard/proxy/upstream.py`：真实 `install_plugin` 调用在 6 关卡前执行 AIBOM preflight，并注入 `aibom_gateway` GateResult；D/F 或远程未镜像引用直接 deny，不触达下游；A/B/C 继续服从既有 Gate2/Gate3/HITL。支持服务端环境变量 `XA_GUARD_AIBOM_OFFLINE_CACHE` 指向预置 `OfflinePackageStore`。
+- 扩展 AIBOM gateway 单元测试、upstream 单元测试和 MCP E2E fixture：覆盖本地 zip/hash、hash mismatch、离线镜像命中、远程未镜像 fail-closed、恶意插件下游 0 次、干净本地插件 HITL approve 后下游 1 次，以及 Gate6 `AIBOM-GATEWAY` 审计命中。
+- 更新 `README.md`、`status.md` 和 AIBOM 模块 worklog，客观标注这是 MCP 参数面离线安装前准入，不是 marketplace/IDE 插件商店集成。
+
+验证：
+- `python -m pytest -q --basetemp pytest_tmp_l3_aibom_mcp2 -p no:cacheprovider tests\unit\test_aibom_gateway.py tests\unit\test_upstream_elicitation.py tests\integration\test_mcp_e2e.py tests\test_aibom_bench_supply_chain.py -x --tb=short`：31 passed。
+- 根据用户补充的实际链路，新增 `configs/xa-guard.opencode-smoke.yaml` 与 `configs/opencode.l3-smoke.json`，并给 demo 下游增加不执行真实安装的模拟 `install_plugin`。`opencode.cmd mcp list` 显示 `xa_guard_l3_smoke connected`。
+- 两次 `opencode.cmd run` 均由真实 LLM 调用 `xa_guard_l3_smoke_install_plugin`；第二次在首因短路修复后返回 `aibom_gateway: AIBOM grade F`，命中 `AIBOM-GATEWAY`，trace `e4abab76-9b3d-4556-8d08-06be6bcc77ce`，未执行下游安装。
+- 修改 `pipeline.run()`：若协议适配器已注入 DENY preflight，则立即走 Gate6 审计并返回，避免后续通用 gate 覆盖供应链首个拒绝原因。
+- `python -m pytest -q --basetemp pytest_tmp_l3_aibom_mcp3 -p no:cacheprovider tests\unit\test_aibom_gateway.py tests\unit\test_upstream_elicitation.py tests\integration\test_mcp_e2e.py tests\test_aibom_bench_supply_chain.py tests\test_pipeline_smoke.py tests\integration\test_proxy_smoke.py tests\unit\test_config.py -x --tb=short`：41 passed；`python -m compileall -q src tests demo`：通过；`git diff --check`：通过，仅 CRLF 提示。
+- `python scripts\verify_audit.py --path logs\opencode-smoke\audit.jsonl`：verified 2 records，0 chain/hash errors，0 missing-field records，0 anchor errors。
+
+未完成 / 客观限制：
+- 未接真实 marketplace、Trae/Cursor/CodeBuddy/Qoder CN 插件商店或下载执行器；当前只在 XA-Guard 暴露的 MCP `install_plugin` 参数面做离线 preflight。
+- 未接实时漏洞/信誉 feed、生产级 TUF/Sigstore/组织签名信任根；离线缓存由服务端运维预置。
+- PRD L3 仍未整体完成：真实客户端 HITL UI、外部 TSA/生产国密链、Docker Compose runtime/Linux gVisor、官方外部 benchmark 与交付材料仍待补。
+
+## 2026-06-17 20:06 +08:00 Codex 主 agent（+2 gpt-5.5 medium 子 agent）- L3 HITL pending schema 感知脱敏
+
+本次具体做了什么：
+- 继续 L3 目标，派出 2 个 `gpt-5.5 medium` 子 agent 做只读审查：一个审查 schema 感知脱敏实现，一个审查 README/status/log 口径；子 agent 均未直接修改文件。
+- 修改 `src/xa_guard/proxy/pending.py`：`redact_arguments()` 支持工具 `inputSchema` 标注，识别 `x-xa-guard-sensitive: true`、`x-sensitive: true`、`writeOnly: true`、`format: password`；支持 object `properties`、array `items` 和 dict 型 `additionalProperties` 的递归脱敏；字段名 best-effort 仍作为 fallback。
+- 修改 `src/xa_guard/proxy/upstream.py`：`_build_app()` 建立 `tool_name -> inputSchema` 映射；pending ledger 写盘、pending list 展示和 MCP elicitation message 都使用 schema-aware redaction。schema 标注字段在当前进程内仍可用原始参数 approve 执行；重启后若只剩脱敏参数仍 fail-closed。
+- 修改 `configs/xa-guard.docker.yaml`：给 Docker profile 静态 manifest 中 `send_email.to` / `send_email.body` 增加少量敏感标注，作为 L3 schema redaction demo 证据。
+- 扩展 `tests/unit/test_pending_ledger.py`：覆盖 `x-xa-guard-sensitive`、`writeOnly`、array items、普通字段不误伤和 ledger 不含 schema 标注字段明文。
+- 扩展 `tests/unit/test_upstream_elicitation.py`：覆盖 pending list / ledger 使用工具 schema 脱敏、当前进程 approve 仍使用原始参数、elicitation message 不展示 schema 标注字段明文。
+- 更新 `README.md`、`status.md`，明确这是 schema 标注优先、字段名回退的 L3 原型，不是完整 JSON Schema 解释器、完整 DLP 或 KMS 加密恢复。
+
+验证：
+- `python -m pytest -q --basetemp pytest_tmp_l3_pending_schema_redaction1 -p no:cacheprovider tests\unit\test_pending_ledger.py tests\unit\test_upstream_elicitation.py tests\integration\test_mcp_e2e.py -x --tb=short`：25 passed。
+- `python -m pytest -q --basetemp pytest_tmp_l3_pending_schema_broad1 -p no:cacheprovider tests\unit\test_pending_ledger.py tests\unit\test_upstream_elicitation.py tests\integration\test_mcp_e2e.py tests\test_approval.py tests\test_pipeline_smoke.py tests\integration\test_proxy_smoke.py tests\unit\test_config.py tests\integration\test_l3_compose_config_smoke.py -x --tb=short`：47 passed。
+- `python -m compileall -q src tests`：通过。
+- `git diff --check`：通过，仅 CRLF 提示。
+
+未完成 / 客观限制：
+- schema 支持是常见标注与 properties/items/additionalProperties 递归，不是完整 JSON Schema 求值；未实现 oneOf/anyOf/allOf 的完整合并语义。
+- 不识别自由文本中的秘密；没有工具 schema 感知的值级 DLP、数据分类分级策略或人工安全评审。
+- 没有 KMS/DPAPI/国密加密恢复；含脱敏参数的 pending 项重启后仍 fail-closed。
+- 真实 IDE HITL UI、多实例审批一致性、完整 RBAC、外部 TSA 和 Docker runtime/gVisor 仍未完成。
+
+## 2026-06-17 20:00 +08:00 Codex 主 agent（+2 gpt-5.5 medium 子 agent）- L3 HITL pending ledger 敏感参数脱敏
+
+本次具体做了什么：
+- 继续 L3 目标，派出 2 个 `gpt-5.5 medium` 子 agent 做只读审查：一个审查 pending ledger 参数脱敏设计，一个审查 README/status/log 的能力边界；子 agent 均未直接修改文件。
+- 修改 `src/xa_guard/proxy/pending.py`：新增递归 `redact_arguments()` / `arguments_are_redacted()`，对常见敏感参数键做 best-effort 脱敏，包括 `password/passwd/pwd`、`token/*_token`、`secret/*_secret`、`api_key/*_key`、`authorization`、`cookie` 等；避免简单 substring 误伤 `monkey` 这类普通字段。
+- pending ledger 写入 `context.arguments` 前先脱敏，并额外记录 `arguments_redacted` 与 `arguments_sha256`；metadata 脱敏仍过滤 token 类字段。
+- 修改 `src/xa_guard/proxy/upstream.py`：`xa_guard_list_pending_approvals` 返回脱敏参数；若重启后 pending 只能从 ledger 恢复到脱敏参数，approve 会 fail-closed，不调用下游，并通过 `pipeline.reject_after_approval()` 追加 `deny` 审计，理由为 `pending_arguments_redacted_after_restart`。
+- 当前进程内未重启的 pending 项仍保留内存原始参数，operator approve 后可正常执行；ledger 和 list 不暴露敏感明文。
+- 扩展 `tests/unit/test_pending_ledger.py`、`tests/unit/test_upstream_elicitation.py`、`tests/integration/test_mcp_e2e.py`：覆盖递归脱敏、普通字段不误伤、ledger/list 无敏感明文、重启后敏感参数 approve fail-closed、审计链 `require_approval -> deny`。
+- 更新 `README.md`、`status.md`，明确这是字段名驱动的本地 ledger 明文收敛原型，不是完整 DLP、KMS 加密恢复或生产级隐私合规。
+
+验证：
+- `python -m pytest -q --basetemp pytest_tmp_l3_pending_redaction2 -p no:cacheprovider tests\unit\test_pending_ledger.py tests\unit\test_upstream_elicitation.py tests\integration\test_mcp_e2e.py -x --tb=short`：22 passed。
+- `python -m pytest -q --basetemp pytest_tmp_l3_pending_redaction3 -p no:cacheprovider tests\unit\test_pending_ledger.py tests\unit\test_upstream_elicitation.py tests\integration\test_mcp_e2e.py -x --tb=short`：22 passed。
+- `python -m compileall -q src tests`：通过。
+- `python -m pytest -q --basetemp pytest_tmp_l3_pending_redaction_broad1 -p no:cacheprovider tests\unit\test_pending_ledger.py tests\unit\test_upstream_elicitation.py tests\integration\test_mcp_e2e.py tests\test_approval.py tests\test_pipeline_smoke.py tests\integration\test_proxy_smoke.py tests\unit\test_config.py -x --tb=short`：43 passed。
+- `git diff --check`：通过，仅 CRLF 提示。
+
+未完成 / 客观限制：
+- 脱敏是字段名驱动 best-effort，不是完整 DLP；不识别自由文本中的秘密，也没有按工具 schema / 数据分类分级做精细策略。
+- 为避免伪加密，当前没有把敏感原文加密落盘；因此含敏感键的 pending 项在服务重启后不能自动恢复执行，只能 fail-closed 并要求重新发起。
+- 没有接 KMS/DPAPI/国密密钥管理、外部审批系统、多实例一致性、完整 RBAC 或真实 IDE HITL UI。
+
+## 2026-06-17 19:52 +08:00 Codex 主 agent（+2 gpt-5.5 medium 子 agent）- L3 HITL pending 本地 ledger / 重启恢复
+
+本次具体做了什么：
+- 继续 L3 目标，派出 2 个 `gpt-5.5 medium` 子 agent 做只读审查：一个审查 pending approval 持久化设计，一个审查 README/status/log 的 L3 表述边界；子 agent 均未直接修改文件。
+- 新增 `src/xa_guard/proxy/pending.py`：实现 `PendingApprovalStore`，支持可选本地 JSONL ledger；记录 `pending_added` / `pending_removed` 生命周期事件，启动时重放 ledger 恢复未过期 pending 项，`list/pop/add` 时清理过期项。
+- pending ledger 只保存恢复审批所需的 `GateContext` 快照：trace/span、tool/arguments、role、input sources、taint/risk、gate_results、rule_hits、final_decision/final_reason；不保存 approval token、operator token、approval secret 或工具执行结果。
+- 修改 `src/xa_guard/proxy/upstream.py`：用新的 `PendingApprovalStore` 替换进程内 dict；支持 `XA_GUARD_PENDING_APPROVAL_STORE` 环境变量覆盖 ledger 路径，或从配置项 `pending_approvals_path` 读取。
+- 修改 `src/xa_guard/config.py`、`configs/xa-guard.yaml`、`configs/xa-guard.docker.yaml`：增加 `pending_approvals_path`，默认指向 `./logs/runtime/pending_approvals.jsonl`。
+- 新增 `tests/unit/test_pending_ledger.py`：覆盖 ledger 上下文恢复、token 字段脱敏、pop 生命周期记录和 TTL 过期清理。
+- 扩展 `tests/unit/test_upstream_elicitation.py`：覆盖 app 重建后从 ledger list/approve/reject pending，approval token 不落 ledger。
+- 扩展 `tests/integration/test_mcp_e2e.py`：新增 MCP E2E 重启恢复场景，同一 ledger 路径下第二个 app 恢复 pending 并 approve，审计链仍为 `require_approval -> allow`。
+- 更新 `README.md`、`status.md`，明确这是单机本地 ledger 原型，不是生产级审批系统、多实例一致性、完整 RBAC、真实 IDE 弹窗或外部可信 TSA。
+
+验证：
+- `python -m pytest -q --basetemp pytest_tmp_l3_pending_ledger1 -p no:cacheprovider tests\unit\test_pending_ledger.py tests\unit\test_upstream_elicitation.py -x --tb=short`：15 passed。
+- `python -m compileall -q src tests`：通过。
+- `python -m pytest -q --basetemp pytest_tmp_l3_pending_ledger_e2e1 -p no:cacheprovider tests\unit\test_pending_ledger.py tests\unit\test_upstream_elicitation.py tests\integration\test_mcp_e2e.py -x --tb=short`：17 passed。
+- `python -m pytest -q --basetemp pytest_tmp_l3_pending_ledger_broad1 -p no:cacheprovider tests\unit\test_pending_ledger.py tests\unit\test_upstream_elicitation.py tests\integration\test_mcp_e2e.py tests\test_approval.py tests\test_pipeline_smoke.py tests\integration\test_proxy_smoke.py tests\unit\test_config.py -x --tb=short`：38 passed。
+- `git diff --check`：通过，仅 CRLF 提示。
+
+未完成 / 客观限制：
+- JSONL ledger 是单机本地恢复原型；没有文件锁、分布式一致性、多 worker 协调或外部审批系统。
+- pending arguments 当前按原始参数落本地 ledger，尚未做字段级脱敏策略；生产环境需要按工具 schema/数据密级脱敏。
+- approval token 仍是进程内 one-shot 消费表，多实例/重启后的全局防重放需要共享 nonce registry。
+- 真实 Trae / 国产 IDE HITL UI 截图、完整 RBAC、外部可信 TSA/国密签名和 Docker Compose runtime 验收仍未完成。
+
+## 2026-06-17 19:43 +08:00 Codex 主 agent（子 agent 尝试受额度限制）- L3 Docker Compose 部署 verifier
+
+本次具体做了什么：
+- 继续 L3 目标，沿用此前 Russell 子 agent 对 deployment verifier 的只读审查建议；本轮再次尝试派出 2 个 `gpt-5.5 medium` 子 agent 审查部署 verifier 与文档口径，但两个子 agent 均因额度限制报错，未修改文件、未产出可用审查结论。
+- 新增 `scripts/verify_l3_deployment.py`：默认安全模式只检查部署文件清单/hash、Docker daemon 状态、`docker compose config` 与静态 Compose/config 摘要；只有显式传入 `--run-build` / `--run-up` 才执行镜像构建、启动 `xa-guard` 服务和 `/healthz` 检查。
+- verifier 输出 `xa-l3-deployment-verification/v0.1` JSON，包含 compose/config/Dockerfile hash、Streamable HTTP transport、Gate5 `sandbox_all_tools`、sandbox 镜像、Docker socket mount、healthcheck、步骤状态和 limitations。
+- 将 Docker daemon / Docker Desktop 未启动识别为 `blocked_external_dependency`，避免把外部环境未就绪误记成产品配置失败；脚本仅在 `summary.status=pass` 时退出 0。
+- 新增 `tests/unit/test_l3_deployment_verifier.py`，覆盖 Docker daemon 缺失、显式 build/up 成功路径，以及显式 build/up 但 Docker daemon 缺失时 runtime 步骤标记为 blocked。
+- 更新 `README.md`、`status.md`，说明默认诊断不会启动容器，完整 build/up 需要本机 Docker daemon 可用。
+
+验证：
+- `python -m pytest -q --basetemp pytest_tmp_l3_deploy_verify4 -p no:cacheprovider tests\unit\test_l3_deployment_verifier.py -x --tb=short`：3 passed。
+- `python scripts\verify_l3_deployment.py --output pytest_tmp_l3_deployment_verification4.json`：生成报告；文件/hash、静态摘要和 `docker compose config` 通过，但 `docker_version` 因 Docker Desktop daemon 未启动（`dockerDesktopLinuxEngine` pipe 不存在）标记为 `blocked_external_dependency`。
+- `python -m pytest -q --basetemp pytest_tmp_l3_deploy_broad4 -p no:cacheprovider tests\unit\test_l3_deployment_verifier.py tests\integration\test_l3_compose_config_smoke.py tests\unit\test_config.py tests\unit\test_downstream_sandbox.py tests\unit\test_gate5.py tests\integration\test_proxy_smoke.py -x --tb=short`：23 passed。
+- `python -m compileall -q scripts src tests`：通过。
+- `git diff --check`：通过，仅 CRLF 提示。
+
+未完成 / 客观限制：
+- 当前机器 Docker Desktop daemon 未启动，`docker compose build/up` 与服务 `/healthz` 的真实 runtime 验收仍未完成。
+- verifier 是部署证据收集器，不替代 Linux/gVisor 真实运行、国产 IDE 真实 HITL 截图、外部 TSA 或长期运行压测。
+- 两个新子 agent 因额度限制未能协助；本轮有效子 agent 输入来自此前 Russell 的只读部署审查。
+
+## 2026-06-17 14:55 +08:00 Codex 主 agent（+2 gpt-5.5 medium 子 agent）- L3 外部 benchmark 本地 projection 证据
+
+本次具体做了什么：
+- 继续 L3 目标，派出 2 个 `gpt-5.5 medium` 子 agent 只读审查 external archive 的 projection 设计、安全边界和测试点；子 agent 均未直接修改文件。
+- 修改 `bench/external/schema.py`：`xa_guard_projection.input_payload` 优先从外部记录的首个 `tool_calls/actions` 中提取 `tool_name` 与 `arguments`，减少全部落到 `external_benchmark_case` 的无效投影。
+- 新增 `bench/external/projection.py`：把 normalized records 的 `xa_guard_projection.input_payload` 送入本地 XA-Guard pipeline，用 mock executor 运行 Gate1–Gate6，生成本地 projection decisions；隔离 audit 输出到 archive 内部目录，不写默认 `logs/audit`。
+- 扩展 `bench/external/cli.py archive --run-projection`：启用后生成 `xa-guard-projection/results.json`、`summary.json`、`audit/audit.jsonl`、`audit-verify.json`；manifest 记录 projection claim_scope、非官方声明、results/summary/audit hash、audit 验链摘要、config path/hash。
+- projection summary 使用 `xa_guard_projection_*` 字段名，避免裸 `ASR` / `score` / leaderboard 口径；不回写 normalized record 的 `observed` 或 smoke metrics。
+- 扩展 `tests/unit/test_external_benchmarks.py`：覆盖 `archive --run-projection` 的本地证据语义、隔离 audit、manifest projection 字段、summary 非官方声明、projection 不污染 smoke metrics、audit verify 记录数与 hash。
+- 更新 `README.md`、`docs/external-benchmarks.md`、`status.md`，明确 `--run-projection` 是本地 XA-Guard 防护投影，不是 AgentDojo/InjecAgent 官方成绩。
+
+验证：
+- `python -m pytest -q --basetemp pytest_tmp_l3_external_projection2 -p no:cacheprovider tests\unit\test_external_benchmarks.py -x --tb=short`：6 passed。
+- `python -m bench.external.cli archive --benchmark agentdojo --input bench/external/fixtures/agentdojo_smoke.jsonl --out-dir pytest_tmp_external_projection_smoke2\agentdojo --run-projection --config configs/xa-guard.yaml`：成功生成 projection results/summary/audit/audit-verify。
+- `python -m pytest -q --basetemp pytest_tmp_l3_external_projection_broad -p no:cacheprovider tests\unit\test_external_benchmarks.py tests\unit\test_opa_export.py tests\integration\test_l3_compose_config_smoke.py tests\unit\test_downstream_sandbox.py tests\integration\test_mcp_e2e.py tests\test_approval.py tests\test_pipeline_smoke.py -x --tb=short`：33 passed。
+- `python -m compileall -q bench src tests`：通过。
+
+未完成 / 客观限制：
+- projection 是本地 XA-Guard pipeline + mock executor 防护模拟，不能作为官方 AgentDojo/InjecAgent ASR、Utility、leaderboard score。
+- projection 质量依赖 normalizer 对外部 tool call 的 best-effort 映射；真实官方环境、模型执行、数据许可和上游 commit 仍未接入。
+- projection audit 已隔离并验链，但还没有外部 TSA/国密签名，也没有统一 evidence/ 顶层真实归档。
+
+## 2026-06-17 14:45 +08:00 Codex 主 agent（+2 gpt-5.5 medium 子 agent）- L3 外部 benchmark evidence archive
+
+本次具体做了什么：
+- 继续 L3 目标，派出 2 个 `gpt-5.5 medium` 子 agent 只读审查外部 benchmark adapter 与证据交付结构；子 agent 均未直接修改文件。
+- 新增 `bench/external/report.py`：从 normalized external benchmark JSONL 构造非官方 report，包含 input hash、validation error、benchmark/suite 分布、标签覆盖、smoke metrics、limitation counts、推荐归档字段。
+- 扩展 `bench/external/cli.py`：
+  - `normalize` 输出增强为评审友好的 JSON，包含 benchmark、claim_scope、schema/adaptor 版本、input/output sha256、输入字节数、records_read/written、limitations。
+  - `validate` 输出增强为包含 input sha256、schema version、records_valid、errors_count 的结构化 JSON。
+  - `smoke-metrics` 输出增强为 `metric_scope=adapter_health_only`、`not_official_benchmark_score=true`，并写明不是 AgentDojo/InjecAgent 官方 ASR。
+  - 新增 `report` 子命令，可对 normalized JSONL 输出 `report.json`。
+  - 新增 `archive` 子命令：一次性生成 `normalized.jsonl`、`validation.json`、`smoke-metrics.json`、`report.json`、`manifest.json`、`README.md`；manifest 记录 input/normalized/schema hash、adapter/schema 版本、validation counts、limitations 和 `official_claim=false`。
+- 扩展 `tests/unit/test_external_benchmarks.py`：覆盖 AgentDojo archive 目录完整性、manifest hash 正确性、`official_claim=false`、InjecAgent archive smoke。
+- 更新 `README.md`、`docs/external-benchmarks.md`、`status.md`、`bench/.log/worklog.md`，明确 external archive 是 supporting evidence，不是官方 benchmark 成绩。
+
+验证：
+- `python -m bench.external.cli archive --benchmark agentdojo --input bench/external/fixtures/agentdojo_smoke.jsonl --out-dir pytest_tmp_external_archive_smoke\agentdojo`：成功生成 manifest/report/normalized/validation/smoke-metrics/README。
+- `python -m pytest -q --basetemp pytest_tmp_l3_external_archive -p no:cacheprovider tests\unit\test_external_benchmarks.py -x --tb=short`：5 passed。
+- `python -m pytest -q --basetemp pytest_tmp_l3_external_archive_broad -p no:cacheprovider tests\unit\test_external_benchmarks.py tests\unit\test_opa_export.py tests\integration\test_l3_compose_config_smoke.py tests\unit\test_downstream_sandbox.py tests\integration\test_mcp_e2e.py tests\test_approval.py -x --tb=short`：27 passed。
+- `python -m compileall -q bench src tests`：通过。
+
+未完成 / 客观限制：
+- `archive` 仍只归档用户提供/fixture 导出，不下载或运行官方 AgentDojo/InjecAgent 环境，不产生官方可比 ASR/Utility。
+- Python 校验仍以现有轻量 `validate_record()` 为主，尚未接完整 JSON Schema engine。
+- 尚未实现 `--run-projection` 将 `xa_guard_projection` 送入 XA-Guard pipeline 并把决策/审计 hash 写入 archive。
+- 长期 evidence 目录结构与真实上游 source commit/license/transcript 仍需在拿到官方导出和实际环境后补齐。
+
+## 2026-06-17 14:37 +08:00 Codex 主 agent（+2 gpt-5.5 medium 子 agent）- L3 HITL 审批证据链加固
+
+本次具体做了什么：
+- 继续 L3 目标，派出 2 个 `gpt-5.5 medium` 子 agent 只读审查：一个复核 L3 全局缺口与下一步优先级，一个专门审查 HITL / approval / audit 生产语义。子 agent 均未直接修改文件。
+- 根据审查结论继续加固 HITL fallback，不把上一轮 pending approval 当作完成状态。
+- 在 `src/xa_guard/approval.py` 新增 `verify_and_consume_approval()`：在原有 HMAC 验签、args_hash、防过期基础上，加入进程内 token 消费表。同一 approval token 在当前进程内只能通过一次，第二次会返回 `approval_token_replay`。
+- 修改 `src/xa_guard/pipeline.py`：`run_after_approval()` 改用 `verify_and_consume_approval()`，让 approval token 从“TTL 内可复用凭据”变为 L3 原型级 one-shot capability；新增 `reject_after_approval()`，用于在原 `require_approval` 审计之后追加一条 `deny` 审计，记录人工拒绝的 approver/reason。
+- 修改 `src/xa_guard/proxy/upstream.py`：elicitation reject 与 pending reject 都调用 `pipeline.reject_after_approval()`，不触达下游但会写第二条 deny 审计；`XA_GUARD_APPROVAL_OPERATOR_TOKEN` 配置后，`xa_guard_list_pending_approvals`、approve、reject 都必须传入匹配 `operator_token`。
+- 更新 `tests/test_approval.py`：覆盖 `verify_and_consume_approval()` 防重放、pipeline 级 approval token replay 拒绝且下游只执行一次。
+- 更新 `tests/unit/test_upstream_elicitation.py`：覆盖 list/approve/reject operator token 校验，fake pipeline 增加 reject 审计接口。
+- 更新 `tests/integration/test_mcp_e2e.py`：reject 路径从原来的单条 `require_approval` 审计升级为 `require_approval -> deny`，断言 deny 行含 final_reason、approver 且无 approval_token；整体审计链长度随之更新。
+- 更新 `README.md`、`status.md`、`src/xa_guard/proxy/.log/worklog.md`，明确当前能力：pending approve one-shot、reject 可追溯、operator token 覆盖 list/approve/reject；仍不是完整持久化审批系统/RBAC。
+
+验证：
+- `python -m pytest -q --basetemp pytest_tmp_l3_hitl_reject_replay2 -p no:cacheprovider tests\test_approval.py tests\test_pipeline_smoke.py tests\unit\test_upstream_elicitation.py tests\integration\test_mcp_e2e.py -x --tb=short`：27 passed。
+- `python -m compileall -q src tests`：通过。
+- `python -m pytest -q --basetemp pytest_tmp_l3_hitl_broad -p no:cacheprovider tests\test_approval.py tests\test_pipeline_smoke.py tests\unit\test_upstream_elicitation.py tests\integration\test_mcp_e2e.py tests\integration\test_proxy_smoke.py tests\integration\test_l3_compose_config_smoke.py tests\unit\test_config.py tests\unit\test_downstream_sandbox.py tests\unit\test_gate5.py tests\unit\test_opa_export.py tests\unit\test_gate3.py::test_rego_backend_uses_layered_merged_view tests\test_sdk_protect.py tests\test_langchain_integration.py -x --tb=short`：55 passed，1 skip（当前环境未安装 `langchain_core`）。
+
+未完成 / 客观限制：
+- approval token 防重放目前是进程内内存表，服务重启或多实例部署后不能提供全局 one-shot；生产级需要外部审批/审计存储或共享 nonce registry。
+- pending store 仍是进程内内存态，尚不支持重启恢复、多 worker 协调或持久化 pending ledger。
+- operator token 仍是 demo 级 bearer token，不是完整 RBAC；真实生产还需要 operator 身份、角色、审批范围、list 参数脱敏和操作审计。
+- 真实 Trae / 国产 IDE HITL 证据、Docker Compose 实际 build/up、外部 AgentDojo/InjecAgent/TSA 仍未完成。
+
+## 2026-06-17 09:44 +08:00 Codex 主 agent（+2 gpt-5.5 medium 子 agent）- L3 HITL pending approval fallback
+
+本次具体做了什么：
+- 继续 L3 目标，按用户要求沿用并等待 2 个 `gpt-5.5 medium` 子 agent 只读分析：一个审查 upstream/pipeline pending approval 设计，一个审查测试与审计闭环风险。子 agent 均未直接修改文件。
+- 在 `src/xa_guard/proxy/upstream.py` 新增内存 pending approval store。红色工具触发 `REQUIRE_APPROVAL` 后，若当前 MCP 客户端没有 elicitation 通道或 elicitation 不可用，不再回落为普通拦截文本，而是保存原始 `GateContext`，返回 `trace_id`、过期时间和审批工具提示。
+- 新增两个上游内置控制工具：`xa_guard_list_pending_approvals` 与 `xa_guard_approve_pending`。这两个工具在 `call_tool()` 开头本地短路处理，不进入 downstream，也不走普通 pipeline，避免审批工具被策略误伤或递归。
+- `xa_guard_approve_pending` 批准时复用原始 ctx，调用现有 `issue_approval()` 签发 HMAC approval token，再调用 `pipeline.run_after_approval()` 完成验签、审计和下游执行；pending 项 approve/reject 后即删除，重复批准会返回“不存在或已过期”，避免同一 pending 请求被二次执行。若设置 `XA_GUARD_APPROVAL_OPERATOR_TOKEN`，审批工具会强制校验传入的 `operator_token`，错误 token 不消费 pending。
+- 拒绝 pending approval 时不触达下游，保持与现有 elicitation reject 一致的最小审计语义：已有第一条 `require_approval` 审计，不额外写 reject 记录。
+- 扩展 MCP E2E fixture：新增 `pending_approval_op` 红色测试工具，并在 `policies/baseline/gate4_capabilities.yaml` 和 legacy `gate2_tool_risks.yaml` 登记，确保 layered 与 legacy Gate2 路径都将其判定为 RED。
+- 扩展 `tests/unit/test_upstream_elicitation.py`：覆盖无 elicitation 时 pending、list、approve、reject、一次性消费、operator token 校验和审批 token 字段。
+- 扩展 `tests/integration/test_mcp_e2e.py`：真实 MCP memory transport 下验证 pending fallback 跨 client session 可 list/approve，批准后仅执行一次，审计为 `require_approval -> allow` 且 trace/参数/approval args_hash 闭环一致。
+- 更新 `README.md`、`status.md`、`src/xa_guard/proxy/.log/worklog.md`，客观标明 pending approval 是无 elicitation 客户端的 L3 原型 fallback，真实 Trae / 国产 IDE 弹窗截图仍未完成。
+
+验证：
+- `python -m pytest -q --basetemp pytest_tmp_l3_pending -p no:cacheprovider tests\unit\test_upstream_elicitation.py tests\integration\test_mcp_e2e.py -x --tb=short`：10 passed。
+- `python -m pytest -q --basetemp pytest_tmp_l3_pending_policy2 -p no:cacheprovider tests\unit\test_upstream_elicitation.py tests\integration\test_mcp_e2e.py tests\unit\test_gate2.py tests\test_tool_gate_coverage_matrix.py -x --tb=short`：30 passed。
+- `python -m compileall -q src tests`：通过。
+- `python -m pytest -q --basetemp pytest_tmp_l3_pending_broad2 -p no:cacheprovider tests\unit\test_upstream_elicitation.py tests\integration\test_mcp_e2e.py tests\integration\test_proxy_smoke.py tests\integration\test_l3_compose_config_smoke.py tests\unit\test_config.py tests\unit\test_downstream_sandbox.py tests\unit\test_gate5.py tests\unit\test_opa_export.py tests\unit\test_gate3.py::test_rego_backend_uses_layered_merged_view tests\test_sdk_protect.py tests\test_langchain_integration.py -x --tb=short`：39 passed，1 skip（当前环境未安装 `langchain_core`）。
+
+未完成 / 客观限制：
+- pending approval 当前是进程内内存态，服务重启后丢失；尚未接外部审批系统、operator token/RBAC、持久化队列或多实例协调。
+- pending reject 当前不追加第二条 deny 审计，语义与现有 elicitation reject 保持一致；如后续要做完整人工拒绝审计，需要在 `Pipeline` 增加显式 reject-after-approval 流程。
+- 真实 Trae / 国产 IDE HITL 弹窗、截图和多客户端交互证据仍未完成；本次只完成协议内 fallback 和进程内 E2E。
+
+## 2026-06-17 09:30 +08:00 Codex 主 agent（+3 gpt-5.5 medium 子 agent）- L3 审计锚定与 Compose/Gate5 闭环增量
+
+本次具体做了什么：
+- 继续 L3 目标，沿用并等待 3 个 `gpt-5.5 medium` 子 agent 的只读分析：外部 AgentDojo/InjecAgent benchmark、Compose/Gate5 闭环、审计证据链。子 agent 均未直接改文件。
+- 新增 `src/xa_guard/audit/tsa.py`：提供本地文件 TSA anchor 原型。anchor manifest 覆盖 audit 文件 SHA-256、字节数、记录数、首条/末条 `record_hash`、hash 算法、生成时间，并写 `anchors/index.jsonl` 串联多次 anchor 的 `previous_anchor_hash`。
+- 新增 `scripts/anchor_audit.py`，增强 `scripts/verify_audit.py`：验证脚本不再只看 `hash_prev`，而是复用 `verify_audit_jsonl()` 重算每行 `record_hash`；支持 `--anchor` 和 `--verify-anchor-index`。
+- 新增 `tests/unit/test_audit_tsa.py`，覆盖 anchor 创建、验锚、审计篡改拒绝、旧 anchor 失效、index 串联。
+- 加固 Docker Compose/Gate5 原型：`docker-compose.yml` 默认构建 `sandbox-image`；`docker/xa-guard.Dockerfile` 安装 Docker CLI；`docker/sandbox.Dockerfile` 内置 `src/`、`demo/` 和项目依赖；`configs/xa-guard.docker.yaml` 将 `workspace_mount` 改为 `false`，避免 Docker-outside-of-Docker 路径错绑。
+- 新增 sandbox policy 单测，确认 `workspace_mount=false` 时 Docker 命令不绑定宿主目录。
+- 继续补 L3 工具发现闭环：`DownstreamSpec.tools` 支持静态工具 manifest；docker profile 在 `configs/xa-guard.docker.yaml` 内声明 ops_target 工具清单，`DownstreamRouter.start()` 不再裸启动 stdio downstream 做 `list_tools`；`gate5.sandbox_all_tools=true` 让 docker profile 下 GREEN 工具调用也至少走 Docker sandbox。
+- 新增 `tests/integration/test_l3_compose_config_smoke.py` 和相关单测，锁住 docker profile 静态 discovery 不创建原生 session。
+- 新增 `bench.external` adapter skeleton：支持 AgentDojo/InjecAgent 用户导出 JSON/JSONL/CSV 的离线 normalize、validate、smoke-metrics；输出统一 JSONL，并强制 `official_claim=false` / `not_official_reproduction`。
+- 新增 `docs/external-benchmarks.md`、`bench/schema/external-benchmark-result.schema.json`、synthetic smoke fixtures 和 `tests/unit/test_external_benchmarks.py`；不下载官方数据、不运行官方环境、不声明官方成绩。
+- 新增 OPA/Rego merged-view 原型：`src/xa_guard/policy/opa_export.py`、`scripts/export_opa_policy.py`；导出当前 `LayeredPolicySource` 的 `data.json`、`gate3.rego`、`manifest.json`。
+- 修改 Gate3：`backend=rego + prefer_layered=true` 时按 `LayeredPolicySource.bundle_sha` 构建/缓存 merged rules 的 `RegoPolicyEngine`，overlay 热加载后 bundle_sha 变化会触发重建；无 OPA binary 时仍走现有 Python fallback。
+- 抽出 SDK `preflight_tool_call()` helper，并新增 `xa_guard.integrations.langchain.protect_tool()`：包装单个 LangChain `BaseTool` 的 `_run/_arun`，DENY/REQUIRE_APPROVAL 时抛 `XAGuardBlocked` 且不调用原工具。当前环境未安装 langchain-core，集成测试按可选依赖 skip。
+- 更新 `README.md`、`status.md`、模块工作日志，客观标明：本地文件 anchor 不是外部生产 TSA，Compose 实际 build/up 因 Docker daemon 未启动仍未验收。
+
+验证：
+- `python -m pytest -q --basetemp pytest_tmp_l3_tsa2 -p no:cacheprovider tests\unit\test_audit_tsa.py tests\unit\test_merkle.py tests\unit\test_audit_archive.py -x --tb=short`：11 passed。
+- `python -m pytest -q --basetemp pytest_tmp_l3_sandbox -p no:cacheprovider tests\unit\test_sandbox_policy.py tests\unit\test_downstream_sandbox.py tests\unit\test_gate5.py -x --tb=short`：13 passed。
+- `python -m compileall -q src scripts tests`：通过。
+- CLI smoke：生成临时 audit JSONL，`scripts/anchor_audit.py` 成功写 anchor/index，`scripts/verify_audit.py --anchor --verify-anchor-index` 通过。
+- `docker compose config`：通过。
+- `docker compose build sandbox-image`：未执行成功，原因是本机 Docker Desktop daemon 未启动，报 `dockerDesktopLinuxEngine` pipe 不存在。
+- `python -m pytest -q --basetemp pytest_tmp_l3_final_full -p no:cacheprovider -x --tb=short`：全量代码回归通过，但 `tests/integration/test_sandbox_runner.py` 因本地 `xa-guard/sandbox:latest` 镜像不可用 skip 1 条；该现象与 Docker daemon 未启动一致。
+- `python -m pytest -q --basetemp pytest_tmp_l3_discovery -p no:cacheprovider tests\unit\test_config.py tests\unit\test_gate5.py tests\unit\test_downstream_sandbox.py tests\integration\test_proxy_smoke.py tests\integration\test_l3_compose_config_smoke.py -x --tb=short`：20 passed。
+- `python -m pytest -q --basetemp pytest_tmp_l3_external -p no:cacheprovider tests\unit\test_external_benchmarks.py tests\unit\test_config.py tests\unit\test_gate5.py tests\unit\test_downstream_sandbox.py tests\integration\test_l3_compose_config_smoke.py -x --tb=short`：21 passed。
+- `python -m bench.external.cli normalize/validate/smoke-metrics` 对 InjecAgent synthetic fixture smoke 通过。
+- `python -m compileall -q bench src tests`：通过。
+- `python -m pytest -q --basetemp pytest_tmp_l3_round2_targeted -p no:cacheprovider tests\unit\test_external_benchmarks.py tests\unit\test_config.py tests\unit\test_gate5.py tests\unit\test_downstream_sandbox.py tests\integration\test_l3_compose_config_smoke.py tests\integration\test_proxy_smoke.py tests\integration\test_mcp_e2e.py -x --tb=short`：24 passed。
+- `python -m pytest -q --basetemp pytest_tmp_l3_round2_full -p no:cacheprovider -x --tb=short`：全量代码回归通过，仍有 1 条 `test_sandbox_runner.py` 因本地 `xa-guard/sandbox:latest` 镜像不可用 skip。
+- `python -m pytest -q --basetemp pytest_tmp_l3_opa -p no:cacheprovider tests\unit\test_opa_export.py tests\unit\test_gate3.py::test_rego_backend_uses_layered_merged_view tests\unit\test_gate3.py::test_rego_backend_evaluates_with_python_fallback tests\unit\test_gate3.py::test_rego_transpiler_covers_current_dsl_shapes tests\unit\test_layered_policy.py -x --tb=short`：39 passed。
+- `python scripts\export_opa_policy.py --out-dir pytest_tmp_l3_opa_cli\opa-bundle`：成功导出 OPA bundle manifest，当前 baseline merged_rules=31、tool_caps=48、sensitive_patterns=29。
+- `python -m pytest -q --basetemp pytest_tmp_l3_opa_sdk -p no:cacheprovider tests\unit\test_opa_export.py tests\unit\test_gate3.py::test_rego_backend_uses_layered_merged_view tests\test_sdk_protect.py tests\test_langchain_integration.py -x --tb=short`：通过；`test_langchain_integration.py` 因当前环境未安装 `langchain_core` skip 1 条。
+- `python -m pytest -q --basetemp pytest_tmp_l3_round3_targeted -p no:cacheprovider tests\unit\test_opa_export.py tests\unit\test_gate3.py::test_rego_backend_uses_layered_merged_view tests\unit\test_layered_policy.py tests\test_sdk_protect.py tests\test_langchain_integration.py tests\unit\test_external_benchmarks.py tests\integration\test_l3_compose_config_smoke.py tests\unit\test_downstream_sandbox.py -x --tb=short`：靶向通过；因未安装 `langchain_core` skip 1 条。
+- `python -m pytest -q --basetemp pytest_tmp_l3_round3_full -p no:cacheprovider -x --tb=short`：全量代码回归通过；skip 2 条，分别是本地 `xa-guard/sandbox:latest` 镜像不可用、当前环境未安装 `langchain_core`。
+
+未完成 / 客观限制：
+- 本地文件 TSA anchor 是可审计 demo/CI 证据锚，不是第三方可信时间戳服务；生产级 SM2/SM3 密钥管理、外部 TSA、签名并发写入的原子化仍未完成。
+- Compose 配置已更接近一键闭环，但完整 `docker compose up --build -d`、容器内 MCP `list_tools` + 高风险工具调用、长期运行和 Linux/gVisor/runsc 仍未实测。
+- docker profile 的下游工具发现已静态化；普通本地 stdio 配置仍保留动态 discovery，主要用于开发/测试。
+- AgentDojo/InjecAgent 当前只有 adapter skeleton；现有 XA-Bench 290 指标和 adapter smoke metrics 都不能冒充外部 benchmark 官方 ASR。
+- OPA 当前是 merged-view Rego engine/export 原型；真实 OPA CLI 执行、服务化部署、性能和三层包硬化仍未完成。
+- LangChain 当前只承诺单个 `BaseTool` wrapper 的强阻断语义；CallbackHandler、HITL approval resume、Agent/LangGraph 全链路 session_history 仍未完成。
+
+## 2026-06-16 21:50 +08:00 Codex 主 agent（+3 gpt-5.5 medium 子 agent）- L3 SDK 非透传 preflight
+
+本次具体做了什么：
+- 继续沿 L3 目标推进，派出 3 个 `gpt-5.5 medium` 子 agent 只读分析：SDK/LangChain、Compose 验收、国密/TSA 审计。
+- 新增可打包 SDK 命名空间 `src/xa_guard/sdk/`，并从 `xa_guard.__init__` 导出 `protect` / `XAGuardBlocked`；历史顶层 `sdk/` 改为兼容转发。
+- 实现 `@protect` 最小非透传能力：同步/异步函数调用前构造 `GateContext`，跑 `build_pipeline()` preflight；若结果为 DENY 或 REQUIRE_APPROVAL，抛出 `XAGuardBlocked`，原函数不会被调用。
+- 新增 `tests/test_sdk_protect.py`，覆盖 public imports、绿色工具放行并调用原函数、危险工具阻断且不调用原函数、async 工具放行。
+- 更新 `README.md`、`status.md` 和 `sdk/.log/worklog.md`：SDK 不再是纯骨架，但完整 LangChain Callback/Tool wrapper、approval_handler 仍未完成。
+
+验证：
+- `python -m pytest -q --basetemp pytest_tmp_l3_sdk -p no:cacheprovider tests\test_sdk_protect.py -x --tb=short`：4 passed。
+- `python -m pytest -q --basetemp pytest_tmp_l3_targeted2 -p no:cacheprovider tests\test_sdk_protect.py tests\test_aibom_bench_supply_chain.py tests\unit\test_aibom_gateway.py tests\test_gate1_evaluator.py tests\integration\test_bench_smoke.py -x --tb=short`：21 passed。
+- `python -m pytest -q --basetemp pytest_tmp_l3_full_sdk -p no:cacheprovider -x --tb=short`：全量通过，进度 100%，无失败。
+- `python -m compileall -q src sdk tests\test_sdk_protect.py`：通过。
+
+未完成 / 客观限制：
+- 当前 SDK 是 preflight wrapper，不是完整 LangChain CallbackHandler；LangChain tool wrapper、版本兼容、审批处理和会话上下文采集仍是 L3 后续。
+- SDK preflight 写审计的是 guard 检查结果，不是被包装函数的真实返回值审计；这点后续需要在 full wrapper 中补齐。
+
+## 2026-06-16 21:34 +08:00 Codex 主 agent（+4 gpt-5.5 medium 子 agent）- L3 原型地基：Compose、Streamable HTTP、AIBOM bench gateway
+
+本次具体做了什么：
+- 按用户要求派出 4 个 `gpt-5.5 medium` 子 agent 并行只读分析：L3 需求映射、部署/沙箱、HITL/MCP/SDK、bench/供应链/评测；子 agent 均未直接改文件。
+- 新增 L3 部署原型：`.dockerignore`、`docker/xa-guard.Dockerfile`、`docker-compose.yml`、`configs/xa-guard.docker.yaml`。Compose profile 暴露 Streamable HTTP 端口 3000，挂载 configs/policies/logs，并提供可选 `build-sandbox` profile 构建 `xa-guard/sandbox:latest`。
+- 实现 `src/xa_guard/proxy/upstream.py::run_streamable_http()`：使用 MCP `StreamableHTTPServerTransport` + Starlette/uvicorn，新增 `/healthz`；修正 DNS rebinding allowed_hosts 带端口校验。
+- 更新 `pyproject.toml`：新增 `http` optional extra（starlette/uvicorn），`all` extra 纳入 http。
+- 新增 `xa_guard.aibom.gateway.admit_install_request()`，把 bench/MCP 风格 `install_plugin` 请求转换为 `ScanReport` 后走统一 `admit()` 准入管线。
+- 修改 `bench/runner.py`：supply_chain/install_plugin 不再绕旧 `rate_install_request`，改为调用 `admit_install_request()`；结果保留 `aibom_gateway` gate metadata 和 `AIBOM-GATEWAY` rule hit。
+- 更新 `README.md`：补 Docker Compose 一键部署说明、Streamable HTTP 当前状态、AIBOM bench gateway 状态，并修正 290 条 seed 维度数量。
+- 更新 `status.md`：把仓库状态从“L3 未达”改为“L3 原型推进中”，明确 Compose/HTTP/AIBOM bench 已补，但国密 TSA、真实 Trae HITL、AgentDojo/InjecAgent、500+ 题库、gVisor Linux、LangChain 非透传仍未完成。
+
+验证：
+- `python -m pytest -q --basetemp pytest_tmp_l3_aibom -p no:cacheprovider tests\test_aibom_bench_supply_chain.py tests\unit\test_aibom_gateway.py -x --tb=short`：8 passed。
+- `python -m pytest -q --basetemp pytest_tmp_l3_targeted -p no:cacheprovider tests\test_aibom_bench_supply_chain.py tests\unit\test_aibom_gateway.py tests\test_gate1_evaluator.py tests\integration\test_bench_smoke.py -x --tb=short`：17 passed。
+- `python -m compileall -q src bench scripts tests`：通过。
+- `docker compose config`：通过。
+- 临时启动 Streamable HTTP 3099 端口：`/healthz` 返回 `{"status":"ok","transport":"streamable-http"}`。
+- 使用 `mcp.client.streamable_http.streamablehttp_client('http://127.0.0.1:3099/mcp')` + `ClientSession.list_tools()`：协议 smoke 通过，临时无 downstream 时 `tools_count=0`。
+- `python -m pytest -q --basetemp pytest_tmp_l3_full -p no:cacheprovider -x --tb=short`：全量通过，进度 100%，无失败。
+- `python -m bench.cli run --suite bench/cases/csab-gov-mini-seed.yaml --config configs/xa-guard.yaml`：290 条 pass_rate 1.0，`audit_completeness=1.0`，P50 75.14 ms，P95 558.4 ms（P95 未达 PRD 中等档 300 ms）。
+
+未完成 / 客观限制：
+- 未执行完整 `docker compose up --build -d` 镜像构建和长期运行验收；本轮只验证了 Compose 配置和本地 HTTP 协议 smoke。
+- 未完成生产级国密 SM2/SM3 + TSA、真实 Trae/国产 IDE 弹窗截图、AgentDojo/InjecAgent 外部 benchmark、500+ 国标题库、OPA Rego 合并视图、Linux gVisor/runsc 实测、LangChain SDK 非透传和 CoT faithfulness 实算法。
+- AIBOM gateway 已接入 bench supply_chain，但还不是“真实 MCP 插件安装链路”；仅包名+版本的 seed 暂未启用离线漏洞库重判，避免未经审核翻转既有评测基线。
+
+下一步建议：
+- 先执行 `docker compose up --build -d xa-guard` 和真实容器内 MCP client smoke，补齐 Compose 一键部署证据。
+- 在 Linux 主机验证 `runsc`/gVisor，并把 Gate5 sandbox 从命令构造提升为真实下游 MCP server 沙箱执行证据。
+- 做 Trae/Cursor/CodeBuddy/Qoder CN HITL 实测矩阵；不要把 toy probe 写成真实 IDE popup。
+- 建 AgentDojo/InjecAgent 最小 adapter 和结果文件，同时扩展 Gate1 对抗集与供应链 case。
+
 ## 2026-06-16 +08:00 Codex - 补齐 Gate5 本机沙箱镜像并消除 pytest skip
 
 本次具体做了什么：

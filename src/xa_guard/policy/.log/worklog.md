@@ -2,6 +2,15 @@
 
 ---
 
+## 2026-06-17 Codex 主 agent - OPA/Rego merged-view 原型
+
+- 新增 `opa_export.py` 和 `scripts/export_opa_policy.py`，可导出 `LayeredPolicySource` 当前生效视图为 OPA `data.json`、`gate3.rego` 和 `manifest.json`。
+- `LayeredPolicySource` 新增 `get_sensitive_patterns()`，并在 snapshot 内保留合并后的敏感词列表，供 data export 使用。
+- `Gate3Policy backend=rego + prefer_layered=true` 支持按 `bundle_sha` 缓存 merged rules 的 `RegoPolicyEngine`；无 OPA binary 时仍走 Python fallback。
+- 验证：`test_opa_export.py`、layered policy 测试、Gate3 merged-view Rego 测试通过；CLI export smoke 通过。
+
+---
+
 ## 2026-06-04 layered.py risk_level 单一事实源
 
 **改动**：在 `layered.py` 新增 `_derive_tool_risks_from_caps()` 辅助函数，在 `_compile_layer` 中当无独立 risks_path（baseline 层）时，从 caps 的 risk_level 字段自动派生 tool_risks 映射；overlay 层若同时提供 tool_risks.yaml 则保留（用于单调性检验），并补全 caps 中未覆盖的工具。

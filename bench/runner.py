@@ -6,7 +6,6 @@
 """
 from __future__ import annotations
 
-import asyncio
 import time
 from pathlib import Path
 from typing import Any
@@ -18,20 +17,27 @@ from xa_guard.types import (
     BenchResult,
     Decision,
     GateContext,
+    GateResult,
     InputSource,
     TaintLabel,
 )
 
 
-def _supply_chain_decision(arguments: dict[str, Any]) -> tuple[Decision, str]:
-    from xa_guard.aibom.rater import rate_install_request
+def _supply_chain_decision(arguments: dict[str, Any]) -> tuple[Decision, str, dict[str, Any]]:
+    from xa_guard.aibom.gateway import admit_install_request
 
-    grade, reason = rate_install_request(arguments)
-    if grade in {"A", "B"}:
-        return Decision.ALLOW, reason
-    if grade == "C":
-        return Decision.WARN, reason
-    return Decision.DENY, reason
+    result = admit_install_request(arguments)
+    decision = Decision(result.decision)
+    metadata = {
+        "component": result.component,
+        "grade": result.grade,
+        "schema_valid": result.schema_valid,
+        "schema_validator": result.schema_validator,
+        "vulnerabilities": result.vulnerabilities,
+        "max_vuln_severity": result.max_vuln_severity,
+        "reputation_flags": result.reputation_flags,
+    }
+    return decision, result.reason, metadata
 
 
 def load_cases(suite_path: str | Path) -> list[BenchCase]:
@@ -79,7 +85,6 @@ async def run_suite(
     cfg,
     dimension: str | None = None,
 ) -> list[BenchResult]:
-    from bench.metrics import compute  # local import to avoid circular
     from xa_guard.server import build_pipeline
 
     cases = load_cases(suite_path)
@@ -113,25 +118,51 @@ async def run_suite(
             }
 
         t0 = time.perf_counter()
-        if case.dimension == "supply_chain" and tool_name == "install_plugin":
-            decision, reason = _supply_chain_decision(arguments)
-            ctx.final_decision = decision
-            ctx.final_reason = reason
-        else:
-            try:
+        infra_error = False
+        infra_error_type = ""
+        infra_error_message = ""
+        try:
+            if case.dimension == "supply_chain" and tool_name == "install_plugin":
+                decision, reason, metadata = _supply_chain_decision(arguments)
+                ctx.final_decision = decision
+                ctx.final_reason = reason
+                ctx.append(
+                    GateResult(
+                        gate_name="aibom_gateway",
+                        decision=decision,
+                        risks=[reason] if decision != Decision.ALLOW else [],
+                        rule_hits=["AIBOM-GATEWAY"],
+                        metadata=metadata,
+                    )
+                )
+                pipeline.finalize_preflight(ctx)
+            else:
                 await pipeline.run(ctx, mock_executor)
-            except Exception:
-                pass
+        except Exception as exc:
+            infra_error = True
+            infra_error_type = type(exc).__name__
+            infra_error_message = str(exc)
+            ctx.final_decision = Decision.DENY
+            ctx.final_reason = f"infra_error: {infra_error_type}: {infra_error_message}"
+            if not any(result.gate_name in ("gate6_audit", "gate6") for result in ctx.gate_results):
+                try:
+                    pipeline.finalize_preflight(ctx)
+                except Exception:
+                    # Gate6 itself may be the failing dependency. The result remains
+                    # explicitly unaudited and infra_error instead of masquerading as allow.
+                    pass
         latency_ms = (time.perf_counter() - t0) * 1000
 
         actual_decision = ctx.final_decision
-        passed = actual_decision == case.expected_decision
+        passed = not infra_error and actual_decision == case.expected_decision
 
         audit_written = False
         audit_completeness = 0.0
+        audit_record_hash = ""
         for gate_result in reversed(ctx.gate_results):
             if gate_result.gate_name in ("gate6_audit", "gate6"):
-                audit_written = bool(gate_result.metadata.get("record_hash"))
+                audit_record_hash = str(gate_result.metadata.get("record_hash", "") or "")
+                audit_written = bool(audit_record_hash)
                 audit_completeness = float(
                     gate_result.metadata.get("audit_completeness", 0.0) or 0.0
                 )
@@ -145,9 +176,15 @@ async def run_suite(
                 rule_hits=list(ctx.rule_hits),
                 latency_ms=latency_ms,
                 passed=passed,
+                note=ctx.final_reason,
                 audit_written=audit_written,
                 audit_complete=audit_completeness >= 1.0,
                 audit_completeness=audit_completeness,
+                trace_id=ctx.trace_id,
+                audit_record_hash=audit_record_hash,
+                infra_error=infra_error,
+                infra_error_type=infra_error_type,
+                infra_error_message=infra_error_message,
             )
         )
 

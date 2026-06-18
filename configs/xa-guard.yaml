@@ -139,4 +139,5 @@ xa_guard:
   policy_default: enterprise-l3
   audit_dir: ./logs/audit
   log_dir: ./logs/runtime
+  pending_approvals_path: ./logs/runtime/pending_approvals.jsonl
   tool_capabilities_file: policies/baseline/gate4_capabilities.yaml

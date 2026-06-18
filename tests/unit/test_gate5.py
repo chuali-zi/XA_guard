@@ -76,6 +76,25 @@ def test_gate5_native_records_no_sandbox_runner_required():
     assert r.metadata["sandbox_enforced"] is False
 
 
+def test_gate5_sandbox_all_tools_routes_green_to_docker():
+    g = Gate5Sandbox(
+        GateConfig(
+            enabled=True,
+            options={
+                "runtime": "runc",
+                "sandbox_all_tools": True,
+                "workspace_mount": False,
+            },
+        )
+    )
+
+    r = g(_ctx(RiskLevel.GREEN))
+
+    assert r.metadata["sandbox_mode"] == "docker"
+    assert r.metadata["sandbox_enforced"] is True
+    assert r.metadata["workspace_mount"] is False
+
+
 def test_gate5_red_degrades_when_runtime_not_gvisor():
     g = Gate5Sandbox(GateConfig(enabled=True, options={"runtime": "runc"}))
     r = g(_ctx(RiskLevel.RED))

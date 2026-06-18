@@ -2,7 +2,7 @@
 
 实现：mcp>=1.27 client API（stdio_client + ClientSession + AsyncExitStack）。
 - 每个 DownstreamSpec.command 启动为子进程（stdio transport）。
-- start() 初始化 ClientSession，调 list_tools 缓存。
+- start() 优先使用 DownstreamSpec.tools 静态 manifest；未提供时才初始化 ClientSession 调 list_tools。
 - list_tools() 聚合所有下游工具（dict 形式）。
 - call_tool(ctx) 路由到对应 session。
 - stop() 优雅关闭所有 session（依靠 AsyncExitStack）。
@@ -29,8 +29,8 @@ log = logging.getLogger("xa_guard.proxy.downstream")
 class DownstreamRouter:
     def __init__(self, specs: list[DownstreamSpec]) -> None:
         self.specs = specs
-        # tool_name -> (spec, ClientSession)
-        self.tools_by_name: dict[str, tuple[DownstreamSpec, ClientSession]] = {}
+        # tool_name -> (spec, ClientSession | None)。静态 manifest 不持有原生 session。
+        self.tools_by_name: dict[str, tuple[DownstreamSpec, ClientSession | None]] = {}
         # spec.name -> list of raw tool dicts（保留 list_tools 顺序）
         self._tools_meta: list[dict[str, Any]] = []
         self._stack: AsyncExitStack | None = None
@@ -48,6 +48,10 @@ class DownstreamRouter:
                     continue
                 if not spec.command:
                     log.warning("downstream %s has empty command, skip", spec.name)
+                    continue
+                if spec.tools:
+                    self._register_static_tools(spec)
+                    log.info("downstream %s registered from static manifest, %d tools", spec.name, len(spec.tools))
                     continue
 
                 params = StdioServerParameters(
@@ -110,9 +114,38 @@ class DownstreamRouter:
         policy = policy_from_context(ctx)
         if policy.enforced:
             return await self._call_tool_sandboxed(spec, ctx, policy)
+        if session is None:
+            raise RuntimeError(
+                f"downstream {spec.name!r} uses static tool discovery; native execution is not available"
+            )
         log.debug("routing %s -> downstream %s", ctx.tool_name, spec.name)
         result = await session.call_tool(ctx.tool_name, ctx.arguments or {})
         return result
+
+    def _register_static_tools(self, spec: DownstreamSpec) -> None:
+        for raw_tool in spec.tools:
+            name = str(raw_tool.get("name") or "")
+            if not name:
+                log.warning("downstream %s static tool without name skipped", spec.name)
+                continue
+            if name in self.tools_by_name:
+                log.warning(
+                    "tool name conflict: %s already registered by %s, overwriting from %s",
+                    name,
+                    self.tools_by_name[name][0].name,
+                    spec.name,
+                )
+            schema = raw_tool.get("inputSchema") or raw_tool.get("input_schema")
+            self.tools_by_name[name] = (spec, None)
+            self._tools_meta.append(
+                {
+                    "name": name,
+                    "description": str(raw_tool.get("description") or ""),
+                    "inputSchema": schema or {"type": "object", "properties": {}},
+                    "_downstream": spec.name,
+                    "_discovery": "static",
+                }
+            )
 
     async def _call_tool_sandboxed(self, spec: DownstreamSpec, ctx: GateContext, policy: SandboxPolicy) -> Any:
         """Run one downstream MCP call through an ephemeral Docker/gVisor server."""

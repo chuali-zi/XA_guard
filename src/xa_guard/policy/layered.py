@@ -79,6 +79,7 @@ class _Snapshot:
     merged_compiled: dict[str, Callable]
     merged_tool_risks: dict[str, RiskLevel]
     merged_tool_caps: dict[str, ToolCapability]
+    merged_sensitive_patterns: list[str]
     merged_pattern: re.Pattern | None
     bundle_sha: str
     overlay_rejections: dict[str, str] = field(default_factory=dict)
@@ -385,6 +386,7 @@ class LayeredPolicySource:
             merged_compiled=merged_compiled,
             merged_tool_risks=merged_risks,
             merged_tool_caps=merged_caps,
+            merged_sensitive_patterns=merged_pats,
             merged_pattern=merged_pattern,
             bundle_sha=bundle_sha,
             overlay_rejections=rejections,
@@ -423,6 +425,10 @@ class LayeredPolicySource:
         with self._lock:
             return self._snapshot.merged_pattern
 
+    def get_sensitive_patterns(self) -> list[str]:
+        with self._lock:
+            return list(self._snapshot.merged_sensitive_patterns)
+
     def stats(self) -> dict[str, Any]:
         with self._lock:
             s = self._snapshot
@@ -434,10 +440,7 @@ class LayeredPolicySource:
                 "merged_rules": len(s.merged_rules),
                 "merged_tool_risks": len(s.merged_tool_risks),
                 "merged_tool_caps": len(s.merged_tool_caps),
-                "merged_sensitive_patterns": (
-                    len(s.baseline.sensitive_patterns)
-                    + sum(len(l.sensitive_patterns) for l in s.overlays.values())
-                ),
+                "merged_sensitive_patterns": len(s.merged_sensitive_patterns),
             }
 
     # ============================================================

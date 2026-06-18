@@ -2,6 +2,13 @@
 
 ---
 
+## 2026-06-17 09:30 Codex 主 agent
+- 新增 `tsa.py` 本地文件 TSA anchor 原型：锚定 audit 文件 SHA-256、字节数、记录数、首尾 `record_hash`，并用 `anchors/index.jsonl` 串联多次 anchor。
+- 决策：anchor 是不可变 sidecar，不回写已落盘 audit JSONL；明确不是外部可信 TSA。
+- 测试：`tests/unit/test_audit_tsa.py` 覆盖创建、验锚、篡改拒绝、旧 anchor 失效和 index 串联。
+
+---
+
 ## 2026-05-25 子 agent G56A
 - merkle.py 完整化：ChainStore 启动扫描末行恢复 _last_hash；append 写 hash_prev → 计算 record_hash → canonical JSONL 追加；verify 全量重算 + 链对齐校验，返回 (ok, first_error_line_idx)
 - sm_crypto.py 完善：sm2_sign / sm2_verify 默认 HMAC-SHA256 占位（key 文件不存在用 demo 内置 key，保证 demo 可跑）；prefer_gm=True 时尝试 gmssl SM2，失败 fallback HMAC

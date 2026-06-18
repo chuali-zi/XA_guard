@@ -1,4 +1,5 @@
-"""XA-Guard SDK — pip install xa-guard-sdk（覆盖 LangChain / AutoGen 用户）。
+"""Compatibility import for the historical top-level ``sdk`` package."""
 
-demo 阶段先骨架；M2-M3 再填实现。
-"""
+from xa_guard.sdk import XAGuardBlocked, protect
+
+__all__ = ["XAGuardBlocked", "protect"]

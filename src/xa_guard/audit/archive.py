@@ -20,6 +20,10 @@ _HASH_PREV_KEY = "gen_ai.evidence.hash_prev"
 _RECORD_HASH_KEY = "record_hash"
 
 
+def _reject_nonfinite(value: str) -> None:
+    raise ValueError(f"non-finite JSON constant is not allowed: {value}")
+
+
 @dataclass(frozen=True)
 class ArchiveResult:
     archive_path: Path
@@ -78,7 +82,7 @@ def verify_audit_jsonl(path: str | Path, *, algo: str = "sha256") -> dict[str, A
             record_count += 1
             line_has_error = False
             try:
-                record = json.loads(line)
+                record = json.loads(line, parse_constant=_reject_nonfinite)
             except Exception:
                 record = None
                 line_has_error = True

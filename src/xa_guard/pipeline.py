@@ -18,7 +18,7 @@ from typing import Awaitable, Callable
 from xa_guard.config import XAGuardConfig
 from xa_guard.gates import GateStage
 from xa_guard.gates.base import Gate
-from xa_guard.types import Decision, GateContext, GateResult, RiskLevel, TaintLabel
+from xa_guard.types import Approval, Decision, GateContext, GateResult, RiskLevel, TaintLabel
 
 log = logging.getLogger("xa_guard.pipeline")
 
@@ -75,17 +75,53 @@ class Pipeline:
         self.gate6 = gate6
         self.cfg = cfg
 
+    def _audit(self, ctx: GateContext) -> GateResult:
+        """Write Gate6 evidence and retain its metadata on the shared context."""
+        result = self.gate6(ctx, GateStage.OUTBOUND)
+        ctx.append(result)
+        return result
+
+    def finalize_preflight(self, ctx: GateContext) -> PipelineResult:
+        """Audit a domain-specific preflight without re-running generic gates.
+
+        Supply-chain evaluators use this after appending their own GateResult so
+        AIBOM's allow/warn/deny semantics are preserved while every operation
+        still receives a traceable Gate6 record.
+        """
+        self._audit(ctx)
+        return PipelineResult(
+            ctx=ctx,
+            allowed=ctx.final_decision not in (Decision.DENY, Decision.REQUIRE_APPROVAL),
+            tool_result=None,
+            final_decision=ctx.final_decision,
+            final_reason=ctx.final_reason,
+        )
+
     async def run(self, ctx: GateContext, executor: ToolExecutor) -> PipelineResult:
         """跑完整 6 关卡 + 工具执行。
 
         executor: 真正调用下游工具的协程函数（由 proxy.downstream 提供）。
         """
+        # Protocol adapters may inject a domain-specific preflight before the
+        # generic six-gate flow (for example AIBOM install admission). Preserve
+        # the first blocking cause and audit it without evaluating/executing the
+        # downstream path again.
+        if ctx.final_decision == Decision.DENY:
+            self._audit(ctx)
+            return PipelineResult(
+                ctx=ctx,
+                allowed=False,
+                tool_result=None,
+                final_decision=ctx.final_decision,
+                final_reason=ctx.final_reason,
+            )
+
         # ---- inbound: input firewall ----
         result = self.gate1(ctx, GateStage.INBOUND)
         _sync_ctx_from_result(ctx, result)
         ctx.append(result)
         if result.decision in (Decision.DENY, Decision.REQUIRE_APPROVAL):
-            self.gate6(ctx, GateStage.OUTBOUND)
+            self._audit(ctx)
             return PipelineResult(
                 ctx=ctx,
                 allowed=False,
@@ -102,7 +138,7 @@ class Pipeline:
 
         if ctx.final_decision in (Decision.DENY, Decision.REQUIRE_APPROVAL):
             # 写一条 audit 后返回；REQUIRE_APPROVAL 同样阻断 executor。
-            self.gate6(ctx, GateStage.OUTBOUND)
+            self._audit(ctx)
             return PipelineResult(
                 ctx=ctx,
                 allowed=False,
@@ -116,7 +152,7 @@ class Pipeline:
         _sync_ctx_from_result(ctx, result)
         ctx.append(result)
         if result.decision in (Decision.DENY, Decision.REQUIRE_APPROVAL):
-            self.gate6(ctx, GateStage.OUTBOUND)
+            self._audit(ctx)
             return PipelineResult(
                 ctx=ctx,
                 allowed=False,
@@ -132,9 +168,10 @@ class Pipeline:
             ctx.tool_result = tool_result
         except Exception as exc:
             log.exception("downstream tool failed")
+            ctx.final_decision = Decision.DENY
             ctx.final_reason = f"tool_error: {type(exc).__name__}: {exc}"
             # 仍写 audit
-            self.gate6(ctx, GateStage.OUTBOUND)
+            self._audit(ctx)
             return PipelineResult(
                 ctx=ctx,
                 allowed=False,
@@ -152,8 +189,7 @@ class Pipeline:
             ctx.tool_result = None
             tool_result = None
 
-        audit_result = self.gate6(ctx, GateStage.OUTBOUND)
-        ctx.append(audit_result)
+        self._audit(ctx)
 
         return PipelineResult(
             ctx=ctx,
@@ -181,15 +217,15 @@ class Pipeline:
 
         # 审批令牌验签：令牌缺失 / 参数被改 / 签名错误 / 过期 → 拒绝执行。
         # 让 approval_token 成为真正的执行闸门，而非审计装饰字段。
-        from xa_guard.approval import verify_approval
+        from xa_guard.approval import verify_and_consume_approval
 
-        valid, why = verify_approval(
+        valid, why = verify_and_consume_approval(
             ctx.approval, trace_id=ctx.trace_id, tool_name=ctx.tool_name, arguments=ctx.arguments
         )
         if not valid:
             ctx.final_decision = Decision.DENY
             ctx.final_reason = f"approval_token_invalid: {why}"
-            self.gate6(ctx, GateStage.OUTBOUND)
+            self._audit(ctx)
             return PipelineResult(
                 ctx=ctx,
                 allowed=False,
@@ -205,7 +241,7 @@ class Pipeline:
         _sync_ctx_from_result(ctx, result)
         ctx.append(result)
         if result.decision in (Decision.DENY, Decision.REQUIRE_APPROVAL):
-            self.gate6(ctx, GateStage.OUTBOUND)
+            self._audit(ctx)
             return PipelineResult(
                 ctx=ctx,
                 allowed=False,
@@ -222,7 +258,7 @@ class Pipeline:
             log.exception("downstream tool failed after HITL approval")
             ctx.final_decision = Decision.DENY
             ctx.final_reason = f"tool_error: {type(exc).__name__}: {exc}"
-            self.gate6(ctx, GateStage.OUTBOUND)
+            self._audit(ctx)
             return PipelineResult(
                 ctx=ctx,
                 allowed=False,
@@ -238,13 +274,50 @@ class Pipeline:
             ctx.tool_result = None
             tool_result = None
 
-        audit_result = self.gate6(ctx, GateStage.OUTBOUND)
-        ctx.append(audit_result)
+        self._audit(ctx)
 
         return PipelineResult(
             ctx=ctx,
             allowed=ctx.final_decision != Decision.DENY,
             tool_result=tool_result,
+            final_decision=ctx.final_decision,
+            final_reason=ctx.final_reason,
+        )
+
+    async def reject_after_approval(
+        self,
+        ctx: GateContext,
+        *,
+        approver: str = "",
+        reason: str = "",
+    ) -> PipelineResult:
+        """Record an explicit HITL rejection after a REQUIRE_APPROVAL decision.
+
+        The initial pipeline run already wrote a `require_approval` audit row.
+        This method appends the operator rejection as a second `deny` row so
+        audit replay can prove who rejected the request and why.
+        """
+        if ctx.final_decision != Decision.REQUIRE_APPROVAL:
+            return PipelineResult(
+                ctx=ctx,
+                allowed=ctx.final_decision != Decision.DENY,
+                tool_result=ctx.tool_result,
+                final_decision=ctx.final_decision,
+                final_reason=ctx.final_reason,
+            )
+
+        ctx.approval = Approval(
+            approver=approver or "mcp-hitl-user",
+            reason=reason,
+        )
+        ctx.tool_result = None
+        ctx.final_decision = Decision.DENY
+        ctx.final_reason = "hitl_rejected" if not reason else f"hitl_rejected: {reason}"
+        self._audit(ctx)
+        return PipelineResult(
+            ctx=ctx,
+            allowed=False,
+            tool_result=None,
             final_decision=ctx.final_decision,
             final_reason=ctx.final_reason,
         )

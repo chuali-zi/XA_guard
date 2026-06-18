@@ -310,3 +310,8 @@ class BenchResult:
     audit_written: bool = False
     audit_complete: bool = False
     audit_completeness: float = 0.0
+    trace_id: str = ""
+    audit_record_hash: str = ""
+    infra_error: bool = False
+    infra_error_type: str = ""
+    infra_error_message: str = ""
