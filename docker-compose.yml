@@ -11,7 +11,10 @@ services:
     depends_on:
       - sandbox-image
     ports:
-      - "3000:3000"
+      # Host port 13000 avoids the Windows-reserved TCP range 2924-3023
+      # (Hyper-V/WSL dynamic port exclusion) that blocks binding host :3000.
+      # Container-internal port stays 3000 per configs/xa-guard.docker.yaml.
+      - "13000:3000"
     volumes:
       - ./configs:/app/configs:ro
       - ./policies:/app/policies:ro

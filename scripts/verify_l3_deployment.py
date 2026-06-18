@@ -128,25 +128,41 @@ def _static_summary(compose_file: Path, config_file: Path) -> dict[str, Any]:
 
 
 def _health_check(url: str, *, timeout: int = 10) -> dict[str, Any]:
+    """Poll ``url`` until it answers 200 or ``timeout`` total seconds elapse.
+
+    A freshly ``up``-ed container needs a start period before /healthz answers,
+    so a single urlopen would race the startup and report a spurious fail.
+    We retry within the budget instead of giving up on the first connection
+    error / transient non-200.
+    """
     started = time.perf_counter()
-    try:
-        with urllib.request.urlopen(url, timeout=timeout) as response:
-            body = response.read().decode("utf-8", errors="replace")
-            return {
-                "url": url,
-                "status": "pass",
-                "http_status": response.status,
-                "duration_ms": (time.perf_counter() - started) * 1000,
-                "body_tail": _tail(body),
-            }
-    except Exception as exc:
-        return {
-            "url": url,
-            "status": "fail",
-            "http_status": None,
-            "duration_ms": (time.perf_counter() - started) * 1000,
-            "error": f"{type(exc).__name__}: {exc}",
-        }
+    deadline = started + max(timeout, 10)
+    last_exc: Exception | None = None
+    attempts = 0
+    while time.perf_counter() < deadline:
+        attempts += 1
+        try:
+            with urllib.request.urlopen(url, timeout=min(10, max(1, int(deadline - time.perf_counter())))) as response:
+                body = response.read().decode("utf-8", errors="replace")
+                return {
+                    "url": url,
+                    "status": "pass",
+                    "http_status": response.status,
+                    "duration_ms": (time.perf_counter() - started) * 1000,
+                    "attempts": attempts,
+                    "body_tail": _tail(body),
+                }
+        except Exception as exc:  # retry on connection / startup errors
+            last_exc = exc
+            time.sleep(2)
+    return {
+        "url": url,
+        "status": "fail",
+        "http_status": None,
+        "duration_ms": (time.perf_counter() - started) * 1000,
+        "attempts": attempts,
+        "error": f"{type(last_exc).__name__}: {last_exc}" if last_exc else "timeout",
+    }
 
 
 def _looks_like_docker_daemon_unavailable(step: dict[str, Any]) -> bool:
