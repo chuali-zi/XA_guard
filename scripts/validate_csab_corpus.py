@@ -11,7 +11,9 @@ from bench.corpus import validate_corpus
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("corpus", type=Path)
-    parser.add_argument("--profile", choices=("candidate", "formal"), default="formal")
+    parser.add_argument(
+        "--profile", choices=("candidate", "implementation", "formal"), default="formal"
+    )
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     result = validate_corpus(args.corpus, profile=args.profile)

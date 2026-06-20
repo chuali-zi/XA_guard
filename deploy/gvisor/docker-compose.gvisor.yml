@@ -1,0 +1,32 @@
+# Linux-only hardening override. Apply on top of the repository root compose file.
+services:
+  xa-guard:
+    runtime: runsc
+    command: ["python", "-m", "xa_guard.server", "--config", "configs/xa-guard.gvisor.yaml", "--log-level", "INFO"]
+    user: "${XA_GUARD_UID:-1000}:${XA_GUARD_GID:-1000}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+    mem_limit: 768m
+    cpus: 2.0
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m
+    volumes:
+      - ./configs:/app/configs:ro
+      - ./policies:/app/policies:ro
+      - ./logs:/app/logs
+      - ${XDG_RUNTIME_DIR:?set XDG_RUNTIME_DIR}/docker.sock:/var/run/docker.sock
+
+  sandbox-image:
+    runtime: runsc
+    user: "10001:10001"
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 32
+    mem_limit: 128m
+    cpus: 0.5
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m

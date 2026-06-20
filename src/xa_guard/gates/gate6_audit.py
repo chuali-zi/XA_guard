@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from xa_guard.audit.completeness import record_completeness_score
+from xa_guard.audit.faithfulness import assess_decision_faithfulness
 from xa_guard.audit.merkle import ChainStore, canonical_json
 from xa_guard.audit.otel import to_otel_dict
 from xa_guard.audit.sm_crypto import (
@@ -107,6 +108,7 @@ class Gate6Audit(Gate):
                 sandbox_metadata = gate_result.metadata or {}
                 break
 
+        faithfulness = assess_decision_faithfulness(ctx)
         record = AuditRecord(
             trace_id=ctx.trace_id,
             span_id=ctx.span_id,
@@ -126,7 +128,9 @@ class Gate6Audit(Gate):
             gen_ai_tool_approval_args_hash=approval_args_hash,
             gen_ai_evidence_hash_prev="",  # ChainStore.append 会写入
             gen_ai_classify_risk_tag=risk_tags,
-            gen_ai_decision_faithfulness_score=1.0,
+            gen_ai_decision_faithfulness_score=faithfulness.score,
+            gen_ai_decision_faithfulness_algorithm=faithfulness.algorithm,
+            gen_ai_decision_faithfulness_evidence=faithfulness.evidence,
             gen_ai_decision_final=ctx.final_decision.value,
             gen_ai_decision_final_reason=ctx.final_reason,
             gen_ai_policy_bundle_sha=bundle_sha,
@@ -168,5 +172,10 @@ class Gate6Audit(Gate):
                 "audit_completeness": audit_completeness,
                 "hash_algo": self.hash_algo,
                 "signature": signature,
+                "faithfulness": {
+                    "score": faithfulness.score,
+                    "algorithm": faithfulness.algorithm,
+                    "evidence": faithfulness.evidence,
+                },
             },
         )

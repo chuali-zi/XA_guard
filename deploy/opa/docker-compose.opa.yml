@@ -1,0 +1,10 @@
+services:
+  xa-guard:
+    build:
+      context: .
+      dockerfile: docker/xa-guard.opa.Dockerfile
+      args:
+        OPA_IMAGE: "${XA_GUARD_OPA_IMAGE:-openpolicyagent/opa:1.4.2-static}"
+    command: ["python", "-m", "xa_guard.server", "--config", "configs/xa-guard.opa.yaml", "--log-level", "INFO"]
+    environment:
+      XA_GUARD_PROFILE: docker-compose-l3-opa

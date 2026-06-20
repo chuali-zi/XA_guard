@@ -37,11 +37,16 @@ REQUIRED_OTEL_KEYS = [
 def _make_ctx(tool_result=None) -> GateContext:
     ctx = GateContext(tool_name="get_cpu", arguments={"host": "web03"}, user_role="ops")
     ctx.taint = TaintLabel.INTERNAL
-    ctx.rule_hits = ["POLICY-1", "POLICY-2"]
     ctx.session_history = [{"model": "qwen-max"}]
     ctx.tool_result = tool_result if tool_result is not None else {"cpu": "30%"}
-    ctx.gate_results.append(
-        GateResult(gate_name="gate1_input", decision=Decision.WARN, risks=["x"], note="suspicious")
+    ctx.append(
+        GateResult(
+            gate_name="gate1_input",
+            decision=Decision.WARN,
+            risks=["x"],
+            rule_hits=["POLICY-1", "POLICY-2"],
+            note="suspicious",
+        )
     )
     return ctx
 
@@ -68,6 +73,27 @@ def test_gate6_writes_14_fields(tmp_path: Path):
     assert rec["gen_ai.request.model"] == "qwen-max"
     assert "suspicious" in rec["gen_ai.classify.risk_tag"]
     assert rec["gen_ai.decision.faithfulness_score"] == 1.0
+
+
+
+def test_gate6_faithfulness_detects_inconsistent_final_decision(tmp_path: Path):
+    gate = Gate6Audit(
+        GateConfig(enabled=True, options={"audit_dir": str(tmp_path), "hash_algo": "sha256"})
+    )
+    ctx = _make_ctx()
+    ctx.final_decision = Decision.ALLOW
+    ctx.final_reason = ""
+
+    result = gate(ctx, GateStage.OUTBOUND)
+    record = json.loads(Path(result.metadata["audit_path"]).read_text(encoding="utf-8"))
+    assessment = result.metadata["faithfulness"]
+    assert 0.0 <= assessment["score"] < 1.0
+    assert assessment["algorithm"] == "xa-guard-decision-faithfulness/v1"
+    assert assessment["evidence"]["expected_decision"] == "warn"
+    assert assessment["evidence"]["components"]["decision_consistent"] is False
+    assert record["gen_ai.decision.faithfulness_score"] == assessment["score"]
+    assert record["gen_ai.decision.faithfulness.algorithm"] == assessment["algorithm"]
+
 
 
 def test_gate6_chain_links_three_records(tmp_path: Path):

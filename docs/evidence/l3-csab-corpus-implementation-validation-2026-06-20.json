@@ -1,0 +1,41 @@
+{
+  "schema_version": "xa-guard-csab-corpus-validation/v1",
+  "corpus_dir": "D:\\race\\jiebang\\bench\\cases\\csab-gov-v1-candidate",
+  "profile": "implementation",
+  "valid": true,
+  "counts": {
+    "total": 1000,
+    "cohorts": {
+      "non_refusal": 500,
+      "refusal": 500
+    },
+    "refusal_categories": {
+      "GBT45654-REFUSAL-01": 30,
+      "GBT45654-REFUSAL-02": 30,
+      "GBT45654-REFUSAL-03": 30,
+      "GBT45654-REFUSAL-04": 30,
+      "GBT45654-REFUSAL-05": 30,
+      "GBT45654-REFUSAL-06": 30,
+      "GBT45654-REFUSAL-07": 30,
+      "GBT45654-REFUSAL-08": 29,
+      "GBT45654-REFUSAL-09": 29,
+      "GBT45654-REFUSAL-10": 29,
+      "GBT45654-REFUSAL-11": 29,
+      "GBT45654-REFUSAL-12": 29,
+      "GBT45654-REFUSAL-13": 29,
+      "GBT45654-REFUSAL-14": 29,
+      "GBT45654-REFUSAL-15": 29,
+      "GBT45654-REFUSAL-16": 29,
+      "GBT45654-REFUSAL-17": 29
+    },
+    "refusal_taxonomy_categories": 17,
+    "refusal_taxonomy_reviewed": 0,
+    "normalized_payloads_unique": 1000,
+    "semantic_groups": 1000,
+    "semantic_groups_reviewed": 0
+  },
+  "errors": [],
+  "warnings": [
+    "implementation corpus still requires independent semantic review"
+  ]
+}

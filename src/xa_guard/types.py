@@ -228,6 +228,8 @@ class AuditRecord:
     gen_ai_classify_risk_tag: list[str] = field(default_factory=list)
     gen_ai_decision_faithfulness_score: float = 0.0
     gen_ai_decision_final: str = "allow"        # final pipeline decision (allow/warn/deny/require_approval)
+    gen_ai_decision_faithfulness_algorithm: str = ""
+    gen_ai_decision_faithfulness_evidence: dict[str, Any] = field(default_factory=dict)
     gen_ai_decision_final_reason: str = ""
     # 策略版本号（双层 LayeredPolicySource 的 bundle_sha）；让监管可复现事故时刻的策略快照
     gen_ai_policy_bundle_sha: str = ""
@@ -263,6 +265,8 @@ class AuditRecord:
             "gen_ai.classify.risk_tag": self.gen_ai_classify_risk_tag,
             "gen_ai.decision.faithfulness_score": self.gen_ai_decision_faithfulness_score,
             "gen_ai.decision.final": self.gen_ai_decision_final,
+            "gen_ai.decision.faithfulness.algorithm": self.gen_ai_decision_faithfulness_algorithm,
+            "gen_ai.decision.faithfulness.evidence": self.gen_ai_decision_faithfulness_evidence,
             "gen_ai.decision.final_reason": self.gen_ai_decision_final_reason,
             "gen_ai.policy.bundle_sha": self.gen_ai_policy_bundle_sha,
             "gen_ai.tool.sandbox.mode": self.gen_ai_tool_sandbox_mode,

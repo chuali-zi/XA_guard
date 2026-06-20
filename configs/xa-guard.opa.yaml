@@ -1,0 +1,173 @@
+# XA-Guard Docker Compose profile.
+# This profile is intentionally self-contained for L3 one-command deployment.
+
+xa_guard:
+  upstream:
+    transport: streamable-http
+    host: 0.0.0.0
+    port: 3000
+    session_idle_timeout_seconds: 300
+
+  downstream:
+    - name: ops_target
+      command: ["python", "-m", "demo.targets.ops_target"]
+      transport: stdio
+      tools:
+        - name: list_servers
+          description: 列出所有受管服务器及其状态
+          inputSchema:
+            type: object
+            properties: {}
+            required: []
+        - name: get_cpu
+          description: 查询指定主机的 CPU 使用率
+          inputSchema:
+            type: object
+            properties:
+              host:
+                type: string
+                description: 主机名
+            required: [host]
+        - name: restart_service
+          description: 重启指定主机上的服务（不真正执行）
+          inputSchema:
+            type: object
+            properties:
+              host:
+                type: string
+              name:
+                type: string
+                description: 服务名
+            required: [host, name]
+        - name: read_log
+          description: 读取日志文件内容
+          inputSchema:
+            type: object
+            properties:
+              path:
+                type: string
+                description: 日志文件路径
+            required: [path]
+        - name: exec_command
+          description: 在指定主机上执行 shell 命令（不真正执行）
+          inputSchema:
+            type: object
+            properties:
+              host:
+                type: string
+              cmd:
+                type: string
+                description: 命令字符串
+            required: [host, cmd]
+        - name: send_notification
+          description: 向指定渠道发送通知（不真正发送）
+          inputSchema:
+            type: object
+            properties:
+              channel:
+                type: string
+              msg:
+                type: string
+            required: [channel, msg]
+        - name: send_email
+          description: 发送邮件（不真正发送）
+          inputSchema:
+            type: object
+            properties:
+              to:
+                type: string
+                x-sensitive: true
+              body:
+                type: string
+                x-xa-guard-sensitive: true
+            required: [to, body]
+
+  gates:
+    gate1:
+      enabled: true
+      detectors:
+        - name: rule
+          type: rule
+          enabled: true
+          patterns_file: policies/baseline/gate1_input_patterns.yaml
+        - name: model_qwen
+          type: model
+          enabled: true
+          backend: qwen3guard
+          model_path: Qwen/Qwen3Guard-Gen-0.6B
+          device: cpu
+          threshold: 0.5
+          timeout_ms: 200
+          fail_open: true
+          category_map_file: policies/baseline/category_maps/qwen3guard.yaml
+          options:
+            dry_run: true
+            torch_dtype: float32
+            max_new_tokens: 64
+            controversial_score: 0.4
+      spotlighting:
+        enabled: true
+      source_risk_weights:
+        user: 1.0
+        web: 1.5
+        document: 1.5
+        rag: 1.2
+        memory: 1.1
+        tool_result: 1.3
+      patterns_file: policies/baseline/gate1_input_patterns.yaml
+
+    gate2:
+      enabled: true
+      hitl_required_for: [red]
+      elicitation_fallback: stdout
+      tool_risk_file: policies/baseline/gate2_tool_risks.yaml
+      approval_token_ttl_seconds: 300
+      prefer_layered: true
+
+    gate3:
+      enabled: true
+      backend: rego
+      strict_opa: true
+      opa_path: /usr/local/bin/opa
+      policy_file: policies/baseline/gate3_rules.yaml
+      prefer_layered: true
+
+    gate4:
+      enabled: true
+      strict_mode: false
+      tool_capabilities_file: policies/baseline/gate4_capabilities.yaml
+      prefer_layered: true
+
+    gate5:
+      enabled: true
+      docker_image: xa-guard/sandbox:latest
+      runtime: runc
+      network_disabled: true
+      readonly_rootfs: true
+      memory: 256m
+      cpus: "1"
+      pids_limit: 128
+      sandbox_all_tools: true
+      workspace_mount: false
+      workspace_target: /workspace
+      workspace_readonly: true
+
+    gate6:
+      enabled: true
+      audit_dir: ./logs/audit
+      hash_algo: sha256
+      signature_mode: none             # none | sm2 (strict) | hmac-demo
+      enable_sm2_signature: false      # legacy compatibility only
+      sm2_key_path: ""
+
+    policy_layered:
+      enabled: true
+      baseline_manifest: policies/baseline/manifest.yaml
+      overlay_root: policies/overlay
+      hot_reload: true
+
+  policy_default: enterprise-l3
+  audit_dir: ./logs/audit
+  log_dir: ./logs/runtime
+  pending_approvals_path: ./logs/runtime/pending_approvals.jsonl
+  tool_capabilities_file: policies/baseline/gate4_capabilities.yaml

@@ -1,12 +1,132 @@
 {
   "schema_version": "xa-guard-csab-corpus/v1",
   "corpus_id": "csab-gov-v1-candidate",
-  "version": "2026-06-19",
+  "version": "2026-06-20",
   "taxonomy_version": "GB/T 45654-2025/A.1+A.2",
   "normalization_version": "xa-guard-payload-normalization/v1",
   "independent_evaluator_attestation": null,
-  "claim_scope": "candidate_non_refusal_corpus_only",
-  "refusal_taxonomy": [],
+  "claim_scope": "l3_static_implementation_corpus_not_independent_formal_evidence",
+  "refusal_taxonomy": [
+    {
+      "category_id": "GBT45654-REFUSAL-01",
+      "label": "宣扬恐怖主义、极端主义",
+      "standard_clause": "GB/T 45654-2025 A.1+A.2; exact mapping pending independent review",
+      "source_url": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=F67D3F376E0A0A0FF5317FB36B32A30A",
+      "alignment_reviewed": false
+    },
+    {
+      "category_id": "GBT45654-REFUSAL-02",
+      "label": "宣扬暴力、淫秽色情",
+      "standard_clause": "GB/T 45654-2025 A.1+A.2; exact mapping pending independent review",
+      "source_url": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=F67D3F376E0A0A0FF5317FB36B32A30A",
+      "alignment_reviewed": false
+    },
+    {
+      "category_id": "GBT45654-REFUSAL-03",
+      "label": "传播虚假有害信息",
+      "standard_clause": "GB/T 45654-2025 A.1+A.2; exact mapping pending independent review",
+      "source_url": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=F67D3F376E0A0A0FF5317FB36B32A30A",
+      "alignment_reviewed": false
+    },
+    {
+      "category_id": "GBT45654-REFUSAL-04",
+      "label": "煽动颠覆国家政权、推翻社会主义制度",
+      "standard_clause": "GB/T 45654-2025 A.1+A.2; exact mapping pending independent review",
+      "source_url": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=F67D3F376E0A0A0FF5317FB36B32A30A",
+      "alignment_reviewed": false
+    },
+    {
+      "category_id": "GBT45654-REFUSAL-05",
+      "label": "煽动分裂国家、破坏国家统一和社会稳定",
+      "standard_clause": "GB/T 45654-2025 A.1+A.2; exact mapping pending independent review",
+      "source_url": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=F67D3F376E0A0A0FF5317FB36B32A30A",
+      "alignment_reviewed": false
+    },
+    {
+      "category_id": "GBT45654-REFUSAL-06",
+      "label": "危害国家安全和利益、损害国家形象",
+      "standard_clause": "GB/T 45654-2025 A.1+A.2; exact mapping pending independent review",
+      "source_url": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=F67D3F376E0A0A0FF5317FB36B32A30A",
+      "alignment_reviewed": false
+    },
+    {
+      "category_id": "GBT45654-REFUSAL-07",
+      "label": "宣扬民族仇恨",
+      "standard_clause": "GB/T 45654-2025 A.1+A.2; exact mapping pending independent review",
+      "source_url": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=F67D3F376E0A0A0FF5317FB36B32A30A",
+      "alignment_reviewed": false
+    },
+    {
+      "category_id": "GBT45654-REFUSAL-08",
+      "label": "其他法律、行政法规禁止的内容",
+      "standard_clause": "GB/T 45654-2025 A.1+A.2; exact mapping pending independent review",
+      "source_url": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=F67D3F376E0A0A0FF5317FB36B32A30A",
+      "alignment_reviewed": false
+    },
+    {
+      "category_id": "GBT45654-REFUSAL-09",
+      "label": "民族歧视",
+      "standard_clause": "GB/T 45654-2025 A.1+A.2; exact mapping pending independent review",
+      "source_url": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=F67D3F376E0A0A0FF5317FB36B32A30A",
+      "alignment_reviewed": false
+    },
+    {
+      "category_id": "GBT45654-REFUSAL-10",
+      "label": "信仰歧视",
+      "standard_clause": "GB/T 45654-2025 A.1+A.2; exact mapping pending independent review",
+      "source_url": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=F67D3F376E0A0A0FF5317FB36B32A30A",
+      "alignment_reviewed": false
+    },
+    {
+      "category_id": "GBT45654-REFUSAL-11",
+      "label": "国别歧视",
+      "standard_clause": "GB/T 45654-2025 A.1+A.2; exact mapping pending independent review",
+      "source_url": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=F67D3F376E0A0A0FF5317FB36B32A30A",
+      "alignment_reviewed": false
+    },
+    {
+      "category_id": "GBT45654-REFUSAL-12",
+      "label": "地域歧视",
+      "standard_clause": "GB/T 45654-2025 A.1+A.2; exact mapping pending independent review",
+      "source_url": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=F67D3F376E0A0A0FF5317FB36B32A30A",
+      "alignment_reviewed": false
+    },
+    {
+      "category_id": "GBT45654-REFUSAL-13",
+      "label": "性别歧视",
+      "standard_clause": "GB/T 45654-2025 A.1+A.2; exact mapping pending independent review",
+      "source_url": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=F67D3F376E0A0A0FF5317FB36B32A30A",
+      "alignment_reviewed": false
+    },
+    {
+      "category_id": "GBT45654-REFUSAL-14",
+      "label": "年龄歧视",
+      "standard_clause": "GB/T 45654-2025 A.1+A.2; exact mapping pending independent review",
+      "source_url": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=F67D3F376E0A0A0FF5317FB36B32A30A",
+      "alignment_reviewed": false
+    },
+    {
+      "category_id": "GBT45654-REFUSAL-15",
+      "label": "职业歧视",
+      "standard_clause": "GB/T 45654-2025 A.1+A.2; exact mapping pending independent review",
+      "source_url": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=F67D3F376E0A0A0FF5317FB36B32A30A",
+      "alignment_reviewed": false
+    },
+    {
+      "category_id": "GBT45654-REFUSAL-16",
+      "label": "健康歧视",
+      "standard_clause": "GB/T 45654-2025 A.1+A.2; exact mapping pending independent review",
+      "source_url": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=F67D3F376E0A0A0FF5317FB36B32A30A",
+      "alignment_reviewed": false
+    },
+    {
+      "category_id": "GBT45654-REFUSAL-17",
+      "label": "其他方面歧视",
+      "standard_clause": "GB/T 45654-2025 A.1+A.2; exact mapping pending independent review",
+      "source_url": "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=F67D3F376E0A0A0FF5317FB36B32A30A",
+      "alignment_reviewed": false
+    }
+  ],
   "sources": [
     {
       "source_id": "chinese-safetyqa-2024",
@@ -20,6 +140,19 @@
       "license_sha256": "sha256:34d68752e1311237514a5822c1ad093e73931e157f236abffae6722fe8d3d2cb",
       "redistribution": "allowed",
       "artifact_sha256": "sha256:edb401b22a0370cca603edd24c27437ea1c066360de742427202e292c06df94c"
+    },
+    {
+      "source_id": "xa-guard-authored-refusal-v1",
+      "title": "XA-Guard project-authored refusal implementation corpus",
+      "url": "urn:xa-guard:dataset:authored-refusal-v1",
+      "version": "1",
+      "retrieved_at": "2026-06-20",
+      "license_id": "MIT",
+      "license_url": "https://spdx.org/licenses/MIT.html",
+      "license_file": "THIRD_PARTY_LICENSE.XAGuardAuthoredRefusal.txt",
+      "license_sha256": "sha256:7a40cad377ee02b60b5917f2d67d1f7dc36967c8e7b0fe398421093967a260c8",
+      "redistribution": "allowed",
+      "artifact_sha256": "sha256:ed54df3ed355a3afd1ef9514bf57bbc3e3b1eaaea40f3d7a71da26b6d3840888"
     }
   ],
   "artifacts": [
@@ -29,12 +162,20 @@
       "path": "non-refusal.jsonl",
       "sha256": "sha256:48cd7dcafc4d39349aea17d6d006b0c9fdf401de773958a99775128e89ded53d",
       "case_count": 500
+    },
+    {
+      "cohort": "refusal",
+      "split": "development",
+      "path": "refusal.jsonl",
+      "sha256": "sha256:df1c30364199e2867e8c581d544dad247dc7d5619bec830d4247ab3c97f7a0cd",
+      "case_count": 500
     }
   ],
   "selection": {
     "source_case_count": 2000,
     "selected_case_count": 500,
-    "method": "lowest sha256(commit + NUL + question)"
+    "method": "lowest sha256(commit + NUL + question)",
+    "refusal_case_count": 500
   },
-  "commitment_sha256": "sha256:2eb2fe4fd5f45e8b2847a7a03cd490a9be1d64cb69271033be0dbff6f1911a78"
+  "commitment_sha256": "sha256:5611ef64dcf3cfca0caafc598589c372a1d0487a7198e26d4b92542007a83281"
 }

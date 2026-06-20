@@ -1,0 +1,512 @@
+{
+  "generated_at": "2026-06-20T06:55:25Z",
+  "mode": "static_only",
+  "repository_root": "D:\\race\\jiebang",
+  "runtime_evidence_required": [
+    {
+      "id": "independent_corpus_review",
+      "reason": "Formal status needs hash-bound independent taxonomy and semantic review.",
+      "section": "corpus",
+      "status": "required"
+    },
+    {
+      "id": "faithfulness_runtime_replay",
+      "reason": "Real agent decisions and traces must be replayed.",
+      "section": "faithfulness",
+      "status": "required"
+    },
+    {
+      "id": "real_langchain_agent_run",
+      "reason": "A supported real LangChain agent and transport must be exercised.",
+      "section": "langchain",
+      "status": "required"
+    },
+    {
+      "id": "linux_gvisor_acceptance",
+      "reason": "runsc isolation, egress denial, rollback, and performance require a Linux host run.",
+      "section": "gvisor",
+      "status": "required"
+    },
+    {
+      "id": "opa_runtime_parity",
+      "reason": "OPA provenance, strict startup, policy parity, and performance require runtime evidence.",
+      "section": "opa",
+      "status": "required"
+    },
+    {
+      "id": "real_trae_acceptance",
+      "reason": "Discovery, decisions, HITL UI behavior, logs, and screenshots require a real Trae client.",
+      "section": "trae",
+      "status": "required"
+    },
+    {
+      "id": "marketplace_installer_acceptance",
+      "reason": "A real marketplace or IDE installer interception must be demonstrated.",
+      "section": "aibom",
+      "status": "required"
+    },
+    {
+      "id": "deployment_runtime_acceptance",
+      "reason": "Compose build/up, health, sandbox execution, and soak require Docker.",
+      "section": "deployment",
+      "status": "required"
+    },
+    {
+      "id": "production_crypto_acceptance",
+      "reason": "Production key custody, HSM/KMS, rotation, and a trusted external TSA remain required.",
+      "section": "crypto",
+      "status": "required"
+    },
+    {
+      "id": "official_external_benchmark_run",
+      "reason": "Official environments, model calls, ASR/utility, and reproducibility require runtime evidence.",
+      "section": "benchmarks",
+      "status": "required"
+    },
+    {
+      "id": "delivery_artifact_review",
+      "reason": "Submission PDF, video, forms, screenshots, and attestations need human acceptance.",
+      "section": "docs",
+      "status": "required"
+    }
+  ],
+  "schema_version": "xa-guard-l3-static-verification/v1",
+  "sections": {
+    "aibom": {
+      "checks": [
+        {
+          "detail": "all required files exist",
+          "id": "aibom_assets",
+          "paths": [
+            "src/xa_guard/aibom/gateway.py",
+            "src/xa_guard/aibom/scanner.py",
+            "src/xa_guard/aibom/schema_validator.py",
+            "src/xa_guard/aibom/signing.py",
+            "src/xa_guard/aibom/offline_fetch.py",
+            "src/xa_guard/aibom/drift_monitor.py",
+            "src/xa_guard/aibom/schema/cyclonedx-1.6.subset.schema.json",
+            "src/xa_guard/aibom/schema/README.txt",
+            "tests/unit/test_aibom_gateway.py",
+            "pyproject.toml",
+            "src/xa_guard/aibom/external_generator.py",
+            "tests/unit/test_aibom_external_generator.py",
+            "docs/L3-aibom-external-generator.md"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "local CycloneDX subset schema parses",
+          "id": "aibom_schema",
+          "paths": [
+            "src/xa_guard/aibom/schema/cyclonedx-1.6.subset.schema.json",
+            "src/xa_guard/aibom/schema/README.txt"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "optional dependencies are declared",
+          "id": "aibom_dependencies",
+          "paths": [
+            "pyproject.toml",
+            "src/xa_guard/aibom/external_generator.py",
+            "tests/unit/test_aibom_external_generator.py",
+            "docs/L3-aibom-external-generator.md"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "external exchange implementation and tests cover the declared generator spec and loader API",
+          "id": "aibom_external_generator_api",
+          "paths": [
+            "src/xa_guard/aibom/external_generator.py",
+            "tests/unit/test_aibom_external_generator.py"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "implementation, tests, and documentation pin the external exchange to CycloneDX 1.6",
+          "id": "aibom_external_cyclonedx_16_contract",
+          "paths": [
+            "src/xa_guard/aibom/external_generator.py",
+            "tests/unit/test_aibom_external_generator.py",
+            "docs/L3-aibom-external-generator.md"
+          ],
+          "status": "pass"
+        }
+      ],
+      "failed": 0,
+      "passed": 5,
+      "status": "pass"
+    },
+    "benchmarks": {
+      "checks": [
+        {
+          "detail": "all required files exist",
+          "id": "benchmark_assets",
+          "paths": [
+            "scripts/benchmark_l3_performance.py",
+            "scripts/benchmark_streamable_http.py",
+            "bench/external/agentdojo_xa_guard.py",
+            "bench/external/injecagent_opencode.py",
+            "bench/schema/external-benchmark-result.schema.json",
+            "docs/external-benchmarks.md",
+            "docs/evidence/l3-performance-benchmark-2026-06-18.json"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "archived local run has 500+ requests, met targets, and a verified audit chain",
+          "id": "benchmark_evidence_shape",
+          "paths": [
+            "docs/evidence/l3-performance-benchmark-2026-06-18.json"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "AgentDojo and InjecAgent adapters are present",
+          "id": "external_adapters",
+          "paths": [
+            "bench/external/agentdojo_xa_guard.py",
+            "bench/external/injecagent_opencode.py"
+          ],
+          "status": "pass"
+        }
+      ],
+      "failed": 0,
+      "passed": 3,
+      "status": "pass"
+    },
+    "corpus": {
+      "checks": [
+        {
+          "detail": "all required files exist",
+          "id": "corpus_assets",
+          "paths": [
+            "bench/cases/csab-gov-v1-candidate/manifest.json",
+            "bench/cases/csab-gov-v1-candidate/non-refusal.jsonl",
+            "bench/cases/csab-gov-v1-candidate/refusal.jsonl",
+            "bench/schema/csab-corpus-manifest.schema.json",
+            "bench/schema/csab-corpus-case.schema.json"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "{\"counts\": {\"cohorts\": {\"non_refusal\": 500, \"refusal\": 500}, \"normalized_payloads_unique\": 1000, \"refusal_categories\": {\"GBT45654-REFUSAL-01\": 30, \"GBT45654-REFUSAL-02\": 30, \"GBT45654-REFUSAL-03\": 30, \"GBT45654-REFUSAL-04\": 30, \"GBT45654-REFUSAL-05\": 30, \"GBT45654-REFUSAL-06\": 30, \"GBT45654-REFUSAL-07\": 30, \"GBT45654-REFUSAL-08\": 29, \"GBT45654-REFUSAL-09\": 29, \"GBT45654-REFUSAL-10\": 29, \"GBT45654-REFUSAL-11\": 29, \"GBT45654-REFUSAL-12\": 29, \"GBT45654-REFUSAL-13\": 29, \"GBT45654-REFUSAL-14\": 29, \"GBT45654-REFUSAL-15\": 29, \"GBT45654-REFUSAL-16\": 29, \"GBT45654-REFUSAL-17\": 29}, \"refusal_taxonomy_categories\": 17, \"refusal_taxonomy_reviewed\": 0, \"semantic_groups\": 1000, \"semantic_groups_reviewed\": 0, \"total\": 1000}, \"errors\": [], \"warnings\": [\"implementation corpus still requires independent semantic review\"]}",
+          "id": "corpus_implementation_validation",
+          "paths": [
+            "bench/cases/csab-gov-v1-candidate/manifest.json",
+            "bench/cases/csab-gov-v1-candidate/non-refusal.jsonl",
+            "bench/cases/csab-gov-v1-candidate/refusal.jsonl",
+            "bench/schema/csab-corpus-manifest.schema.json",
+            "bench/schema/csab-corpus-case.schema.json"
+          ],
+          "status": "pass"
+        }
+      ],
+      "failed": 0,
+      "passed": 2,
+      "status": "pass"
+    },
+    "crypto": {
+      "checks": [
+        {
+          "detail": "all required files exist",
+          "id": "crypto_assets",
+          "paths": [
+            "src/xa_guard/audit/sm_crypto.py",
+            "src/xa_guard/audit/tsa.py",
+            "src/xa_guard/audit/tsa_client.py",
+            "tests/unit/test_sm3_pure.py",
+            "tests/unit/test_sm2_sign.py",
+            "tests/unit/test_tsa_client.py",
+            "docs/evidence/l3-sm2-tsa-evidence-2026-06-18.json"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "SM3 and strict SM2-with-SM3 paths are implemented",
+          "id": "crypto_implementations",
+          "paths": [
+            "src/xa_guard/audit/sm_crypto.py"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "evidence identifies algorithms and limits local TSA trust",
+          "id": "crypto_evidence_scope",
+          "paths": [
+            "docs/evidence/l3-sm2-tsa-evidence-2026-06-18.json"
+          ],
+          "status": "pass"
+        }
+      ],
+      "failed": 0,
+      "passed": 3,
+      "status": "pass"
+    },
+    "deployment": {
+      "checks": [
+        {
+          "detail": "all required files exist",
+          "id": "deployment_assets",
+          "paths": [
+            "docker-compose.yml",
+            "configs/xa-guard.docker.yaml",
+            "docker/xa-guard.Dockerfile",
+            "docker/sandbox.Dockerfile",
+            ".dockerignore"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "API and sandbox, health check, and MCP port are configured",
+          "id": "deployment_compose",
+          "paths": [
+            "docker-compose.yml"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "HTTP and isolated Gate5 are enabled",
+          "id": "deployment_profile",
+          "paths": [
+            "configs/xa-guard.docker.yaml"
+          ],
+          "status": "pass"
+        }
+      ],
+      "failed": 0,
+      "passed": 3,
+      "status": "pass"
+    },
+    "docs": {
+      "checks": [
+        {
+          "detail": "all required files exist",
+          "id": "l3_documentation",
+          "paths": [
+            "LICENSE",
+            "docs/PRD.md",
+            "docs/README.md",
+            "docs/L3-test-and-acceptance.md",
+            "docs/L3-trae-static-integration.md",
+            "deploy/gvisor/README.md",
+            "deploy/opa/README.md",
+            "docs/external-benchmarks.md"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "runbooks distinguish static readiness from runtime acceptance",
+          "id": "documentation_boundaries",
+          "paths": [
+            "docs/L3-test-and-acceptance.md",
+            "docs/L3-trae-static-integration.md",
+            "deploy/gvisor/README.md",
+            "deploy/opa/README.md",
+            "docs/external-benchmarks.md"
+          ],
+          "status": "pass"
+        }
+      ],
+      "failed": 0,
+      "passed": 2,
+      "status": "pass"
+    },
+    "faithfulness": {
+      "checks": [
+        {
+          "detail": "all required files exist",
+          "id": "faithfulness_assets",
+          "paths": [
+            "src/xa_guard/audit/faithfulness.py",
+            "src/xa_guard/gates/gate6_audit.py",
+            "src/xa_guard/types.py",
+            "tests/unit/test_gate6_audit.py"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "required symbols: ALGORITHM_VERSION, assess_decision_faithfulness",
+          "id": "faithfulness_faithfulness",
+          "paths": [
+            "src/xa_guard/audit/faithfulness.py"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "required symbols: assess_decision_faithfulness, faithfulness.algorithm, faithfulness.evidence",
+          "id": "faithfulness_gate6_audit",
+          "paths": [
+            "src/xa_guard/gates/gate6_audit.py"
+          ],
+          "status": "pass"
+        }
+      ],
+      "failed": 0,
+      "passed": 3,
+      "status": "pass"
+    },
+    "gvisor": {
+      "checks": [
+        {
+          "detail": "all required files exist",
+          "id": "gvisor_assets",
+          "paths": [
+            "deploy/gvisor/docker-compose.gvisor.yml",
+            "deploy/gvisor/daemon-system.json",
+            "deploy/gvisor/daemon-rootless.json",
+            "deploy/gvisor/README.md",
+            "configs/xa-guard.gvisor.yaml"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "runsc, read-only, dropped capabilities, and no-network are set",
+          "id": "gvisor_hardening",
+          "paths": [
+            "deploy/gvisor/docker-compose.gvisor.yml"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "runsc is opt-in and runc remains default",
+          "id": "gvisor_daemon_registration",
+          "paths": [
+            "deploy/gvisor/daemon-system.json",
+            "deploy/gvisor/daemon-rootless.json"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "Gate5 selects isolated runsc children",
+          "id": "gvisor_gate5_profile",
+          "paths": [
+            "configs/xa-guard.gvisor.yaml"
+          ],
+          "status": "pass"
+        }
+      ],
+      "failed": 0,
+      "passed": 4,
+      "status": "pass"
+    },
+    "langchain": {
+      "checks": [
+        {
+          "detail": "all required files exist",
+          "id": "langchain_assets",
+          "paths": [
+            "src/xa_guard/integrations/langchain.py",
+            "src/xa_guard/integrations/langgraph.py",
+            "tests/test_langchain_integration.py"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "required symbols: protect_tool, protect_tools, guard_callable, XAGuardCallbackHandler, XAGuardApprovalRequired",
+          "id": "langchain_langchain",
+          "paths": [
+            "src/xa_guard/integrations/langchain.py"
+          ],
+          "status": "pass"
+        }
+      ],
+      "failed": 0,
+      "passed": 2,
+      "status": "pass"
+    },
+    "opa": {
+      "checks": [
+        {
+          "detail": "all required files exist",
+          "id": "opa_assets",
+          "paths": [
+            "deploy/opa/docker-compose.opa.yml",
+            "deploy/opa/README.md",
+            "docker/xa-guard.opa.Dockerfile",
+            "configs/xa-guard.opa.yaml",
+            "scripts/export_opa_policy.py",
+            "src/xa_guard/policy/opa_export.py"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "Gate3 uses strict Rego and explicit OPA path",
+          "id": "opa_strict_profile",
+          "paths": [
+            "configs/xa-guard.opa.yaml"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "official OPA image is a versioned template",
+          "id": "opa_image_template",
+          "paths": [
+            "docker/xa-guard.opa.Dockerfile"
+          ],
+          "status": "pass"
+        }
+      ],
+      "failed": 0,
+      "passed": 3,
+      "status": "pass"
+    },
+    "trae": {
+      "checks": [
+        {
+          "detail": "all required files exist",
+          "id": "trae_assets",
+          "paths": [
+            "configs/trae/mcp-stdio.windows.template.json",
+            "configs/trae/mcp-stdio.linux.template.json",
+            "configs/trae/mcp-http.template.json",
+            "docs/L3-trae-static-integration.md"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "stdio templates configure server, pending store, and operator token",
+          "id": "trae_stdio_templates",
+          "paths": [
+            "configs/trae/mcp-stdio.windows.template.json",
+            "configs/trae/mcp-stdio.linux.template.json"
+          ],
+          "status": "pass"
+        },
+        {
+          "detail": "HTTP template targets the Compose MCP endpoint",
+          "id": "trae_http_template",
+          "paths": [
+            "configs/trae/mcp-http.template.json"
+          ],
+          "status": "pass"
+        }
+      ],
+      "failed": 0,
+      "passed": 3,
+      "status": "pass"
+    }
+  },
+  "selected_sections": [
+    "corpus",
+    "faithfulness",
+    "langchain",
+    "gvisor",
+    "opa",
+    "trae",
+    "aibom",
+    "deployment",
+    "crypto",
+    "benchmarks",
+    "docs"
+  ],
+  "summary": {
+    "failed_sections": [],
+    "runtime_evidence_items": 11,
+    "sections_checked": 11,
+    "sections_failed": 0,
+    "sections_passed": 11,
+    "status": "pass"
+  }
+}

@@ -1,5 +1,40 @@
 # 工作日志
 
+## 2026-06-20 本轮 L3 静态实现客观日志
+
+完成：
+- 完成双 500 题库相关静态实现：分别覆盖应拒答与非拒答样本的组织、校验及验收入口；本轮未据此宣称已完成外部独立实测。
+- 完成 faithfulness 静态实现与验收说明，明确指标输入、输出和失败判定边界。
+- 补齐 LangChain / LangGraph 集成的静态代码与配置路径，并纳入统一验收口径。
+- 补齐 Trae、gVisor、OPA 相关静态部署、策略与验收资产；这些资产仅完成代码和配置层准备。
+- 完成 AIBOM 外部交换相关静态实现，并将其纳入统一 verifier 校验范围。
+- 收敛统一 verifier，补充覆盖双 500、faithfulness、LangChain / LangGraph、Trae / gVisor / OPA、AIBOM 外部交换及许可证等项目的完整验收说明。
+- 补充 Apache-2.0 `LICENSE`，明确仓库许可证文本。
+- 最终轻量 pytest 合并运行结果为 `121 passed`，统一 verifier 为 `11/11 sections PASS`；未修改测试代码以绕过测试。
+
+未完成 / 未执行：
+- 未运行真实 LLM，因此没有模型调用质量、faithfulness 实际效果或端到端 agent 行为证据。
+- 未运行 Docker、gVisor、OPA 或 Trae，因此没有容器构建启动、Linux 隔离、策略执行或真实 IDE 集成证据。
+- 未运行全仓 pytest，也未执行依赖上述外部运行时的完整 L3 端到端验收；当前结论仅限静态实现、最终轻量 pytest 合并运行 `121 passed` 和统一 verifier `11/11 sections PASS`。
+
+下一步：
+- 在具备合法依赖、凭据和受支持 Linux/IDE 环境后，按统一 verifier 与完整验收说明依次执行真实 LLM、Docker/gVisor、OPA、Trae 和 AIBOM 外部交换验收，保存可复核产物并据结果更新 `status.md`。
+
+## 2026-06-20 Codex 主 agent - L3 gVisor/Linux 静态部署资产
+
+本次具体完成：
+- 新增 `deploy/gvisor/`：Linux Compose override、system/rootless Docker daemon 的 `runsc` 注册样例，以及安装前提、rootless socket 边界、启动校验、资源限制和回滚手册。
+- 新增 `configs/xa-guard.gvisor.yaml`：Gate5 使用 `runsc`，所有工具进入 Docker 隔离，禁网、只读 rootfs、无 workspace 挂载，并设置 memory/CPU/PID 限制。
+- override 保持根 `docker-compose.yml` 不变；XA-Guard 与 helper 均显式使用 `runsc`、非 root、只读 rootfs、cap-drop、no-new-privileges 和资源限制，并以 rootless Docker socket 替换 rootful socket 来源。
+- 新增 `tests/unit/test_l3_gvisor_assets.py`，只解析 YAML/JSON/应用配置和运行手册，不启动 Docker/gVisor。新增测试 4 passed，Ruff 通过；`docker compose ... config` 双文件静态合并解析通过。
+
+未完成 / 限制：
+- 按任务约束未安装或真实运行 Docker、gVisor、`runsc`，因此没有 Linux syscall 隔离、禁网、只读、性能开销或回滚实跑证据。
+- Docker API socket 对 XA-Guard 必须可写才能创建 Gate5 子容器；手册明确其等价于 daemon 控制权，生产需专用 rootless daemon、账号与主机隔离。
+
+下一步：
+- 在受支持的 Linux 主机固定并校验 gVisor 版本，执行手册中的 runtime 注册、Compose build/up、子容器禁网/只读/资源限制及回滚验收，并归档命令输出和性能对照证据。
+
 ## 2026-06-19 Codex 主 agent - InjecAgent 官方代码 OpenCode 单例基线与 defended smoke
 
 本次具体完成：

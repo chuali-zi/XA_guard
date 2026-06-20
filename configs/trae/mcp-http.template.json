@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "xa-guard-l3-http": {
+      "url": "http://127.0.0.1:13000/mcp"
+    }
+  }
+}

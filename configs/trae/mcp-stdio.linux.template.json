@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "xa-guard-l3": {
+      "command": "/ABSOLUTE/PATH/TO/venv/bin/python",
+      "args": [
+        "-m",
+        "xa_guard.server",
+        "--config",
+        "/ABSOLUTE/PATH/TO/jiebang/configs/xa-guard.yaml"
+      ],
+      "env": {
+        "PYTHONPATH": "/ABSOLUTE/PATH/TO/jiebang/src:/ABSOLUTE/PATH/TO/jiebang",
+        "XA_GUARD_APPROVAL_OPERATOR_TOKEN": "REPLACE_WITH_SECRET",
+        "XA_GUARD_PENDING_APPROVAL_STORE": "/ABSOLUTE/PATH/TO/jiebang/logs/trae/pending.jsonl"
+      }
+    }
+  }
+}

@@ -34,12 +34,14 @@ def test_payload_normalization_is_stable_and_drops_non_semantic_fields():
     assert payload_sha256(left) == payload_sha256(right)
 
 
-def test_candidate_asset_is_hash_bound_and_has_500_unique_non_refusals():
-    result = validate_corpus(CORPUS, profile="candidate")
+def test_implementation_asset_is_hash_bound_and_has_dual_500_cohorts():
+    result = validate_corpus(CORPUS, profile="implementation")
     assert result.valid, result.errors
-    assert result.counts["cohorts"] == {"non_refusal": 500}
-    assert result.counts["normalized_payloads_unique"] == 500
-    assert result.counts["semantic_groups"] == 500
+    assert result.counts["cohorts"] == {"non_refusal": 500, "refusal": 500}
+    assert result.counts["normalized_payloads_unique"] == 1000
+    assert result.counts["semantic_groups"] == 1000
+    assert result.counts["refusal_taxonomy_categories"] == 17
+    assert min(result.counts["refusal_categories"].values()) >= 20
     manifest = json.loads((CORPUS / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["schema_version"] == SCHEMA_VERSION
     assert manifest["normalization_version"] == NORMALIZATION_VERSION
@@ -48,12 +50,12 @@ def test_candidate_asset_is_hash_bound_and_has_500_unique_non_refusals():
     assert manifest["sources"][0]["version"] == "5be00913f99e24965378b557f1f0ecb7443caba3"
 
 
-def test_candidate_is_not_misrepresented_as_formal_corpus():
+def test_implementation_is_not_misrepresented_as_formal_corpus():
     result = validate_corpus(CORPUS, profile="formal")
     assert not result.valid
-    assert "formal profile requires at least 500 refusal cases" in result.errors
     assert "formal profile requires a hash-bound independent evaluator attestation" in result.errors
-    assert "formal profile requires exactly 17 refusal taxonomy categories" in result.errors
+    assert "formal profile requires independent review of every taxonomy mapping" in result.errors
+    assert "formal profile requires semantic_group_reviewed=true for every case" in result.errors
 
 
 def test_artifact_tampering_is_detected(tmp_path: Path):

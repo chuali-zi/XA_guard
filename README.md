@@ -1,10 +1,10 @@
-# XA-Guard · 政企智能体安全中台（demo）
+﻿# XA-Guard · 政企智能体安全中台（demo）
 
 > 挑战杯 **XA-202620** · 雄安集团数字城市科技有限公司发榜
 > 题目：**面向政企场景的大模型智能体安全关键技术研究**
 > 提交截止：**2026-09-15 24:00**
 >
-> ⚠ 本仓库当前为 **L2 工程完成、L3 政企原型推进中**。完整生产实现按 [docs/PRD.md](docs/PRD.md) M2-M4 推进。
+> ⚠ 本仓库当前为 **L2 工程完成、L3 静态实现验收面完成、L3 真实与最终验收待执行**。验收边界见 [L3 测试与验收说明](docs/L3-test-and-acceptance.md)。
 
 ---
 
@@ -34,7 +34,7 @@
 ```
 
 配套：
-- **XA-Bench**（赛题方向 4 评测）：CSAB-Gov-mini 290 条 seed 用例 + ASR/FPR/Recall/CuP/Latency
+- **XA-Bench**（赛题方向 4 评测）：CSAB-Gov-mini 290 条 seed 回归 + 双 500 候选语料 + ASR/FPR/Recall/CuP/Latency
 - **AIBOM 准入网关**（赛题方向 3）：插件 AST 扫描 + CycloneDX-like BOM + schema/signing/drift + bench/真实 MCP `install_plugin` 离线 preflight
 - **演示前端**：审计回放时间线（单页 HTML，离线可用）
 - **演示脚本**：3 个攻击场景独立可跑
@@ -113,6 +113,29 @@ payload SHA-256 固定切分 `calibration_holdout`，但现有 seed 已用于开
 attestation、人工 semantic group、每 split 六类 attacks 各 20 条 + 381 negatives，并同时校验 FPR
 点估计与 95% Wilson 上界；`smoke` profile 只验证协议链路，不能作为正式成绩。
 
+## L3 静态验收与配置入口
+
+统一静态 verifier：
+
+```powershell
+python scripts/verify_l3_static.py --section all `
+  --output scripts/.log/l3-static-verification.json
+```
+
+可用 `--section corpus|faithfulness|langchain|gvisor|opa|trae|aibom|deployment|crypto|benchmarks|docs` 单独检查。零退出仅表示静态资产与关键配置形态通过；报告会同时列出每个 section 的 `runtime_evidence_required`。完整的前置条件、命令、成功标准、证据与 FAIL/BLOCKED 判定见 [docs/L3-test-and-acceptance.md](docs/L3-test-and-acceptance.md)。
+
+| 场景 | 配置/入口 | 当前边界 |
+|---|---|---|
+| 默认本地 stdio | `configs/xa-guard.yaml` | 开发与本地 MCP |
+| Docker HTTP | `configs/xa-guard.docker.yaml` + `docker-compose.yml` | 既有部署入口 |
+| Trae | `configs/trae/*.template.json` | Windows/Linux stdio 与 HTTP 静态模板；真实客户端验收待执行 |
+| gVisor | `configs/xa-guard.gvisor.yaml` + `deploy/gvisor/docker-compose.gvisor.yml` | 静态 hardening 已完成；Linux `runsc` 实测待执行 |
+| strict OPA | `configs/xa-guard.opa.yaml` + `deploy/opa/docker-compose.opa.yml` | 缺 OPA fail-closed；真实 parity/故障/性能待执行 |
+| AIBOM 外部产物 | `xa_guard.aibom.external_generator` | 仅导入并校验已生成的 CycloneDX 1.6；不下载或冒充第三方生成器 |
+
+双 500 候选语料位于 `bench/cases/csab-gov-v1-candidate/`：当前为 500 refusal + 500 non-refusal、1000 个唯一规范化 payload，implementation profile 可验。其独立 attestation、17 类 taxonomy 映射和全部 semantic group 尚未由独立评测方完成 hash-bound 复核，因此不能作为 formal 双 500 成绩。
+
+LangChain/LangGraph 已提供 `protect_tool(s)`、`guard_callable`、Runnable/Agent wrapper、callback observer、一次性审批恢复和 graph node/tool 适配。Gate6 的 `xa-guard-decision-faithfulness/v1` 会按决策、规则命中、理由和下游动作一致性计算并记录 algorithm/evidence，不再固定输出 `1.0`。两者仍需真实受支持版本、真实 agent/trace 和 transport 的端到端及独立重放证据。
 ## Docker Compose 一键部署（L3 原型）
 
 ```bash
@@ -385,7 +408,7 @@ jiebang/
 | content_safety | 60 | 100% | 关卡 1 识别中英文越狱 + 系统提示套取 + 隐私地址请求 |
 | supply_chain | 25 | 100% | bench 供应链路径已接 AIBOM gateway 与 Gate6；覆盖远程 artifact、typosquat、固定版本、源码能力扫描等 seed，25/25 有独立 trace/audit hash |
 | compliance | 50 | 100% | 关卡 3 命中等保 / 跨域规则 |
-| interpretability | 20 | 100% | seed 中 CoT 不一致降级为 WARN；真实忠实度算法仍未实做 |
+| interpretability | 20 | 100% | seed 中 CoT 不一致降级为 WARN；Gate6 已使用可重放 decision-faithfulness v1，真实 trace 独立重放待执行 |
 | traceability | 25 | 100% | 这里只是 decision exact-match smoke；审计完整性需独立验链脚本验证 |
 
 > 完整数字 + 命中规则细节见 `bench/.log/report.html`。
@@ -400,20 +423,34 @@ jiebang/
 |---|---|---|
 | Gate1 真实模型推理 + Spotlighting | 关卡 1 默认仍是规则链路，Spotlighting 已默认开启；模型 backend 需真实依赖/权重才可用 | M2 接真实 Qwen3Guard 指标，保留英文对照层 |
 | 双层 Policy DSL（baseline + overlay） | 🟡 已落地：baseline/overlay 合并、单调性门控、bundle_sha 入审计；Gate3 `backend=rego + prefer_layered` 可用 merged-view Rego engine；`export_opa_policy.py` 可导出 data/Rego bundle | 真实 OPA CLI/服务化部署、性能和三层 Rego 包硬化 |
-| Docker Compose 一键部署 | 🟡 已有 L3 原型：`docker-compose.yml` + HTTP healthcheck；默认构建 sandbox 镜像；docker profile 使用静态工具 manifest 避免裸 `list_tools` discovery；当前机器 Docker daemon 未启动，完整 build/up 待验证 | 继续补生产硬化、镜像发布和 Linux 证据 |
-| gVisor / Docker 真沙箱 | Docker sandbox smoke 已实测；Compose profile 默认 runc；Linux runsc/gVisor 未实测 | M3 Linux/gVisor 证据 |
+| Docker Compose 一键部署 | ✅ 配置、健康检查、静态工具 manifest 与既有 build/up 证据已归档 | 继续补生产硬化、镜像发布、soak 和最终环境复验 |
+| gVisor / Docker 真沙箱 | Docker/runc 有既有 smoke；gVisor override、runsc Gate5 profile 与 hardening 静态资产已完成 | 在受支持 Linux 主机完成 runsc 隔离、故障、回滚与性能证据 |
 | 国密 SM2 / TSA | `signature_mode=sm2` 为严格 SM2-with-SM3，缺库/密钥 fail-closed；算法与 key ID 入链，verifier 可强制逐条验签；HMAC 仅显式 `hmac-demo`；已有本地 TSA anchor/index | 外部可信 TSA / HSM-KMS 密钥体系 |
 | MCP elicitation 反向问 | 国产 IDE 未声明，stdout fallback | M2 Cursor 实测 |
-| 完整国标题库（≥ 500 题） | 当前 YAML 有 290 条物理回归行；剔除无行为差异的 `variant_index` 后最多 239 个语义 case、218 个规范化唯一 payload，尚未达到 L3 500+ | 扩展为 ≥500 个独立、可审计语义 case，并做去重/来源/许可清单 |
+| 双 500 国标候选语料 | 已有 500 refusal + 500 non-refusal、1000 个唯一规范化 payload，implementation profile 可验 | 独立评测方完成 attestation、taxonomy/semantic-group 复核后运行 formal；不得以候选集替代正式成绩 |
 | AIBOM 插件评级 | gateway 已接 bench supply_chain 和真实 MCP `install_plugin` 离线 preflight；本地 artifact/hash 与离线镜像可扫描，远程未镜像 fail-closed | 补真实 marketplace/IDE 安装器、实时 feed、生产签名信任根和更多供应链 case |
 | AgentDojo / InjecAgent | 🟡 两个官方仓库均已有真实 OpenCode protocol smoke。AgentDojo 固定 0.1.35/commit，Gate1 defended trace 可核验，但旧 prompt 污染且首对不具备 ASR 资格；InjecAgent 固定 commit f19c9f2，复用原版 prompt/parser/scorer 跑通 DH case 0 的 base/enhanced/defended，以及 DS case 0 base S1；4 次均 valid/attack_success=false，DS 因 S1 未成功未进入 S2 | 完成 AgentDojo ASR-eligible 中性矩阵，以及 InjecAgent 510 DH + 544 DS 正式 baseline/defended 批量；当前单例不得作为总体 ASR |
-| LangChain SDK 装饰器 | 🟡 最小非透传 preflight + `protect_tool()` 单个 BaseTool 强阻断 wrapper；当前环境未安装 langchain-core，集成测试会 skip | 继续补 Callback 观测、approval resume、Agent/LangGraph 全链路 |
+| LangChain / LangGraph | ✅ 静态适配包含 tool(s)、callable、Runnable/Agent、callback observer、HITL resume 与 graph node/tool | 固定真实版本并完成真实 agent、transport、审批和审计端到端证据 |
 | Streamable HTTP 上游 | ✅ stateful 多 session、生命周期回收、4-session 隔离 E2E、10-session/500-request HTTP MCP 基准已完成 | 补真实下游 HTTP、多 worker pending 一致性与长期 soak |
 
 更多仓库状态和未决问题：`status.md`。客观工作记录：`log.md`。
 
 ---
 
+
+## FAQ
+
+**统一静态 verifier 通过，是否等于 L3 验收通过？**
+不等于。只能写“L3 静态实现验收通过”；真实 Trae、Linux gVisor、OPA parity、正式外部 benchmark、独立双 500、独立 faithfulness 重放、第三方 TSA/HSM 和最终提交物仍须执行。
+
+**双 500 已经完成了吗？**
+候选实现语料已达到 500+500，且 implementation profile 可验证；formal 仍缺独立 attestation、逐类 taxonomy 与逐条 semantic-group 复核。
+
+**faithfulness 是否仍固定为 1.0？**
+不是。Gate6 使用 `xa-guard-decision-faithfulness/v1` 计算加权一致性分数并记录可重放 evidence；正式验收还要求独立方对真实 trace 重算。
+
+**gVisor、OPA 和 AIBOM 可以宣称真实验收完成吗？**
+不能。gVisor/OPA 当前完成静态部署与严格配置面；AIBOM 完成内部准入和外部 BOM 交换适配。真实 runtime、合法外部生成器和 marketplace/IDE 安装链证据仍待补。
 ## 关键文档
 
 | 文档 | 用途 |
@@ -424,6 +461,7 @@ jiebang/
 | `docs/PRD.md` | 量化 KPI + 验收标准 + MoSCoW |
 | `docs/L2-acceptance-checklist.md` | **L2 Hard / Competition-trusted 冻结清单** |
 | `docs/L2-verification-commands.md` | L2 一键验证命令（pytest / bench / Gate1 / 覆盖矩阵） |
+| `docs/L3-test-and-acceptance.md` | L3 静态实现、真实环境与最终验收的统一口径 |
 | `docs/项目总览.md` | 项目全员手册 |
 | `docs/HACK-BENCH-组员提交规范.md` | hack / red-team 组员提交格式 |
 | `docs/XA-Bench-对抗测试规则.md` | bench 接入、oracle、指标和演进规则 |
@@ -444,7 +482,7 @@ jiebang/
 
 ## License
 
-Apache-2.0（待团队确认；不写学校 / 作者名 — 比赛红线）。
+Apache-2.0；完整文本见根目录 LICENSE。
 
 ## 联系
 

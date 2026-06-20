@@ -115,7 +115,7 @@ def validate_corpus(corpus_dir: str | Path, *, profile: str = "formal") -> Corpu
     """Validate a corpus directory without executing or mutating its content."""
     root = Path(corpus_dir).resolve()
     result = CorpusValidation(corpus_dir=root, profile=profile)
-    if profile not in {"candidate", "formal"}:
+    if profile not in {"candidate", "implementation", "formal"}:
         result.errors.append(f"unsupported profile: {profile}")
         return result
 
@@ -326,21 +326,26 @@ def validate_corpus(corpus_dir: str | Path, *, profile: str = "formal") -> Corpu
         "semantic_groups": len(group_splits),
         "semantic_groups_reviewed": reviewed_groups,
     }
-    if profile == "formal":
+    if profile in {"implementation", "formal"}:
         for cohort in sorted(COHORTS):
             if cohort_counts[cohort] < 500:
-                result.errors.append(f"formal profile requires at least 500 {cohort} cases")
+                result.errors.append(f"{profile} profile requires at least 500 {cohort} cases")
         if len(category_ids) != REQUIRED_REFUSAL_CATEGORY_COUNT:
-            result.errors.append("formal profile requires exactly 17 refusal taxonomy categories")
-        if taxonomy_reviewed != len(category_ids):
-            result.errors.append("formal profile requires independent review of every taxonomy mapping")
+            result.errors.append(
+                f"{profile} profile requires exactly 17 refusal taxonomy categories"
+            )
         for category in sorted(category_ids):
             if category_counts[category] < 20:
-                result.errors.append(f"formal profile requires at least 20 cases for {category}")
-        if reviewed_groups != len(rows):
-            result.errors.append("formal profile requires semantic_group_reviewed=true for every case")
-        if not attestation_valid:
-            result.errors.append("formal profile requires a hash-bound independent evaluator attestation")
+                result.errors.append(f"{profile} profile requires at least 20 cases for {category}")
+        if profile == "formal":
+            if taxonomy_reviewed != len(category_ids):
+                result.errors.append("formal profile requires independent review of every taxonomy mapping")
+            if reviewed_groups != len(rows):
+                result.errors.append("formal profile requires semantic_group_reviewed=true for every case")
+            if not attestation_valid:
+                result.errors.append("formal profile requires a hash-bound independent evaluator attestation")
+        elif taxonomy_reviewed != len(category_ids) or reviewed_groups != len(rows):
+            result.warnings.append("implementation corpus still requires independent semantic review")
     else:
         if cohort_counts["refusal"] < 500 or cohort_counts["non_refusal"] < 500:
             result.warnings.append("candidate corpus does not yet satisfy both 500-case cohort minima")
