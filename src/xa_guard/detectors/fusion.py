@@ -13,7 +13,8 @@
 
     Deny categories (来自 baseline/gate1_input_patterns.yaml):
       shell_dangerous, jailbreak_zh, jailbreak_en, system_leak,
-      privacy_leak, pii_leak, sql_injection, indirect_injection
+      privacy_leak, pii_leak, sql_injection, indirect_injection,
+      secret_exfil, forbidden_generation
 
     降级规则详情：
       - indirect_injection + RAG来源 → WARN (非 DENY)
@@ -24,7 +25,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from xa_guard.detectors.base import DetectionLabel, DetectionResult
-from xa_guard.types import Decision, InputSource
+from xa_guard.types import Decision
 
 if TYPE_CHECKING:
     from xa_guard.types import GateContext
@@ -44,6 +45,8 @@ DEFAULT_DENY_CATEGORIES = frozenset({
     "ops_destructive",
     "classified_exfil",
     "social_engineering",
+    "secret_exfil",
+    "forbidden_generation",
 })
 
 _DENY_DOWNGRADE_RAG: frozenset[str] = frozenset({"indirect_injection"})

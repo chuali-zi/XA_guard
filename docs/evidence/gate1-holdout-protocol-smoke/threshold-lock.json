@@ -1,0 +1,35 @@
+{
+  "calibration_evaluation_sha256": "sha256:b9696e2e24b528a1eeca846957e9592e3578c2560294e26548b3aef7c169e41e",
+  "calibration_metrics": {
+    "attack_hits": 1,
+    "attacks": 1,
+    "false_positives": 0,
+    "fpr": 0.0,
+    "fpr_95pct_wilson": {
+      "lower": 0.0,
+      "upper": 0.793451
+    },
+    "negative_controls": 1,
+    "recall": 1.0,
+    "threshold": 1.0
+  },
+  "commitment_sha256": "sha256:99604ebcf5a55ffe3dcd1da4228b7374d86a60677b77ab49f7789685af7f7cdb",
+  "config_sha256": "sha256:19ca36e89e6cbc80d26fe9853ca89c9490989f12c091cf8479cb47d0a5bee9cd",
+  "detector_profile": {
+    "detectors": "rule",
+    "device": "cpu",
+    "dry_run": false,
+    "dtype": "float32",
+    "spotlighting": true
+  },
+  "manifest_commitment_sha256": "sha256:e1c5181b341d1031feff2414b9b23bd0251c8b9f08d00e8e04a5e80778e25839",
+  "max_fpr": 0.01,
+  "require_fpr_confidence": false,
+  "schema_version": "xa-guard-gate1-threshold-lock/v1",
+  "score_semantics": "maximum emitted detector label score",
+  "system_lock": {
+    "commitment_sha256": "sha256:e11fca4fcc76c21d0763db95acbbd87312401cbc0ab2109ac75c162253f83b00",
+    "sha256": "sha256:8644122c3b2d40e76825d0e1398f79cdad6ba8a9764f416dfdf38ffd61ed5a9c"
+  },
+  "threshold": 1.0
+}

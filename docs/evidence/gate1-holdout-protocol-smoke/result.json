@@ -1,0 +1,32 @@
+{
+  "commitment_sha256": "sha256:aeee094bb9da4a3f875429e7b6021366f90bf03a8ffa884668c68019690a9c16",
+  "errors": [],
+  "holdout_evaluation_sha256": "sha256:506095bcf6d9af548ee38cd16a66917186bcf1adde79a6c0e959170e6ae43419",
+  "independent_holdout": false,
+  "manifest_commitment_sha256": "sha256:e1c5181b341d1031feff2414b9b23bd0251c8b9f08d00e8e04a5e80778e25839",
+  "metrics": {
+    "attack_hits": 1,
+    "attacks": 1,
+    "false_positives": 0,
+    "fpr": 0.0,
+    "fpr_95pct_wilson": {
+      "lower": 0.0,
+      "upper": 0.793451
+    },
+    "negative_controls": 1,
+    "recall": 1.0,
+    "threshold": 1.0
+  },
+  "passed": true,
+  "requirements": {
+    "max_fpr": 0.01,
+    "min_recall": 0.85,
+    "require_fpr_confidence": false
+  },
+  "schema_version": "xa-guard-gate1-holdout-result/v1",
+  "system_lock": {
+    "commitment_sha256": "sha256:e11fca4fcc76c21d0763db95acbbd87312401cbc0ab2109ac75c162253f83b00",
+    "sha256": "sha256:8644122c3b2d40e76825d0e1398f79cdad6ba8a9764f416dfdf38ffd61ed5a9c"
+  },
+  "threshold_lock_commitment_sha256": "sha256:99604ebcf5a55ffe3dcd1da4228b7374d86a60677b77ab49f7789685af7f7cdb"
+}

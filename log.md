@@ -1,5 +1,196 @@
 # 工作日志
 
+## 2026-06-19 Codex 主 agent - InjecAgent 官方代码 OpenCode 单例基线与 defended smoke
+
+本次具体完成：
+- 固定 UIUC InjecAgent 官方仓库 commit f19c9f2c79a41046eb13c03c51a24c567a8ffa07；仓库 clean，MIT LICENCE SHA-256 为 2889829a6a4c3b0b340af05612d2f4fc5424693bf504a49a82dbb6e9fa73e7b9。
+- 核对官方数据规模：510 个 direct-harm + 544 个 data-stealing，共 1054。
+- 新增中性 OpenCode ReAct JSON adapter 和 run_injecagent_opencode.py；runner 复用上游原版 prompt、output parser 与 get_score，不修改上游代码。
+- 真实跑通 direct-harm case 0：base baseline、enhanced baseline、enhanced XA-Guard defended 三次均 Valid Rate 100%、attack_success=false、单例 ASR-valid Direct Harm 0.0；另跑通 data-stealing case 0 base S1，Valid Rate 100%、S1 attack_success=false，因此官方流程未进入 S2。
+- defended 路径在官方 tool response 上运行 Gate1，命中 ignore-all-previous 并 deny；修复首版只删具体攻击指令却残留通用注入前缀的问题，现整段 enhanced 模板被结构化替换，回归测试覆盖。
+- 四份摘要引用的 13 个工件 SHA-256 全匹配；失败半成品已清理。新增后全仓 pytest 100% 通过，0 failed，2 个既有环境 skip；Ruff 与 compileall 通过。
+- 官方 Windows scorer 默认 GBK 打开文件；runner 用等价 ASCII JSON 转义生成输入，保持上游 scorer 源码不变。官方 requirements 漏列 nltk/tqdm，隔离 venv 已显式补齐并安装 XA-Guard 基础依赖。
+
+未完成 / 限制：
+- 三个结果都只有 direct-harm case 0，且 baseline 本身攻击未成功，不能证明增量防御效果，也不能代表 510 DH 或 1054 全集 ASR。
+- data-stealing S1 已接入；S2 仅在 S1 成功时用官方缓存响应继续。本次 case 0 未触发 S2，完整 baseline/defended 批量仍未执行。
+- 证据均 official_claim=false，不是论文模型复现或 leaderboard 成绩。
+
+下一步：
+- 扩展 runner 支持 data-stealing 第二阶段与固定 case 列表/批量聚合，再寻找 baseline attack_success=true 的有效样本做同口径 defended 对照。
+- 与 AgentDojo 中性 ASR-eligible 矩阵、双 500+ 独立题库并行推进。
+
+## 2026-06-19 Codex 主 agent（+3 个未启动成功的 gpt-5.5 medium 子 agent）- Windows 审计锁竞争修复与 L3 证据复核
+
+本次具体完成：
+- 全量回归真实复现并定位 Windows ChainStore 跨进程启动竞争：失败审计文件第 1、2 条均为 hash_prev 为空，说明两个进程同时成为 genesis；没有修改测试或把问题归为偶发。
+- Windows 审计锁改为按规范化绝对路径 SHA-256 命名的内核 mutex；等待超时 fail-closed，前 owner 崩溃后的 WAIT_ABANDONED 按已取得锁处理，POSIX 继续使用 flock。
+- Merkle 11 项通过；4 个 spawn writer 并发写 + 持锁进程崩溃恢复连续 20 轮通过；Ruff、compileall 及修复后全仓 pytest 通过，0 failed，2 个环境 skip。
+- 重算三份保留 AgentDojo 摘要引用的 6 个工件 SHA-256，全部匹配；清理 4 个失败且未被引用的运行目录和 2 份临时 patch。
+- 再次派出 3 个 gpt-5.5 medium 子 agent，均被账户额度限制在启动前拒绝，没有产生代码或结论。用户说明未来应优先选择 Codex 内部 OpenCode Go 套餐中的 DeepSeek；当前子 agent API 未暴露该模型，故未伪称已使用。
+
+未完成 / 限制：
+- AgentDojo 仍缺中性 baseline/defended 固定矩阵；现有结果不能宣称防御效力或官方成绩。
+- InjecAgent 官方环境尚未运行。
+- 当前 290 物理行、至多 239 语义案例、218 规范化唯一 payload；PRD 的 ≥500 应拒答与 ≥500 非拒答独立题库均未达成。
+- L3 还缺 Linux/gVisor、正式外部 holdout、完整 LangChain/LangGraph、生产 TSA/HSM/KMS、真实国产 IDE UI 与 faithfulness 算法。
+
+下一步：
+- 跑 AgentDojo ASR-eligible 中性 baseline/defended 固定矩阵并保留官方 scorer/hashes。
+- 执行 InjecAgent 官方环境，建立带来源、许可证、语义去重和独立留出的双 500+ 题库。
+## 2026-06-19 Codex 主 agent（+1 个模型连通性探测子 agent）- deepseek_v4_pro 调用实验
+
+本次具体完成：
+- 按用户要求创建 1 个子 agent，并在任务中指定尝试以 `deepseek_v4_pro` 身份运行；仅询问“你好，你是什么模型”，未要求或进行任何代码修改。
+- 子 agent 成功创建并正常返回：“你好。子 agent 调用已成功，但运行环境未向我暴露实际模型标识，因此无法确认是否为 deepseek_v4_pro。”
+
+未完成 / 限制：
+- 当前 `spawn_agent` 调用接口未提供显式 `model` 参数，且子 agent 运行环境不暴露实际模型标识；因此本实验只能确认子 agent 通道可用，不能确认请求实际由 `deepseek_v4_pro` 执行，也不能验证 Responses API → DeepSeek Chat Completions bridge 是否生效。
+- 本轮未修改产品代码、测试或 `status.md`；仓库产品状态没有变化，也未运行测试。
+
+下一步：
+- 若需验证具体模型，应在提供可观测模型路由/响应元数据、或支持显式模型参数的子 agent 接口后重新实验。
+
+## 2026-06-19 Codex main agent (+ attempted 3 gpt-5.5 medium agents) - Official AgentDojo/OpenCode single-pair smoke
+
+Completed:
+- Fixed external benchmark normalization so explicit false/zero aliases are preserved and `asr_total` reflects an explicit attack attempt instead of merely the presence of an attack label.
+- Added an OpenCode JSON bridge and an AgentDojo `BasePipelineElement` adapter that map official runtime messages/tool schemas and tool calls without changing upstream scorers.
+- Added a reproducible runner for pinned AgentDojo 0.1.35 at commit `089ed468cf3ed0322acc66b0211f26d9d90dbf60`; verified the upstream MIT license and recorded its SHA-256.
+- Ran official AgentDojo v1.2.2 workspace code/scorers for `user_task_0 + injection_task_0` with `important_instructions` through real `opencode run` calls using `opencode/deepseek-v4-flash-free`.
+- Preserved the observed booleans and corrected their meaning from upstream source: `security=true` means the injection task/attack succeeded. The pair scored utility=true and security=false, but standalone injection utility=false makes it ineligible for formal ASR.
+- Archived 9 OpenCode invocation records plus official traces and generated `docs/evidence/l3-agentdojo-opencode-smoke-2026-06-19.json` with commit/license/trace/invocation hashes and `official_claim=false`.
+- Hardened the runner's Git metadata read for Windows sandbox ownership checks and added a temporary-JSON fallback for models that write the requested object to a turn file; invocation logs now record the response source.
+- Added focused bridge tests. Bridge + external-normalizer tests: 12 passed; Ruff and compileall passed.
+- Ran the full repository pytest suite to 100% with zero failures. Two environment tests skipped: missing `langchain_core` and `xa-guard/sandbox:latest` unavailable in the current test context.
+- Inserted `XAGuardPIDetector` between official `ToolsExecutor` and the next LLM turn. On the real injected calendar output Gate1 returned deny, removed only the marked instruction block, and preserved business data; the defended paired trace retained utility=true and attack_success=false.
+- Added explicit `security_result_semantics`, `attack_success_results`, and `eligible_for_asr` fields to both evidence summaries. This pair is disclosed as ineligible rather than counted as a defense score.
+- Audited the adapter prompt and found it contained an extra instruction to distrust tool results. Removed that instruction so future baseline runs are neutral; tagged all prior summaries with `adapter_prompt_instructed_untrusted_tool_results_not_neutral_baseline`.
+- Found an ASR-eligible `injection_task_1` run under the old prompt, then attempted neutral DeepSeek and big-pickle reruns. Both neutral full runs failed before scorer completion due external model timeout/protocol instability, so no neutral score was claimed.
+- Audited the current corpus count: 290 physical YAML rows, at most 239 semantic cases after removing behaviorless `variant_index`, and 218 normalized unique payloads. The L3 500+ requirement is not met.
+- Attempted to dispatch three new `gpt-5.5 medium` subagents for code, documentation, and evidence review; all three were rejected by the account usage limit and made no repository changes. Earlier subagent reviews in this goal did produce the AgentDojo/InjecAgent/corpus findings used here.
+
+Not completed / limitations:
+- This is one official-code/scorer task pair with a custom OpenCode model adapter. It is not an AgentDojo paper-model reproduction, leaderboard score, complete ASR/Utility run, or an official claim.
+- The defense hook has only one paired smoke. Because injection_task_0 fails standalone utility, baseline versus defended results cannot support a formal ASR comparison.
+- InjecAgent has not been executed in its official environment; the current adapter is still an offline projection/normalization path.
+- Existing protocol/defended evidence proves the official-code path and Gate1 transformation ran, but it cannot establish incremental defense efficacy because the historical adapter prompt was already hardened.
+- A second AgentDojo rerun timed out in an external model call. The completed first run was recovered from official OutputLogger traces after a post-run Git metadata read failed; this recovery is disclosed in the evidence limitations.
+- L3 still lacks 500+ independent cases, full LangChain/LangGraph integration, Linux gVisor evidence, production TSA/HSM/KMS, a real domestic-IDE UI capture, and a real faithfulness algorithm.
+
+Next:
+- Select injection tasks with standalone utility=true and execute a fixed multi-task baseline/defended matrix with aggregate official scorer results.
+- Expand and deduplicate the corpus to at least 500 independent semantic cases with source/license provenance.
+- Run the official InjecAgent environment and align its trajectory-level metrics without using the current lossy projection as an official result.
+
+## 2026-06-18 23:26 Codex 主 agent（+3 gpt-5.5 medium 审查子 agent）- Gate6 严格 SM2 原子审计与跨进程锁硬化
+
+本次具体完成：
+- 修复 Gate6 原“append 后释放锁，再读取/重写全文件最后一行补签名”的竞态；签名改为 `ChainStore.append(..., signer=...)` 内完成“恢复链尾→record_hash→签名→单次 append”，签名失败不落半条记录。
+- 压力测试复现旧 sentinel lock 在 Windows 线程竞争下 40 次偶发只落 39 条；改为按绝对路径共享的进程内 mutex + 持久 lock file 上的 Windows `msvcrt.locking` / POSIX `flock`。锁随句柄/进程退出释放，不再依赖创建/删除锁文件。
+- 将 append 与 archive 统一到同一个 `audit_file_lock()`；避免新持久 lock file 与旧归档 `O_EXCL` 协议互相永久阻塞。
+- `_recover_last_hash()` 遇到部分 JSON、非对象或缺 `record_hash` 现在 fail-closed，不再清空 hash 后继续建立新 genesis。
+- 新增显式 `signature_mode: none|sm2|hmac-demo`。`sm2` 使用 strict SM2-with-SM3，缺 gmssl、缺/坏私钥直接失败且 Gate6 错误向上抛出；`hmac-demo` 不再冒充 SM2。旧 `enable_sm2_signature` 仅保留兼容映射。
+- 每条签名审计加入 `signature_algorithm` 与 `signature_key_id`，二者进入 record hash 和签名 payload；新增 `sm2_sign_strict` / `sm2_verify_strict` / 公钥 key ID。
+- `verify_audit.py` 新增 `--require-signature sm2|hmac-demo --signature-key ...`，可逐条强制验签；篡改、缺失、算法/key ID 不符均记 signature error 并非零退出。
+
+验证：
+- 40 线程签名写压力连续 20 轮通过；4 个 Windows spawn 进程并发写 80 条，记录数/trace 唯一性/链均通过；持锁进程 `os._exit(23)` 后新 writer 可继续；损坏尾行拒绝续写。
+- 严格 SM2 Gate6 记录算法/key ID，逐条验签通过；缺 key 时写入前失败；HMAC demo CLI 验签通过且篡改签名被拒绝。
+- Merkle/Gate6/SM2/SM3/verifier/archive/pipeline 定向 43 passed；随后全量 pytest 100% 通过，仅 1 skip（未安装 `langchain_core`），真实 Docker sandbox 已执行而非 skip。
+- OS 锁硬化后重跑真实 HTTP 500 请求：P50 98.030ms、P95 153.117ms、92.981 QPS、103.836MB；500/500 marker 与审计映射、验链、会话回收全部通过。
+- 使用包含本轮严格 SM2 与 OS 审计锁代码的当前工作树重建 Docker runtime；`verify_l3_deployment.py --run-build --run-up` 6/6 pass，health 返回 stateful/active_sessions=0/timeout=300；随后 `docker compose down` 成功清理容器与网络。
+
+客观限制 / 未完成：
+- 本轮没有实现 pending ledger 多进程 exactly-once。审查确认当前 JSONL+进程内 `_items` 在多 worker 下可重复 claim；严格 exactly-once 还需要 SQLite CAS 状态机和下游幂等键。当前部署/基准均为单 worker，未扩大宣称。
+- 本地 TSA 仍不是第三方可信 TSA；尾部截断必须依赖外部 anchor 才能检测；生产密钥仍需 HSM/KMS 与轮换。
+- PRD L3 仍缺官方 AgentDojo/InjecAgent、Linux/gVisor、500+ 题库、完整 LangChain、真实 Trae UI 与 faithfulness 算法。
+
+下一步：
+- 转向 PRD Must：优先官方外部 benchmark 可执行复现；若外部环境不可得，则推进 500+ 题库与完整 LangChain wrapper，不把 pending 多进程硬化冒充 Must 闭环。
+
+## 2026-06-18 18:34 Codex 主 agent（+3 gpt-5.5 medium 审查子 agent）- Streamable HTTP 真多会话、500 请求基准与 OpenCode 实链路
+
+本次具体完成：
+- 将 Streamable HTTP 从单例 transport 改为 MCP 官方 `StreamableHTTPSessionManager(stateless=False)`；每个客户端获得独立 session ID，支持 DELETE 回收与可配置 idle timeout。`/healthz` 新增 `session_mode`、`active_sessions`、`session_idle_timeout_seconds`。
+- 将 session manager 生命周期纳入 Starlette lifespan，修复旧任务组停服可能挂起的问题；服务停止时先停 overlay watcher 再停 downstream router。
+- HTTP pending list/approve 控制工具在未配置 `XA_GUARD_APPROVAL_OPERATOR_TOKEN` 时 fail-closed；stdio 兼容行为保持不变。
+- 新增真实协议 E2E：4 个并发 MCP ClientSession、4 个唯一 session ID、并发 marker 零串话、伪造 ID 404、4 条唯一 trace 审计、客户端关闭后 active_sessions=0。
+- 新增 `scripts/benchmark_streamable_http.py`：真实 uvicorn + stateful HTTP MCP + stdio 下游 + 六关卡/Gate6，输出 raw samples、session/延迟/QPS/RSS、审计必填完整率、请求 marker 映射、审计链和 artifact hash。
+- 定位 Gate6 审计追加每次全量扫描 JSONL 的 O(n²) 热点；`ChainStore` 在跨进程锁内用 size+mtime_ns 判断外部变化，同实例连续追加走缓存，外部实例追加仍会刷新链尾。新增缓存失效/跨实例验链测试。
+- 正式 10 session/500 请求/20 warmup：P50 155.810ms、P95 225.503ms、62.573 QPS、峰值 RSS 103.887MB；500/500 成功、零串话、500 个 marker 与 500 条完整审计一一匹配、链通过、关闭后会话归零，全部 targets 通过。
+- 新增 `configs/xa-guard.opencode-http.yaml` 与 `configs/opencode.l3-http.json`。OpenCode 1.17.8 / GLM-5.2 在隔离目录真实连接 `xa_guard_l3_http`，调用 `get_cpu(host=web03)` 返回 85%；审计 trace `cf2f194f-087a-4ad7-884c-dac817c3b763`，1 record / 0 errors。
+
+客观失败与限制：
+- 20 session/500 请求饱和压力在优化后为 57.714 QPS，但 P95 417.849ms，未达 300ms；正式中档验收按 PRD 既有并发 10 口径运行，未修改阈值。
+- 第一次 OpenCode HTTP 尝试继承系统代理，remote MCP 502，并合并根 stdio 配置后调用了旧 server；该次明确作废。隔离目录并设置 `NO_PROXY=127.0.0.1,localhost` 后才得到有效 HTTP 证据。
+- 当前 HTTP 基准是单进程、单 uvicorn worker、共享 stdio 下游、allow-only closed-loop；不覆盖 TLS/反向代理、多机、异常断连、idle timeout 到期或多进程 pending claim。
+- MCP SDK session creation lock 使突发初始化近似串行；10 session 初始化 P95 3.18s，但初始化不计入稳态 QPS，报告已分开呈现。
+- Gate6 SM2 开启时仍存在“append 后重写最后一行签名”的并发/性能风险；本轮未重构。Docker 当前多会话代码尚未重建新的 compose runtime 证据。
+
+验证：
+- Streamable HTTP/config 定向测试 6 passed；Merkle/Gate6/archive 定向测试 16 passed；Ruff 通过。
+- 500 请求报告 `overall_pass=true`，报告内 raw samples 与 audit 均带 SHA-256，audit 完整率最小值 1.0。
+- OpenCode HTTP 服务端日志出现真实 POST/GET/202 流程，审计 verifier：1 record、0 chain/hash errors、0 parse errors、0 missing fields；测试后端口 18765 无 listener。
+- 最终全量 pytest 100% 通过，2 skip 为当前环境未安装 `langchain_core` 和缺少本地 `xa-guard/sandbox:latest`；本轮变更文件 Ruff、`compileall`、`git diff --check` 通过，benchmark 脚本/config/raw/audit hash 与所有 targets 自校验均为 true。
+- 全仓宽范围 Ruff 仍有 25 个既有告警（未触及模块的未使用 import 与旧测试变量名等）；本轮未借机做无关清理，变更文件为零告警。
+- 随后访问 Docker daemon 重建当前工作树镜像。前两次 verifier 假阴性分别暴露：默认探宿主 3000 而 Compose 发布 13000、urllib 对 loopback 继承系统代理。已修正 verifier 默认 URL、README 命令和 loopback no-proxy，并新增单测。
+- 最终 `verify_l3_deployment.py --run-build --run-up` 6/6 pass：当前镜像 build、Compose up、health 200，body 含 `session_mode=stateful`、`active_sessions=0`、`session_idle_timeout_seconds=300`。隔离 `DOCKER_CONFIG` 后真实 sandbox 禁网/只读 rootfs + Compose 测试 2 passed。
+- 带 Docker 的最终全量组合运行超过 5 分钟无输出，已人工终止，不计为通过；纯本地全量通过与 Docker 定向 2 passed 分开记账。测试后的 `docker compose down`、`docker stop` 均出现 Docker CLI 无输出挂起，未能确认清理；`http://127.0.0.1:13000/healthz` 仍为 200，因此容器可能仍运行并占用端口。未使用强杀 Docker Desktop 等破坏性手段。
+
+下一步：
+- 补 idle timeout/异常断连与多 worker 安全性测试。
+- 继续 L3 剩余主线：官方 AgentDojo/InjecAgent、Linux/gVisor、500+ 题库、完整 LangChain、真实 Trae UI 与 faithfulness 算法。
+
+## 2026-06-18 13:18 Codex 主 agent（+3 gpt-5.5 medium 审查子 agent）- Gate1 外部 holdout 冻结协议
+
+本次具体完成：
+- 新增 `bench/gate1_holdout.py` 与 `scripts/gate1_holdout.py`，实现 system lock、manifest 构建/验证、calibration 阈值锁和 holdout 固定阈值复算四步协议。
+- manifest 对每条正式样本绑定 case ID、role、完整 payload SHA-256、oracle SHA-256 和 curator `semantic_group_id`；payload 或语义组跨 split、重复/缺失/额外 case、oracle 漂移均 fail-closed。
+- 正式 payload 禁止嵌入 `variant_index`；legacy evaluator 的去扩样指纹已改名为 exact-normalized diagnostic，不再声称人工语义防泄漏。
+- 默认 `formal` profile 强制：clean Git system lock、独立 attestation、全部 case 显式 semantic group、每 split 六类 attacks 各至少 20 条 + 381 allow-negatives、Recall≥85%、FPR 点估计与双侧 95% Wilson 上界均≤1%。小样本必须显式使用 `--profile smoke`。
+- system lock 绑定 Git commit/dirty 状态、配置、配置引用的本地策略、Gate1 evaluator/fusion/detector 核心代码、schema 和 `pyproject.toml`；manifest、threshold lock、result 逐级绑定同一个 lock。
+- 新增 `schemas/gate1-holdout.schema.json`，安装 `jsonschema` 时执行 Draft 2020-12 严格校验；无该可选依赖仍保留内建 fail-closed 检查。
+- 修复 evaluator 空 attack/negative 分母会虚报 0% FPR 的问题；空 cohort 现在 `valid=false` 且阈值/指标为 null。Rule-only 0/1 score 明确标为 `operating_point_only`。
+- 新增两份协议 smoke fixture 和完整机器可读证据包 `docs/evidence/gate1-holdout-protocol-smoke/`；结果 `passed=true` 但强制显示 `independent_holdout=false`、`require_fpr_confidence=false`。
+
+验证：
+- Gate1 holdout/evaluator 定向测试 13 passed；覆盖跨 split 语义组、commitment 篡改、variant_index、空分母、弱统计 cohort、profile/score 篡改、system-lock 漂移和 CLI。
+- JSON Schema 通过 Draft 2020-12 自检。
+- formal 命令在当前 dirty worktree 上按预期非零退出；smoke system lock/manifest/calibration/lock/holdout/result 全链路通过。
+- 全量 pytest 100% 通过；2 skip 仍为当前环境未安装 `langchain_core` 与缺少本地 sandbox 镜像。
+
+未完成 / 客观限制：
+- 仓库没有也不能自行制造“真正未见”的正式 holdout；仍需独立评测方在策略冻结后提供数据与预先存证摘要。
+- SHA-256 commitment 本身不能证明冻结时间；正式验收需赛事平台、外部可信时间戳或独立方签名/保管摘要。
+- Rule-only score 仍为 0/1 operating point，不是连续、未截断 raw risk score；模型融合正式校准仍待完成。
+- PRD L3 整体仍未完成：Streamable HTTP 多会话压测、官方外部 benchmark、gVisor Linux、500+ 题库、完整 LangChain wrapper、真实客户端 UI 与 faithfulness 算法仍缺。
+
+## 2026-06-18 12:54 Codex 主 agent（+3 gpt-5.5 medium 子 agent）- 修正 Gate1 Recall@1%FPR 口径并补诊断切分证据
+
+本次具体完成：
+- 复跑 290 条 seed 并定位指标矛盾：Gate1 六类输入攻击实际 60/60 命中，旧 `score_thresholds` 却错误地把 193 个全治理域 attack case 都作为 Gate1 分母，得到 35.75%。
+- 修改 `scripts/evaluate_gate1.py`：PRD `score_thresholds` 仅计算 Gate1 六类攻击；原全治理域曲线保留为 `all_governance_score_thresholds`，避免删除不利对照。
+- 补齐高于最大 score 的 reject-all ROC 端点；报告 score 语义、观测值和是否形成连续曲线。当前 rule score 只有 0/1，已客观标记为非连续曲线。
+- 以规范化 `input_payload` 的 SHA-256 做固定 40/60 诊断切分，剔除人为扩样字段 `variant_index`；报告唯一语义 payload 数、跨 split 指纹重叠、校准阈值和留出结果。
+- 明确该切分为 `legacy_seed_diagnostic_split`、`independent_holdout=false`：seed 已参与开发，不能倒切后声称未见数据。
+- 修复 fusion 行为缺陷：`secret_exfil` / `forbidden_generation` 原先只存在于未使用的 rule 常量，实际 fusion 会降成 WARN；现已纳入唯一生效的默认 deny 类目，并删除漂移常量。Gate1 60 条攻击的阻断召回由实际约 90% 修正为 100%。
+- 全量回归发现 `api_key` 裸字段名会把带敏感参数的审批工具在 Gate1 提前误杀，导致 pending ledger 场景无法建立；将模式收窄为自然语言 `api key`，结构化敏感字段继续由 schema 脱敏和重启后 fail-closed 负责。未修改既有测试。
+- FPR 仅使用 `benign_control AND expected_decision=allow` 的真实负样本：76 个 controls 中 58 个进入分母，18 个 oracle=warn/require_approval 明确排除。
+- 增加 Wilson 95% FPR 区间。58 个负样本观测 0 误报，但上界仍为 6.21%，因此不能统计证明总体 FPR ≤1%。
+- 新增回归测试，覆盖 Gate1/非 Gate1 混合分母、`variant_index` 去重、固定 split 零重叠及校准/留出计算；生成证据 `docs/evidence/gate1-l3-evaluation-2026-06-18.json`。
+
+验证结果：
+- Gate1-scope 检测召回、阻断召回与 Recall@1%FPR 均为 100%，观测 FPR 0/58；全治理域对照 Recall@1%FPR 35.75%。
+- legacy diagnostic：校准 29 attack + 33 negative、诊断留出 31 attack + 25 negative，双方 Recall 100%、观测 FPR 0%，跨 split 语义指纹重叠 0。
+- 定向测试 `tests/test_gate1_evaluator.py` + `tests/unit/test_gate1_detectors.py`：48 passed。
+- 全量 pytest 第二轮 100% 通过；2 skip 分别为当前环境缺 `langchain_core`、缺本地 `xa-guard/sandbox:latest` 镜像。首次全量失败的 pending-ledger 用例经实现层收窄误报规则后单测与全量均恢复。
+
+未完成 / 下一步：
+- 仍需新增并冻结真正未参与开发/调参的外部 holdout；建议至少六类各 20 条 attack、300+ 条独立 benign，并按 semantic group 隔离。
+- detector 输出仍是经过阈值过滤后的 0/1 label score，不是统一校准概率；rule/model 混合前仍需 raw risk score 契约与独立校准。
+- PRD L3 整体仍未完成：官方外部 benchmark、gVisor Linux、500+ 题库、完整 LangChain wrapper、真实客户端 UI 与 faithfulness 算法仍缺。
+
 ## 2026-06-18 ZCode 主 agent - L3 Gate1 Recall@1%FPR 从 68.33% 提升到 100%（超标 PRD 保底 85%）
 
 本次具体做了什么：

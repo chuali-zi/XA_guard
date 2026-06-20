@@ -5,11 +5,16 @@ import sys
 from pathlib import Path
 
 from scripts import verify_audit
-from xa_guard.audit.merkle import compute_record_hash
+from xa_guard.audit.merkle import canonical_json, compute_record_hash
+from xa_guard.audit.sm_crypto import hmac_demo_key_id, sm2_sign
 
 
-def _run_main(monkeypatch, audit_path: Path) -> int:
-    monkeypatch.setattr(sys, "argv", ["verify_audit.py", "--path", str(audit_path)])
+def _run_main(monkeypatch, audit_path: Path, *extra: str) -> int:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["verify_audit.py", "--path", str(audit_path), *extra],
+    )
     return verify_audit.main()
 
 
@@ -54,3 +59,19 @@ def test_main_returns_zero_for_minimal_valid_audit(tmp_path: Path, monkeypatch) 
     _write_record(audit_path, _minimal_audit_record())
 
     assert _run_main(monkeypatch, audit_path) == 0
+
+
+def test_main_can_require_and_detect_tampered_demo_signature(tmp_path: Path, monkeypatch) -> None:
+    audit_path = tmp_path / "audit.jsonl"
+    record = _minimal_audit_record()
+    record["signature_algorithm"] = "HMAC-SHA256-DEMO"
+    record["signature_key_id"] = hmac_demo_key_id("")
+    record["record_hash"] = compute_record_hash(record)
+    record["signature"] = sm2_sign(canonical_json(record), "", prefer_gm=False)
+    audit_path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+
+    assert _run_main(monkeypatch, audit_path, "--require-signature", "hmac-demo") == 0
+
+    record["signature"] = "0" * 64
+    audit_path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+    assert _run_main(monkeypatch, audit_path, "--require-signature", "hmac-demo") != 0

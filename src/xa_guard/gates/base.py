@@ -27,6 +27,7 @@ class Gate(ABC):
 
     name: str = "gate"
     supported_stages: tuple[GateStage, ...] = (GateStage.INBOUND,)
+    fail_closed_on_error = False
 
     def __init__(self, cfg: GateConfig | None = None) -> None:
         self.cfg = cfg or GateConfig()
@@ -51,6 +52,8 @@ class Gate(ABC):
         try:
             result = self.evaluate(ctx, stage)
         except Exception as exc:  # 关卡内部异常不应崩 pipeline
+            if self.fail_closed_on_error:
+                raise
             return GateResult(
                 gate_name=self.name,
                 decision=Decision.WARN,

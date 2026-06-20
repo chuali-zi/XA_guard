@@ -62,8 +62,8 @@ def _init_layered_policy(cfg: XAGuardConfig) -> tuple[LayeredPolicySource | None
 
 
 def build_pipeline(cfg: XAGuardConfig) -> Pipeline:
-    _init_layered_policy(cfg)
-    return Pipeline(
+    _source, watcher = _init_layered_policy(cfg)
+    pipeline = Pipeline(
         gate1=Gate1Input(cfg.gate("gate1")),
         gate2=Gate2Plan(cfg.gate("gate2")),
         gate3=Gate3Policy(cfg.gate("gate3")),
@@ -72,6 +72,8 @@ def build_pipeline(cfg: XAGuardConfig) -> Pipeline:
         gate6=Gate6Audit(cfg.gate("gate6")),
         cfg=cfg,
     )
+    pipeline.overlay_watcher = watcher
+    return pipeline
 
 
 async def run_server(cfg: XAGuardConfig) -> None:
@@ -82,8 +84,17 @@ async def run_server(cfg: XAGuardConfig) -> None:
         if cfg.upstream.transport == "stdio":
             await run_stdio(pipeline, router)
         else:
-            await run_streamable_http(pipeline, router, cfg.upstream.host, cfg.upstream.port)
+            await run_streamable_http(
+                pipeline,
+                router,
+                cfg.upstream.host,
+                cfg.upstream.port,
+                cfg.upstream.session_idle_timeout_seconds,
+            )
     finally:
+        watcher = getattr(pipeline, "overlay_watcher", None)
+        if watcher is not None:
+            watcher.stop()
         await router.stop()
 
 

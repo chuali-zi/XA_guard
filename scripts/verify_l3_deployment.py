@@ -10,6 +10,7 @@ import json
 import subprocess
 import time
 import urllib.request
+from urllib.parse import urlparse
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -139,10 +140,15 @@ def _health_check(url: str, *, timeout: int = 10) -> dict[str, Any]:
     deadline = started + max(timeout, 10)
     last_exc: Exception | None = None
     attempts = 0
+    hostname = (urlparse(url).hostname or "").lower()
+    if hostname in {"127.0.0.1", "localhost", "::1"}:
+        open_url = urllib.request.build_opener(urllib.request.ProxyHandler({})).open
+    else:
+        open_url = urllib.request.urlopen
     while time.perf_counter() < deadline:
         attempts += 1
         try:
-            with urllib.request.urlopen(url, timeout=min(10, max(1, int(deadline - time.perf_counter())))) as response:
+            with open_url(url, timeout=min(10, max(1, int(deadline - time.perf_counter())))) as response:
                 body = response.read().decode("utf-8", errors="replace")
                 return {
                     "url": url,
@@ -298,7 +304,7 @@ def main() -> None:
     parser.add_argument("--compose-file", default="docker-compose.yml")
     parser.add_argument("--config", default="configs/xa-guard.docker.yaml")
     parser.add_argument("--output", default="logs/runtime/l3_deployment_verification.json")
-    parser.add_argument("--health-url", default="http://127.0.0.1:3000/healthz")
+    parser.add_argument("--health-url", default="http://127.0.0.1:13000/healthz")
     parser.add_argument("--run-build", action="store_true")
     parser.add_argument("--run-up", action="store_true")
     parser.add_argument("--timeout", type=int, default=30)

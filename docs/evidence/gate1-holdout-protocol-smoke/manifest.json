@@ -1,0 +1,67 @@
+{
+  "cases": [
+    {
+      "attack_type": "dangerous_command",
+      "case_id": "G1-SMOKE-CAL-A",
+      "oracle_sha256": "sha256:caa531ca5438813f7989b34672002eebadc195e5186f2cfd200f0790eddce011",
+      "payload_sha256": "sha256:b61edc37f5439a6f1c4c88fc74c61b53aecac3830c9b8c83885a59ae30cbe40e",
+      "role": "attack",
+      "semantic_group_id": "sha256:632f625c4a9c96e1ae94478efe9578f12b7b45e8c2f19dd75395ea7d1ff8975e",
+      "semantic_group_source": "explicit",
+      "split": "calibration"
+    },
+    {
+      "attack_type": "",
+      "case_id": "G1-SMOKE-CAL-N",
+      "oracle_sha256": "sha256:f60ac6579cce37bcc8c0cd3ba3cac9fa94ccb2b1cb28b9f29e17c64d9fd2ef41",
+      "payload_sha256": "sha256:3d333d1d3a73b6dea856e25d390b6e4401bf05d18741aafa8cd999c89f107c36",
+      "role": "negative_control",
+      "semantic_group_id": "sha256:2c7bfe76e9ad2669dba143daae59f46d2472de1f847ed1cb0240d2821fb5559a",
+      "semantic_group_source": "explicit",
+      "split": "calibration"
+    },
+    {
+      "attack_type": "dangerous_command",
+      "case_id": "G1-SMOKE-HOLD-A",
+      "oracle_sha256": "sha256:caa531ca5438813f7989b34672002eebadc195e5186f2cfd200f0790eddce011",
+      "payload_sha256": "sha256:61b4343e99db527c8f08b9df40acba9720a36a29ad6f18988a4fd191972f43f5",
+      "role": "attack",
+      "semantic_group_id": "sha256:e536eb294ae6825e648a88a0ea3b638184e47c3f7e7b8e67b11dd02747f41922",
+      "semantic_group_source": "explicit",
+      "split": "holdout"
+    },
+    {
+      "attack_type": "",
+      "case_id": "G1-SMOKE-HOLD-N",
+      "oracle_sha256": "sha256:f60ac6579cce37bcc8c0cd3ba3cac9fa94ccb2b1cb28b9f29e17c64d9fd2ef41",
+      "payload_sha256": "sha256:a6940fdab15c958645ae95e2b3ed23652defd065bfd5f88fe0fe0f87d69f031f",
+      "role": "negative_control",
+      "semantic_group_id": "sha256:88b3aa28511a94f88440120f4738e489c8aad07918feb1be79d6559194a400b7",
+      "semantic_group_source": "explicit",
+      "split": "holdout"
+    }
+  ],
+  "claim_scope": "gate1_external_holdout_protocol",
+  "commitment_sha256": "sha256:e1c5181b341d1031feff2414b9b23bd0251c8b9f08d00e8e04a5e80778e25839",
+  "excluded_cases": {},
+  "independence_attestation": {
+    "asserted": false,
+    "attestor": "",
+    "statement": ""
+  },
+  "schema_version": "xa-guard-gate1-holdout-manifest/v1",
+  "sources": {
+    "calibration": {
+      "name": "calibration.yaml",
+      "sha256": "sha256:32a4a36a48179a9f802889a33e066aaba5f80d18646263f3a0ce1e76a9ebbbc5"
+    },
+    "holdout": {
+      "name": "holdout.yaml",
+      "sha256": "sha256:2b8d205bc3f2efd18709e3fca43e7de2f13c385798903a8bd0d2cb273ae2374d"
+    }
+  },
+  "system_lock": {
+    "commitment_sha256": "sha256:e11fca4fcc76c21d0763db95acbbd87312401cbc0ab2109ac75c162253f83b00",
+    "sha256": "sha256:8644122c3b2d40e76825d0e1398f79cdad6ba8a9764f416dfdf38ffd61ed5a9c"
+  }
+}

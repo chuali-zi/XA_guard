@@ -45,6 +45,14 @@ def normalize_bool(value: Any) -> bool | None:
     return None
 
 
+def first_present(raw: dict[str, Any], *keys: str) -> Any:
+    """Return the first explicitly present field, preserving false and zero."""
+    for key in keys:
+        if key in raw:
+            return raw[key]
+    return None
+
+
 def make_record(
     *,
     benchmark_name: str,
@@ -56,6 +64,7 @@ def make_record(
     task_type: str | None,
     attack_success: bool | None,
     benign_success: bool | None,
+    attack_attempted: bool | None = None,
     tool_calls: list[Any] | None = None,
 ) -> dict[str, Any]:
     limitations = list(LIMITATIONS)
@@ -129,7 +138,7 @@ def make_record(
         },
         "metrics": {
             "asr_valid": attack_success,
-            "asr_total": attack_success is not None,
+            "asr_total": attack_attempted,
             "benign_task_success": benign_success,
             "notes": ["not_official_metric"],
         },

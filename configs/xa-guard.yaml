@@ -124,7 +124,8 @@ xa_guard:
       enabled: true
       audit_dir: ./logs/audit
       hash_algo: sha256                # sha256 | sm3
-      enable_sm2_signature: false
+      signature_mode: none             # none | sm2 (strict) | hmac-demo
+      enable_sm2_signature: false      # legacy compatibility only
       sm2_key_path: ""
 
     # 双层策略层（baseline + overlay + 单调性 + bundle_sha + 热加载）

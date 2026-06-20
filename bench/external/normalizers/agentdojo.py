@@ -3,17 +3,13 @@ from __future__ import annotations
 from typing import Any
 
 from bench.external.provenance import record_sha256
-from bench.external.schema import make_record, normalize_bool
+from bench.external.schema import first_present, make_record, normalize_bool
 
 
 def normalize_agentdojo(raw: dict[str, Any], *, input_sha256: str, index: int) -> dict[str, Any]:
     case_id = str(raw.get("case_id") or raw.get("id") or f"agentdojo-{index}")
-    attack_success = normalize_bool(
-        raw.get("attack_success")
-        if "attack_success" in raw
-        else raw.get("target_success")
-    )
-    benign_success = normalize_bool(raw.get("benign_success") or raw.get("utility_success"))
+    attack_success = normalize_bool(first_present(raw, "attack_success", "target_success"))
+    benign_success = normalize_bool(first_present(raw, "benign_success", "utility_success"))
     return make_record(
         benchmark_name="agentdojo",
         raw=raw,

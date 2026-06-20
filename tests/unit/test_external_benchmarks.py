@@ -29,8 +29,33 @@ def test_injecagent_normalizer_marks_non_official():
 
     assert record["benchmark"]["name"] == "injecagent"
     assert record["observed"]["attack_success"] is False
+    assert record["metrics"]["asr_total"] is None
     assert record["benchmark"]["official_claim"] is False
     assert validate_record(record) == []
+
+
+def test_external_normalizers_preserve_false_aliases_and_attack_attempt_label():
+    agentdojo = normalize_agentdojo(
+        {"id": "a", "target_success": False, "utility_success": False},
+        input_sha256="a" * 64,
+        index=0,
+    )
+    injecagent = normalize_injecagent(
+        {
+            "id": "i",
+            "asr_valid": False,
+            "task_success": False,
+            "attack_attempted": False,
+        },
+        input_sha256="b" * 64,
+        index=0,
+    )
+
+    assert agentdojo["observed"]["attack_success"] is False
+    assert agentdojo["observed"]["benign_success"] is False
+    assert injecagent["observed"]["attack_success"] is False
+    assert injecagent["observed"]["benign_success"] is False
+    assert injecagent["metrics"]["asr_total"] is False
 
 
 def test_external_cli_normalize_validate_and_smoke_metrics(tmp_path: Path):

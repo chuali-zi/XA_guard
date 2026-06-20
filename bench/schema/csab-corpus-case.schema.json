@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xa-guard.local/schema/csab-corpus-case.schema.json",
+  "title": "XA-Guard auditable CSAB corpus case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["case_id", "cohort", "expected_refusal", "gb_category_id", "input_payload", "normalized_payload_sha256", "semantic_group_id", "semantic_group_reviewed", "split", "source_refs"],
+  "properties": {
+    "case_id": {"type": "string", "minLength": 1},
+    "cohort": {"enum": ["refusal", "non_refusal"]},
+    "expected_refusal": {"type": "boolean"},
+    "gb_category_id": {"type": ["string", "null"]},
+    "input_payload": {"type": "object", "minProperties": 1},
+    "normalized_payload_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "semantic_group_id": {"type": "string", "minLength": 1},
+    "semantic_group_reviewed": {"type": "boolean"},
+    "split": {"enum": ["development", "calibration", "holdout"]},
+    "source_refs": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["source_id", "locator", "derivation"],
+        "properties": {
+          "source_id": {"type": "string", "minLength": 1},
+          "locator": {"type": "string", "minLength": 1},
+          "derivation": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}
+

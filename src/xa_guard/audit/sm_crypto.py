@@ -193,6 +193,58 @@ def write_sm2_keyfile(key_path: str | Path, private_hex: str, public_hex: str) -
     p.write_text(f"private: {private_hex}\npublic: {public_hex}\n", encoding="utf-8")
 
 
+def sm2_public_key_hex(key_path: str = "") -> str:
+    """Return a validated SM2 public point, deriving it from the private key if needed."""
+    from gmssl import sm2 as gm_sm2  # type: ignore
+
+    keys = _load_sm2_keyfile(key_path)
+    public_hex = keys["public"]
+    if not public_hex and keys["private"]:
+        tmp = gm_sm2.CryptSM2(private_key=keys["private"], public_key="0" * 128)
+        public_hex = (tmp._kg(int(keys["private"], 16), tmp.ecc_table["g"]) or "")[:128]
+    if len(public_hex) != 128:
+        raise ValueError("valid SM2 public key is required")
+    int(public_hex, 16)
+    return public_hex
+
+
+def sm2_key_id(key_path: str = "") -> str:
+    public_hex = sm2_public_key_hex(key_path)
+    return hashlib.sha256(bytes.fromhex(public_hex)).hexdigest()[:16]
+
+
+def hmac_demo_key_id(key_path: str = "") -> str:
+    return "hmac-demo:" + hashlib.sha256(_read_key(key_path)).hexdigest()[:16]
+
+
+def sm2_sign_strict(data: bytes, key_path: str) -> str:
+    """Sign with real SM2-with-SM3 or raise; never downgrade to HMAC."""
+    from gmssl import sm2 as gm_sm2  # type: ignore
+
+    keys = _load_sm2_keyfile(key_path)
+    private_hex = keys["private"]
+    if len(private_hex) != 64:
+        raise ValueError("valid 64-hex SM2 private key is required")
+    int(private_hex, 16)
+    public_hex = sm2_public_key_hex(key_path)
+    signer = gm_sm2.CryptSM2(private_key=private_hex, public_key=public_hex)
+    signature = signer.sign_with_sm3(data)
+    if not signature or len(signature) != 128:
+        raise RuntimeError("SM2-with-SM3 signing failed")
+    return signature
+
+
+def sm2_verify_strict(data: bytes, signature: str, key_path: str) -> bool:
+    """Verify a real SM2-with-SM3 signature without any fallback."""
+    from gmssl import sm2 as gm_sm2  # type: ignore
+
+    if len(signature) != 128:
+        return False
+    public_hex = sm2_public_key_hex(key_path)
+    verifier = gm_sm2.CryptSM2(private_key="", public_key=public_hex)
+    return bool(verifier.verify_with_sm3(signature, data))
+
+
 def sm2_sign(data: bytes, key_path: str = "", *, prefer_gm: bool = False) -> str:
     """SM2 签名（hex，r||s 各 64 字符，共 128）。
 
@@ -202,7 +254,7 @@ def sm2_sign(data: bytes, key_path: str = "", *, prefer_gm: bool = False) -> str
     """
     if prefer_gm:
         try:
-            from gmssl import func, sm2 as gm_sm2  # type: ignore
+            from gmssl import sm2 as gm_sm2  # type: ignore
 
             keys = _load_sm2_keyfile(key_path)
             priv_hex = keys["private"]

@@ -24,21 +24,7 @@ import yaml
 from xa_guard.detectors.base import DetectionInput, DetectionLabel, DetectionResult, Detector
 
 if TYPE_CHECKING:
-    from xa_guard.types import GateContext, InputSource
-
-# 这些类目命中后直接对应 deny（fusion 层使用）
-_DENY_CATEGORIES = frozenset({
-    "shell_dangerous",
-    "jailbreak_zh",
-    "jailbreak_en",
-    "system_leak",
-    "privacy_leak",
-    "indirect_injection",
-    "pii_leak",
-    "sql_injection",
-    "secret_exfil",
-    "forbidden_generation",
-})
+    from xa_guard.types import GateContext
 
 # 根据角色决定是否降级（RAG 来源的 indirect_injection → 不构成 deny）
 _RAG_DENY_DOWNGRADE = frozenset({"indirect_injection"})

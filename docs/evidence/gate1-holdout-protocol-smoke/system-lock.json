@@ -1,0 +1,29 @@
+{
+  "commitment_sha256": "sha256:e11fca4fcc76c21d0763db95acbbd87312401cbc0ab2109ac75c162253f83b00",
+  "config_path": "configs/xa-guard.yaml",
+  "files": {
+    "bench/gate1_holdout.py": "sha256:a2d6cfb8e3ecbdb482881c7f6d472222b2739f444c508b8889ea4d38816deec1",
+    "configs/xa-guard.yaml": "sha256:19ca36e89e6cbc80d26fe9853ca89c9490989f12c091cf8479cb47d0a5bee9cd",
+    "policies/baseline/category_maps/qwen3guard.yaml": "sha256:596462ab9b8808b067c450e5a925007bd5f4c846013b6d595c2189c008956f6d",
+    "policies/baseline/gate1_input_patterns.yaml": "sha256:3b5e1f0e244f5957ea66843b7b5ac4c2561c16855f526075c1a948ea9a4a099c",
+    "policies/baseline/gate2_tool_risks.yaml": "sha256:0828d1d9b7a19f70e428d16b52fcff96a1118b5aac6cd318e8aa15325ec28582",
+    "policies/baseline/gate3_rules.yaml": "sha256:4997cd90b2aac010341030575bd716b7c146b2770384518779927204d45b1e73",
+    "policies/baseline/gate4_capabilities.yaml": "sha256:d42f9496b0f2a0b75e3e56eac688269aec58de85f7b5cbd48fac58dd995eea9c",
+    "policies/baseline/manifest.yaml": "sha256:80bd1b213e7e105e05ed7a0c121713ebcbc88128cb36bc699a667695857e99d4",
+    "pyproject.toml": "sha256:4eb8cd58f06194dca6b349075a8f0319c024ea7f24580af6058104eb30c0429a",
+    "schemas/gate1-holdout.schema.json": "sha256:cf35d2293c8e0a62ebc90eb9c08b6aa1bfc3311906747a3ad8379956fea419e4",
+    "scripts/evaluate_gate1.py": "sha256:af287752865697174b4b7fc55e0aebdb1663285d6991d858982cdba6461cf61e",
+    "src/xa_guard/detectors/fusion.py": "sha256:8c511d5675229442f2f9910e673b62371cd7702df5b9dc5617287f5b7c3a365d",
+    "src/xa_guard/detectors/model_detector.py": "sha256:5af56ced1d8c2d73b9aafc3fd3ba528666992777e5936b1e6e118941b21657de",
+    "src/xa_guard/detectors/rule_detector.py": "sha256:78c198c656104d5334a3d4923c23b89d02c31ebaa456f15bc3f82e430caaf8b0",
+    "src/xa_guard/gates/gate1_input.py": "sha256:cf603dd9386540d223502a6e0a7657dfcc7f10e961a94c350509b30509be60b5"
+  },
+  "git_commit": "236c02e42bf867da6f87ba5c1530790d8cf20909",
+  "git_dirty": true,
+  "git_status_sha256": "sha256:ae458e8dc623d33bfe51b4e9b2396e527edffcaa11e0dbcc46a92bdf174474b3",
+  "python": {
+    "implementation": "cpython",
+    "version": "3.12.10"
+  },
+  "schema_version": "xa-guard-gate1-system-lock/v1"
+}

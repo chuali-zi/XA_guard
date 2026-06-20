@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from xa_guard.audit.merkle import ChainStore
+from xa_guard.audit.merkle import ChainStore, canonical_json
+from xa_guard.audit.archive import verify_audit_signatures
+from xa_guard.audit.sm_crypto import generate_sm2_keypair, sm2_verify, write_sm2_keyfile
 from xa_guard.config import GateConfig
 from xa_guard.gates.base import GateStage
 from xa_guard.gates.gate6_audit import Gate6Audit
@@ -77,7 +80,7 @@ def test_gate6_chain_links_three_records(tmp_path: Path):
 
     p = Path(r.metadata["audit_path"])
     lines = p.read_text(encoding="utf-8").splitlines()
-    recs = [json.loads(l) for l in lines]
+    recs = [json.loads(line) for line in lines]
 
     assert recs[0]["gen_ai.evidence.hash_prev"] == ""
     assert recs[1]["gen_ai.evidence.hash_prev"] == hashes[0]
@@ -131,6 +134,87 @@ def test_gate6_sm2_signature_optional(tmp_path: Path):
     p = Path(r.metadata["audit_path"])
     rec = json.loads(p.read_text(encoding="utf-8").splitlines()[-1])
     assert rec.get("signature") == r.metadata["signature"]
+    payload = canonical_json({key: value for key, value in rec.items() if key != "signature"})
+    assert sm2_verify(payload, rec["signature"], "", prefer_gm=False)
+
+
+def test_gate6_signed_concurrent_writers_preserve_every_record(tmp_path: Path):
+    options = {
+        "audit_dir": str(tmp_path),
+        "hash_algo": "sha256",
+        "enable_sm2_signature": True,
+        "sm2_key_path": "",
+    }
+    gates = [Gate6Audit(GateConfig(enabled=True, options=options)) for _ in range(4)]
+
+    def write(index: int) -> None:
+        ctx = _make_ctx({"index": index})
+        ctx.arguments = {"host": f"web-{index}"}
+        gates[index % len(gates)](ctx, GateStage.OUTBOUND)
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        list(pool.map(write, range(40)))
+
+    path = tmp_path / "audit.jsonl"
+    records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert len(records) == 40
+    assert len({record["trace_id"] for record in records}) == 40
+    assert ChainStore(path).verify() == (True, None)
+    for record in records:
+        signature = record.pop("signature")
+        assert sm2_verify(canonical_json(record), signature, "", prefer_gm=False)
+
+
+def test_gate6_strict_sm2_records_algorithm_key_id_and_verifies(tmp_path: Path):
+    private_hex, public_hex = generate_sm2_keypair()
+    key_path = tmp_path / "sm2.key"
+    write_sm2_keyfile(key_path, private_hex, public_hex)
+    gate = Gate6Audit(
+        GateConfig(
+            enabled=True,
+            options={
+                "audit_dir": str(tmp_path),
+                "hash_algo": "sm3",
+                "signature_mode": "sm2",
+                "sm2_key_path": str(key_path),
+            },
+        )
+    )
+
+    result = gate(_make_ctx(), GateStage.OUTBOUND)
+    record = json.loads((tmp_path / "audit.jsonl").read_text(encoding="utf-8"))
+    assert result.metadata["signature"] == record["signature"]
+    assert record["signature_algorithm"] == "SM2-SM3"
+    assert len(record["signature_key_id"]) == 16
+    verified = verify_audit_signatures(
+        tmp_path / "audit.jsonl",
+        mode="sm2",
+        key_path=str(key_path),
+    )
+    assert verified["ok"] is True
+    assert verified["record_count"] == 1
+
+
+def test_gate6_strict_sm2_missing_key_fails_before_write(tmp_path: Path):
+    gate = Gate6Audit(
+        GateConfig(
+            enabled=True,
+            options={
+                "audit_dir": str(tmp_path),
+                "hash_algo": "sm3",
+                "signature_mode": "sm2",
+                "sm2_key_path": str(tmp_path / "missing.key"),
+            },
+        )
+    )
+
+    try:
+        gate(_make_ctx(), GateStage.OUTBOUND)
+    except ValueError as exc:
+        assert "SM2" in str(exc)
+    else:
+        raise AssertionError("strict SM2 mode must reject a missing key")
+    assert not (tmp_path / "audit.jsonl").exists()
 
 
 def test_audit_record_carries_final_decision(tmp_path: Path):

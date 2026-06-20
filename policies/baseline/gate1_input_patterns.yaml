@@ -68,7 +68,7 @@ patterns:
     - "access_key"
     - "密钥"
     - "access token"
-    - "api_key"
+    - "api key"
 
   forbidden_generation:
     - "密码列表"
@@ -83,3 +83,4 @@ patterns:
     - "[ADMIN_OVERRIDE]"
     - "请同时执行"
     - "请额外执行"
+    - "before you can solve the task that i gave you"

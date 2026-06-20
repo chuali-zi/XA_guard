@@ -22,7 +22,13 @@ from typing import Any
 from xa_guard.audit.completeness import record_completeness_score
 from xa_guard.audit.merkle import ChainStore, canonical_json
 from xa_guard.audit.otel import to_otel_dict
-from xa_guard.audit.sm_crypto import sm2_sign, sm3_hash
+from xa_guard.audit.sm_crypto import (
+    hmac_demo_key_id,
+    sm2_key_id,
+    sm2_sign,
+    sm2_sign_strict,
+    sm3_hash,
+)
 from xa_guard.config import GateConfig
 from xa_guard.gates.base import Gate, GateStage
 from xa_guard.policy.layered import get_global_source
@@ -32,6 +38,7 @@ from xa_guard.types import AuditRecord, Decision, GateContext, GateResult
 class Gate6Audit(Gate):
     name = "gate6_audit"
     supported_stages = (GateStage.OUTBOUND,)
+    fail_closed_on_error = True
 
     def __init__(self, cfg: GateConfig | None = None) -> None:
         super().__init__(cfg)
@@ -40,8 +47,13 @@ class Gate6Audit(Gate):
         self.audit_path = audit_dir / "audit.jsonl"
         self.hash_algo: str = self.opt("hash_algo", "sha256") or "sha256"
         self.chain = ChainStore(self.audit_path, algo=self.hash_algo)
-        self.enable_sig: bool = bool(self.opt("enable_sm2_signature", False))
         self.sm2_key_path: str = self.opt("sm2_key_path", "") or ""
+        configured_mode = str(self.opt("signature_mode", "") or "").lower()
+        if not configured_mode and bool(self.opt("enable_sm2_signature", False)):
+            configured_mode = "sm2" if self.hash_algo == "sm3" and self.sm2_key_path else "hmac-demo"
+        self.signature_mode = configured_mode or "none"
+        if self.signature_mode not in {"none", "sm2", "hmac-demo"}:
+            raise ValueError(f"unsupported Gate6 signature_mode: {self.signature_mode}")
 
     def evaluate(self, ctx: GateContext, stage: GateStage = GateStage.OUTBOUND) -> GateResult:
         # 1. 计算 tool_result_hash（canonical JSON）
@@ -129,17 +141,23 @@ class Gate6Audit(Gate):
         # 移除占位字段，让 ChainStore 重新计算
         record_dict.pop("record_hash", None)
         record_dict.pop("signature", None)
-        appended = self.chain.append(record_dict)
+        if self.signature_mode == "sm2":
+            record_dict["signature_algorithm"] = "SM2-SM3"
+            record_dict["signature_key_id"] = sm2_key_id(self.sm2_key_path)
+        elif self.signature_mode == "hmac-demo":
+            record_dict["signature_algorithm"] = "HMAC-SHA256-DEMO"
+            record_dict["signature_key_id"] = hmac_demo_key_id(self.sm2_key_path)
+        signer = None
+        if self.signature_mode == "sm2":
+            def signer(payload: bytes) -> str:
+                return sm2_sign_strict(payload, self.sm2_key_path)
+        elif self.signature_mode == "hmac-demo":
+            def signer(payload: bytes) -> str:
+                return sm2_sign(payload, self.sm2_key_path, prefer_gm=False)
+        appended = self.chain.append(record_dict, signer=signer)
         record_hash = appended.get("record_hash", "")
         audit_completeness = record_completeness_score(appended)
-
-        # 7. 可选 SM2 签名（demo HMAC-SHA256 fallback）
-        signature: Any = None
-        if self.enable_sig:
-            payload = canonical_json({k: v for k, v in appended.items() if k != "signature"})
-            signature = sm2_sign(payload, self.sm2_key_path, prefer_gm=(self.hash_algo == "sm3"))
-            # 把 signature 写回最后一行（追加再写一份会破坏链；这里覆盖最后一行）
-            self._patch_last_signature(signature)
+        signature: Any = appended.get("signature")
 
         return GateResult(
             gate_name=self.name,
@@ -152,18 +170,3 @@ class Gate6Audit(Gate):
                 "signature": signature,
             },
         )
-
-    def _patch_last_signature(self, signature: str) -> None:
-        """把最后一行 JSON 的 signature 字段补上。"""
-        try:
-            lines = self.audit_path.read_text(encoding="utf-8").splitlines()
-            if not lines:
-                return
-            import json
-
-            last = json.loads(lines[-1])
-            last["signature"] = signature
-            lines[-1] = canonical_json(last).decode("utf-8")
-            self.audit_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-        except Exception:
-            pass

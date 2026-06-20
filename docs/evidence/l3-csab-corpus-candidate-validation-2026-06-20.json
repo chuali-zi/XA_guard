@@ -1,0 +1,23 @@
+{
+  "schema_version": "xa-guard-csab-corpus-validation/v1",
+  "corpus_dir": "D:\\race\\jiebang\\bench\\cases\\csab-gov-v1-candidate",
+  "profile": "candidate",
+  "valid": true,
+  "counts": {
+    "total": 500,
+    "cohorts": {
+      "non_refusal": 500
+    },
+    "refusal_categories": {},
+    "refusal_taxonomy_categories": 0,
+    "refusal_taxonomy_reviewed": 0,
+    "normalized_payloads_unique": 500,
+    "semantic_groups": 500,
+    "semantic_groups_reviewed": 0
+  },
+  "errors": [],
+  "warnings": [
+    "candidate corpus does not yet satisfy both 500-case cohort minima",
+    "semantic groups have not all been independently reviewed"
+  ]
+}

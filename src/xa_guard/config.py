@@ -31,6 +31,7 @@ class UpstreamSpec:
     transport: Literal["stdio", "streamable-http"] = "stdio"
     host: str = "127.0.0.1"
     port: int = 3000
+    session_idle_timeout_seconds: float = 300.0
 
 
 def _default_gates() -> dict[str, GateConfig]:
@@ -61,7 +62,12 @@ class XAGuardConfig:
             transport=upstream_raw.get("transport", "stdio"),
             host=upstream_raw.get("host", "127.0.0.1"),
             port=int(upstream_raw.get("port", 3000)),
+            session_idle_timeout_seconds=float(
+                upstream_raw.get("session_idle_timeout_seconds", 300.0)
+            ),
         )
+        if upstream.session_idle_timeout_seconds <= 0:
+            raise ValueError("upstream.session_idle_timeout_seconds must be positive")
 
         downstream = [
             DownstreamSpec(

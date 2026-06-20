@@ -11,7 +11,7 @@ import json
 import sys
 from pathlib import Path
 
-from xa_guard.audit.archive import verify_audit_jsonl
+from xa_guard.audit.archive import verify_audit_jsonl, verify_audit_signatures
 from xa_guard.audit.tsa import verify_file_anchor
 
 REQUIRED_FIELDS = [
@@ -39,6 +39,12 @@ def main() -> int:
     parser.add_argument("--algo", choices=["sha256", "sm3"], default="sha256")
     parser.add_argument("--anchor", help="optional local file TSA anchor manifest to verify")
     parser.add_argument("--verify-anchor-index", action="store_true", help="also require the anchor index entry")
+    parser.add_argument(
+        "--require-signature",
+        choices=["sm2", "hmac-demo"],
+        help="require and verify every record signature in the selected mode",
+    )
+    parser.add_argument("--signature-key", default="", help="SM2 or demo HMAC key file")
     args = parser.parse_args()
 
     p = Path(args.path)
@@ -89,12 +95,41 @@ def main() -> int:
                 f"{anchor.anchor_path} -> {anchor.manifest['anchored_record_hash'][:16]}"
             )
 
+    signature_errors = 0
+    if args.require_signature:
+        try:
+            signatures = verify_audit_signatures(
+                p,
+                mode=args.require_signature,
+                key_path=args.signature_key,
+            )
+        except Exception as exc:
+            signature_errors = 1
+            print(f"signature verification setup failed: {exc}")
+        else:
+            signature_errors = signatures["error_count"]
+            if not signatures["ok"] and signature_errors == 0:
+                signature_errors = 1
+            print(
+                "signatures verified: "
+                f"mode={signatures['mode']} records={signatures['record_count']} "
+                f"errors={signatures['error_count']} key_id={signatures['expected_key_id']}"
+            )
+
     print(
         f"\nverified {ok} records, {chain['error_count']} chain/hash errors, "
         f"{parse_errors} JSON parse errors, {missing_fields} missing-field records, "
-        f"{anchor_errors} anchor errors"
+        f"{anchor_errors} anchor errors, {signature_errors} signature errors"
     )
-    return 0 if chain["ok"] and parse_errors == 0 and missing_fields == 0 and anchor_errors == 0 else 1
+    return (
+        0
+        if chain["ok"]
+        and parse_errors == 0
+        and missing_fields == 0
+        and anchor_errors == 0
+        and signature_errors == 0
+        else 1
+    )
 
 
 if __name__ == "__main__":

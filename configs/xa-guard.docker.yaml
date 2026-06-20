@@ -6,6 +6,7 @@ xa_guard:
     transport: streamable-http
     host: 0.0.0.0
     port: 3000
+    session_idle_timeout_seconds: 300
 
   downstream:
     - name: ops_target
@@ -153,7 +154,8 @@ xa_guard:
       enabled: true
       audit_dir: ./logs/audit
       hash_algo: sha256
-      enable_sm2_signature: false
+      signature_mode: none             # none | sm2 (strict) | hmac-demo
+      enable_sm2_signature: false      # legacy compatibility only
       sm2_key_path: ""
 
     policy_layered:

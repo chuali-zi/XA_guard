@@ -117,3 +117,36 @@ def test_l3_deployment_report_blocks_runtime_steps_without_docker(monkeypatch, t
     assert by_name["docker_compose_up"]["status"] == "blocked"
     assert by_name["docker_compose_up"]["blocker"] == "docker_daemon_unavailable"
     assert "healthz" not in by_name
+
+
+def test_health_check_disables_proxy_for_loopback(monkeypatch):
+    captured_handlers = []
+
+    class Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return b'{"status":"ok"}'
+
+    class Opener:
+        def open(self, url, timeout):
+            assert url == "http://127.0.0.1:13000/healthz"
+            assert timeout > 0
+            return Response()
+
+    def fake_build_opener(*handlers):
+        captured_handlers.extend(handlers)
+        return Opener()
+
+    monkeypatch.setattr(verifier.urllib.request, "build_opener", fake_build_opener)
+    result = verifier._health_check("http://127.0.0.1:13000/healthz", timeout=1)
+
+    assert result["status"] == "pass"
+    assert len(captured_handlers) == 1
+    assert captured_handlers[0].proxies == {}

@@ -1,0 +1,32 @@
+{
+  "schema_version": "xa-guard-external-corpus-inspection/v1",
+  "source": "https://github.com/UnicomAI/UnicomBenchmark/tree/dd67c6f9fd82d848fe719c57ec5c91683ec6d1d8/CHiSafetyBench",
+  "upstream_commit": "dd67c6f9fd82d848fe719c57ec5c91683ec6d1d8",
+  "files": [
+    {
+      "path": "CHiSafetyBench/dataset/v1/risky_questions_without_dialog_history.json",
+      "sha256": "sha256:2cba5863275e5f2167fa9d0d46010e46f3ae862a2edb3b11a4c19ad16fc72b0a"
+    },
+    {
+      "path": "CHiSafetyBench/dataset/v1/risky_questions_with_dialog_history.json",
+      "sha256": "sha256:b8e87036d236ae52d9cd100a2b69c1dc40d6f844ba1680d58129a9284bec5c81"
+    }
+  ],
+  "counts": {
+    "single_turn": 462,
+    "multi_turn": 101,
+    "total": 563,
+    "raw_category_labels": 20,
+    "normalized_categories": 17,
+    "minimum_per_category": 24,
+    "maximum_per_category": 65,
+    "exact_payloads_unique": 562
+  },
+  "applicable_license_files": [],
+  "license_status": "no_explicit_license_found",
+  "redistribution_permitted": false,
+  "formal_import_eligible": false,
+  "import_performed": false,
+  "official_claim": false,
+  "note": "Public availability is not redistribution permission. Obtain an explicit data license or author permission before importing raw questions."
+}

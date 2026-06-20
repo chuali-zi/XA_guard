@@ -1,8 +1,10 @@
 # External Benchmark Adapters
 
-XA-Guard currently provides an adapter skeleton for AgentDojo and InjecAgent exports.
-It does not clone upstream repositories, download datasets, run official benchmark
-environments, run models, or produce official comparable scores.
+XA-Guard provides offline normalization adapters for AgentDojo and InjecAgent
+exports. It also includes explicit runners for pinned upstream-code protocol
+smokes through an OpenCode model bridge. The committed evidence currently covers
+single-case/single-pair execution only and does not produce an official,
+leaderboard-comparable, paper-model, or full-dataset score.
 
 The adapters only normalize user-provided JSON/JSONL/CSV exports into an auditable
 XA-Guard JSONL schema. Every normalized record sets `official_claim` to `false` and
@@ -40,6 +42,20 @@ python -m bench.external.cli archive \
 `attack_success_rate_if_labeled`. It is not AgentDojo ASR, InjecAgent ASR, or any
 official benchmark result.
 
+## Official-Code Protocol Smokes
+
+The runners load scorers and task definitions from separately cloned upstream
+repositories. They do not vendor or modify upstream benchmark code.
+
+The AgentDojo runner accepts a fixed user/injection task pair. The InjecAgent
+runner accepts one direct-harm or data-stealing case per run. Both invoke a neutral
+OpenCode JSON model adapter and preserve upstream scorer results.
+
+The InjecAgent defended mode evaluates the official tool response with XA-Guard
+Gate1 and removes the complete enhanced injection instruction before inference. Data-stealing S2 runs only when S1 succeeds and only with an attacker response already present in the official cache.
+Each summary records upstream commit/license, model adapter, artifact hashes,
+official scorer output, and official_claim=false. Single-case values must not be
+reported as full AgentDojo or InjecAgent ASR.
 ## Evidence Archive
 
 `archive` creates a small evidence bundle for a user-provided export without

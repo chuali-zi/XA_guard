@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xa-guard.local/schemas/gate1-holdout.schema.json",
+  "title": "XA-Guard Gate1 holdout evidence",
+  "oneOf": [
+    { "$ref": "#/$defs/manifest" },
+    { "$ref": "#/$defs/systemLock" },
+    { "$ref": "#/$defs/thresholdLock" },
+    { "$ref": "#/$defs/holdoutResult" }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sha256"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "systemBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256", "commitment_sha256"],
+      "properties": {
+        "sha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "const": "" }] },
+        "commitment_sha256": { "anyOf": [{ "$ref": "#/$defs/sha256" }, { "const": "" }] }
+      }
+    },
+    "manifestCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "split",
+        "role",
+        "attack_type",
+        "semantic_group_id",
+        "semantic_group_source",
+        "payload_sha256",
+        "oracle_sha256"
+      ],
+      "properties": {
+        "case_id": { "type": "string", "minLength": 1 },
+        "split": { "enum": ["calibration", "holdout"] },
+        "role": { "enum": ["attack", "negative_control"] },
+        "attack_type": { "type": "string" },
+        "semantic_group_id": { "$ref": "#/$defs/sha256" },
+        "semantic_group_source": { "enum": ["explicit", "derived_exact_payload"] },
+        "payload_sha256": { "$ref": "#/$defs/sha256" },
+        "oracle_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "claim_scope",
+        "independence_attestation",
+        "sources",
+        "system_lock",
+        "excluded_cases",
+        "cases",
+        "commitment_sha256"
+      ],
+      "properties": {
+        "schema_version": { "const": "xa-guard-gate1-holdout-manifest/v1" },
+        "claim_scope": { "const": "gate1_external_holdout_protocol" },
+        "independence_attestation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["asserted", "attestor", "statement"],
+          "properties": {
+            "asserted": { "type": "boolean" },
+            "attestor": { "type": "string" },
+            "statement": { "type": "string" }
+          }
+        },
+        "sources": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["calibration", "holdout"],
+          "properties": {
+            "calibration": { "$ref": "#/$defs/source" },
+            "holdout": { "$ref": "#/$defs/source" }
+          }
+        },
+        "system_lock": { "$ref": "#/$defs/systemBinding" },
+        "excluded_cases": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "cases": { "type": "array", "items": { "$ref": "#/$defs/manifestCase" } },
+        "commitment_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "systemLock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "git_commit",
+        "git_dirty",
+        "git_status_sha256",
+        "python",
+        "config_path",
+        "files",
+        "commitment_sha256"
+      ],
+      "properties": {
+        "schema_version": { "const": "xa-guard-gate1-system-lock/v1" },
+        "git_commit": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+        "git_dirty": { "type": "boolean" },
+        "git_status_sha256": { "$ref": "#/$defs/sha256" },
+        "python": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["implementation", "version"],
+          "properties": {
+            "implementation": { "type": "string", "minLength": 1 },
+            "version": { "type": "string", "minLength": 1 }
+          }
+        },
+        "config_path": { "type": "string", "minLength": 1 },
+        "files": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/$defs/sha256" }
+        },
+        "commitment_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "operatingPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "threshold",
+        "attacks",
+        "attack_hits",
+        "recall",
+        "negative_controls",
+        "false_positives",
+        "fpr",
+        "fpr_95pct_wilson"
+      ],
+      "properties": {
+        "threshold": { "type": "number" },
+        "attacks": { "type": "integer", "minimum": 0 },
+        "attack_hits": { "type": "integer", "minimum": 0 },
+        "recall": { "type": "number", "minimum": 0, "maximum": 1 },
+        "negative_controls": { "type": "integer", "minimum": 0 },
+        "false_positives": { "type": "integer", "minimum": 0 },
+        "fpr": { "type": "number", "minimum": 0, "maximum": 1 },
+        "fpr_95pct_wilson": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["lower", "upper"],
+          "properties": {
+            "lower": { "type": ["number", "null"] },
+            "upper": { "type": ["number", "null"] }
+          }
+        }
+      }
+    },
+    "thresholdLock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "manifest_commitment_sha256",
+        "system_lock",
+        "calibration_evaluation_sha256",
+        "config_sha256",
+        "detector_profile",
+        "score_semantics",
+        "max_fpr",
+        "require_fpr_confidence",
+        "threshold",
+        "calibration_metrics",
+        "commitment_sha256"
+      ],
+      "properties": {
+        "schema_version": { "const": "xa-guard-gate1-threshold-lock/v1" },
+        "manifest_commitment_sha256": { "$ref": "#/$defs/sha256" },
+        "system_lock": { "$ref": "#/$defs/systemBinding" },
+        "calibration_evaluation_sha256": { "$ref": "#/$defs/sha256" },
+        "config_sha256": { "$ref": "#/$defs/sha256" },
+        "detector_profile": { "type": "object" },
+        "score_semantics": { "type": "string", "minLength": 1 },
+        "max_fpr": { "type": "number", "minimum": 0, "maximum": 1 },
+        "require_fpr_confidence": { "type": "boolean" },
+        "threshold": { "type": "number" },
+        "calibration_metrics": { "$ref": "#/$defs/operatingPoint" },
+        "commitment_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "holdoutResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "passed",
+        "independent_holdout",
+        "manifest_commitment_sha256",
+        "system_lock",
+        "threshold_lock_commitment_sha256",
+        "holdout_evaluation_sha256",
+        "requirements",
+        "metrics",
+        "errors",
+        "commitment_sha256"
+      ],
+      "properties": {
+        "schema_version": { "const": "xa-guard-gate1-holdout-result/v1" },
+        "passed": { "type": "boolean" },
+        "independent_holdout": { "type": "boolean" },
+        "manifest_commitment_sha256": { "$ref": "#/$defs/sha256" },
+        "system_lock": { "$ref": "#/$defs/systemBinding" },
+        "threshold_lock_commitment_sha256": { "$ref": "#/$defs/sha256" },
+        "holdout_evaluation_sha256": { "$ref": "#/$defs/sha256" },
+        "requirements": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["min_recall", "max_fpr", "require_fpr_confidence"],
+          "properties": {
+            "min_recall": { "type": "number", "minimum": 0, "maximum": 1 },
+            "max_fpr": { "type": "number", "minimum": 0, "maximum": 1 },
+            "require_fpr_confidence": { "type": "boolean" }
+          }
+        },
+        "metrics": { "anyOf": [{ "$ref": "#/$defs/operatingPoint" }, { "type": "object", "maxProperties": 0 }] },
+        "errors": { "type": "array", "items": { "type": "string" } },
+        "commitment_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

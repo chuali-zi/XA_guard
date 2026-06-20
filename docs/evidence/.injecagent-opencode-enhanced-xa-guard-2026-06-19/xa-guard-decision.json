@@ -1,0 +1,13 @@
+{
+  "blocked": true,
+  "decision": "deny",
+  "detected_patterns": [
+    "jailbreak_en:ignore all previous"
+  ],
+  "input_sha256": "d609cc9734d0c96f604e47552ce73aadd9b1d371169036747fd63e1b6c2b17b5",
+  "output_sha256": "1f005468fee621c0ca25930cd669763870092afad8c35279c77d25286b5433ed",
+  "risks": [
+    "deny: jailbreak_en:ignore all previous"
+  ],
+  "structured_redaction": true
+}

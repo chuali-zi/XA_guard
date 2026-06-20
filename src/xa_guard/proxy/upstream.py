@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from contextlib import asynccontextmanager
 from hmac import compare_digest
 from typing import Any
 
@@ -119,7 +120,12 @@ def _aibom_offline_store() -> Any:
     return OfflinePackageStore(cache_path)
 
 
-def _build_app(pipeline: Pipeline, downstream_router: DownstreamRouter) -> Server:
+def _build_app(
+    pipeline: Pipeline,
+    downstream_router: DownstreamRouter,
+    *,
+    require_operator_token: bool = False,
+) -> Server:
     app: Server = Server("xa-guard")
     pending = PendingApprovalStore(ledger_path=_pending_ledger_path(pipeline))
     aibom_offline_store = _aibom_offline_store()
@@ -150,13 +156,18 @@ def _build_app(pipeline: Pipeline, downstream_router: DownstreamRouter) -> Serve
             return await downstream_router.call_tool(c)
 
         if name == _PENDING_LIST_TOOL:
-            return _list_pending_approvals(pending, arguments)
+            return _list_pending_approvals(
+                pending,
+                arguments,
+                require_configured_token=require_operator_token,
+            )
         if name == _PENDING_APPROVE_TOOL:
             return await _approve_pending_approval(
                 pipeline=pipeline,
                 pending=pending,
                 arguments=arguments,
                 executor=_executor,
+                require_configured_token=require_operator_token,
             )
 
         ctx = GateContext(
@@ -284,8 +295,17 @@ def _control_tools() -> list[mtypes.Tool]:
     ]
 
 
-def _operator_token_error(arguments: dict[str, Any]) -> mtypes.TextContent | None:
+def _operator_token_error(
+    arguments: dict[str, Any],
+    *,
+    require_configured_token: bool = False,
+) -> mtypes.TextContent | None:
     operator_token = os.getenv("XA_GUARD_APPROVAL_OPERATOR_TOKEN")
+    if require_configured_token and not operator_token:
+        return mtypes.TextContent(
+            type="text",
+            text="⚠ XA-Guard HTTP pending approval operator_token 未配置，控制操作已拒绝",
+        )
     if operator_token and not compare_digest(
         str(arguments.get("operator_token") or ""),
         operator_token,
@@ -300,8 +320,13 @@ def _operator_token_error(arguments: dict[str, Any]) -> mtypes.TextContent | Non
 def _list_pending_approvals(
     pending: PendingApprovalStore,
     arguments: dict[str, Any],
+    *,
+    require_configured_token: bool = False,
 ) -> list[mtypes.TextContent]:
-    token_error = _operator_token_error(arguments)
+    token_error = _operator_token_error(
+        arguments,
+        require_configured_token=require_configured_token,
+    )
     if token_error is not None:
         return [token_error]
 
@@ -334,12 +359,16 @@ async def _approve_pending_approval(
     pending: PendingApprovalStore,
     arguments: dict[str, Any],
     executor: Any,
+    require_configured_token: bool = False,
 ) -> list[mtypes.TextContent]:
     trace_id = str(arguments.get("trace_id") or "")
     if not trace_id:
         return [mtypes.TextContent(type="text", text="⚠ XA-Guard pending approval 缺少 trace_id")]
 
-    token_error = _operator_token_error(arguments)
+    token_error = _operator_token_error(
+        arguments,
+        require_configured_token=require_configured_token,
+    )
     if token_error is not None:
         return [token_error]
 
@@ -523,26 +552,60 @@ async def run_streamable_http(
     downstream_router: DownstreamRouter,
     host: str = "127.0.0.1",
     port: int = 3000,
+    session_idle_timeout_seconds: float = 300.0,
 ) -> None:
     """启动 Streamable HTTP MCP server，阻塞直到 uvicorn 退出。"""
     try:
-        import anyio
         import uvicorn
-        from mcp.server.streamable_http import (
-            StreamableHTTPServerTransport,
-            TransportSecuritySettings,
-        )
-        from starlette.applications import Starlette
-        from starlette.responses import JSONResponse
-        from starlette.routing import Mount, Route
     except Exception as exc:  # pragma: no cover - exercised only when optional deps are absent
         raise RuntimeError(
             "Streamable HTTP upstream requires xa-guard[http] "
             "(starlette + uvicorn + mcp streamable_http transport)"
         ) from exc
 
-    mcp_app = _build_app(pipeline, downstream_router)
-    init_opts: InitializationOptions = mcp_app.create_initialization_options()
+    asgi_app = _build_streamable_http_asgi_app(
+        pipeline,
+        downstream_router,
+        host=host,
+        port=port,
+        session_idle_timeout_seconds=session_idle_timeout_seconds,
+    )
+    config = uvicorn.Config(asgi_app, host=host, port=port, log_level="info")
+    server = uvicorn.Server(config)
+
+    log.info("xa-guard Streamable HTTP server starting on http://%s:%s/mcp", host, port)
+    await server.serve()
+
+
+def _build_streamable_http_asgi_app(
+    pipeline: Pipeline,
+    downstream_router: DownstreamRouter,
+    *,
+    host: str = "127.0.0.1",
+    port: int = 3000,
+    session_idle_timeout_seconds: float = 300.0,
+) -> Any:
+    """Build the stateful multi-session MCP ASGI application."""
+    try:
+        from mcp.server.streamable_http import TransportSecuritySettings
+        from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
+        from starlette.applications import Starlette
+        from starlette.responses import JSONResponse
+        from starlette.routing import Mount, Route
+    except Exception as exc:  # pragma: no cover
+        raise RuntimeError(
+            "Streamable HTTP upstream requires xa-guard[http] "
+            "(starlette + mcp streamable_http session manager)"
+        ) from exc
+
+    if session_idle_timeout_seconds <= 0:
+        raise ValueError("session_idle_timeout_seconds must be positive")
+
+    mcp_app = _build_app(
+        pipeline,
+        downstream_router,
+        require_operator_token=True,
+    )
 
     allowed_hosts = [
         host,
@@ -563,27 +626,49 @@ async def run_streamable_http(
                 f"127.0.0.1:{port}",
             ]
         )
-    transport = StreamableHTTPServerTransport(
-        mcp_session_id=None,
-        is_json_response_enabled=False,
+    manager = StreamableHTTPSessionManager(
+        app=mcp_app,
+        json_response=False,
+        stateless=False,
         security_settings=TransportSecuritySettings(allowed_hosts=sorted(set(allowed_hosts))),
+        session_idle_timeout=session_idle_timeout_seconds,
     )
+
+    async def _handle_mcp(scope, receive, send):
+        headers = {
+            key.decode("latin-1").lower(): value.decode("latin-1")
+            for key, value in scope.get("headers", [])
+        }
+        session_id = headers.get("mcp-session-id")
+        await manager.handle_request(scope, receive, send)
+        if session_id:
+            transport = manager._server_instances.get(session_id)
+            if transport is not None and transport.is_terminated:
+                manager._server_instances.pop(session_id, None)
 
     async def _healthz(_request):
-        return JSONResponse({"status": "ok", "transport": "streamable-http"})
+        return JSONResponse(
+            {
+                "status": "ok",
+                "transport": "streamable-http",
+                "session_mode": "stateful",
+                "active_sessions": len(manager._server_instances),
+                "session_idle_timeout_seconds": session_idle_timeout_seconds,
+            }
+        )
+
+    @asynccontextmanager
+    async def _lifespan(_app):
+        async with manager.run():
+            yield
 
     asgi_app = Starlette(
+        lifespan=_lifespan,
         routes=[
             Route("/healthz", endpoint=_healthz, methods=["GET"]),
-            Mount("/mcp", app=transport.handle_request),
-            Mount("/", app=transport.handle_request),
+            Mount("/mcp", app=_handle_mcp),
+            Mount("/", app=_handle_mcp),
         ]
     )
-    config = uvicorn.Config(asgi_app, host=host, port=port, log_level="info")
-    server = uvicorn.Server(config)
-
-    log.info("xa-guard Streamable HTTP server starting on http://%s:%s/mcp", host, port)
-    async with transport.connect() as (read_stream, write_stream):
-        async with anyio.create_task_group() as tg:
-            tg.start_soon(mcp_app.run, read_stream, write_stream, init_opts)
-            tg.start_soon(server.serve)
+    asgi_app.state.session_manager = manager
+    return asgi_app

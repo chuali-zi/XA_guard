@@ -6,15 +6,18 @@ and writes a manifest instead of rewriting broken records.
 from __future__ import annotations
 
 import json
-import os
-import time
-from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
-from xa_guard.audit.merkle import compute_record_hash
+from xa_guard.audit.merkle import audit_file_lock, canonical_json, compute_record_hash
+from xa_guard.audit.sm_crypto import (
+    hmac_demo_key_id,
+    sm2_key_id,
+    sm2_verify,
+    sm2_verify_strict,
+)
 
 _HASH_PREV_KEY = "gen_ai.evidence.hash_prev"
 _RECORD_HASH_KEY = "record_hash"
@@ -29,28 +32,6 @@ class ArchiveResult:
     archive_path: Path
     manifest_path: Path
     manifest: dict[str, Any]
-
-
-@contextmanager
-def _audit_file_lock(path: Path, timeout_seconds: float = 10.0) -> Iterator[None]:
-    lock_path = path.with_suffix(path.suffix + ".lock")
-    start = time.monotonic()
-    fd: int | None = None
-    while fd is None:
-        try:
-            fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        except FileExistsError:
-            if time.monotonic() - start >= timeout_seconds:
-                raise TimeoutError(f"timed out waiting for audit archive lock: {lock_path}")
-            time.sleep(0.01)
-    try:
-        yield
-    finally:
-        os.close(fd)
-        try:
-            os.unlink(lock_path)
-        except FileNotFoundError:
-            pass
 
 
 def _unique_archive_path(source: Path, archive_dir: Path, archived_at: datetime) -> Path:
@@ -108,6 +89,63 @@ def verify_audit_jsonl(path: str | Path, *, algo: str = "sha256") -> dict[str, A
     }
 
 
+def verify_audit_signatures(
+    path: str | Path,
+    *,
+    mode: str,
+    key_path: str = "",
+) -> dict[str, Any]:
+    """Verify every audit record signature in strict SM2 or explicit demo mode."""
+    normalized_mode = mode.lower()
+    if normalized_mode == "sm2":
+        expected_algorithm = "SM2-SM3"
+        expected_key_id = sm2_key_id(key_path)
+
+        def verifier(payload: bytes, signature: str) -> bool:
+            return sm2_verify_strict(payload, signature, key_path)
+    elif normalized_mode == "hmac-demo":
+        expected_algorithm = "HMAC-SHA256-DEMO"
+        expected_key_id = hmac_demo_key_id(key_path)
+
+        def verifier(payload: bytes, signature: str) -> bool:
+            return sm2_verify(payload, signature, key_path, prefer_gm=False)
+    else:
+        raise ValueError(f"unsupported signature verification mode: {mode}")
+
+    record_count = 0
+    error_count = 0
+    first_error_line: int | None = None
+    with Path(path).open(encoding="utf-8") as handle:
+        for line_no, raw_line in enumerate(handle, 1):
+            line = raw_line.strip()
+            if not line:
+                continue
+            record_count += 1
+            try:
+                record = json.loads(line, parse_constant=_reject_nonfinite)
+                signature = str(record.pop("signature"))
+                valid = (
+                    record.get("signature_algorithm") == expected_algorithm
+                    and record.get("signature_key_id") == expected_key_id
+                    and verifier(canonical_json(record), signature)
+                )
+            except Exception:
+                valid = False
+            if not valid:
+                error_count += 1
+                if first_error_line is None:
+                    first_error_line = line_no
+    return {
+        "ok": record_count > 0 and error_count == 0,
+        "mode": normalized_mode,
+        "record_count": record_count,
+        "error_count": error_count,
+        "first_error_line": first_error_line,
+        "expected_algorithm": expected_algorithm,
+        "expected_key_id": expected_key_id,
+    }
+
+
 def archive_audit_log(
     audit_path: str | Path = "logs/audit/audit.jsonl",
     *,
@@ -120,7 +158,7 @@ def archive_audit_log(
     source = Path(audit_path)
     target_dir = Path(archive_dir) if archive_dir is not None else source.parent / "archive"
 
-    with _audit_file_lock(source):
+    with audit_file_lock(source):
         if not source.exists():
             raise FileNotFoundError(source)
 
