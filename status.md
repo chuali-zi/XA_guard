@@ -3,7 +3,7 @@
 > 快照日期：2026-06-21（America/Los_Angeles；仓库环境）
 > 本文件仅描述当前仓库状态、验收边界与剩余差距，不记录工作历史。
 > 2026-06-20 已在 commit `432ebbc` 实跑 L3 静态验收 S1–S7（全 PASS，123 测试）与能力范围内真实验收 R2/R3/R4/R6/R7/R9；证据目录 `D:/evidence/l3-20260620T090452Z/`（final-report.json + artifact-hashes.json 149 文件）。R6 Docker build/up+healthz 已 PASS（gVisor runsc 仍 BLOCKED，Windows 无 runsc）。BUG-R9 已修复+回归测试。仍 BLOCKED：R1 独立双 500/holdout、R2/R3 完整 ASR 矩阵、R5 真实 Trae GUI、R6 gVisor runsc（需 Linux）、R8 外部 AIBOM 生成器、R9 第三方 TSA/HSM。
-> 2026-06-21 对当前 dirty 工作树复核：统一静态 verifier `11/11` sections PASS；全量 pytest 在默认 Windows/CP1252 子进程环境为 `561 passed, 1 failed, 1 skipped`，总覆盖率 `79%`。唯一失败是 `validate_csab_gov_mini.py` 输出 Unicode 箭头触发 `UnicodeEncodeError`，设置 `PYTHONUTF8=1` 后该用例通过；唯一 skip 是本机缺 `xa-guard/sandbox:latest` 测试镜像。故当前不能写“默认环境全量测试全绿”。
+> 2026-06-21 对 commit `6cf1ce9` 复核：统一静态 verifier `11/11` sections PASS；全量 pytest 在默认 Windows/CP1252 子进程环境为 `561 passed, 1 failed, 1 skipped`，总覆盖率 `79%`。唯一失败是 `validate_csab_gov_mini.py` 输出 Unicode 箭头触发 `UnicodeEncodeError`，设置 `PYTHONUTF8=1` 后该用例通过；唯一 skip 是本机缺 `xa-guard/sandbox:latest` 测试镜像。故当前不能写“默认环境全量测试全绿”。
 
 ## 总体结论
 
@@ -12,7 +12,7 @@
 - 真实验收已通过：R4 性能（进程内 500 + HTTP 10 会话/500，四项 PRD 中等档全达标）、R6 Docker build/up + healthz（6/6 steps PASS，容器 live healthy）、R7 OPA parity（真实 OPA 1.17.0 与 Python fallback 7/7 一致 + strict_opa fail-closed 确认）、R2 install_plugin + AgentDojo baseline + InjecAgent base/defended 真实 opencode smoke（官方上游 pinned，official_claim=False）、R9 本地 SM2-with-SM3 签验 + 篡改检出 + faithfulness 独立重算 + 本地 TSA anchor（含 SM2-TSA-token 路径，BUG-R9 修复后 PASS）。
 - 20 会话容量如实记录为 LIMIT（P95 366.979ms > 300ms），未声明支持。
 - BUG-R9（SM2-TSA-token anchor 验证 mismatch）已修复：`tsa.py` `_payload_for_hash` 排除 `sm2_tsa_*` 字段，新增回归测试，S7 全套 123 passed 无回归。
-- 当前工作树不是可发布基线：相对 commit `432ebbc`，`tsa.py`、对应测试、`status.md`、`log.md` 有未提交修改；BUG-R9 修复尚未进入提交。2026-06-21 全量测试默认 Windows 编码下还有 1 个可复现兼容性失败。
+- BUG-R9 修复及回归测试已进入 commit `6cf1ce9`，本快照随之同步。2026-06-21 全量测试默认 Windows 编码下还有 1 个可复现兼容性失败。
 
 当前仍**不能宣称“L3 最终验收通过”或“赛题最终达标”**。剩余差距：R1 正式双 500/holdout 独立评测、R2/R3 完整 ASR 矩阵、R5 真实 Trae GUI、R6 真实 Linux/gVisor runsc 隔离、R8 外部 AIBOM 生成器、R9 第三方 TSA/HSM。
 
@@ -22,7 +22,7 @@
 
 | 验收面 | 当前状态 | 边界 |
 |---|---|---|
-| L3 static-only (S1–S7) | 本轮实跑全 PASS：S1 双 500 implementation + formal 负测、S2 holdout 协议 8 测、S3 runner 9 测、S4 性能入口 7 测、S5 Trae 3/3、S6 compose+gVisor/OPA/deployment+17 测+OPA bundle、S7 AIBOM/国密/审计/faithfulness 122 测 | 静态 PASS 不等于最终验收 PASS；S7 首跑 1 例 external-TSA flake，重跑 3 次干净 |
+| L3 static-only (S1–S7) | 2026-06-20 实跑全 PASS：S1 双 500 implementation + formal 负测、S2 holdout 协议 8 测、S3 runner 9 测、S4 性能入口 7 测、S5 Trae 3/3、S6 compose+gVisor/OPA/deployment+17 测+OPA bundle、S7 修复后 123 测 | 静态 PASS 不等于最终验收 PASS；BUG-R9 修复现已进入 `6cf1ce9` |
 | 当前全仓测试/覆盖率 | 2026-06-21：默认环境 `561 passed, 1 failed, 1 skipped`；覆盖率 `79%`；`PYTHONUTF8=1` 后失败用例单独 PASS；统一静态 verifier 11/11 PASS | 默认 Windows/CP1252 下校验脚本输出 Unicode 箭头失败；sandbox 镜像测试 skip，不能宣称全绿 |
 | 双 500 语料 (R1) | implementation profile 500+500、1000 唯一 payload、17 类各≥29 已实测验过；formal 正确非零退出 | formal 所需独立 attestation/taxonomy/semantic-group 复核 BLOCKED，不能作为正式双 500 |
 | Decision faithfulness (R9c) | 本轮 25 条真实签名审计独立重算 100% 一致；直接函数验证非固定 1.0（不一致 deny→0.45） | 真实 agent trace 的大规模独立重放未完成 |
@@ -55,4 +55,4 @@
 
 ## 距离赛题目标
 
-核心安全链路、L3 静态资产和验证入口已具备，且本轮已在 commit `432ebbc` 实跑通过 S1–S7 静态验收全 PASS（123 测试），并完成能力范围内真实验收：R4 性能（进程内 500 + HTTP 10 会话，四项 PRD 中等档全达标）、R6 Docker build/up + healthz（6/6 PASS，容器 live healthy）、R7 OPA parity（7/7 + fail-closed）、R2/R3 真实 opencode 单例 smoke、R9 本地 SM2/SM3 签验 + 篡改检出 + faithfulness 重算 + 本地 TSA anchor（含 SM2-TSA-token，BUG-R9 修复后 PASS）。20 会话如实记为容量 LIMIT。BUG-R9 已修复+回归测试。剩余 BLOCKED：R1 独立双 500/holdout、R5 真实 Trae GUI、R6 gVisor runsc（需 Linux 主机）、R8 外部 AIBOM 生成器、R9 第三方 TSA/HSM。在剩余项形成可复核证据并满足 `docs/L3-test-and-acceptance.md` 前，仓库状态保持：**L3 静态实现验收通过 + 大部分能力范围内真实验收通过，L3 最终验收未完成**。完整证据见 `D:/evidence/l3-20260620T090452Z/final-report.json`（149 文件 artifact hash manifest）。
+核心安全链路、L3 静态资产和验证入口已具备；2026-06-20 的证据显示 S1–S7 静态验收通过，并完成 R4 性能、R6 Docker build/up + healthz、R7 OPA parity、R2/R3 单例 smoke、R9 本地密码与审计验证。20 会话为容量 LIMIT。当前仍 BLOCKED：R1 独立双 500/holdout、R2/R3 完整矩阵、R5 真实 Trae、R6 Linux/runsc、R8 外部 AIBOM、R9 第三方 TSA/HSM；另有默认 Windows 编码测试失败。满足全部必验项前，仓库状态保持：**L3 静态实现验收通过 + 部分真实验收通过；L3 最终验收 BLOCKED**。完整历史证据见 `D:/evidence/l3-20260620T090452Z/final-report.json`。
