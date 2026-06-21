@@ -96,16 +96,14 @@ def main() -> None:
         )
     suite = get_suite(args.benchmark_version, args.suite)
     # AgentDojo's attack registry maps pipeline name → model name via a fixed
-    # lookup table (MODEL_NAMES).  Custom / local models that aren't in that
-    # table cause a ValueError.  Append a recognized generic name so the attack
-    # can be instantiated without modifying upstream code.
+    # lookup table (MODEL_NAMES) using substring matching on keys.  Custom
+    # models like opencode-go/glm-5.2 are not in that table, so we append the
+    # recognized key "local" to let the attack resolve to "Local model".
+    # This does not change any scorer, parser, or benchmark semantics.
     from agentdojo.models import MODEL_NAMES
 
-    pipeline_model_name = next(
-        (generic for key, generic in MODEL_NAMES.items() if key in (pipeline.name or "")),
-        "Local model",
-    )
-    pipeline.name = f"{pipeline.name or 'unnamed'}--{pipeline_model_name}"
+    if pipeline.name and not any(key in pipeline.name for key in MODEL_NAMES):
+        pipeline.name = f"{pipeline.name}--local"
     attack = load_attack(args.attack, suite, pipeline)
 
     started_at = datetime.now(timezone.utc)
