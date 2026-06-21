@@ -1,5 +1,34 @@
 # 工作日志
 
+## 2026-06-21 R2/R3 矩阵自动验收总控器实现（Codex）
+
+已完成：
+- 新增 `scripts/run_r2_r3_acceptance.py`，提供 `plan/run/resume/aggregate/verify`。总控器复用现有单 case runner；实际模型路径仍为 `opencode run ... --pure --format json -m <model> --file <turn>`，没有绕开官方 prompt/parser/scorer。
+- `plan` 冻结 XA-Guard/AgentDojo/InjecAgent commit、dirty 状态、license hash、配置 hash、模型和数据集 hash；默认 clean-only。实际 dry-run 枚举 AgentDojo 四 suite 949 对 case + InjecAgent DS/base 544 case，baseline/defended 总计 **2,986 jobs**，plan hash `f11c1ea32b298003b3c2d1895a9a6a60459f17f33094f2a1028e52165e1025f2`（临时审计 plan 已清理）。
+- 实现逐 job 原子结果/state、有限重试、resume 跳过、baseline/defended 配对、缺题 fail、R2 Targeted ASR/Utility、R3 ASR-valid、aggregate 非零退出、artifact hash manifest 和 verify。
+- R3 最终 attack oracle 使用上游 `official_scorer_results['ASR-valid (Data Stealing)']`，没有错误使用只代表第一阶段的 `case_result.attack_success`；同时报告 S1 successes、S2 attempted/successes、valid/invalid。
+- 新增 `configs/r2-r3-acceptance.example.json`，未写入任何密钥。
+- 新增 `tests/unit/test_r2_r3_acceptance.py`，验证 defended 命令、完整配对矩阵 PASS、缺 job FAIL、artifact 篡改检出；连同现有 runner/bridge 测试共 **15 passed**，ruff PASS。
+- 新增 `docs/R2-R3矩阵自动验收使用说明.md`：包含规模/费用护栏、五步命令、退出码、证据结构、Goal objective 和可直接交给执行 agent 的 Prompt。
+- 实际执行一次最小 OpenCode 健康检查：`opencode-go/glm-5.2` exit 0，约 11.7 秒、输入 9852/output 6 tokens、记录 cost `$0.0138348`；模型返回 `{ready:true}` 而非合法 JSON。该结果表明 provider 可调用，但结构化输出不稳定，不能直接启动完整矩阵；脚本会将同类 parse failure 记录为失败并有限重试，不会算作防御成功。
+
+未完成 / 下一步：
+- 未运行 4-job 真实 benchmark smoke，未运行完整 2,986-job 付费矩阵。
+- 下一步应在 clean worktree 复制 local config，选择并冻结能稳定输出严格 JSON 的模型，运行 plan → 4-job dry-run → 4-job real smoke；报告预计调用量/费用并获得用户确认后，才运行完整矩阵。
+- 不得用修改 scorer/parser/数据/测试断言、删除失败结果或把 invalid/timeout 计为防御成功的方式获得 PASS。
+
+## 2026-06-21 R2/R3 正式矩阵自动化可行性检查（Codex）
+
+本轮完成：
+- 阅读现有 AgentDojo/InjecAgent OpenCode runner、外部 benchmark schema、normalizer、测试和验收文档。
+- 确认仓库已经具备单 case 真实执行、官方 prompt/parser/scorer 调用、模型调用日志、XA-Guard 决策日志、上游 commit/license/hash 和结果 JSON；无需重写底层 runner。
+- 确认正式矩阵目前缺少总控编排层：case 枚举、baseline/defended 配对、断点续跑、有限重试、timeout/invalid/infra 分类、指标聚合、置信区间、阈值判定、artifact hash manifest 和非零退出码。
+- 结论：执行与判分可实现约 85%–90% 自动化；固定模型与预算、上游/配置冻结、API 可用性和最终独立复核不能由测试代码替代。
+
+未完成 / 下一步：
+- 本轮未实现矩阵 orchestrator，也未发起付费模型调用。
+- 建议新增统一 `run_r2_r3_acceptance.py`（plan/run/resume/aggregate/verify）和纯离线单元测试；先以 2×2 小矩阵证明断点续跑与判分，再执行完整 R2/R3。
+
 ## 2026-06-21 当前仓库状态与“真实 L3”差距复核（Codex）
 
 本轮只做仓库检查、实跑验证与状态维护；未修改产品代码，未修改任何测试代码，也未执行提交、推送或外部发布。

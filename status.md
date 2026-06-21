@@ -32,7 +32,7 @@
 | OPA (R7) | 本轮真实 OPA 1.17.0 与 Python fallback 7/7 parity；strict_opa fail-closed 在 gate3_policy.py:59-60 确认 | 真实 OPA 固定镜像 provenance/license、漂移负测与完整 fixture 矩阵未跑 |
 | AIBOM (R2/R8) | 内部扫描/评级/签名/漂移/离线 preflight S7 测过；真实 opencode install_plugin smoke PASS（AIBOM F deny） | 合法外部生成器真实产物/marketplace/IDE 安装链 BLOCKED |
 | 审计与国密 (R9) | 本轮真实 SM2-with-SM3 签验 25 条 0 错误 + 篡改检出；本地 TSA anchor（**含 SM2-TSA-token 路径，BUG-R9 修复后 PASS**）验过；faithfulness 重算 PASS | 第三方 TSA/HSM BLOCKED（本地 file TSA + 软件 SM2 key 仅为 demo/CI） |
-| 外部 benchmark (R2/R3) | 真实 opencode smoke：AgentDojo baseline PASS、InjecAgent DS base+defended PASS、AgentDojo defended PARTIAL（19 LLM 调用+22 deny/warn 决策已存，scorer 循环因免费模型非 JSON 未跑完） | 完整 ASR 矩阵 BLOCKED：需固定模型+完整矩阵+预算；opencode-go/glm-5.2 仅在仓库根 cwd 可解析 |
+| 外部 benchmark (R2/R3) | 已新增统一矩阵 orchestrator：自动枚举 2,986 baseline/defended jobs，支持 plan/run/resume/aggregate/verify、有限重试、严格完整率/门槛判定和 artifact hash；15 个相关离线测试 PASS，dry-run 成功生成完整 plan | 尚未运行 4-job 真实 benchmark smoke 或完整付费矩阵；`opencode-go/glm-5.2` 简单健康检查虽 exit 0，但返回 `{ready:true}` 非合法 JSON，正式使用前必须验证/解决结构化输出稳定性；需固定模型、预算和 clean 上游 |
 | 性能 (R4) | 本轮实测：进程内 500 P50 2.912ms/P95 21.72ms/QPS 415.17/RSS 62.59MB；HTTP 10×500 P95 169.79ms/QPS 74.09/RSS 103.76MB、500/500 审计 marker 匹配，全达标 | 20 会话容量 LIMIT（P95 366.979ms > 300ms，未声明支持）；多 worker/TLS/多机 soak 未跑 |
 
 ## 本轮性能证据（2026-06-20 实测，commit 432ebbc）
