@@ -1,9 +1,10 @@
 # 仓库状态：XA-Guard / XA-202620
 
-> 快照日期：2026-06-21（America/Los_Angeles；仓库环境）
+> 快照日期：2026-06-21（仓库环境）
 > 本文件仅描述当前仓库状态、验收边界与剩余差距，不记录工作历史。
 > 2026-06-20 已在 commit `432ebbc` 实跑 L3 静态验收 S1–S7（全 PASS，123 测试）与能力范围内真实验收 R2/R3/R4/R6/R7/R9；证据目录 `D:/evidence/l3-20260620T090452Z/`（final-report.json + artifact-hashes.json 149 文件）。R6 Docker build/up+healthz 已 PASS（gVisor runsc 仍 BLOCKED，Windows 无 runsc）。BUG-R9 已修复+回归测试。仍 BLOCKED：R1 独立双 500/holdout、R2/R3 完整 ASR 矩阵、R5 真实 Trae GUI、R6 gVisor runsc（需 Linux）、R8 外部 AIBOM 生成器、R9 第三方 TSA/HSM。
-> 2026-06-21 对 commit `6cf1ce9` 复核：统一静态 verifier `11/11` sections PASS；全量 pytest 在默认 Windows/CP1252 子进程环境为 `561 passed, 1 failed, 1 skipped`，总覆盖率 `79%`。唯一失败是 `validate_csab_gov_mini.py` 输出 Unicode 箭头触发 `UnicodeEncodeError`，设置 `PYTHONUTF8=1` 后该用例通过；唯一 skip 是本机缺 `xa-guard/sandbox:latest` 测试镜像。故当前不能写“默认环境全量测试全绿”。
+> 2026-06-21 对 commit `6cf1ce9` 复核：统一静态 verifier `11/11` sections PASS；全量 pytest 在默认 Windows/CP1252 子进程环境为 `561 passed, 1 failed, 1 skipped`，总覆盖率 `79%`。唯一失败是 `validate_csab_gov_mini.py` 输出 Unicode 箭头触发 `UnicodeEncodeError`，设置 `PYTHONUTF8=1` 后该用例通过；唯一 skip 是本机缺 `xa-guard/sandbox:latest` 测试镜像。故当前不能写”默认环境全量测试全绿”。
+> 2026-06-21 R2/R3 正式矩阵 smoke：4-job 真实 `opencode run` 调用完成（4/4 status=complete，resume skip 验证通过），模型 `opencode-go/glm-5.2`，证据 `D:/evidence/r2-r3-20260621b/`。完整 2,986-job 矩阵**等待用户确认预算**（预估 ~$289 / ~99 小时）。
 
 ## 总体结论
 
@@ -32,7 +33,7 @@
 | OPA (R7) | 本轮真实 OPA 1.17.0 与 Python fallback 7/7 parity；strict_opa fail-closed 在 gate3_policy.py:59-60 确认 | 真实 OPA 固定镜像 provenance/license、漂移负测与完整 fixture 矩阵未跑 |
 | AIBOM (R2/R8) | 内部扫描/评级/签名/漂移/离线 preflight S7 测过；真实 opencode install_plugin smoke PASS（AIBOM F deny） | 合法外部生成器真实产物/marketplace/IDE 安装链 BLOCKED |
 | 审计与国密 (R9) | 本轮真实 SM2-with-SM3 签验 25 条 0 错误 + 篡改检出；本地 TSA anchor（**含 SM2-TSA-token 路径，BUG-R9 修复后 PASS**）验过；faithfulness 重算 PASS | 第三方 TSA/HSM BLOCKED（本地 file TSA + 软件 SM2 key 仅为 demo/CI） |
-| 外部 benchmark (R2/R3) | 已新增统一矩阵 orchestrator：自动枚举 2,986 baseline/defended jobs，支持 plan/run/resume/aggregate/verify、有限重试、严格完整率/门槛判定和 artifact hash；15 个相关离线测试 PASS，dry-run 成功生成完整 plan | 尚未运行 4-job 真实 benchmark smoke 或完整付费矩阵；`opencode-go/glm-5.2` 简单健康检查虽 exit 0，但返回 `{ready:true}` 非合法 JSON，正式使用前必须验证/解决结构化输出稳定性；需固定模型、预算和 clean 上游 |
+| 外部 benchmark (R2/R3) | 统一矩阵 orchestrator（plan/run/resume/aggregate/verify）已实现；15 个离线测试 PASS；**4-job 真实 smoke 完成**：workspace suite baseline/defended 配对，模型 `opencode-go/glm-5.2`，4/4 status=complete，resume skip 验证通过；证据目录 `D:/evidence/r2-r3-20260621b/`（matrix-plan.json + jobs/*/result.json + state.json + logs/*） | 完整 2,986-job 矩阵**等待用户确认预算**（预估 ~17,916 次调用 / ~$289 / ~99 小时）；aggregate/verify 未执行（矩阵不完整时 aggregate 必定 FAIL，属预期行为） |
 | 性能 (R4) | 本轮实测：进程内 500 P50 2.912ms/P95 21.72ms/QPS 415.17/RSS 62.59MB；HTTP 10×500 P95 169.79ms/QPS 74.09/RSS 103.76MB、500/500 审计 marker 匹配，全达标 | 20 会话容量 LIMIT（P95 366.979ms > 300ms，未声明支持）；多 worker/TLS/多机 soak 未跑 |
 
 ## 本轮性能证据（2026-06-20 实测，commit 432ebbc）
@@ -48,11 +49,11 @@
 2. R5 真实 Trae 四案例 + 截图/录像 — 需真实 Trae GUI（按用户指示本轮跳过）。
 3. R6 真实 Linux/gVisor runsc 隔离/故障/性能 — Docker build/up + healthz 已 PASS，但 runsc 需 Linux 主机安装（Windows Docker Desktop 无 runsc runtime）。
 4. R7 真实 OPA 固定镜像 provenance/license、漂移负测与完整 fixture 矩阵 — parity 与 fail-closed 已 PASS，镜像层未跑。
-5. R2 完整 AgentDojo ASR 矩阵 + R3 完整 InjecAgent 510 DH + 544 DS — 需固定模型+完整矩阵+预算；并解决 opencode-go/glm-5.2 cwd 解析问题。
+5. R2 完整 AgentDojo ASR 矩阵 + R3 完整 InjecAgent 510 DH + 544 DS — **4-job smoke 已通过**（workspace suite），完整 2,986-job 矩阵等待用户确认预算（~$289 / ~99h）。
 6. R8 合法外部 AIBOM 生成器 + 真实 CycloneDX 1.6 产物 + 真实安装链 — 需用户安装/批准外部生成器。
 7. R9 第三方 TSA + 真实 HSM/合法 SDK + 故障负测 + faithfulness 大规模独立重放 — 需生产 key/HSM provider（本地 file TSA + 软件 SM2 key 仅为 demo/CI；BUG-R9 已修复，SM2-TSA-token anchor round-trip PASS）。
 8. 最终 PDF、视频、表单、截图、原始证据、artifact hash manifest 与外部存证/签名的收束和验收。
 
 ## 距离赛题目标
 
-核心安全链路、L3 静态资产和验证入口已具备；2026-06-20 的证据显示 S1–S7 静态验收通过，并完成 R4 性能、R6 Docker build/up + healthz、R7 OPA parity、R2/R3 单例 smoke、R9 本地密码与审计验证。20 会话为容量 LIMIT。当前仍 BLOCKED：R1 独立双 500/holdout、R2/R3 完整矩阵、R5 真实 Trae、R6 Linux/runsc、R8 外部 AIBOM、R9 第三方 TSA/HSM；另有默认 Windows 编码测试失败。满足全部必验项前，仓库状态保持：**L3 静态实现验收通过 + 部分真实验收通过；L3 最终验收 BLOCKED**。完整历史证据见 `D:/evidence/l3-20260620T090452Z/final-report.json`。
+核心安全链路、L3 静态资产和验证入口已具备；2026-06-20 的证据显示 S1–S7 静态验收通过，并完成 R4 性能、R6 Docker build/up + healthz、R7 OPA parity、R2/R3 单例 smoke、R9 本地密码与审计验证。20 会话为容量 LIMIT。2026-06-21 R2/R3 正式矩阵 4-job smoke 完成（baseline/defended 配对、resume skip 验证通过），完整 2,986-job 矩阵等待用户确认预算。当前仍 BLOCKED：R1 独立双 500/holdout、R2/R3 完整矩阵（待预算确认）、R5 真实 Trae、R6 Linux/runsc、R8 外部 AIBOM、R9 第三方 TSA/HSM；另有默认 Windows 编码测试失败。满足全部必验项前，仓库状态保持：**L3 静态实现验收通过 + 部分真实验收通过；L3 最终验收 BLOCKED**。完整历史证据见 `D:/evidence/l3-20260620T090452Z/final-report.json`，R2/R3 smoke 证据见 `D:/evidence/r2-r3-20260621b/`。
