@@ -110,7 +110,22 @@ def _default_anchor_path(audit_path: Path, created_at: str) -> Path:
 
 
 def _payload_for_hash(manifest: dict[str, Any]) -> dict[str, Any]:
-    return {k: v for k, v in manifest.items() if k not in {"anchor_hash", "tsa_token"}}
+    # ``anchor_hash`` and ``tsa_token`` are derived from this payload, so they
+    # must not participate in their own hash. The ``sm2_tsa_*`` fields are the
+    # SM2 timestamp-token metadata attached AFTER ``anchor_hash`` is computed
+    # (the TSA token signs ``anchor_hash``, not the manifest body), so they are
+    # also excluded to keep create-time and verify-time payloads identical.
+    # Otherwise verify_file_anchor would recompute a different hash whenever an
+    # SM2 TSA token was attached (BUG-R9).
+    _EXCLUDED = {
+        "anchor_hash",
+        "tsa_token",
+        "sm2_tsa_token_path",
+        "sm2_tsa_signature_algo",
+        "sm2_tsa_utc_time",
+        "sm2_tsa_error",
+    }
+    return {k: v for k, v in manifest.items() if k not in _EXCLUDED}
 
 
 def _anchor_hash(manifest: dict[str, Any], algo: str) -> str:
