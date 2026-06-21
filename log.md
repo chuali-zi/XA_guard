@@ -1,5 +1,30 @@
 # 工作日志
 
+## 2026-06-21 仓库完整性核查（用户担心“goal”操作破坏仓库）（ZCode）
+
+起因：用户表示刚才“瞎用 goal”，担心仓库被破坏，要求调查刚才发生了什么并描述当前仓库状态。本轮只做只读核查与文档维护，未改任何产品代码、测试代码，未提交、未推送。
+
+已完成（只读核查）：
+- `git status`：分支 `main`，工作树 clean，无未提交修改。
+- `git fsck --no-dangling`：exit 0，无对象损坏/悬空。
+- `git diff HEAD --stat`：空；`git ls-files --others --exclude-standard`：0 个未跟踪文件。工作树与 HEAD 完全一致。
+- `git reflog -30`：仅出现 `commit` 操作，无 `reset`/`checkout`/`rebase`/`cherry-pick`/`amend` 等改写历史的动作。HEAD 线性前进到 `3b7f663`。
+- `git log -5`：最近 5 个提交均为 `chuali` 在 2026-06-21 02:30–03:06 的 R2/R3 runner/配置/gitignore/docs 提交，内容与 log.md 既有记录吻合。
+- 分支/引用：本地仅 `main`；远端有 `origin/main`、`origin/codex/gate1-model-integration`；无 tag。
+
+核查结论：
+- 仓库未被破坏。无论“goal”具体指什么，git 层面没有留下任何破坏性痕迹：历史完整、工作树干净、对象库完好。
+- 唯一需关注的 git 状态是分叉：本地 `main` 领先 `origin/main` **25** 个提交、落后 **2** 个提交（未 push、未 pull）。
+  - 落后的 2 个 = 远端 PR #2（`codex/gate1-real-model-verification`）：`c8d6d34 Validate Gate1 real model behavior`（Codex, 2026-06-05）+ `262ff24 Merge pull request #2`（Chuali, 2026-06-16）。
+  - 共同祖先是 `10a7234`：本地在其上叠了 25 个 L3 提交，远端在其上合了 PR #2 的 2 个提交，故分叉。`origin/main` 远端引用时间停在 2026-06-16，之后未再 fetch。
+  - 这是 6-16 起就存在的分叉，不是本次“goal”造成的；需要后续 merge 或 rebase 收敛，但不影响当前仓库完整性。
+- 项目层状态（见 status.md）：L3 静态实现验收通过 + 部分真实验收通过；L3 最终验收仍 BLOCKED（R1/R2完整/R3完整/R5/R6 Linux-runsc/R8/R9 第三方）。R2/R3 4-job smoke 已完成，完整 2,986-job 矩阵等待用户确认预算。默认 Windows/CP1252 编码下有 1 个可复现测试失败（`PYTHONUTF8=1` 后通过）。
+
+未做 / 下一步：
+- 未执行 push/pull/rebase/merge，未改动分叉状态（等用户决定如何收敛与 origin/main 的分叉）。
+- 未运行测试（本轮只做 git 完整性核查）。
+- 下一步由用户决定：是否要把本地 25 个提交 push、以及是否 merge/rebase 远端 PR #2 的 2 个提交。
+
 ## 2026-06-21 R2/R3 正式矩阵 4-Job Smoke Test 执行（ZCode）
 
 已完成：

@@ -5,6 +5,7 @@
 > 2026-06-20 已在 commit `432ebbc` 实跑 L3 静态验收 S1–S7（全 PASS，123 测试）与能力范围内真实验收 R2/R3/R4/R6/R7/R9；证据目录 `D:/evidence/l3-20260620T090452Z/`（final-report.json + artifact-hashes.json 149 文件）。R6 Docker build/up+healthz 已 PASS（gVisor runsc 仍 BLOCKED，Windows 无 runsc）。BUG-R9 已修复+回归测试。仍 BLOCKED：R1 独立双 500/holdout、R2/R3 完整 ASR 矩阵、R5 真实 Trae GUI、R6 gVisor runsc（需 Linux）、R8 外部 AIBOM 生成器、R9 第三方 TSA/HSM。
 > 2026-06-21 对 commit `6cf1ce9` 复核：统一静态 verifier `11/11` sections PASS；全量 pytest 在默认 Windows/CP1252 子进程环境为 `561 passed, 1 failed, 1 skipped`，总覆盖率 `79%`。唯一失败是 `validate_csab_gov_mini.py` 输出 Unicode 箭头触发 `UnicodeEncodeError`，设置 `PYTHONUTF8=1` 后该用例通过；唯一 skip 是本机缺 `xa-guard/sandbox:latest` 测试镜像。故当前不能写”默认环境全量测试全绿”。
 > 2026-06-21 R2/R3 正式矩阵 smoke：4-job 真实 `opencode run` 调用完成（4/4 status=complete，resume skip 验证通过），模型 `opencode-go/glm-5.2`，证据 `D:/evidence/r2-r3-20260621b/`。完整 2,986-job 矩阵**等待用户确认预算**（预估 ~$289 / ~99 小时）。
+> 2026-06-21 Git 同步状态：本地 `main` 工作树 clean、对象库完好（`git fsck` 通过、reflog 无破坏性操作）；本地领先 `origin/main` **25** 提交、落后 **2** 提交（未 push/pull）。落后的 2 个为远端 PR #2 `codex/gate1-real-model-verification`（`c8d6d34`+`262ff24`，6-16 合入），共同祖先 `10a7234`，需后续 merge/rebase 收敛——属同步事项，不影响仓库完整性或验收状态。
 
 ## 总体结论
 
