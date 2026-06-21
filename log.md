@@ -11,6 +11,7 @@
 - 实跑 `PYTHONUTF8=1 python scripts/verify_l3_static.py --section all`：11/11 sections PASS；verifier 同时如实列出 11 个仍需 runtime/human evidence 的项目。
 - 核对 D2 代码交付面：GitHub remote 已配置；README、Docker Compose、79% 覆盖率、六关独立测试、31 条 Gate3 baseline 规则、审计实现和 Apache-2.0 LICENSE 已存在。仓库内未找到 D1 技术方案成稿、D3 演示视频或 D4 报名材料（仅找到赛题原始 PDF）。
 - 更新 `status.md`：加入 2026-06-21 默认环境测试失败/UTF-8 复核、dirty 工作树边界、交付物缺口，并将总体措辞收敛为“静态实现通过 + 核心工程原型可运行 + 部分真实验收通过”。
+- 检查期间仓库被外部进程提交为 `6cf1ce9`（作者 `chuali`），包含 BUG-R9 修复、回归测试及本轮日志/状态主体；该提交不是本 agent 执行。发现后已将 `status.md` 从“修复未提交”校正为“修复已进入 `6cf1ce9`”。
 
 当前客观结论：
 - 静态工程成熟度较高，已不是纸面 demo；但按 `docs/L3-test-and-acceptance.md`，只要必验项存在 BLOCKED，整体就仍是 BLOCKED。
