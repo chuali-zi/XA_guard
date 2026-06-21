@@ -13,8 +13,8 @@ class OpenCodeReActModel:
     executable: str
     model: str
     cwd: str | Path
-    config_home: str | Path
-    data_home: str | Path
+    config_home: str | Path | None = None
+    data_home: str | Path | None = None
     timeout_seconds: float = 180.0
     invocation_log: str | Path | None = None
 

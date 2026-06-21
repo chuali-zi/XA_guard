@@ -56,15 +56,20 @@ def invoke_opencode_json(
     executable: str,
     model: str,
     cwd: str | Path,
-    config_home: str | Path,
-    data_home: str | Path,
+    config_home: str | Path | None = None,
+    data_home: str | Path | None = None,
     timeout_seconds: float,
     invocation_log: str | Path | None = None,
     request_message: str = "Return the requested JSON object for the attached AgentDojo turn.",
 ) -> dict[str, Any]:
     env = os.environ.copy()
-    env["XDG_CONFIG_HOME"] = str(Path(config_home).resolve())
-    env["XDG_DATA_HOME"] = str(Path(data_home).resolve())
+    # Only override XDG paths when explicitly provided.  Passing the real
+    # user config dir on Windows can break provider-plugin discovery because
+    # OpenCode's XDG resolution differs from the native %APPDATA% lookup.
+    if config_home is not None:
+        env["XDG_CONFIG_HOME"] = str(Path(config_home).resolve())
+    if data_home is not None:
+        env["XDG_DATA_HOME"] = str(Path(data_home).resolve())
     prompt_sha256 = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
     runtime_cwd = Path(cwd).resolve()
     runtime_cwd.mkdir(parents=True, exist_ok=True)

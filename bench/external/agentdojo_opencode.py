@@ -51,16 +51,16 @@ class OpenCodeLLM(BasePipelineElement):
         executable: str,
         model: str,
         cwd: str | Path,
-        config_home: str | Path,
-        data_home: str | Path,
+        config_home: str | Path | None = None,
+        data_home: str | Path | None = None,
         timeout_seconds: float = 180.0,
         invocation_log: str | Path | None = None,
     ) -> None:
         self.executable = executable
         self.model = model
         self.cwd = Path(cwd)
-        self.config_home = Path(config_home)
-        self.data_home = Path(data_home)
+        self.config_home = Path(config_home) if config_home is not None else None
+        self.data_home = Path(data_home) if data_home is not None else None
         self.timeout_seconds = timeout_seconds
         self.invocation_log = invocation_log
         # AgentDojo's attacks infer a prose model family from this official token.

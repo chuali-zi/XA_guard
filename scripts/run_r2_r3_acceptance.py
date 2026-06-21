@@ -159,11 +159,20 @@ def build_plan(config_path: Path, config: dict[str, Any]) -> dict[str, Any]:
     ia = config["injecagent"]
     ad_upstream = _resolved(config_path, ad["upstream_dir"])
     ia_upstream = _resolved(config_path, ia["upstream_dir"])
-    config_home = _resolved(config_path, oc["config_home"])
-    data_home = _resolved(config_path, oc["data_home"])
-    for required_dir in (config_home, data_home):
-        if not required_dir.is_dir():
-            raise FileNotFoundError(f"OpenCode directory does not exist: {required_dir}")
+    # config_home / data_home are optional; "default" or null means use OpenCode's
+    # native resolution (no XDG override).
+    config_home_raw = oc.get("config_home")
+    data_home_raw = oc.get("data_home")
+    config_home = None
+    data_home = None
+    if config_home_raw and config_home_raw != "default":
+        config_home = _resolved(config_path, config_home_raw)
+        if not config_home.is_dir():
+            raise FileNotFoundError(f"OpenCode config directory does not exist: {config_home}")
+    if data_home_raw and data_home_raw != "default":
+        data_home = _resolved(config_path, data_home_raw)
+        if not data_home.is_dir():
+            raise FileNotFoundError(f"OpenCode data directory does not exist: {data_home}")
 
     locks = {
         "repository": {
@@ -199,8 +208,8 @@ def build_plan(config_path: Path, config: dict[str, Any]) -> dict[str, Any]:
         "execution": {
             "opencode_executable": oc.get("executable", "opencode.cmd"),
             "model": oc["model"],
-            "config_home": str(config_home),
-            "data_home": str(data_home),
+            "config_home": str(config_home) if config_home else "default",
+            "data_home": str(data_home) if data_home else "default",
             "timeout_seconds": float(oc.get("timeout_seconds", 180)),
             "max_attempts": int(oc.get("max_attempts", 2)),
         },
@@ -226,12 +235,15 @@ def _job_command(plan: dict[str, Any], job: dict[str, Any], result: Path, logdir
         "--upstream-dir", benchmark_config["upstream_dir"],
         "--opencode-executable", execution["opencode_executable"],
         "--opencode-model", execution["model"],
-        "--opencode-config-home", execution["config_home"],
-        "--opencode-data-home", execution["data_home"],
         "--logdir", str(logdir),
         "--output", str(result),
         "--timeout-seconds", str(execution["timeout_seconds"]),
     ]
+    # Only pass XDG paths when explicitly configured (not null/"default")
+    if execution.get("config_home") and execution["config_home"] != "default":
+        common.extend(["--opencode-config-home", execution["config_home"]])
+    if execution.get("data_home") and execution["data_home"] != "default":
+        common.extend(["--opencode-data-home", execution["data_home"]])
     case = job["case"]
     if job["benchmark"] == "agentdojo":
         command = [
