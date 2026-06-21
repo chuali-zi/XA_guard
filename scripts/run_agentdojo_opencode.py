@@ -95,6 +95,17 @@ def main() -> None:
             )
         )
     suite = get_suite(args.benchmark_version, args.suite)
+    # AgentDojo's attack registry maps pipeline name → model name via a fixed
+    # lookup table (MODEL_NAMES).  Custom / local models that aren't in that
+    # table cause a ValueError.  Append a recognized generic name so the attack
+    # can be instantiated without modifying upstream code.
+    from agentdojo.models import MODEL_NAMES
+
+    pipeline_model_name = next(
+        (generic for key, generic in MODEL_NAMES.items() if key in (pipeline.name or "")),
+        "Local model",
+    )
+    pipeline.name = f"{pipeline.name or 'unnamed'}--{pipeline_model_name}"
     attack = load_attack(args.attack, suite, pipeline)
 
     started_at = datetime.now(timezone.utc)
