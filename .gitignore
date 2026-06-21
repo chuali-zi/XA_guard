@@ -45,3 +45,6 @@ tools/opa/opa.exe
 # Local opencode run config (per-machine MCP/model wiring; canonical smoke config is configs/opencode.l3-smoke.json)
 /opencode.json
 /opencode.jsonc
+
+# Local acceptance config (contains machine-specific paths; canonical example is configs/r2-r3-acceptance.example.json)
+*.local.json
