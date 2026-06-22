@@ -4,7 +4,7 @@
 > 本文件仅描述当前仓库状态、验收边界与剩余差距，不记录工作历史。
 > 2026-06-20 已在 commit `432ebbc` 实跑 L3 静态验收 S1–S7（全 PASS，123 测试）与能力范围内真实验收 R2/R3/R4/R6/R7/R9；证据目录 `D:/evidence/l3-20260620T090452Z/`（final-report.json + artifact-hashes.json 149 文件）。R6 Docker build/up+healthz 已 PASS（gVisor runsc 仍 BLOCKED，Windows 无 runsc）。BUG-R9 已修复+回归测试。仍 BLOCKED：R1 独立双 500/holdout、R5 真实 Trae GUI、R6 gVisor runsc（需 Linux）、R8 外部 AIBOM 生成器、R9 第三方 TSA/HSM；R2/R3 比赛目标另按 `$20` 预算型抽样管理。
 > 2026-06-21 对 commit `6cf1ce9` 复核：统一静态 verifier `11/11` sections PASS；全量 pytest 在默认 Windows/CP1252 子进程环境为 `561 passed, 1 failed, 1 skipped`，总覆盖率 `79%`。唯一失败是 `validate_csab_gov_mini.py` 输出 Unicode 箭头触发 `UnicodeEncodeError`，设置 `PYTHONUTF8=1` 后该用例通过；唯一 skip 是本机缺 `xa-guard/sandbox:latest` 测试镜像。故当前不能写”默认环境全量测试全绿”。
-> 2026-06-21 R2/R3 4-job 真实 `opencode run` smoke 完成（4/4 status=complete，resume skip 验证通过），模型 `opencode-go/glm-5.2`，证据 `D:/evidence/r2-r3-20260621b/`。2026-06-22 `competition_budget_v1` 离线工具已实现：未来新增 API 上限 `$20`（校准 `$2`、R2 `$10`、R3 `$6`、重试 `$2`），seed `20260622`，确定性分层 manifest、原子成本账本、调用前熔断、resume、sampled Wilson 聚合与 hash 校验均已有测试。现有约 `$0.39` smoke 不计入预算和正式指标；本轮未调用模型，正式 `$2` 校准与主评测仍 NOT RUN。2,986-job 全矩阵为 `research_full_matrix / DEFERRED_OPTIONAL`。
+> 2026-06-22 用户授权的 `$10` 首批运行已安全停止，证据 `D:/evidence/r2-r3-budget10-20260622/`。实际新增 provider 成本 `$2.94602940`（calibration `$1.95051700` + retry `$0.99551240`），87 次调用全部 settled、无未知成本；32 calibration jobs 为 7 complete / 25 infra_error，其中 24 个在桶余额不足时调用前阻断、1 个为 OpenCode content schema 波动。校准不完整，`budget-freeze` 正确拒绝，未生成正式 sample manifest 或 sampled 指标；剩余约 `$7.05397` 未使用。2,986-job 全矩阵仍为 `DEFERRED_OPTIONAL`。
 > 2026-06-22 Git 状态：本地 `main` 与 `origin/main` 同步（ahead 0 / behind 0）；工作树包含本轮文档纠偏修改，尚未提交。此前对象库完整性核查通过。
 
 ## 总体结论
@@ -34,7 +34,7 @@
 | OPA (R7) | 本轮真实 OPA 1.17.0 与 Python fallback 7/7 parity；strict_opa fail-closed 在 gate3_policy.py:59-60 确认 | 真实 OPA 固定镜像 provenance/license、漂移负测与完整 fixture 矩阵未跑 |
 | AIBOM (R2/R8) | 内部扫描/评级/签名/漂移/离线 preflight S7 测过；真实 opencode install_plugin smoke PASS（AIBOM F deny） | 合法外部生成器真实产物/marketplace/IDE 安装链 BLOCKED |
 | 审计与国密 (R9) | 本轮真实 SM2-with-SM3 签验 25 条 0 错误 + 篡改检出；本地 TSA anchor（**含 SM2-TSA-token 路径，BUG-R9 修复后 PASS**）验过；faithfulness 重算 PASS | 第三方 TSA/HSM BLOCKED（本地 file TSA + 软件 SM2 key 仅为 demo/CI） |
-| 外部 benchmark (R2/R3) | 完整矩阵 orchestrator保持兼容；**4-job 真实 smoke 完成**，成本 `$0.38763`。`competition_budget_v1` 已实现 `budget-plan/run/resume/freeze/aggregate/verify`、固定 seed SHA-256 分层配对、四桶原子账本/调用前熔断、usage cost/token、Wilson 区间与 artifact hash；相关目标测试 18 passed | 本轮未调用模型，正式 `$2` 校准、样本冻结和主评测 NOT RUN，故仍无 sampled 结论。`max_invocation_reserve_usd` 是保守调用前预留，必须在付费前结合 provider 价格复核；缺 cost 会 fail-closed。2,986-job `research_full_matrix` 为 `DEFERRED_OPTIONAL` |
+| 外部 benchmark (R2/R3) | 完整矩阵 orchestrator保持兼容；`competition_budget_v1` 工具目标测试 18 passed。2026-06-22 首批 `$10` 授权实际使用 `$2.94602940`，87 次调用全部 settled；7/32 calibration jobs complete，预算分桶熔断阻止了超额调用 | calibration 未覆盖完整四 suite + R3，冻结失败，正式 sampled 结果仍 NOT RUN。当前需先离线修复 OpenCode content schema 兼容与 phase 级预算耗尽停止，再考虑剩余 `$7.05397`；不得把 7 个结果写入正式分母 |
 | 性能 (R4) | 本轮实测：进程内 500 P50 2.912ms/P95 21.72ms/QPS 415.17/RSS 62.59MB；HTTP 10×500 P95 169.79ms/QPS 74.09/RSS 103.76MB、500/500 审计 marker 匹配，全达标 | 20 会话容量 LIMIT（P95 366.979ms > 300ms，未声明支持）；多 worker/TLS/多机 soak 未跑 |
 
 ## 本轮性能证据（2026-06-20 实测，commit 432ebbc）
@@ -50,7 +50,7 @@
 2. R5 真实 Trae 四案例 + 截图/录像 — 需真实 Trae GUI（按用户指示本轮跳过）。
 3. R6 真实 Linux/gVisor runsc 隔离/故障/性能 — Docker build/up + healthz 已 PASS，但 runsc 需 Linux 主机安装（Windows Docker Desktop 无 runsc runtime）。
 4. R7 真实 OPA 固定镜像 provenance/license、漂移负测与完整 fixture 矩阵 — parity 与 fail-closed 已 PASS，镜像层未跑。
-5. R2/R3 `competition_budget_v1` — **离线工具与目标测试已完成，4-job 历史 smoke 已通过**；正式 `$2` 校准和后续 sampled 评测尚未运行。2,986-job `research_full_matrix` 为 `DEFERRED_OPTIONAL`。预算与边界见 `docs/R2-R3完整矩阵预算分析.md`。
+5. R2/R3 `competition_budget_v1` — 离线工具已完成；首批真实 calibration 因 `$2/$1` 分桶耗尽停在 `$2.94602940`，7/32 complete，冻结失败。需先修复兼容性和调度，再决定是否使用剩余 `$7.05397`。2,986-job `research_full_matrix` 为 `DEFERRED_OPTIONAL`。
 6. R8 合法外部 AIBOM 生成器 + 真实 CycloneDX 1.6 产物 + 真实安装链 — 需用户安装/批准外部生成器。
 7. R9 第三方 TSA + 真实 HSM/合法 SDK + 故障负测 + faithfulness 大规模独立重放 — 需生产 key/HSM provider（本地 file TSA + 软件 SM2 key 仅为 demo/CI；BUG-R9 已修复，SM2-TSA-token anchor round-trip PASS）。
 8. 最终 PDF、视频、表单、截图、原始证据、artifact hash manifest 与外部存证/签名的收束和验收。

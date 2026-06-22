@@ -1,5 +1,23 @@
 # 工作日志
 
+## 2026-06-22 `$10` 首批 R2/R3 预算运行（Codex）
+
+起因：用户授权先运行最多 `$10`，并明确允许为付费运行建立本地 commit。执行前将已验证的预算工具提交为本地 commit `b871281`；没有推送。
+
+已完成：
+- 使用独立证据目录 `D:/evidence/r2-r3-budget10-20260622/` 和固定模型 `opencode-go/glm-5.2` 建立首批预算配置。总硬上限 `$10`，分桶为 calibration `$2`、R2 `$5`、R3 `$2`、retry `$1`；seed `20260622`。
+- 执行 `budget-plan`，冻结 32 个校准 jobs；执行完整 `budget-run --phase calibration --dry-run`，确认 dry-run 没有修改账本；随后执行真实 calibration，并在前台宿主退出后使用同一账本 `budget-resume`，已完成结果没有重复计费。
+- 真实 provider 成本累计 `$2.94602940`：calibration `$1.95051700`、retry `$0.99551240`，共 87 次已结算调用；无 reserved、无 unknown cost。总额未达到 `$10`，但 calibration/retry 两桶余额均不足下一次 `$0.05` 预留，后续调用全部在调用前被拒绝，证明分桶熔断有效。
+- 32 个校准 jobs 中 7 个 complete、25 个 infra_error。完整结果包含 workspace 2 对、slack 1 对，另有 slack defended 单臂；25 个错误中 24 个由预算调用前阻断，1 个 baseline 在两次尝试后仍因 OpenCode `content` 类型不符合 adapter schema 失败。没有 R3 complete。
+- 执行无费用 `budget-freeze` 检查；因 calibration 不完整而正确拒绝冻结，错误为 `calibration cost incomplete`。没有生成正式 `sample-manifest.json`，没有 sampled 指标或达标声明。
+
+未完成 / 边界：
+- 本轮没有为了“花满 `$10`”而挪用主评测桶或扩大重试额度；实际新增支出停在 `$2.94602940`，剩余约 `$7.05397` 未使用。
+- 当前校准设计对 AgentDojo 单 case 多轮 utility 调用的成本估计过低，且 OpenCode 输出 schema 存在真实波动。直接继续付费不能形成完整校准或可冻结样本，应先修正兼容性和校准调度，再决定是否使用剩余额度。
+- 本次仅为首批 calibration 工程证据，不进入正式 sampled 分母，不构成 R2/R3 PASS。
+
+下一步：离线修复 adapter 对 AgentDojo 合法 content block/list 形态的规范化，并修改 orchestrator 在预算桶耗尽后停止整个 phase、避免逐 job 启动后再失败；补回归测试后，重新评估是否在剩余 `$7.05397` 内完成精简但覆盖四 suite + R3 的校准。未经用户后续指示不再产生费用。
+
 ## 2026-06-22 `competition_budget_v1` 离线评测工具实现（Codex）
 
 起因：用户批准实现 20 美元预算型 R2/R3 评测工具，并明确本轮只做代码、测试、文档和 dry-run，不执行付费模型调用。
