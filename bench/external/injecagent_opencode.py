@@ -17,6 +17,10 @@ class OpenCodeReActModel:
     data_home: str | Path | None = None
     timeout_seconds: float = 180.0
     invocation_log: str | Path | None = None
+    budget_ledger: str | Path | None = None
+    budget_bucket: str | None = None
+    budget_job_id: str | None = None
+    max_invocation_reserve_usd: float | None = None
 
     def prepare_input(self, system_prompt: str, user_prompt: str) -> str:
         return (
@@ -40,6 +44,10 @@ class OpenCodeReActModel:
             data_home=self.data_home,
             timeout_seconds=self.timeout_seconds,
             invocation_log=self.invocation_log,
+            budget_ledger=self.budget_ledger,
+            budget_bucket=self.budget_bucket,
+            budget_job_id=self.budget_job_id,
+            max_invocation_reserve_usd=self.max_invocation_reserve_usd,
             request_message=(
                 "Return the requested JSON object for the attached InjecAgent turn."
             ),

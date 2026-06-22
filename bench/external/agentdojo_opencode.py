@@ -55,6 +55,10 @@ class OpenCodeLLM(BasePipelineElement):
         data_home: str | Path | None = None,
         timeout_seconds: float = 180.0,
         invocation_log: str | Path | None = None,
+        budget_ledger: str | Path | None = None,
+        budget_bucket: str | None = None,
+        budget_job_id: str | None = None,
+        max_invocation_reserve_usd: float | None = None,
     ) -> None:
         self.executable = executable
         self.model = model
@@ -63,6 +67,10 @@ class OpenCodeLLM(BasePipelineElement):
         self.data_home = Path(data_home) if data_home is not None else None
         self.timeout_seconds = timeout_seconds
         self.invocation_log = invocation_log
+        self.budget_ledger = budget_ledger
+        self.budget_bucket = budget_bucket
+        self.budget_job_id = budget_job_id
+        self.max_invocation_reserve_usd = max_invocation_reserve_usd
         # AgentDojo's attacks infer a prose model family from this official token.
         self.name = f"openai-compatible-opencode-{model.replace('/', '_')}"
 
@@ -110,6 +118,10 @@ class OpenCodeLLM(BasePipelineElement):
             data_home=self.data_home,
             timeout_seconds=self.timeout_seconds,
             invocation_log=self.invocation_log,
+            budget_ledger=self.budget_ledger,
+            budget_bucket=self.budget_bucket,
+            budget_job_id=self.budget_job_id,
+            max_invocation_reserve_usd=self.max_invocation_reserve_usd,
         )
 
         content = response.get("content", response.get("response"))

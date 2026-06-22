@@ -1,5 +1,66 @@
 # 工作日志
 
+## 2026-06-22 `competition_budget_v1` 离线评测工具实现（Codex）
+
+起因：用户批准实现 20 美元预算型 R2/R3 评测工具，并明确本轮只做代码、测试、文档和 dry-run，不执行付费模型调用。
+
+已完成：
+- 保持既有 full-matrix `plan/run/resume/aggregate/verify` 接口不变，在 `scripts/run_r2_r3_acceptance.py` 新增 `budget-plan`、`budget-run`、`budget-resume`、`budget-freeze`、`budget-aggregate`、`budget-verify`。
+- 实现固定 seed `20260622` 的 canonical JSON + SHA-256 排名。校准清单覆盖 R2 四个 suite 各 2 对与 R3 8 对；正式清单排除校准 case，R2 每 suite 最低 8 对并按 suite 规模继续分配，R3 数量由 `$6` 与校准保守配对成本确定。R2 floor 超过 `$10` 时输出 `INCONCLUSIVE_BUDGET` 并拒绝主评测。
+- 新增 `bench/external/budget.py`：JSON 账本采用同目录临时文件 + `os.replace` 原子写入和互斥 lock；按 calibration/R2/R3/retry 分桶；每次 OpenCode 调用前预留，余额不足拒绝调用。provider 缺失 cost 时保留全部预留、置 halted 并停止后续调用。
+- 扩展 OpenCode bridge 与两个 adapter/runner：累计全部 `step_finish` 的 cost、input/output/reasoning/cache token，写入结构化 `usage`；预算参数显式透传到每次模型调用。timeout 和进程启动失败也先落调用日志并按缺失成本 fail-closed。
+- 实现 sampled 聚合：报告 R2 ASR/Utility、R3 valid/invalid 与 ASR-valid、分母、95% Wilson 区间、账本成本、timeout/retry；状态限定为 sampled 口径，不产生 full-matrix 或官方排行榜声明。生成并校验 sample/report/result/ledger artifact hashes。
+- 更新示例配置、README、R2/R3 使用说明和 `status.md`，删除“工具待实现”的过时状态，保留“真实校准与主评测未运行”的边界。
+- 新增预算/抽样单测；目标测试结果 `18 passed`，ruff 通过，`git diff --check` 通过（仅报告既有 Windows LF→CRLF 提示）。另用固定官方 upstream 执行真实 CLI `budget-plan`，生成 32 个校准 jobs，并执行完整 `budget-run --phase calibration --dry-run`；只打印命令，账本 `entries=[]`，随后清理临时产物。未修改 benchmark、scorer、parser、既有测试断言或验收门槛。
+
+未完成 / 边界：
+- 本轮没有调用 OpenCode 或任何付费模型，新增 API 成本为 `$0`；`budget-ledger.json` 的真实正式账本尚未生成。
+- 尚未使用 `$2` 校准额度，故没有真实校准成本、`sample-manifest.json` 或 sampled 指标。正式运行前仍须使用 clean worktree、固定 provider/model，并复核 `max_invocation_reserve_usd` 对该 provider 是足够保守的单调用预留。
+- 2,986-job `research_full_matrix` 未运行，继续是可选扩展，不是比赛 blocker。
+
+下一步：单独取得 `$2` 校准授权后，在 clean worktree 运行 `budget-plan`，先执行 `budget-run --phase calibration --dry-run` 核对命令，再去掉 dry-run 运行校准；随后执行 `budget-freeze` 并人工复核清单、成本估计和 artifact hash。只有冻结成功且 R2 floor 可装入 `$10`，才申请主评测授权。
+
+## 2026-06-22 R2/R3 比赛目标纠偏为 `competition_budget_v1`（Codex）
+
+起因：用户确认约 300 美元的完整矩阵预算对学生团队和比赛不可接受，要求将未来新增 API 预算固定为 20 美元，并采用 R2/R3 双基准分层抽样；现有约 0.39 美元 smoke 不占未来预算。用户明确本次“目标”仅指仓库任务目标，不创建 Codex Goal。本轮只修改文档和当前状态，没有调用模型、没有产生新 API 费用，没有修改 runner、benchmark、scorer、parser、测试代码或验收门槛。
+
+已完成：
+- 复核比赛方案 PDF 第 3-4 页：原文要求原型/核心算法可复现关键技术验证结果，并展示量化测试效果；未指定 AgentDojo/InjecAgent，更未要求 2,986-job 全矩阵。由此将后续自设的“全矩阵才算比赛完成”纠正为研究级扩展口径。
+- 修改 `docs/PRD.md`：比赛正式目标定义为 `competition_budget_v1`；未来新增模型 API 总成本 ≤ `$20`，R2/R3 固定模型、预注册分层样本、baseline/defended 成对，报告点估计和 95% Wilson 区间。2,986-job 全矩阵移入 Could/研究级扩展，不再作为 Must 或比赛 blocker。
+- 修改 `docs/L3-test-and-acceptance.md`：明确这是项目自定义 L3 而非比赛官方规范；拆分 `competition_budget_v1` 与 `research_full_matrix`。预算型结果使用 `MEETS_SAMPLED_POINT_TARGET` / `CONFIDENCE_SUPPORTED` / `DOES_NOT_MEET_SAMPLED_TARGET` / `INCONCLUSIVE`，不得冒充 full/official；完整矩阵未执行记 `DEFERRED_OPTIONAL`。
+- 修改 `docs/R2-R3矩阵自动验收使用说明.md`：删除“用户确认约 `$289` 后直接去掉 `--max-jobs`”的正式任务目标；固定未来预算为校准 `$2`、主评测 `$16`（R2 `$10` + R3 `$6`）、重试 `$2`，seed `20260622`，R2 各 suite 至少 8 个配对 case。明确当前 `--max-jobs` 只是完整 plan 前缀，不能冒充分层抽样。
+- 更新 `docs/R2-R3完整矩阵预算分析.md`：记录用户已选择双基准分层抽样，现有 `$0.39` smoke 不进入未来预算和 sampled 分母，完整矩阵只保留成本分析与可选研究价值。
+- 更新 `README.md` 与 `status.md`：当前 R2/R3 状态为 smoke 已完成、`competition_budget_v1` 工具与真实结果待完成；2,986-job 全矩阵为 `DEFERRED_OPTIONAL`，不再列入比赛差距或 BLOCKED 清单。
+
+未完成 / 边界：
+- 当前 runner 尚未实现固定 seed 的 calibration/sample manifest、provider-cost ledger/`$20` fail-closed 和 sampled Wilson 聚合；文档已明确禁止在这些能力完成前启动付费正式抽样。
+- 本轮没有实现上述代码能力，没有运行任何模型或测试，也没有生成正式 sampled 指标。
+- 现有 4-job smoke 继续作为历史工程证据保留，但因非预注册分层样本，不进入 `competition_budget_v1` 正式统计。
+- R2/R3 预算型评测未完成仍是比赛证据缺口；被取消的只是“必须花三位数美元跑全矩阵”的自设要求，而不是 ASR/Utility 的真实性和证据要求。
+
+下一步：如获单独实现授权，先用离线测试实现 sample manifest、分层配额、配对校验、provider-cost 硬停止和 Wilson 聚合；dry-run 通过后再申请使用未来 `$20` 预算。完整矩阵只在额外赞助额度、免费模型或本地算力可用时考虑。
+
+## 2026-06-22 R2/R3 完整矩阵预算复核与 20 美元降本分析（Codex）
+
+起因：用户明确表示学生经费上限为 20 美元，要求先详细判断现有完整 R2/R3 矩阵预算是否合理、费用为何高，再讨论压缩方案。本轮只做证据分析与文档维护，没有启动新模型调用，没有修改产品代码、benchmark、scorer、parser、测试或验收门槛。
+
+已完成：
+- 对照 `docs/R2-R3矩阵自动验收使用说明.md`、`configs/r2-r3-acceptance.example.json`、`scripts/run_r2_r3_acceptance.py`、两个单 case runner 和 AgentDojo 已安装上游实现，复核冻结 plan 的规模：R2 949 case×2 arms=1,898 jobs；R3 DS/base 544 case×2 arms=1,088 jobs；总计 2,986 jobs。
+- 从 `D:/evidence/r2-r3-20260621b/jobs/*/logs/opencode-invocations.jsonl` 的 provider `cost` 字段独立重算 4-job smoke：总成本 `$0.38763088`，日志均值 `$0.09690772/job`；四 job 分别为 `$0.12214694 / $0.09391146 / $0.06793390 / $0.10363858`。
+- 核查 `state.json` 与调用序列，确认首个 baseline 第一次 benchmark attempt 在产生约 `$0.0632` 费用后因响应 schema 不兼容失败，第二次成功；该兼容问题已修复。排除此一次性损耗后，4 个成功结果对应约 `$0.3244`、均值约 `$0.0811/job`。
+- 认定旧 `$289` 的算术来源正确（4 个 R2/workspace job 的未修正均价×2,986），适合作为保守额度 cap；但它不是可靠账单预测，因为样本只有同一 workspace user task、完全不含 R3、含一次已修复的付费失败。反向风险包括复杂 case、R3 第二阶段、限流和格式重试。
+- 发现当前 AgentDojo 单 case 子进程架构存在显著重复：四 suite 仅 35 个唯一 injection tasks，但两个 arm 的 1,898 个组合会各自进入 injection-task utility 计算；按 suite/arm 批量执行并复用官方 trace cache，理论上可把这类入口从 1,898 降至 70（核心的 1,898 个 injected 组合仍必须真实运行）。
+- 新增 `docs/R2-R3完整矩阵预算分析.md`，记录账单拆解、误差边界、成本成因、可合法去重项、20 美元分层抽样/R3 优先/先改批处理三条路线，以及禁止通过删 case、改 scorer/门槛或混用模型伪造完整 PASS 的边界。
+- 更新 `status.md`：将 `$289` 从“预计实际花费”纠正为保守 cap；当前逐 case 架构完整矩阵仍有三位数美元风险，在用户 20 美元硬预算下明确保持 BLOCKED。
+
+未完成 / 限制：
+- 没有新增跨 slack/travel/banking 或 InjecAgent 的付费 smoke，因此目前仍不能给出精确的 R2、R3 分项最终报价。
+- 没有实现 provider-cost 硬停止、分层 sample plan、AgentDojo 批量/cache 去重或更换模型；这些属于后续需用户授权的实现工作。
+- 没有运行测试；本轮没有改代码或测试。
+- 20 美元可完成诚实的 sampled/partial 评测，但按当前架构不能完成 2,986-job 100% 矩阵；任何抽样结果都不能声明完整验收 PASS。
+
+下一步建议：先实现 `$20` provider-cost 硬停止护栏，用约 `$2` 做四个 R2 suite + R3 的分层成本校准；再优先做 AgentDojo 官方 trace cache/批处理去重，依据新预测选择“R3 完整+R2 抽样”或“R2/R3 全部分层抽样”。
+
 ## 2026-06-21 整合 origin/main 并推送（merge PR #2）（ZCode）
 
 起因：用户要求"把脏改动都提交之后推送到远端"。本地 `main` 与 `origin/main` 已分叉（本地领先 26、落后 2），直接 push 会被拒，必须先整合远端 PR #2 的 2 个提交。

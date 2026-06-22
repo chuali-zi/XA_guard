@@ -151,6 +151,10 @@ def main() -> None:
     parser.add_argument("--output", required=True)
     parser.add_argument("--timeout-seconds", type=float, default=180.0)
     parser.add_argument("--xa-guard-defense", action="store_true")
+    parser.add_argument("--budget-ledger")
+    parser.add_argument("--budget-bucket")
+    parser.add_argument("--budget-job-id")
+    parser.add_argument("--max-invocation-reserve-usd", type=float)
     args = parser.parse_args()
 
     upstream = Path(args.upstream_dir).resolve()
@@ -216,6 +220,10 @@ def main() -> None:
         data_home=args.opencode_data_home,
         timeout_seconds=args.timeout_seconds,
         invocation_log=invocation_log,
+        budget_ledger=args.budget_ledger,
+        budget_bucket=args.budget_bucket,
+        budget_job_id=args.budget_job_id,
+        max_invocation_reserve_usd=args.max_invocation_reserve_usd,
     )
 
     started_at = datetime.now(timezone.utc)

@@ -157,6 +157,8 @@
 | **CSAB-Gov-mini 误拒率** | ≤ 5% | **≤ 3%** | ≤ 1% | P3: GB/T 45654-2025 硬指标 ≤ 5% |
 | **Gate1 攻击识别 Recall @ 1% FPR** | 85% | **95%** | 97% | P1: Meta PG2 86M = 97.5%（仅作国际对照基线） |
 
+> **R2/R3 证据范围（2026-06-22 纠偏）**：上表门槛不变，但比赛正式评测采用 `competition_budget_v1`，在未来新增 API 支出不超过 `$20` 的前提下，对 AgentDojo 与 InjecAgent 做预注册、baseline/defended 成对的分层抽样，同时报告点估计、95% Wilson 区间、valid/invalid、timeout 和 retry。点估计达标写 `MEETS_SAMPLED_POINT_TARGET`；只有置信区间也支持门槛时才加写 `CONFIDENCE_SUPPORTED`。该结果不得写成完整矩阵或官方排行榜成绩。[比赛方案原文](./XA-202620中国雄安集团数字城市科技有限公司-面向政企场景的大模型智能体安全关键技术研究比赛方案.pdf)第 3-4 页仅要求可复现关键技术验证结果及量化测试效果，没有规定必须执行 2,986-job 全矩阵。
+
 ### 3.2 性能维度 KPI 三档表
 
 | KPI 指标 | 保底 | 中等 | 前沿 | 数据来源 |
@@ -311,7 +313,7 @@
 | OpenTelemetry 审计日志 | 14 字段完整 |
 | Docker 沙箱 | gVisor 可选，Docker 必选 |
 | **CSAB-Gov-mini 290 用例**（**PoC 缩减版**）| 同时覆盖 31 类生成内容 + 17 类应拒答 |
-| AgentDojo / InjecAgent baseline 复现 | 至少跑一遍 |
+| AgentDojo / InjecAgent 预算型复现 | `competition_budget_v1`：总新增 API 成本 ≤ `$20`，固定模型、预注册分层样本、baseline/defended 成对，输出可复核 ASR/Utility/区间；2,986 全矩阵不是比赛 Must |
 | 30 页方案 + 10 分钟视频 + 代码仓库 | 必交三大件 |
 | **轻量演示前端**（HTML/React 时间线） | 最小可演示 trace 时间线 |
 | **Trae 接入实测**（**国产 IDE 硬承诺只此一个**） | 国产生态证据 |
@@ -335,6 +337,7 @@
 | Cursor 国际兼容性镜头 | 演示视频结尾 1 个镜头 |
 | ShieldAgent 风格 Markov 验证 | 学术加分但工程复杂 |
 | Adaptive attack 评测 | 显示对评委可能 challenge 的应对 |
+| AgentDojo / InjecAgent 2,986-job 全矩阵 | 研究级扩展；仅在赞助额度、免费模型或本地算力可用时执行，不阻塞比赛交付 |
 
 ### Won't（这次不做，已决策）
 
@@ -389,10 +392,10 @@
 - [ ] 国密 SM3 哈希链 + SM2 签名（gmssl）
 - [ ] **关卡 6 KPI**：100% 操作有 trace + 可验证签名
 - [ ] CSAB-Gov-mini 290 用例 + 评测脚本（pytest 风格）
-- [ ] AgentDojo / InjecAgent 基线复现
-- [ ] **核心 KPI 达标自测**：
-  - [ ] AgentDojo Targeted ASR ≤ 10%
-  - [ ] InjecAgent ASR-valid ≤ 10%
+- [ ] `competition_budget_v1`：AgentDojo / InjecAgent 分层抽样 baseline/defended 复现（新增 API 成本 ≤ `$20`）
+- [ ] **核心 KPI 结果自测**（达标与否均须如实记录）：
+  - [ ] AgentDojo sampled Targeted ASR / Utility 点估计与 95% Wilson 区间已记录（目标 ASR ≤ 10%、Utility ≥ 75%）
+  - [ ] InjecAgent sampled ASR-valid 点估计与 95% Wilson 区间已记录（目标 ≤ 10%）
   - [ ] CSAB-Gov-mini 拒答率 ≥ 95%
   - [ ] P50 延迟 ≤ 100ms
 
@@ -468,8 +471,8 @@
 
 | 基准 | 用途 | 我们的目标数字 |
 |---|---|---|
-| **AgentDojo**（NeurIPS'24, 英文，工业标杆） | Targeted ASR + Utility | ASR ≤ 10%, Utility ≥ 75% |
-| **InjecAgent**（ACL'24, 数据外泄专项） | 数据外泄 ASR | ≤ 10% |
+| **AgentDojo**（NeurIPS'24, 英文，工业标杆） | Targeted ASR + Utility | `competition_budget_v1` 分层抽样：点目标 ASR ≤ 10%、Utility ≥ 75%，附 95% Wilson 区间 |
+| **InjecAgent**（ACL'24, 数据外泄专项） | 数据外泄 ASR | `competition_budget_v1` DS/base 抽样：点目标 ≤ 10%，附 95% Wilson 区间 |
 | **Agent-SafetyBench**（清华 2024-12, 中文） | 多维 Safety Score | ≥ 65 |
 | **CHiSafetyBench**（TC260 中文合规） | 合规拒答率 | ≥ 95% |
 | **CSAB-Gov-mini**（我们自建） | 中文政企场景 | 290 用例覆盖 31 类 |
@@ -504,8 +507,8 @@ benchmarks/
 
 ### 8.4 内部 Self-Check 清单（提交前必跑）
 
-- [ ] AgentDojo 跑通 → ASR / Utility 数字记录
-- [ ] InjecAgent 跑通 → 数据外泄 ASR 记录
+- [ ] AgentDojo 预算型分层样本跑通 → ASR / Utility / 95% Wilson 区间 / 分母记录
+- [ ] InjecAgent DS/base 预算型样本跑通 → ASR-valid / 95% Wilson 区间 / valid/invalid 记录
 - [ ] CSAB-Gov-mini 跑通 → 拒答率 / 误拒率 / 31 类细分记录
 - [ ] 性能基准跑通 → P50 / P95 / QPS / Memory 记录
 - [ ] 国密签名验证脚本通过

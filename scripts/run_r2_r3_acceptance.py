@@ -16,14 +16,20 @@ import os
 import subprocess
 import sys
 import time
+import math
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from bench.external.budget import create_ledger, ledger_totals, load_ledger
 
 
 ROOT = Path(__file__).resolve().parents[1]
 PLAN_SCHEMA = "xa-r2-r3-matrix-plan/v1"
 REPORT_SCHEMA = "xa-r2-r3-acceptance-report/v1"
+BUDGET_PLAN_SCHEMA = "xa-competition-budget-plan/v1"
+SAMPLE_MANIFEST_SCHEMA = "xa-sample-manifest/v1"
+SAMPLED_REPORT_SCHEMA = "xa-sampled-report/v1"
 
 
 def _utc_now() -> str:
@@ -54,6 +60,27 @@ def _write_json(path: Path, value: Any) -> None:
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_bytes(_canonical(value))
     os.replace(temporary, path)
+
+
+def _with_hash(value: dict[str, Any], field: str) -> dict[str, Any]:
+    value[field] = _sha256_bytes(_canonical({key: item for key, item in value.items() if key != field}))
+    return value
+
+
+def _case_key(benchmark: str, case: dict[str, Any]) -> str:
+    material = {"benchmark": benchmark, "case": case}
+    return _sha256_bytes(_canonical(material))
+
+
+def _rank(seed: int, benchmark: str, case: dict[str, Any]) -> str:
+    return _sha256_bytes(str(seed).encode() + b"\n" + _canonical({"benchmark": benchmark, "case": case}))
+
+
+def _case_jobs(benchmark: str, case: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {"id": _job_id(benchmark, case, arm), "benchmark": benchmark, "arm": arm, "case": case}
+        for arm in ("baseline", "defended")
+    ]
 
 
 def _git(upstream: Path, *args: str) -> str:
@@ -228,7 +255,185 @@ def build_plan(config_path: Path, config: dict[str, Any]) -> dict[str, Any]:
     return plan
 
 
-def _job_command(plan: dict[str, Any], job: dict[str, Any], result: Path, logdir: Path) -> list[str]:
+def _budget_settings(config: dict[str, Any]) -> dict[str, Any]:
+    budget = config.get("budget", {})
+    sampling = config.get("sampling", {})
+    return {
+        "total_usd": float(budget.get("total_usd", 20.0)),
+        "calibration_usd": float(budget.get("calibration_usd", 2.0)),
+        "r2_main_usd": float(budget.get("r2_main_usd", 10.0)),
+        "r3_main_usd": float(budget.get("r3_main_usd", 6.0)),
+        "retry_usd": float(budget.get("retry_usd", 2.0)),
+        "max_invocation_reserve_usd": float(budget.get("max_invocation_reserve_usd", 0.05)),
+        "cost_safety_multiplier": float(budget.get("cost_safety_multiplier", 1.25)),
+        "seed": int(sampling.get("seed", 20260622)),
+        "r2_calibration_pairs_per_suite": int(sampling.get("r2_calibration_pairs_per_suite", 2)),
+        "r3_calibration_pairs": int(sampling.get("r3_calibration_pairs", 8)),
+        "r2_min_main_pairs_per_suite": int(sampling.get("r2_min_main_pairs_per_suite", 8)),
+    }
+
+
+def _unique_cases(full_plan: dict[str, Any]) -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    cases = []
+    for job in full_plan["jobs"]:
+        key = _case_key(job["benchmark"], job["case"])
+        if key not in seen:
+            seen.add(key)
+            cases.append({"benchmark": job["benchmark"], "case": job["case"], "case_key": key})
+    return cases
+
+
+def build_budget_plan(config_path: Path, config: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    full = build_plan(config_path, config)
+    settings = _budget_settings(config)
+    if abs(
+        settings["calibration_usd"] + settings["r2_main_usd"]
+        + settings["r3_main_usd"] + settings["retry_usd"] - settings["total_usd"]
+    ) > 1e-9:
+        raise ValueError("budget buckets must sum exactly to total_usd")
+    cases = _unique_cases(full)
+    for item in cases:
+        item["rank_sha256"] = _rank(settings["seed"], item["benchmark"], item["case"])
+    cases.sort(key=lambda item: (item["rank_sha256"], item["case_key"]))
+    selected: list[dict[str, Any]] = []
+    r2 = [item for item in cases if item["benchmark"] == "agentdojo"]
+    for suite in full["benchmark_config"]["agentdojo"]["suites"]:
+        stratum = [item for item in r2 if item["case"]["suite"] == suite]
+        count = settings["r2_calibration_pairs_per_suite"]
+        if len(stratum) < count:
+            raise ValueError(f"not enough AgentDojo calibration cases in {suite}")
+        selected.extend(stratum[:count])
+    r3 = [item for item in cases if item["benchmark"] == "injecagent"]
+    if len(r3) < settings["r3_calibration_pairs"]:
+        raise ValueError("not enough InjecAgent calibration cases")
+    selected.extend(r3[: settings["r3_calibration_pairs"]])
+    calibration_jobs = [job for item in selected for job in _case_jobs(item["benchmark"], item["case"])]
+    budget_plan = {
+        **{key: value for key, value in full.items() if key not in {"created_at", "jobs", "job_count", "plan_sha256"}},
+        "schema_version": BUDGET_PLAN_SCHEMA,
+        "profile": "competition_budget_v1",
+        "budget": settings,
+        "universe": cases,
+        "universe_count": len(cases),
+        "calibration_case_keys": [item["case_key"] for item in selected],
+    }
+    _with_hash(budget_plan, "budget_plan_sha256")
+    calibration = {
+        "schema_version": SAMPLE_MANIFEST_SCHEMA,
+        "phase": "calibration",
+        "seed": settings["seed"],
+        "budget_plan_sha256": budget_plan["budget_plan_sha256"],
+        "claim_scope": "engineering_calibration_excluded_from_sampled_metrics",
+        "case_keys": budget_plan["calibration_case_keys"],
+        "job_count": len(calibration_jobs),
+        "jobs": calibration_jobs,
+    }
+    _with_hash(calibration, "manifest_sha256")
+    return budget_plan, calibration
+
+
+def _calibration_pair_costs(
+    budget_plan: dict[str, Any], ledger: dict[str, Any]
+) -> dict[tuple[str, str], float]:
+    costs: dict[str, float] = {}
+    for entry in ledger.get("entries", []):
+        if entry.get("bucket") == "calibration" and entry.get("status") == "settled":
+            costs[entry["job_id"]] = costs.get(entry["job_id"], 0.0) + float(entry["charged_usd"])
+    pairs: dict[tuple[str, str], float] = {}
+    calibration = set(budget_plan["calibration_case_keys"])
+    for item in budget_plan["universe"]:
+        if item["case_key"] not in calibration:
+            continue
+        job_ids = [job["id"] for job in _case_jobs(item["benchmark"], item["case"])]
+        if not all(job_id in costs for job_id in job_ids):
+            raise RuntimeError(f"calibration cost incomplete for {item['case_key']}")
+        stratum = item["case"].get("suite", "ds/base")
+        pairs[(item["benchmark"], stratum)] = max(
+            pairs.get((item["benchmark"], stratum), 0.0), sum(costs[job_id] for job_id in job_ids)
+        )
+    return pairs
+
+
+def freeze_sample_manifest(budget_plan: dict[str, Any], ledger: dict[str, Any]) -> dict[str, Any]:
+    settings = budget_plan["budget"]
+    pair_costs = _calibration_pair_costs(budget_plan, ledger)
+    multiplier = settings["cost_safety_multiplier"]
+    excluded = set(budget_plan["calibration_case_keys"])
+    selected: list[dict[str, Any]] = []
+    estimates: dict[str, float] = {}
+    infeasible: list[str] = []
+    suites = budget_plan["benchmark_config"]["agentdojo"]["suites"]
+    remaining_by_suite: dict[str, list[dict[str, Any]]] = {}
+    r2_floor_cost = 0.0
+    for suite in suites:
+        candidates = [
+            item for item in budget_plan["universe"]
+            if item["benchmark"] == "agentdojo" and item["case"]["suite"] == suite
+            and item["case_key"] not in excluded
+        ]
+        conservative = pair_costs.get(("agentdojo", suite), 0.0) * multiplier
+        estimates[f"r2:{suite}"] = conservative
+        floor = settings["r2_min_main_pairs_per_suite"]
+        if conservative <= 0 or len(candidates) < floor:
+            infeasible.append(f"r2_floor_unavailable:{suite}")
+        else:
+            selected.extend(candidates[:floor])
+            remaining_by_suite[suite] = candidates[floor:]
+            r2_floor_cost += floor * conservative
+    if r2_floor_cost > settings["r2_main_usd"] + 1e-12:
+        infeasible.append("r2_floor_exceeds_$10")
+    if not infeasible:
+        spent = r2_floor_cost
+        counts = {suite: settings["r2_min_main_pairs_per_suite"] for suite in suites}
+        universe_sizes = {
+            suite: sum(1 for item in budget_plan["universe"] if item["benchmark"] == "agentdojo" and item["case"]["suite"] == suite)
+            for suite in suites
+        }
+        while True:
+            options = [suite for suite in suites if remaining_by_suite.get(suite)]
+            options.sort(key=lambda suite: (counts[suite] / universe_sizes[suite], suite))
+            chosen = next(
+                (suite for suite in options if spent + estimates[f"r2:{suite}"] <= settings["r2_main_usd"] + 1e-12),
+                None,
+            )
+            if chosen is None:
+                break
+            selected.append(remaining_by_suite[chosen].pop(0))
+            counts[chosen] += 1
+            spent += estimates[f"r2:{chosen}"]
+    r3_candidates = [
+        item for item in budget_plan["universe"]
+        if item["benchmark"] == "injecagent" and item["case_key"] not in excluded
+    ]
+    r3_cost = pair_costs.get(("injecagent", "ds/base"), 0.0) * multiplier
+    estimates["r3:ds/base"] = r3_cost
+    if r3_cost <= 0:
+        infeasible.append("r3_cost_unavailable")
+    else:
+        selected.extend(r3_candidates[: min(len(r3_candidates), int(settings["r3_main_usd"] // r3_cost))])
+    jobs = [] if infeasible else [job for item in selected for job in _case_jobs(item["benchmark"], item["case"])]
+    manifest = {
+        "schema_version": SAMPLE_MANIFEST_SCHEMA,
+        "phase": "main",
+        "seed": settings["seed"],
+        "budget_plan_sha256": budget_plan["budget_plan_sha256"],
+        "claim_scope": "competition_budget_v1_sampled_not_full_matrix_or_leaderboard",
+        "status": "INCONCLUSIVE_BUDGET" if infeasible else "FROZEN",
+        "errors": infeasible,
+        "conservative_pair_cost_usd": estimates,
+        "excluded_calibration_case_keys": sorted(excluded),
+        "case_keys": [item["case_key"] for item in selected] if not infeasible else [],
+        "job_count": len(jobs),
+        "jobs": jobs,
+    }
+    return _with_hash(manifest, "manifest_sha256")
+
+
+def _job_command(
+    plan: dict[str, Any], job: dict[str, Any], result: Path, logdir: Path,
+    *, budget_ledger: Path | None = None, budget_bucket: str | None = None,
+) -> list[str]:
     execution = plan["execution"]
     benchmark_config = plan["benchmark_config"][job["benchmark"]]
     common = [
@@ -244,6 +449,13 @@ def _job_command(plan: dict[str, Any], job: dict[str, Any], result: Path, logdir
         common.extend(["--opencode-config-home", execution["config_home"]])
     if execution.get("data_home") and execution["data_home"] != "default":
         common.extend(["--opencode-data-home", execution["data_home"]])
+    if budget_ledger is not None:
+        common.extend([
+            "--budget-ledger", str(budget_ledger),
+            "--budget-bucket", str(budget_bucket),
+            "--budget-job-id", job["id"],
+            "--max-invocation-reserve-usd", str(plan["budget"]["max_invocation_reserve_usd"]),
+        ])
     case = job["case"]
     if job["benchmark"] == "agentdojo":
         command = [
@@ -286,23 +498,39 @@ def _result_matches(plan: dict[str, Any], job: dict[str, Any], result_path: Path
     return payload.get("upstream", {}).get("commit") == plan["locks"][job["benchmark"]]["commit"]
 
 
-def run_jobs(plan: dict[str, Any], output_dir: Path, *, max_jobs: int | None, dry_run: bool) -> int:
+def run_jobs(
+    plan: dict[str, Any], output_dir: Path, *, max_jobs: int | None, dry_run: bool,
+    budget_ledger: Path | None = None, phase_bucket: str | None = None,
+) -> int:
     jobs = plan["jobs"][:max_jobs] if max_jobs is not None else plan["jobs"]
     failed = 0
     for ordinal, job in enumerate(jobs, 1):
+        job_phase_bucket = (
+            "r2_main" if phase_bucket == "main" and job["benchmark"] == "agentdojo"
+            else "r3_main" if phase_bucket == "main"
+            else phase_bucket
+        )
         job_root = output_dir / "jobs" / job["id"]
         result_path = job_root / "result.json"
         state_path = job_root / "state.json"
         if _result_matches(plan, job, result_path):
             print(f"[{ordinal}/{len(jobs)}] SKIP complete {job['id']}")
             continue
-        command = _job_command(plan, job, result_path, job_root / "logs")
+        command = _job_command(
+            plan, job, result_path, job_root / "logs",
+            budget_ledger=budget_ledger, budget_bucket=job_phase_bucket,
+        )
         if dry_run:
             print(subprocess.list2cmdline(command))
             continue
         attempts: list[dict[str, Any]] = []
         success = False
         for attempt in range(1, int(plan["execution"]["max_attempts"]) + 1):
+            attempt_bucket = job_phase_bucket if attempt == 1 else "retry"
+            command = _job_command(
+                plan, job, result_path, job_root / "logs",
+                budget_ledger=budget_ledger, budget_bucket=attempt_bucket,
+            )
             print(f"[{ordinal}/{len(jobs)}] RUN attempt={attempt} {job['id']}", flush=True)
             started = _utc_now()
             completed = subprocess.run(
@@ -507,17 +735,234 @@ def verify(plan: dict[str, Any], output_dir: Path) -> list[str]:
     return errors
 
 
+def wilson_interval(successes: int, total: int, confidence_z: float = 1.959963984540054) -> tuple[float | None, float | None]:
+    if total <= 0:
+        return None, None
+    proportion = successes / total
+    denominator = 1 + confidence_z**2 / total
+    center = (proportion + confidence_z**2 / (2 * total)) / denominator
+    margin = confidence_z * math.sqrt(
+        proportion * (1 - proportion) / total + confidence_z**2 / (4 * total**2)
+    ) / denominator
+    return max(0.0, center - margin), min(1.0, center + margin)
+
+
+def _sample_execution_plan(budget_plan: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **{key: value for key, value in budget_plan.items() if key not in {"universe", "universe_count"}},
+        "jobs": manifest["jobs"],
+        "job_count": manifest["job_count"],
+        "plan_sha256": manifest["manifest_sha256"],
+    }
+
+
+def aggregate_sampled(
+    budget_plan: dict[str, Any], manifest: dict[str, Any], output_dir: Path
+) -> dict[str, Any]:
+    plan = _sample_execution_plan(budget_plan, manifest)
+    collected, errors = _collect(plan, output_dir)
+    expected_pairs = set(manifest.get("case_keys", []))
+    observed: dict[str, set[str]] = {}
+    for row in collected["rows"]:
+        key = _case_key(row["job"]["benchmark"], row["job"]["case"])
+        observed.setdefault(key, set()).add(row["job"]["arm"])
+    for key in expected_pairs:
+        if observed.get(key) != {"baseline", "defended"}:
+            errors.append(f"incomplete_pair:{key}")
+    r2 = collected["agentdojo"]["defended"]
+    r3 = collected["injecagent"]["defended"]
+    r2_asr_ci = wilson_interval(r2["attack_successes"], r2["eligible_for_asr"])
+    r2_utility_success = round((r2["utility"] or 0) * r2["completed"])
+    r2_utility_ci = wilson_interval(r2_utility_success, r2["completed"])
+    r3_ci = wilson_interval(r3["attack_successes"], r3["valid"])
+    thresholds = budget_plan["thresholds"]
+    ledger = load_ledger(output_dir / "budget-ledger.json")
+    costs = ledger_totals(ledger)
+    retry_calls = sum(entry.get("bucket") == "retry" for entry in ledger["entries"])
+    unknown_cost_calls = sum(entry.get("status") == "cost_unknown" for entry in ledger["entries"])
+    timeout_attempts = 0
+    total_attempts = 0
+    for job in manifest["jobs"]:
+        state_path = output_dir / "jobs" / job["id"] / "state.json"
+        if not state_path.is_file():
+            continue
+        for attempt in _read_json(state_path).get("attempts", []):
+            total_attempts += 1
+            timeout_attempts += attempt.get("returncode") == 124
+    point = (
+        not errors
+        and r2["targeted_asr"] is not None and r2["targeted_asr"] <= float(thresholds["r2_asr_max"])
+        and r2["utility"] is not None and r2["utility"] >= float(thresholds["r2_utility_min"])
+        and r3["asr_valid"] is not None and r3["asr_valid"] <= float(thresholds["r3_asr_valid_max"])
+    )
+    confidence = point and (
+        r2_asr_ci[1] is not None and r2_asr_ci[1] <= float(thresholds["r2_asr_max"])
+        and r2_utility_ci[0] is not None and r2_utility_ci[0] >= float(thresholds["r2_utility_min"])
+        and r3_ci[1] is not None and r3_ci[1] <= float(thresholds["r3_asr_valid_max"])
+    )
+    if errors:
+        status = "INCONCLUSIVE"
+    elif point:
+        status = "MEETS_SAMPLED_POINT_TARGET"
+    else:
+        status = "DOES_NOT_MEET_SAMPLED_TARGET"
+    report = {
+        "schema_version": SAMPLED_REPORT_SCHEMA,
+        "generated_at": _utc_now(),
+        "claim_scope": "competition_budget_v1_sampled_not_full_matrix_or_official_leaderboard",
+        "official_leaderboard_claim": False,
+        "budget_plan_sha256": budget_plan["budget_plan_sha256"],
+        "manifest_sha256": manifest["manifest_sha256"],
+        "status": status,
+        "confidence_status": "CONFIDENCE_SUPPORTED" if confidence else "NOT_CONFIDENCE_SUPPORTED",
+        "thresholds": thresholds,
+        "metrics": {
+            "agentdojo": collected["agentdojo"],
+            "injecagent": collected["injecagent"],
+            "wilson_95": {
+                "r2_targeted_asr": list(r2_asr_ci),
+                "r2_utility": list(r2_utility_ci),
+                "r3_asr_valid": list(r3_ci),
+            },
+        },
+        "denominators": {
+            "r2_asr": r2["eligible_for_asr"], "r2_utility": r2["completed"],
+            "r3_valid": r3["valid"], "r3_invalid": r3["invalid"],
+        },
+        "execution": {
+            "costs": costs,
+            "budget_caps_usd": ledger["bucket_caps_usd"],
+            "total_budget_cap_usd": ledger["total_cap_usd"],
+            "ledger_halted": ledger["halted"],
+            "total_attempts": total_attempts,
+            "timeout_attempts": timeout_attempts,
+            "retry_calls": retry_calls,
+            "unknown_cost_calls": unknown_cost_calls,
+        },
+        "errors": errors,
+    }
+    _write_json(output_dir / "sampled-report.json", report)
+    artifacts = [
+        {"path": str(Path(row["result"]).relative_to(output_dir)), "sha256": row["result_sha256"]}
+        for row in collected["rows"]
+    ]
+    for name in ("budget-plan.json", "sample-manifest.json", "budget-ledger.json"):
+        path = output_dir / name
+        if path.is_file():
+            artifacts.append({"path": name, "sha256": _sha256_file(path)})
+    _write_json(output_dir / "sampled-artifact-hashes.json", {
+        "schema_version": "xa-sampled-artifact-hashes/v1", "generated_at": _utc_now(), "artifacts": artifacts,
+    })
+    return report
+
+
+def verify_sampled(budget_plan: dict[str, Any], manifest: dict[str, Any], output_dir: Path) -> list[str]:
+    errors: list[str] = []
+    expected_plan = _sha256_bytes(_canonical({key: value for key, value in budget_plan.items() if key != "budget_plan_sha256"}))
+    expected_manifest = _sha256_bytes(_canonical({key: value for key, value in manifest.items() if key != "manifest_sha256"}))
+    if budget_plan.get("budget_plan_sha256") != expected_plan:
+        errors.append("budget_plan_hash_mismatch")
+    if manifest.get("manifest_sha256") != expected_manifest:
+        errors.append("sample_manifest_hash_mismatch")
+    hashes_path = output_dir / "sampled-artifact-hashes.json"
+    report_path = output_dir / "sampled-report.json"
+    if not hashes_path.is_file() or not report_path.is_file():
+        return errors + ["missing_sampled_report_or_hashes"]
+    for artifact in _read_json(hashes_path).get("artifacts", []):
+        path = output_dir / artifact["path"]
+        if not path.is_file() or _sha256_file(path) != artifact["sha256"]:
+            errors.append(f"artifact_hash_mismatch:{artifact['path']}")
+    report = _read_json(report_path)
+    if report.get("manifest_sha256") != manifest.get("manifest_sha256"):
+        errors.append("report_manifest_hash_mismatch")
+    try:
+        ledger = load_ledger(output_dir / "budget-ledger.json")
+        totals = ledger_totals(ledger)
+        if totals["total_usd"] > float(ledger["total_cap_usd"]) + 1e-12:
+            errors.append("ledger_total_cap_exceeded")
+    except (OSError, ValueError, RuntimeError):
+        errors.append("invalid_budget_ledger")
+    return errors
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("plan", "run", "resume", "aggregate", "verify"))
+    parser.add_argument("command", choices=(
+        "plan", "run", "resume", "aggregate", "verify",
+        "budget-plan", "budget-run", "budget-resume", "budget-freeze",
+        "budget-aggregate", "budget-verify",
+    ))
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--max-jobs", type=int, help="safety cap for smoke runs; omit for the full matrix")
     parser.add_argument("--dry-run", action="store_true", help="print runner commands without model calls")
+    parser.add_argument("--phase", choices=("calibration", "main"))
     args = parser.parse_args()
     config_path = args.config.resolve()
     config = _load_config(config_path)
     output_dir = _resolved(config_path, config["output_dir"])
     plan_path = output_dir / "matrix-plan.json"
+
+    if args.command == "budget-plan":
+        budget_plan, calibration = build_budget_plan(config_path, config)
+        _write_json(output_dir / "budget-plan.json", budget_plan)
+        _write_json(output_dir / "calibration-manifest.json", calibration)
+        settings = budget_plan["budget"]
+        create_ledger(
+            output_dir / "budget-ledger.json",
+            total_cap_usd=settings["total_usd"],
+            caps={
+                "calibration": settings["calibration_usd"],
+                "r2_main": settings["r2_main_usd"],
+                "r3_main": settings["r3_main_usd"],
+                "retry": settings["retry_usd"],
+            },
+        )
+        print(json.dumps({
+            "budget_plan": str(output_dir / "budget-plan.json"),
+            "calibration_manifest": str(output_dir / "calibration-manifest.json"),
+            "calibration_jobs": calibration["job_count"],
+        }, indent=2))
+        return 0
+    if args.command.startswith("budget-"):
+        budget_plan_path = output_dir / "budget-plan.json"
+        if not budget_plan_path.is_file():
+            raise FileNotFoundError(f"run budget-plan first; missing {budget_plan_path}")
+        budget_plan = _read_json(budget_plan_path)
+        if budget_plan.get("schema_version") != BUDGET_PLAN_SCHEMA:
+            raise ValueError("unsupported budget plan schema")
+        if budget_plan.get("config_sha256") != _sha256_file(config_path):
+            raise RuntimeError("config changed after budget planning; create a new output directory")
+        if args.command == "budget-freeze":
+            manifest = freeze_sample_manifest(budget_plan, load_ledger(output_dir / "budget-ledger.json"))
+            _write_json(output_dir / "sample-manifest.json", manifest)
+            print(json.dumps({"status": manifest["status"], "jobs": manifest["job_count"], "errors": manifest["errors"]}, indent=2))
+            return 0 if manifest["status"] == "FROZEN" else 2
+        if args.command in {"budget-run", "budget-resume"}:
+            if args.phase is None:
+                parser.error("budget-run and budget-resume require --phase calibration|main")
+            manifest_path = output_dir / ("calibration-manifest.json" if args.phase == "calibration" else "sample-manifest.json")
+            if not manifest_path.is_file():
+                raise FileNotFoundError(f"missing phase manifest: {manifest_path}")
+            manifest = _read_json(manifest_path)
+            if manifest.get("phase") == "main" and manifest.get("status") != "FROZEN":
+                raise RuntimeError("main sample is not feasible/frozen")
+            execution_plan = _sample_execution_plan(budget_plan, manifest)
+            return run_jobs(
+                execution_plan, output_dir, max_jobs=args.max_jobs, dry_run=args.dry_run,
+                budget_ledger=output_dir / "budget-ledger.json",
+                phase_bucket="calibration" if args.phase == "calibration" else "main",
+            )
+        manifest_path = output_dir / "sample-manifest.json"
+        if not manifest_path.is_file():
+            raise FileNotFoundError(f"run budget-freeze first; missing {manifest_path}")
+        manifest = _read_json(manifest_path)
+        if args.command == "budget-aggregate":
+            report = aggregate_sampled(budget_plan, manifest, output_dir)
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+            return 0 if report["status"] == "MEETS_SAMPLED_POINT_TARGET" else 2
+        errors = verify_sampled(budget_plan, manifest, output_dir)
+        print(json.dumps({"status": "PASS" if not errors else "FAIL", "errors": errors}, indent=2))
+        return 0 if not errors else 3
 
     if args.command == "plan":
         plan = build_plan(config_path, config)

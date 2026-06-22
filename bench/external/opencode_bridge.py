@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from bench.external.budget import reserve_cost, settle_cost
+
 
 def parse_opencode_json_events(stdout: str) -> dict[str, Any]:
     text_parts: list[str] = []
@@ -50,6 +52,41 @@ def parse_opencode_json_events(stdout: str) -> dict[str, Any]:
     return payload
 
 
+def parse_opencode_usage(stdout: str) -> dict[str, Any]:
+    steps: list[dict[str, Any]] = []
+    token_totals = {"input": 0, "output": 0, "reasoning": 0, "cache_read": 0, "cache_write": 0}
+    costs: list[float] = []
+    for raw_line in stdout.splitlines():
+        try:
+            event = json.loads(raw_line)
+        except json.JSONDecodeError:
+            continue
+        if event.get("type") != "step_finish" or not isinstance(event.get("part"), dict):
+            continue
+        part = event["part"]
+        cost = part.get("cost")
+        if isinstance(cost, (int, float)) and not isinstance(cost, bool):
+            costs.append(float(cost))
+        tokens = part.get("tokens") if isinstance(part.get("tokens"), dict) else {}
+        cache = tokens.get("cache") if isinstance(tokens.get("cache"), dict) else {}
+        normalized = {
+            "input": int(tokens.get("input", 0) or 0),
+            "output": int(tokens.get("output", 0) or 0),
+            "reasoning": int(tokens.get("reasoning", 0) or 0),
+            "cache_read": int(cache.get("read", 0) or 0),
+            "cache_write": int(cache.get("write", 0) or 0),
+        }
+        for key, value in normalized.items():
+            token_totals[key] += value
+        steps.append({"cost_usd": float(cost) if isinstance(cost, (int, float)) else None, "tokens": normalized})
+    return {
+        "step_count": len(steps),
+        "cost_usd": sum(costs) if steps and len(costs) == len(steps) else None,
+        "tokens": token_totals,
+        "steps": steps,
+    }
+
+
 def invoke_opencode_json(
     prompt: str,
     *,
@@ -60,8 +97,22 @@ def invoke_opencode_json(
     data_home: str | Path | None = None,
     timeout_seconds: float,
     invocation_log: str | Path | None = None,
+    budget_ledger: str | Path | None = None,
+    budget_bucket: str | None = None,
+    budget_job_id: str | None = None,
+    max_invocation_reserve_usd: float | None = None,
     request_message: str = "Return the requested JSON object for the attached AgentDojo turn.",
 ) -> dict[str, Any]:
+    reservation_id = None
+    if budget_ledger is not None:
+        if budget_bucket is None or budget_job_id is None or max_invocation_reserve_usd is None:
+            raise ValueError("budget ledger requires bucket, job id, and invocation reserve")
+        reservation_id = reserve_cost(
+            budget_ledger,
+            bucket=budget_bucket,
+            amount_usd=max_invocation_reserve_usd,
+            job_id=budget_job_id,
+        )
     env = os.environ.copy()
     # Only override XDG paths when explicitly provided.  Passing the real
     # user config dir on Windows can break provider-plugin discovery because
@@ -112,6 +163,13 @@ def invoke_opencode_json(
                 stdout=stdout,
                 stderr=f"{stderr}\nOpenCode timed out after {timeout_seconds} seconds".lstrip(),
             )
+        except OSError as exc:
+            completed = subprocess.CompletedProcess(
+                command,
+                125,
+                stdout="",
+                stderr=f"OpenCode process could not start: {exc}",
+            )
 
         fallback_payloads: list[tuple[str, dict[str, Any]]] = []
         candidates = []
@@ -145,6 +203,7 @@ def invoke_opencode_json(
             response_source, response = "none", None
         parse_error = "" if response is not None else str(exc)
 
+    usage = parse_opencode_usage(completed.stdout)
     record = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "model": model,
@@ -156,7 +215,15 @@ def invoke_opencode_json(
         "stdout_tail": completed.stdout[-8000:],
         "response_source": response_source,
         "response": response,
+        "usage": usage,
     }
+    if reservation_id is not None:
+        settle_cost(
+            budget_ledger,
+            reservation_id=reservation_id,
+            actual_cost_usd=usage["cost_usd"],
+            usage=usage,
+        )
     if invocation_log is not None:
         path = Path(invocation_log)
         path.parent.mkdir(parents=True, exist_ok=True)
