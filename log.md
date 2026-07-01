@@ -1,5 +1,23 @@
 # 工作日志
 
+## 2026-07-01 08:45 UTC 全链路额外压力测试与静态 verifier 兼容入口
+
+起因：用户要求新增额外类似测试，对系统进行压力实测，防止只为既有测试写死；范围覆盖企业治理预检与 Gate1-Gate6 全链路。
+
+已完成：
+- 新增 `tests/integration/test_full_gate_stress_extra.py`，使用真实 GovernanceEnforcer、Gate1Input、Gate2Plan、Gate3Policy、Gate4Taint、Gate5Sandbox、Gate6Audit，覆盖 allow 批量审计链、治理 deny 矩阵、治理 approval、Gate1 攻击变体、Gate2→Gate5 风险路由、Gate2 审批恢复、审批参数篡改、Gate3 deny 优先级、Gate4 出向拦截、executor 异常审计。
+- 新增 docs 旧路径兼容入口：`docs/PRD.md`、`docs/L3-test-and-acceptance.md`、`docs/L3-trae-static-integration.md`、`docs/external-benchmarks.md`、`docs/L3-aibom-external-generator.md`，指向重构后的真实文档，恢复既有静态 verifier 路径契约。
+
+验证：
+- 新增压力测试：`23 passed`。
+- Gate/治理/审计相关回归：`172 passed`。
+- 全仓 `PYTHONPATH=src;.` + `PYTHONUTF8=1`：通过，唯一 skip 为本机缺 `xa-guard/sandbox:latest` 镜像。
+- `ruff check tests/integration/test_full_gate_stress_extra.py`：通过。
+
+边界：
+- 本轮不修改生产代码，不修改既有测试断言；只新增测试和 docs 兼容入口。
+- 发现并保留一个现有边界：Gate4 出向 `output_taint=CONFIDENTIAL` 会 deny，但 pipeline 未把 `output_taint` 回写到 `ctx.taint`，审计敏感级别仍可能保持入向标签；本轮未修复。
+
 ## 2026-06-30 20:30 PDT docs 物理重构与下一步工作设计
 
 起因：用户要求按既定计划实现 `docs/` 内部物理重构，把混乱的顶层文档分类存储，并为接下来要做的工作留下规范设计文档，同时标注已完成、部分完成、阻塞和待办状态。

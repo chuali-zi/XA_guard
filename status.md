@@ -11,6 +11,7 @@
 > 2026-06-30 Agent Governance v1 已从 `codex/agent-governance-platform` 合入当前 main 工作树：新增本地治理 registry、Gate1 前治理预检、MCP `_xa_guard` envelope 提取与剥离、`gen_ai.governance.*` 审计字段、pending ledger 透传、Gate3 治理变量和静态治理控制台；已包含 review 修复（空 allow-list 默认 fail-closed、跨主体 `all` 不自动放行、Capability Token 只落摘要、前端治理控制台 HTML escape、默认 tenant 回写）。该能力默认关闭，不改变既有 L3 验收口径。
 > 2026-06-30 合并后验证：治理单测/集成/配置 20 passed；pipeline/Gate3/Gate6/pending/MCP e2e 回归通过；R2/R3 预算关键测试 32 passed；ruff 针对变更 Python 文件通过；`node --check frontend/governance.js` 通过；治理样例 JSON/NDJSON 解析通过；设置 `PYTHONPATH=src;.` 与 `PYTHONUTF8=1` 后全仓 `pytest -q` 通过，唯一 skip 仍为本机缺 `xa-guard/sandbox:latest` 镜像。
 > 2026-06-30 docs 已完成物理重构：`docs/` 顶层只保留 `README.md`，原顶层文档迁入 `source-of-truth/`、`planning/`、`workplan/`、`delivery/`、`acceptance/`、`gates/`、`bench-redteam/`、`research/`；新增 `docs/workplan/NEXT-WORK-DESIGN.md`、D1 草稿、D3 视频脚本和提交清单骨架。该整理不改变代码能力、测试结果、L3 验收或比赛达标结论。
+> 2026-07-01 新增全链路额外压力测试 `tests/integration/test_full_gate_stress_extra.py`：覆盖企业治理预检与 Gate1-Gate6 的 allow/deny/require_approval/warn、审批恢复、审批篡改、出向拦截、executor 异常和审计链。为保持既有静态 verifier 路径契约，补充 docs 顶层兼容入口指向重构后的真实文档；这不改变 L3 真实验收 blocker。
 
 ## 总体结论
 
@@ -35,7 +36,7 @@
 | 验收面 | 当前状态 | 边界 |
 |---|---|---|
 | L3 static-only (S1–S7) | 2026-06-20 实跑全 PASS：S1 双 500 implementation + formal 负测、S2 holdout 协议 8 测、S3 runner 9 测、S4 性能入口 7 测、S5 Trae 3/3、S6 compose+gVisor/OPA/deployment+17 测+OPA bundle、S7 修复后 123 测 | 静态 PASS 不等于最终验收 PASS；BUG-R9 修复现已进入 `6cf1ce9` |
-| 当前全仓测试/覆盖率 | 2026-06-30 合并后：`PYTHONPATH=src;.` + `PYTHONUTF8=1` 下全仓 `pytest -q` PASS，唯一 skip 为本机缺 `xa-guard/sandbox:latest`；治理目标测试 20 passed，R2/R3 预算关键测试 32 passed，ruff / Node check / 样例解析 PASS；最近记录覆盖率仍为 79% | 本轮未重新生成 coverage；不带 `PYTHONUTF8=1` 的默认 Windows/CP1252 子进程仍可能触发校验脚本 Unicode 输出兼容问题 |
+| 当前全仓测试/覆盖率 | 2026-07-01：新增全链路压力测试 23 passed；Gate/治理/审计相关回归 172 passed；`PYTHONPATH=src;.` + `PYTHONUTF8=1` 下全仓 `pytest -q` PASS，唯一 skip 为本机缺 `xa-guard/sandbox:latest`；新增测试 ruff PASS。最近记录覆盖率仍为 79% | 本轮未重新生成 coverage；不带 `PYTHONUTF8=1` 的默认 Windows/CP1252 子进程仍可能触发校验脚本 Unicode 输出兼容问题；Gate4 出向 `output_taint` 当前不回写 `ctx.taint`，审计敏感级别可能保留入向标签 |
 | Agent Governance v1 | 已合入 main 工作树：本地 registry、运行时 preflight、MCP `_xa_guard` envelope、审计扩展字段、`frontend/governance.html` 控制台和工资条越权/HR 审批样例；包含 fail-closed allow-list、跨主体访问限制、token 摘要审计、前端 HTML 转义和默认 tenant 一致性修复；合并后目标测试与相关回归通过 | 默认关闭；v1 是私有化演示控制面，不是 SaaS；成本为估算归属，不是供应商账单；尚未接真实企业 SSO/IAM、真实 Trae GUI 或多 Agent 编排治理 |
 | 双 500 语料 (R1) | implementation profile 500+500、1000 唯一 payload、17 类各≥29 已实测验过；formal 正确非零退出 | formal 所需独立 attestation/taxonomy/semantic-group 复核 BLOCKED，不能作为正式双 500 |
 | Decision faithfulness (R9c) | 本轮 25 条真实签名审计独立重算 100% 一致；直接函数验证非固定 1.0（不一致 deny→0.45） | 真实 agent trace 的大规模独立重放未完成 |
