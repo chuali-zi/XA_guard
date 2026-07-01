@@ -10,6 +10,8 @@ predicate 表达式可用的变量（子 agent 在 sandbox 里执行）：
     taint      ctx.taint (TaintLabel)
     risk       ctx.risk_level (RiskLevel)
     sources    [s.value for s in ctx.input_sources]
+    tenant / principal / agent_id / data_domain / resource_owner / task_id
+               governance envelope 中的企业身份与数据域字段
     contains(arg_key, keyword) 辅助函数
 
 例：
@@ -41,6 +43,23 @@ def compile_predicate(expr: str) -> Callable[[GateContext], bool]:
             "taint": ctx.taint.value,
             "risk": ctx.risk_level.value,
             "sources": [s.value for s in ctx.input_sources],
+            "tenant": ctx.tenant_id,
+            "principal": ctx.human_principal,
+            "agent_id": ctx.agent_id,
+            "data_domain": ctx.data_domain,
+            "resource_owner": ctx.resource_owner,
+            "task_id": ctx.task_id,
+            "governance": {
+                "tenant_id": ctx.tenant_id,
+                "human_principal": ctx.human_principal,
+                "agent_id": ctx.agent_id,
+                "data_domain": ctx.data_domain,
+                "resource_owner": ctx.resource_owner,
+                "task_id": ctx.task_id,
+                "cost_estimate_usd": ctx.cost_estimate_usd,
+                "output_estimate": ctx.output_estimate,
+                "capability_token": ctx.capability_token_summary,
+            },
             "contains": contains,
         }
         return bool(eval(code, {"__builtins__": {}}, env))

@@ -26,6 +26,7 @@ from xa_guard.gates.gate3_policy import Gate3Policy
 from xa_guard.gates.gate4_taint import Gate4Taint
 from xa_guard.gates.gate5_sandbox import Gate5Sandbox
 from xa_guard.gates.gate6_audit import Gate6Audit
+from xa_guard.governance import GovernanceEnforcer
 from xa_guard.pipeline import Pipeline
 from xa_guard.policy.hot_reload import OverlayWatcher
 from xa_guard.policy.layered import LayeredPolicySource, set_global_source
@@ -71,6 +72,7 @@ def build_pipeline(cfg: XAGuardConfig) -> Pipeline:
         gate5=Gate5Sandbox(cfg.gate("gate5")),
         gate6=Gate6Audit(cfg.gate("gate6")),
         cfg=cfg,
+        governance=GovernanceEnforcer(cfg.governance),
     )
     pipeline.overlay_watcher = watcher
     return pipeline

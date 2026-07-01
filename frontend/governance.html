@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XA-Guard · Agent Governance Console</title>
+<link rel="stylesheet" href="governance.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>XA-Guard Agent Governance Console</h1>
+      <p>私有化 Agent Gateway 控制面 · 员工 / 智能体 / 数据域 / 成本产出 / 审计</p>
+    </div>
+    <div class="loaders">
+      <label>Registry JSON <input id="registry-path" value="sample_governance_registry.json"></label>
+      <label>Audit JSONL <input id="audit-path" value="sample_governance_audit.ndjson"></label>
+      <button id="load-btn">加载</button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="metric-strip" id="metric-strip"></section>
+
+    <section class="band">
+      <div class="section-head">
+        <h2>治理场景</h2>
+        <span id="scenario-summary"></span>
+      </div>
+      <div class="scenario-grid" id="scenario-grid"></div>
+    </section>
+
+    <section class="split">
+      <div class="panel">
+        <div class="section-head">
+          <h2>Agent 资产盘点</h2>
+          <span id="agent-count"></span>
+        </div>
+        <div class="table-wrap">
+          <table id="agent-table"></table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="section-head">
+          <h2>员工 - 数据域矩阵</h2>
+          <span id="domain-count"></span>
+        </div>
+        <div class="table-wrap">
+          <table id="matrix-table"></table>
+        </div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="section-head">
+        <h2>治理审计时间线</h2>
+        <span id="audit-count"></span>
+      </div>
+      <div class="audit-list" id="audit-list"></div>
+    </section>
+  </main>
+
+<script src="governance.js"></script>
+</body>
+</html>

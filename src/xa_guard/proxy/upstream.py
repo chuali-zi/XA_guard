@@ -13,6 +13,7 @@ Streamable HTTP：使用 mcp.server.streamable_http.StreamableHTTPServerTranspor
 from __future__ import annotations
 
 import json
+import hashlib
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -37,6 +38,104 @@ log = logging.getLogger("xa_guard.proxy.upstream")
 _PENDING_LIST_TOOL = "xa_guard_list_pending_approvals"
 _PENDING_APPROVE_TOOL = "xa_guard_approve_pending"
 _AIBOM_INSTALL_TOOL = "install_plugin"
+_GOVERNANCE_ENVELOPE_KEY = "_xa_guard"
+_CAPABILITY_SUMMARY_FIELDS = {
+    "audience",
+    "expires_at",
+    "issuer",
+    "jti",
+    "key_id",
+    "scope",
+    "scopes",
+    "sha256",
+    "subject",
+    "token_id",
+    "token_sha256",
+    "ttl",
+}
+_CAPABILITY_SECRET_MARKERS = (
+    "authorization",
+    "bearer",
+    "cookie",
+    "credential",
+    "password",
+    "private",
+    "secret",
+    "signature",
+    "token",
+)
+
+
+def _pop_governance_envelope(arguments: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    raw = dict(arguments or {})
+    envelope = raw.pop(_GOVERNANCE_ENVELOPE_KEY, {})
+    if not isinstance(envelope, dict):
+        envelope = {}
+    return raw, dict(envelope)
+
+
+def _float_field(envelope: dict[str, Any], key: str) -> float:
+    try:
+        return float(envelope.get(key) or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _digest_summary(value: Any) -> str:
+    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, default=str).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _is_capability_secret_key(key: str) -> bool:
+    normalized = key.lower().replace("-", "_")
+    if normalized in {"token_sha256", "sha256"}:
+        return False
+    return any(marker in normalized for marker in _CAPABILITY_SECRET_MARKERS)
+
+
+def _capability_token_summary(envelope: dict[str, Any]) -> dict[str, Any]:
+    source = envelope.get("capability_token_summary")
+    if source is None:
+        source = envelope.get("capability_token")
+    if not source:
+        return {}
+    if not isinstance(source, dict):
+        return {"sha256": _digest_summary(source)}
+
+    summary: dict[str, Any] = {}
+    for key, value in source.items():
+        key_text = str(key)
+        normalized = key_text.lower().replace("-", "_")
+        if normalized in _CAPABILITY_SUMMARY_FIELDS:
+            summary[key_text] = value
+        elif _is_capability_secret_key(key_text):
+            summary[f"{key_text}_sha256"] = _digest_summary(value)
+    if not summary:
+        summary["sha256"] = _digest_summary(source)
+    return summary
+
+
+def _ctx_with_governance(name: str, arguments: dict[str, Any], envelope: dict[str, Any]) -> GateContext:
+    return GateContext(
+        tool_name=name,
+        arguments=arguments,
+        session_history=[],
+        input_sources=[InputSource.USER],
+        tenant_id=str(envelope.get("tenant_id") or envelope.get("tenant") or ""),
+        human_principal=str(
+            envelope.get("human_principal")
+            or envelope.get("principal")
+            or envelope.get("employee_id")
+            or ""
+        ),
+        agent_id=str(envelope.get("agent_id") or ""),
+        data_domain=str(envelope.get("data_domain") or ""),
+        resource_owner=str(envelope.get("resource_owner") or ""),
+        task_id=str(envelope.get("task_id") or ""),
+        cost_estimate_usd=_float_field(envelope, "cost_estimate_usd"),
+        output_estimate=str(envelope.get("output_estimate") or ""),
+        capability_token_summary=_capability_token_summary(envelope),
+    )
 
 
 def _aibom_install_preflight(
@@ -170,15 +269,11 @@ def _build_app(
                 require_configured_token=require_operator_token,
             )
 
-        ctx = GateContext(
-            tool_name=name,
-            arguments=arguments,
-            session_history=[],
-            input_sources=[InputSource.USER],
-        )
+        tool_arguments, governance_envelope = _pop_governance_envelope(arguments)
+        ctx = _ctx_with_governance(name, tool_arguments, governance_envelope)
         if name == _AIBOM_INSTALL_TOOL:
             ctx.append(
-                _aibom_install_preflight(arguments, offline_store=aibom_offline_store)
+                _aibom_install_preflight(tool_arguments, offline_store=aibom_offline_store)
             )
 
         result = await pipeline.run(ctx, _executor)

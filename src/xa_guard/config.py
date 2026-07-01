@@ -34,6 +34,13 @@ class UpstreamSpec:
     session_idle_timeout_seconds: float = 300.0
 
 
+@dataclass
+class GovernanceConfig:
+    enabled: bool = False
+    registry_file: str = "configs/governance.demo.yaml"
+    default_tenant: str = "default"
+
+
 def _default_gates() -> dict[str, GateConfig]:
     return {
         "gate5": GateConfig(enabled=False),
@@ -45,6 +52,7 @@ class XAGuardConfig:
     upstream: UpstreamSpec = field(default_factory=UpstreamSpec)
     downstream: list[DownstreamSpec] = field(default_factory=list)
     gates: dict[str, GateConfig] = field(default_factory=_default_gates)
+    governance: GovernanceConfig = field(default_factory=GovernanceConfig)
     policy_default: str = "enterprise-l3"
     audit_dir: str = "./logs/audit"
     log_dir: str = "./logs/runtime"
@@ -87,11 +95,18 @@ class XAGuardConfig:
             )
             for name, spec in (root.get("gates") or {}).items()
         }
+        governance_raw = root.get("governance", {}) or {}
+        governance = GovernanceConfig(
+            enabled=bool(governance_raw.get("enabled", False)),
+            registry_file=str(governance_raw.get("registry_file", "configs/governance.demo.yaml")),
+            default_tenant=str(governance_raw.get("default_tenant", "default")),
+        )
 
         return cls(
             upstream=upstream,
             downstream=downstream,
             gates=gates,
+            governance=governance,
             policy_default=root.get("policy_default", "enterprise-l3"),
             audit_dir=root.get("audit_dir", "./logs/audit"),
             log_dir=root.get("log_dir", "./logs/runtime"),

@@ -1,5 +1,32 @@
 # 工作日志
 
+## 2026-06-30 19:48 PDT Agent Governance 合入 main 与身份鉴权状态收束
+
+起因：用户要求直接修复，把身份管理和鉴权并到 `main`，整理仓库中重复或异常的文件夹/分支，并在完成后提交、推送。
+
+已完成：
+- 修复并重新识别 `D:\race\XA_guard\jiebang-agent-governance` worktree 的 Git 元数据，使 `codex/agent-governance-platform` 分支可正常读取和提交。
+- 将该分支的 Agent Governance v1 先提交为 `0c18d58 feat: add agent governance controls`，再 cherry-pick 到当前 `main` 工作树。
+- 解决 `log.md` 和 `status.md` 冲突：保留 2026-06-30 新增的赛题 TODO / `$60 subscription_budget60_v1` 状态，同时合入身份治理的当前事实，不回退到旧 `$20` 口径。
+- 合入本地治理 registry、`GovernanceEnforcer`、配置项 `governance.enabled / registry_file / default_tenant`、Gate1 前治理预检、MCP `_xa_guard` envelope 提取与下游剥离、pending ledger 透传、Gate3 predicate 治理变量、Gate6 `gen_ai.governance.*` 审计字段。
+- 合入静态治理控制台 `frontend/governance.html/js/css` 和示例 registry/audit 数据；控制台展示员工、Agent、数据域矩阵、工资条越权/HR 审批样例和治理审计时间线。
+- 合入 README、PRD、产品架构文档中的 Agent Gateway / 企业治理控制面叙事，并明确 v1 不是 SaaS、不是完整生产 IAM/RBAC/SSO，也不是完整 Shadow AI 或多 Agent 编排治理。
+
+验证：
+- `PYTHONPATH=src python -X utf8 -m pytest tests/unit/test_governance.py tests/integration/test_governance_mcp.py tests/unit/test_config.py -q`：20 passed。
+- `PYTHONPATH=src python -X utf8 -m pytest tests/test_pipeline_smoke.py tests/unit/test_gate3.py tests/unit/test_gate6_audit.py tests/unit/test_pending_ledger.py tests/integration/test_mcp_e2e.py -q`：通过。
+- `PYTHONPATH=src python -X utf8 -m pytest tests/unit/test_budget_evaluation.py tests/unit/test_opencode_bridge.py tests/unit/test_r2_r3_acceptance.py -q`：32 passed。
+- `python -m ruff check ...` 针对变更 Python 文件和治理测试：通过。
+- `node --check frontend/governance.js`：通过。
+- 治理样例 `frontend/sample_governance_registry.json` 与 `frontend/sample_governance_audit.ndjson` 解析通过。
+- 设置 `PYTHONPATH=src;.` 与 `PYTHONUTF8=1` 后，`python -m pytest -q` 全仓通过，唯一 skip 仍是本机缺 `xa-guard/sandbox:latest` 镜像。
+- 未设置完整环境变量的全仓测试曾复现既有 Windows/CP1252 子进程 Unicode 输出问题，以及脚本子进程缺根目录 import path；失败项在正确环境下单独重跑通过。
+
+未完成 / 客观边界：
+- 治理能力默认关闭；开启后依赖本地 YAML registry 和 `_xa_guard` envelope，不等同生产 SSO/IAM、RBAC 管理后台、多实例一致性系统或真实供应商账单。
+- 本轮没有做真实 Trae GUI 演示、企业数据接入、Shadow AI 自动发现、TEE/PrivLLM、云端 SaaS 或完整多 Agent 委托链治理。
+- 本轮没有产生新的 `$60` 付费校准或 sampled R2/R3 结果。
+
 ## 2026-06-30 19:28 PDT docs 当前状态分析与下一步 TODO 整理
 
 起因：用户要求详细分析赛题、已有 docs 和当前仓库状态，把“下一步该干什么”的详细 TODO 放到 docs，并整理混乱的 docs 入口。
@@ -118,7 +145,64 @@
 - OpenCode 内部工具限制仍依赖 `--pure`、隔离 runtime cwd、临时 turn 文件和权限配置 hash 记录；未新增经真实 CLI 证明的更细粒度权限 flag。
 
 下一步：先实现/验证 AgentDojo 批量缓存或进一步降本，再在新输出目录做不超过 `$0.50` 的微型验证；确认成本可装入剩余预算后，才能重新 `budget-plan`/`budget-freeze` 并付费运行正式样本。
+## 2026-06-27 Agent Governance review 问题修复（Codex）
 
+起因：用户要求根据未提交更改 review 结果进行修复，重点处理治理权限默认误放开、跨主体资源访问、Capability Token 审计泄露、前端治理控制台 XSS 和默认 tenant 审计不一致问题。
+
+已完成：
+- 修改 `src/xa_guard/governance.py`：治理启用时，员工可用 Agent、Agent 可调用工具、Agent 可访问数据域均改为默认 fail-closed；需要全量开放必须显式配置 `*`。
+- 修改 `src/xa_guard/governance.py`：`resource_owner="all"` / `"*"` 不再自动允许，只有空资源主体或访问本人资源可直接放行，跨主体访问必须命中 `allow_cross_subject_roles`。
+- 修改 `src/xa_guard/governance.py`：治理预检解析默认 tenant 后回写 `GateContext.tenant_id`，使 Gate3、Gate6 审计和治理判断使用同一租户值。
+- 修改 `src/xa_guard/proxy/upstream.py`：`_xa_guard.capability_token` / `capability_token_summary` 进入上下文前做摘要化；白名单字段保留，token、signature、secret 等敏感字段只记录 SHA-256 摘要。
+- 修改 `frontend/governance.js`：所有从 registry/audit 进入 `innerHTML` 的展示值增加 HTML escape；decision class 做 allow-list，避免审计样例或外部文件注入 HTML/脚本。
+- 更新 `tests/unit/test_governance.py` 与 `tests/integration/test_governance_mcp.py`，覆盖空 allow-list 拒绝、显式 `*` 放行、`all` 跨主体拒绝/HR 审批、默认 tenant 回写和 capability token 原文不入审计。
+- 更新 `status.md`，同步当前 Agent Governance v1 的安全修复状态。
+
+验证：
+- `PYTHONPATH=src python -m pytest tests/unit/test_governance.py tests/integration/test_governance_mcp.py tests/unit/test_config.py -q`：20 passed。
+- `PYTHONPATH=src python -m pytest tests/test_pipeline_smoke.py tests/unit/test_gate3.py tests/unit/test_gate6_audit.py tests/unit/test_pending_ledger.py tests/integration/test_mcp_e2e.py -q`：通过；2 个 OPA 本地二进制相关用例按既有条件 skip。
+- `python -m ruff check` 针对变更 Python 文件和测试文件：通过。
+- `node --check frontend/governance.js`：通过。
+- Node 前端转义校验：`text('<img ...>')` 输出转义文本，异常 decision 被归入 allow-list fallback：通过。
+- `git diff --check`：通过；仅有 Git 对 LF→CRLF 的既有提示。
+
+未完成 / 边界：
+- 本轮未提交 commit、未 push、未创建 PR。
+- 前端控制台仍是本地静态演示，不是生产 IAM/RBAC 管理后台；治理能力仍默认关闭。
+
+下一步：如继续推进，应增加真实浏览器视觉回归或 Playwright 检查，并把 capability token 摘要字段约定补进对接文档，便于上游适配器按摘要而非原始 token 传参。
+
+## 2026-06-27 Agent Governance 控制面 v1 实现（Codex）
+
+起因：用户希望在现有 XA-Guard MCP 防护链之外，补一个面向企业落地的配套管理平台，用于回答“哪个员工使用哪个 Agent、Agent 能访问哪些数据域、成本和产出如何归属、工资条等敏感数据是否能在事前阻断”的问题。按用户要求，先从干净 `origin/main` 新建独立 worktree 分支 `codex/agent-governance-platform`，没有触碰原 `D:\race\jiebang` 脏工作树。
+
+已完成：
+- 新增 `src/xa_guard/governance.py`，实现本地治理 registry 和可选 `GovernanceEnforcer`：覆盖员工/角色/部门、Agent inventory、数据域、跨资源主体访问、预算估算和敏感数据域审批。
+- 扩展配置 `governance.enabled / registry_file / default_tenant`，默认关闭；新增 `configs/governance.demo.yaml` 与 `configs/xa-guard.governance-demo.yaml` 演示 HR/财务/研发数据域和工资条越权场景。
+- 扩展 `GateContext` 与 `AuditRecord`，新增 `tenant_id`、`human_principal`、`agent_id`、`data_domain`、`resource_owner`、`task_id`、`cost_estimate_usd`、`output_estimate`、`capability_token_summary`，并以 `gen_ai.governance.*` 写入审计，不破坏原 14 字段。
+- 在 pipeline 的 Gate1 前接入治理预检；启用后，员工不能用指定 Agent、Agent 不能调用工具、员工或 Agent 无权访问数据域、预算超限会直接 `deny` 并写审计；敏感数据域可触发 `require_approval`。
+- 在 MCP upstream 支持保留入参 `_xa_guard` envelope：提取治理字段写入 `GateContext`，并在调用下游前从工具参数中剥离，避免治理元数据泄露给业务工具；pending ledger 同步保留治理字段。
+- 扩展 Gate3 predicate 环境，使策略表达可读取 `principal`、`agent_id`、`tenant`、`data_domain`、`resource_owner`、`task_id` 等治理变量。
+- 新增 `frontend/governance.html`、`governance.js`、`governance.css`、`sample_governance_registry.json`、`sample_governance_audit.ndjson`，提供静态私有化治理控制台：资产盘点、员工-数据域矩阵、工资条越权/HR 审批样例、成本估算和治理审计时间线。
+- 更新 README、`docs/产品架构.md`、`docs/PRD.md`、`frontend/__init__.py` 和 `status.md`，将项目叙事补充为 Agent Gateway + 治理控制面，同时明确 v1 不是 SaaS，不声明完整 Shadow AI / 多 Agent 编排治理。
+- 新增 `tests/unit/test_governance.py` 和 `tests/integration/test_governance_mcp.py`；更新配置测试。
+
+验证：
+- `PYTHONPATH=src python -m pytest tests/unit/test_governance.py tests/integration/test_governance_mcp.py tests/unit/test_config.py -q`：通过。
+- `PYTHONPATH=src python -m pytest tests/unit/test_governance.py tests/integration/test_governance_mcp.py tests/unit/test_config.py tests/test_pipeline_smoke.py tests/unit/test_gate3.py tests/unit/test_gate6_audit.py tests/unit/test_pending_ledger.py tests/integration/test_mcp_e2e.py -q`：通过；其中 2 个 OPA 本地二进制相关用例按既有条件 skip。
+- `python -m ruff check` 针对本轮变更代码与测试文件：通过。
+- `node --check frontend/governance.js`：通过。
+- 前端治理样例 `sample_governance_registry.json` 与 `sample_governance_audit.ndjson` 用 Python 解析通过。
+
+未完成 / 边界：
+- 本轮未提交 commit、未 push、未创建 PR。
+- 治理能力默认关闭；开启后依赖本地 registry 和 `_xa_guard` envelope，不等同生产级 SSO/IAM、RBAC 管理后台或多实例一致性系统。
+- 成本与产出只做估算和审计归属，不是 provider 账单级计费。
+- 未做真实 Trae GUI 演示、真实企业数据接入、Shadow AI 自动发现、完整多 Agent 编排治理、TEE/PrivLLM 或云端 SaaS。
+- 未运行全仓 pytest；只运行了目标测试与相关回归。
+
+下一步：
+- 如继续推进，应补真实 Trae / 支持 elicitation 客户端的治理演示截图或视频；再考虑把 registry 管理从静态 YAML 扩展为内网管理 API，并接入企业 SSO/OIDC、审批人 RBAC、真实预算账单和更多多 Agent 委托链字段。
 ## 2026-06-22 `$10` 首批 R2/R3 预算运行（Codex）
 
 起因：用户授权先运行最多 `$10`，并明确允许为付费运行建立本地 commit。执行前将已验证的预算工具提交为本地 commit `b871281`；没有推送。

@@ -18,6 +18,7 @@ from typing import Awaitable, Callable
 from xa_guard.config import XAGuardConfig
 from xa_guard.gates import GateStage
 from xa_guard.gates.base import Gate
+from xa_guard.governance import GovernanceEnforcer
 from xa_guard.types import Approval, Decision, GateContext, GateResult, RiskLevel, TaintLabel
 
 log = logging.getLogger("xa_guard.pipeline")
@@ -66,6 +67,7 @@ class Pipeline:
         gate5: Gate,
         gate6: Gate,
         cfg: XAGuardConfig | None = None,
+        governance: GovernanceEnforcer | None = None,
     ) -> None:
         self.gate1 = gate1
         self.gate2 = gate2
@@ -74,6 +76,7 @@ class Pipeline:
         self.gate5 = gate5
         self.gate6 = gate6
         self.cfg = cfg
+        self.governance = governance
 
     def _audit(self, ctx: GateContext) -> GateResult:
         """Write Gate6 evidence and retain its metadata on the shared context."""
@@ -115,6 +118,19 @@ class Pipeline:
                 final_decision=ctx.final_decision,
                 final_reason=ctx.final_reason,
             )
+
+        if self.governance is not None and self.governance.enabled:
+            result = self.governance.evaluate(ctx)
+            ctx.append(result)
+            if result.decision in (Decision.DENY, Decision.REQUIRE_APPROVAL):
+                self._audit(ctx)
+                return PipelineResult(
+                    ctx=ctx,
+                    allowed=False,
+                    tool_result=None,
+                    final_decision=ctx.final_decision,
+                    final_reason=ctx.final_reason,
+                )
 
         # ---- inbound: input firewall ----
         result = self.gate1(ctx, GateStage.INBOUND)

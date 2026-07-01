@@ -66,8 +66,9 @@
 | D7 | **XA-Guard SDK** | pip install xa-guard | LangChain 适配 |
 | D8 | **XA-Bench 评测套件** | CSAB-Gov-mini 用例 + CLI | 实际效果证据 |
 | D9 | **AIBOM 准入网关 demo** | 小工具 | 方向 3 加分 |
-| D10 | **演示前端** | React 时间线可视化 | 演示视频素材 |
+| D10 | **演示前端** | HTML/React 时间线可视化 | 演示视频素材 |
 | D11 | **审计证据样例** | JSON + 国密签名 + 哈希链 | 方向 4 加分 |
+| D12 | **Agent Governance 控制台 v1** | 私有化静态控制台 + 本地治理 registry + 审计扩展字段 | 应用价值加分；展示“谁的员工、哪个 Agent、访问哪个数据域、成本产出如何归属” |
 
 ---
 
@@ -296,8 +297,9 @@
 | D7 SDK | pip 装上，3 行代码包装 LangChain agent |
 | D8 XA-Bench | 290 用例 + CLI + HTML 报告 |
 | D9 AIBOM 准入 | 跑通 OWASP AIBOM Generator + 自加评级 |
-| D10 演示前端 | React 时间线 + 拦截事件可视化 |
+| D10 演示前端 | HTML/React 时间线 + 拦截事件可视化 |
 | D11 审计样例 | JSON 含 14 字段 + SM2 签名 + Merkle 链 |
+| D12 Agent Governance 控制台 v1 | 本地 registry 可加载；员工-Agent-数据域权限矩阵可视化；工资条越权样例阻断；审计记录含 `gen_ai.governance.*` 扩展字段 |
 
 ---
 
@@ -317,6 +319,7 @@
 | 30 页方案 + 10 分钟视频 + 代码仓库 | 必交三大件 |
 | **轻量演示前端**（HTML/React 时间线） | 最小可演示 trace 时间线 |
 | **Trae 接入实测**（**国产 IDE 硬承诺只此一个**） | 国产生态证据 |
+| **Agent Governance 控制台 v1** | 私有化控制台演示员工、Agent、数据域、成本产出和治理审计；默认不做 SaaS |
 
 ### Should（应做，影响一等奖以上）
 
@@ -324,7 +327,7 @@
 |---|---|
 | **关卡 4 完整版**（三色信息流污点 + 工具能力声明 + 进出向检查） | MVP 之上扩展 |
 | 国密 SM3/SM2 哈希链 | 政企卖点 |
-| **完整管理后台前端**（React + 仪表盘 + 实时拦截事件） | MVP 演示前端之上扩展，影响展示表达 5 分 |
+| **完整管理后台前端**（HTML/React + 仪表盘 + 实时拦截事件） | MVP 演示前端之上扩展，影响展示表达 5 分 |
 | Python SDK LangChain 适配 | 扩大覆盖面 |
 | 答辩 Q&A 模拟 | 影响答辩表现 |
 | **CodeBuddy / Qoder CN 接入实测**（按版本验证） | 国产 IDE 覆盖度补强 |

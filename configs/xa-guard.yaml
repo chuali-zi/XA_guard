@@ -12,6 +12,11 @@ xa_guard:
       command: ["python", "-m", "demo.targets.ops_target"]
       transport: stdio
 
+  governance:
+    enabled: false
+    registry_file: configs/governance.demo.yaml
+    default_tenant: acme-corp
+
   gates:
     gate1:
       enabled: true

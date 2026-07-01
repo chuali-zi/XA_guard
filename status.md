@@ -1,14 +1,15 @@
 # 仓库状态：XA-Guard / XA-202620
 
-> 快照日期：2026-06-30（仓库环境）
+> 快照日期：2026-06-30 19:48 PDT（仓库环境；Agent Governance v1 已合入 main 工作树）
 > 本文件仅描述当前仓库状态、验收边界与剩余差距，不记录工作历史。
 > 2026-06-20 已在 commit `432ebbc` 实跑 L3 静态验收 S1–S7（全 PASS，123 测试）与能力范围内真实验收 R2/R3/R4/R6/R7/R9；证据目录 `D:/evidence/l3-20260620T090452Z/`（final-report.json + artifact-hashes.json 149 文件）。R6 Docker build/up+healthz 已 PASS（gVisor runsc 仍 BLOCKED，Windows 无 runsc）。BUG-R9 已修复+回归测试。仍 BLOCKED：R1 独立双 500/holdout、R5 真实 Trae GUI、R6 gVisor runsc（需 Linux）、R8 外部 AIBOM 生成器、R9 第三方 TSA/HSM；R2/R3 比赛目标现按 OpenCode Go 订阅 `$60` 预算型抽样管理。
 > 2026-06-21 对 commit `6cf1ce9` 复核：统一静态 verifier `11/11` sections PASS；全量 pytest 在默认 Windows/CP1252 子进程环境为 `561 passed, 1 failed, 1 skipped`，总覆盖率 `79%`。唯一失败是 `validate_csab_gov_mini.py` 输出 Unicode 箭头触发 `UnicodeEncodeError`，设置 `PYTHONUTF8=1` 后该用例通过；唯一 skip 是本机缺 `xa-guard/sandbox:latest` 测试镜像。故当前不能写”默认环境全量测试全绿”。
 > 2026-06-22 用户授权的 `$10` 首批运行已安全停止，证据 `D:/evidence/r2-r3-budget10-20260622/`。实际新增 provider 成本 `$2.94602940`（calibration `$1.95051700` + retry `$0.99551240`），87 次调用全部 settled、无未知成本；32 calibration jobs 为 7 complete / 25 infra_error，其中 24 个在桶余额不足时调用前阻断、1 个为 OpenCode content schema 波动。校准不完整，`budget-freeze` 正确拒绝，未生成正式 sample manifest 或 sampled 指标；旧 7 个结果不得混入正式分母。当前新正式口径为 `subscription_budget60_v1`：总 cap `$60`，calibration `$6`、R2 `$32`、R3 `$16`、retry `$6`。离线 runner 已修复 content block、R2/R3 turn retry、retry 分桶、预算停止、provider 配额暂停、结果 provenance，以及按全局未完成列表续考；AgentDojo 同一 job 恢复时不再强制重跑已完成内部 task。单题连续基础设施失败默认最多 2 次，之后不再阻塞后续题。尚未做新的付费校准。2,986-job 全矩阵仍为 `DEFERRED_OPTIONAL`。
-> 2026-06-23 Git 状态：本地 `main` 相对 `origin/main` 为 ahead 2 / behind 0，HEAD `ebcdfde`；工作树共有 22 个变更条目，包含本轮新增文档及此前未提交修改。此前对象库完整性核查通过。
 > 2026-06-22 当前工作树离线验证：R2/R3 目标测试 `32 passed`，changed-file ruff PASS；设置 `PYTHONUTF8=1` 的全仓测试共 585 项，结果 `584 passed, 1 skipped`，唯一 skip 为本机缺 `xa-guard/sandbox:latest`；统一静态 verifier `11/11` sections PASS。未执行任何模型调用。
 > 2026-06-23 新增 `docs/force-ai-security-2026/`，将用户提供的 FORCE 原动力大会企业 AI / 智能体安全 PPT 照片整理为专题资料：逐页笔记、风险图谱、治理架构、数据/控制流安全、XA-Guard 映射和行动清单。该资料属于研究与答辩素材沉淀，不改变当前代码验收状态，也不构成任何新增测试或正式验收通过声明。
 > 2026-06-30 新增 `docs/TODO.md` 作为当前下一步执行入口，并更新 `docs/README.md` 导航。该整理明确官方 D1-D4、赛题四方向证据、L3 BLOCKED 项、R2/R3 sampled 口径和 docs 后续整理计划；不改变代码能力、测试结果或 L3 验收状态。
+> 2026-06-30 Agent Governance v1 已从 `codex/agent-governance-platform` 合入当前 main 工作树：新增本地治理 registry、Gate1 前治理预检、MCP `_xa_guard` envelope 提取与剥离、`gen_ai.governance.*` 审计字段、pending ledger 透传、Gate3 治理变量和静态治理控制台；已包含 review 修复（空 allow-list 默认 fail-closed、跨主体 `all` 不自动放行、Capability Token 只落摘要、前端治理控制台 HTML escape、默认 tenant 回写）。该能力默认关闭，不改变既有 L3 验收口径。
+> 2026-06-30 合并后验证：治理单测/集成/配置 20 passed；pipeline/Gate3/Gate6/pending/MCP e2e 回归通过；R2/R3 预算关键测试 32 passed；ruff 针对变更 Python 文件通过；`node --check frontend/governance.js` 通过；治理样例 JSON/NDJSON 解析通过；设置 `PYTHONPATH=src;.` 与 `PYTHONUTF8=1` 后全仓 `pytest -q` 通过，唯一 skip 仍为本机缺 `xa-guard/sandbox:latest` 镜像。
 
 ## 总体结论
 
@@ -18,6 +19,7 @@
 - 20 会话容量如实记录为 LIMIT（P95 366.979ms > 300ms），未声明支持。
 - BUG-R9（SM2-TSA-token anchor 验证 mismatch）已修复：`tsa.py` `_payload_for_hash` 排除 `sm2_tsa_*` 字段，新增回归测试，S7 全套 123 passed 无回归。
 - BUG-R9 修复及回归测试已进入 commit `6cf1ce9`，本快照随之同步。2026-06-21 全量测试默认 Windows 编码下还有 1 个可复现兼容性失败。
+- 当前 main 工作树的 Agent Governance v1 进一步补齐“员工、Agent、数据域、预算/产出归属”的企业控制面；当前治理预检为 fail-closed 语义，Capability Token 仅落摘要，静态控制台已做基础 HTML 转义。该能力默认关闭，不改变既有 L3 验收口径，也不构成 SaaS 或完整 Shadow AI / 多 Agent 编排治理实现声明。
 
 当前仍**不能宣称“L3 最终验收通过”或“赛题最终达标”**。剩余比赛差距：R1 正式双 500/holdout 独立评测、R2/R3 `subscription_budget60_v1` 真实校准与 sampled 结果、R5 真实 Trae GUI、R6 真实 Linux/gVisor runsc 隔离、R8 外部 AIBOM 生成器、R9 第三方 TSA/HSM，以及 D1/D3/D4 交付物。2,986-job 全矩阵不在比赛差距内。
 
@@ -32,7 +34,8 @@
 | 验收面 | 当前状态 | 边界 |
 |---|---|---|
 | L3 static-only (S1–S7) | 2026-06-20 实跑全 PASS：S1 双 500 implementation + formal 负测、S2 holdout 协议 8 测、S3 runner 9 测、S4 性能入口 7 测、S5 Trae 3/3、S6 compose+gVisor/OPA/deployment+17 测+OPA bundle、S7 修复后 123 测 | 静态 PASS 不等于最终验收 PASS；BUG-R9 修复现已进入 `6cf1ce9` |
-| 当前全仓测试/覆盖率 | 2026-06-22 当前工作树：`PYTHONUTF8=1` 全仓 `584 passed, 1 skipped`（585 collected），目标测试 `32 passed`，ruff PASS，统一静态 verifier 11/11 PASS；最近记录覆盖率为 79% | 唯一 skip 是本机缺 `xa-guard/sandbox:latest`；本轮未重新生成 coverage，且默认 Windows/CP1252 仍可能触发校验脚本 Unicode 输出兼容问题 |
+| 当前全仓测试/覆盖率 | 2026-06-30 合并后：`PYTHONPATH=src;.` + `PYTHONUTF8=1` 下全仓 `pytest -q` PASS，唯一 skip 为本机缺 `xa-guard/sandbox:latest`；治理目标测试 20 passed，R2/R3 预算关键测试 32 passed，ruff / Node check / 样例解析 PASS；最近记录覆盖率仍为 79% | 本轮未重新生成 coverage；不带 `PYTHONUTF8=1` 的默认 Windows/CP1252 子进程仍可能触发校验脚本 Unicode 输出兼容问题 |
+| Agent Governance v1 | 已合入 main 工作树：本地 registry、运行时 preflight、MCP `_xa_guard` envelope、审计扩展字段、`frontend/governance.html` 控制台和工资条越权/HR 审批样例；包含 fail-closed allow-list、跨主体访问限制、token 摘要审计、前端 HTML 转义和默认 tenant 一致性修复；合并后目标测试与相关回归通过 | 默认关闭；v1 是私有化演示控制面，不是 SaaS；成本为估算归属，不是供应商账单；尚未接真实企业 SSO/IAM、真实 Trae GUI 或多 Agent 编排治理 |
 | 双 500 语料 (R1) | implementation profile 500+500、1000 唯一 payload、17 类各≥29 已实测验过；formal 正确非零退出 | formal 所需独立 attestation/taxonomy/semantic-group 复核 BLOCKED，不能作为正式双 500 |
 | Decision faithfulness (R9c) | 本轮 25 条真实签名审计独立重算 100% 一致；直接函数验证非固定 1.0（不一致 deny→0.45） | 真实 agent trace 的大规模独立重放未完成 |
 | LangChain / LangGraph | wrapper、callback/observer、HITL resume、node/tool 等适配已实现 | 固定真实版本及真实 agent/transport 端到端验收未完成 |

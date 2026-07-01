@@ -187,6 +187,15 @@ def context_to_dict(ctx: GateContext, input_schema: dict[str, Any] | None = None
         "user_role": ctx.user_role,
         "session_history": ctx.session_history,
         "input_sources": [_enum_value(item) for item in ctx.input_sources],
+        "tenant_id": ctx.tenant_id,
+        "human_principal": ctx.human_principal,
+        "agent_id": ctx.agent_id,
+        "data_domain": ctx.data_domain,
+        "resource_owner": ctx.resource_owner,
+        "task_id": ctx.task_id,
+        "cost_estimate_usd": ctx.cost_estimate_usd,
+        "output_estimate": ctx.output_estimate,
+        "capability_token_summary": ctx.capability_token_summary,
         "taint": _enum_value(ctx.taint),
         "risk_level": _enum_value(ctx.risk_level),
         "gate_results": [gate_result_to_dict(item) for item in ctx.gate_results],
@@ -208,6 +217,15 @@ def context_from_dict(raw: dict[str, Any]) -> GateContext:
         input_sources=[
             InputSource(item) for item in (raw.get("input_sources") or [InputSource.USER.value])
         ],
+        tenant_id=str(raw.get("tenant_id") or ""),
+        human_principal=str(raw.get("human_principal") or ""),
+        agent_id=str(raw.get("agent_id") or ""),
+        data_domain=str(raw.get("data_domain") or ""),
+        resource_owner=str(raw.get("resource_owner") or ""),
+        task_id=str(raw.get("task_id") or ""),
+        cost_estimate_usd=float(raw.get("cost_estimate_usd") or 0.0),
+        output_estimate=str(raw.get("output_estimate") or ""),
+        capability_token_summary=dict(raw.get("capability_token_summary") or {}),
     )
     ctx.taint = TaintLabel(raw.get("taint") or TaintLabel.PUBLIC.value)
     ctx.risk_level = RiskLevel(raw.get("risk_level") or RiskLevel.GREEN.value)

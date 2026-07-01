@@ -162,6 +162,17 @@ class GateContext:
     session_history: list[dict] = field(default_factory=list)
     input_sources: list[InputSource] = field(default_factory=lambda: [InputSource.USER])
 
+    # 企业治理控制面（可选）：由上游 `_xa_guard` envelope 注入，默认空值不影响旧路径。
+    tenant_id: str = ""
+    human_principal: str = ""
+    agent_id: str = ""
+    data_domain: str = ""
+    resource_owner: str = ""
+    task_id: str = ""
+    cost_estimate_usd: float = 0.0
+    output_estimate: str = ""
+    capability_token_summary: dict[str, Any] = field(default_factory=dict)
+
     # 累积属性
     taint: TaintLabel = TaintLabel.PUBLIC
     risk_level: RiskLevel = RiskLevel.GREEN
@@ -237,6 +248,15 @@ class AuditRecord:
     gen_ai_tool_sandbox_enforced: bool = False
     gen_ai_tool_sandbox_image: str = ""
     gen_ai_tool_sandbox_runtime: str = ""
+    gen_ai_governance_tenant_id: str = ""
+    gen_ai_governance_human_principal: str = ""
+    gen_ai_governance_agent_id: str = ""
+    gen_ai_governance_data_domain: str = ""
+    gen_ai_governance_resource_owner: str = ""
+    gen_ai_governance_task_id: str = ""
+    gen_ai_governance_cost_estimate_usd: float = 0.0
+    gen_ai_governance_output_estimate: str = ""
+    gen_ai_governance_capability_token: dict[str, Any] = field(default_factory=dict)
 
     # 链式签名（关卡 6）
     record_hash: str = ""                                         # 本条记录的哈希
@@ -273,6 +293,15 @@ class AuditRecord:
             "gen_ai.tool.sandbox.enforced": self.gen_ai_tool_sandbox_enforced,
             "gen_ai.tool.sandbox.image": self.gen_ai_tool_sandbox_image,
             "gen_ai.tool.sandbox.runtime": self.gen_ai_tool_sandbox_runtime,
+            "gen_ai.governance.tenant_id": self.gen_ai_governance_tenant_id,
+            "gen_ai.governance.human_principal": self.gen_ai_governance_human_principal,
+            "gen_ai.governance.agent_id": self.gen_ai_governance_agent_id,
+            "gen_ai.governance.data_domain": self.gen_ai_governance_data_domain,
+            "gen_ai.governance.resource_owner": self.gen_ai_governance_resource_owner,
+            "gen_ai.governance.task_id": self.gen_ai_governance_task_id,
+            "gen_ai.governance.cost_estimate_usd": self.gen_ai_governance_cost_estimate_usd,
+            "gen_ai.governance.output_estimate": self.gen_ai_governance_output_estimate,
+            "gen_ai.governance.capability_token": self.gen_ai_governance_capability_token,
             "record_hash": self.record_hash,
             "signature": self.signature,
         }

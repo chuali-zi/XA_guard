@@ -15,6 +15,16 @@ def test_repository_config_enables_spotlighting_by_default():
     cfg = XAGuardConfig.from_yaml(Path("configs") / "xa-guard.yaml")
 
     assert cfg.gate("gate1").options["spotlighting"]["enabled"] is True
+    assert cfg.governance.enabled is False
+    assert cfg.governance.registry_file == "configs/governance.demo.yaml"
+
+
+def test_governance_demo_config_enables_registry():
+    cfg = XAGuardConfig.from_yaml(Path("configs") / "xa-guard.governance-demo.yaml")
+
+    assert cfg.governance.enabled is True
+    assert cfg.governance.default_tenant == "acme-corp"
+    assert cfg.governance.registry_file == "configs/governance.demo.yaml"
 
 
 def test_docker_config_uses_static_downstream_manifest_and_sandbox_all_tools():

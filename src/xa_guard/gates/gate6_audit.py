@@ -138,6 +138,15 @@ class Gate6Audit(Gate):
             gen_ai_tool_sandbox_enforced=bool(sandbox_metadata.get("sandbox_enforced", False)),
             gen_ai_tool_sandbox_image=str(sandbox_metadata.get("docker_image") or ""),
             gen_ai_tool_sandbox_runtime=str(sandbox_metadata.get("runtime") or ""),
+            gen_ai_governance_tenant_id=ctx.tenant_id,
+            gen_ai_governance_human_principal=ctx.human_principal,
+            gen_ai_governance_agent_id=ctx.agent_id,
+            gen_ai_governance_data_domain=ctx.data_domain,
+            gen_ai_governance_resource_owner=ctx.resource_owner,
+            gen_ai_governance_task_id=ctx.task_id,
+            gen_ai_governance_cost_estimate_usd=ctx.cost_estimate_usd,
+            gen_ai_governance_output_estimate=ctx.output_estimate,
+            gen_ai_governance_capability_token=dict(ctx.capability_token_summary or {}),
         )
 
         # 6. 序列化 → ChainStore 追加（落盘并计算 record_hash）

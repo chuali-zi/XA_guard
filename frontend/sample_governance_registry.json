@@ -1,0 +1,101 @@
+{
+  "schema_version": "xa-guard-governance/v0.1",
+  "default_tenant": "acme-corp",
+  "employees": [
+    {
+      "principal": "alice.hr@acme.local",
+      "name": "Alice HR",
+      "department": "HR",
+      "roles": ["hr_staff"],
+      "data_domains": ["employee_profile", "payroll"],
+      "allowed_agents": ["hr-assistant", "general-office-agent"],
+      "budget_limit_usd": 20.0,
+      "spent_usd": 3.25
+    },
+    {
+      "principal": "bob.dev@acme.local",
+      "name": "Bob Engineer",
+      "department": "Engineering",
+      "roles": ["engineer"],
+      "data_domains": ["engineering_docs"],
+      "allowed_agents": ["general-office-agent"],
+      "budget_limit_usd": 8.0,
+      "spent_usd": 1.1
+    },
+    {
+      "principal": "carol.finance@acme.local",
+      "name": "Carol Finance",
+      "department": "Finance",
+      "roles": ["finance_staff"],
+      "data_domains": ["finance_report"],
+      "allowed_agents": ["finance-agent", "general-office-agent"],
+      "budget_limit_usd": 15.0,
+      "spent_usd": 4.4
+    }
+  ],
+  "agents": [
+    {
+      "agent_id": "general-office-agent",
+      "name": "通用办公智能体",
+      "owner": "platform-team",
+      "purpose": "通用摘要、邮件草拟和内部资料检索",
+      "allowed_tools": ["echo", "content_generation", "send_email", "read_log"],
+      "allowed_data_domains": ["employee_profile", "engineering_docs", "finance_report"],
+      "risk_level": "medium",
+      "max_autonomy": "assistive"
+    },
+    {
+      "agent_id": "hr-assistant",
+      "name": "HR 薪酬智能体",
+      "owner": "hr-security-owner",
+      "purpose": "HR 授权薪酬查询、员工资料整理和审批材料生成",
+      "allowed_tools": ["echo", "read_log", "content_generation", "send_email"],
+      "allowed_data_domains": ["employee_profile", "payroll"],
+      "risk_level": "high",
+      "max_autonomy": "approval_required"
+    },
+    {
+      "agent_id": "finance-agent",
+      "name": "财务分析智能体",
+      "owner": "finance-security-owner",
+      "purpose": "财报摘要和预算分析",
+      "allowed_tools": ["echo", "content_generation", "send_email"],
+      "allowed_data_domains": ["finance_report"],
+      "risk_level": "high",
+      "max_autonomy": "assistive"
+    }
+  ],
+  "data_domains": [
+    {
+      "domain_id": "employee_profile",
+      "name": "员工基础资料",
+      "sensitivity": "INTERNAL",
+      "allowed_departments": ["HR"],
+      "allowed_roles": ["hr_staff"]
+    },
+    {
+      "domain_id": "payroll",
+      "name": "工资条与薪酬明细",
+      "sensitivity": "CONFIDENTIAL",
+      "allowed_departments": ["HR"],
+      "allowed_roles": ["hr_staff"],
+      "allow_cross_subject_roles": ["hr_staff"],
+      "requires_approval": true
+    },
+    {
+      "domain_id": "engineering_docs",
+      "name": "研发内部资料",
+      "sensitivity": "INTERNAL",
+      "allowed_departments": ["Engineering"],
+      "allowed_roles": ["engineer"]
+    },
+    {
+      "domain_id": "finance_report",
+      "name": "财务报表",
+      "sensitivity": "CONFIDENTIAL",
+      "allowed_departments": ["Finance"],
+      "allowed_roles": ["finance_staff"],
+      "allow_cross_subject_roles": ["finance_staff"]
+    }
+  ]
+}

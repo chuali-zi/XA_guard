@@ -10,19 +10,20 @@
 
 ## 一句话
 
-> 给政府和国企用的 AI 助手装一套"安全管理系统"——任何遵循 MCP 协议的 LLM 客户端（Trae / Cursor / CodeBuddy / Qoder CN ...）改一行配置就能接入，6 关卡逐层拦截，输出可法庭呈堂的国密审计证据链。
+> 给政府和国企用的 AI 助手装一套"安全管理系统"——任何遵循 MCP 协议的 LLM 客户端（Trae / Cursor / CodeBuddy / Qoder CN ...）改一行配置就能接入，Agent Gateway 先做员工 / Agent / 数据域治理预检，再由 6 关卡逐层拦截，输出可法庭呈堂的国密审计证据链。
 
 ## 它是什么
 
 一个**双面 MCP 代理**：
 - 上游：作为 MCP Server 暴露给 LLM 客户端（stdio / Streamable HTTP）
 - 下游：作为 MCP Client 透传到真实工具（filesystem / shell / database / ...）
-- 中间：**6 关卡 pipeline** 逐层评估每次工具调用
+- 中间：**治理预检 + 6 关卡 pipeline** 逐层评估每次工具调用
 
 ```
 [Trae / Cursor / ...]
     ↓  MCP
 [XA-Guard]
+    ├ 治理预检 Agent Gateway ── 员工 / Agent / 数据域 / 成本归属
     ├ 关卡 1 门口安检         ── 赛题方向 1（输入攻击识别）
     ├ 关卡 2 办事大厅 HITL    ── 赛题方向 2（关键操作审批）
     ├ 关卡 3 规则引擎         ── 赛题方向 2（双层 Policy DSL：国标 baseline + 企业 overlay）
@@ -36,7 +37,7 @@
 配套：
 - **XA-Bench**（赛题方向 4 评测）：CSAB-Gov-mini 290 条 seed 回归 + 双 500 候选语料 + ASR/FPR/Recall/CuP/Latency
 - **AIBOM 准入网关**（赛题方向 3）：插件 AST 扫描 + CycloneDX-like BOM + schema/signing/drift + bench/真实 MCP `install_plugin` 离线 preflight
-- **演示前端**：审计回放时间线（单页 HTML，离线可用）
+- **演示前端**：审计回放时间线 + Agent Governance 控制台（单页 HTML，离线可用）
 - **演示脚本**：3 个攻击场景独立可跑
 
 ## 赛题 4 方向 ↔ 模块对照
@@ -345,8 +346,10 @@ jiebang/
 │   ├── scenarios/                  3 个攻击场景脚本
 │   └── .log/
 │
-├── frontend/                       审计回放时间线（单页 HTML）
+├── frontend/                       审计回放时间线 + Agent Governance 控制台（单页 HTML）
 │   ├── index.html / timeline.js / style.css / sample_audit.jsonl
+│   ├── governance.html / governance.js / governance.css
+│   ├── sample_governance_registry.json / sample_governance_audit.ndjson
 │   └── .log/
 │
 ├── docker/
