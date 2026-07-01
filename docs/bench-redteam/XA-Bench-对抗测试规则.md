@@ -68,7 +68,7 @@ actual_decision == expected_decision
 
 ## 3. hack-submission/v1 目标
 
-本轮新增 [`../bench/schema/hack-submission.schema.json`](../bench/schema/hack-submission.schema.json) 和 [`../bench/cases/hack-submission-template.yaml`](../bench/cases/hack-submission-template.yaml)。
+本轮新增 [`../bench/schema/hack-submission.schema.json`](../../bench/schema/hack-submission.schema.json) 和 [`../bench/cases/hack-submission-template.yaml`](../../bench/cases/hack-submission-template.yaml)。
 
 顶层结构：
 
@@ -265,7 +265,7 @@ dedupe:
 - 有严重性理由。
 - 有去重说明。
 - 最好有相邻 `benign_control`。
-- 若 case 用于验证 Gate3 规则，必须按 [规则测试样例约定](./规则测试样例约定.md) 绑定目标 `policy_refs`，并至少存在一条相邻正/反例。
+- 若 case 用于验证 Gate3 规则，必须按 [规则测试样例约定](../gates/规则测试样例约定.md) 绑定目标 `policy_refs`，并至少存在一条相邻正/反例。
 - 涉及日期、留存期、审批有效期、上线时间、备案时间或测评时间时，必须使用阳历/公历 ISO 8601 日期；相对日期必须同时给出 `reference_date`。
 
 ### 10.2 fixture extension
@@ -305,7 +305,7 @@ Gate3 规则扩展必须遵守“一规则一对正/反例”：
 - 需要相对时间语义时，在 payload 中显式写 `reference_date`，例如 `reference_date: "2026-06-04"`。
 - 闰年、月末、留存期边界等时间测试必须写成固定阳历日期。
 
-详细维护约定见 [规则测试样例约定](./规则测试样例约定.md)。
+详细维护约定见 [规则测试样例约定](../gates/规则测试样例约定.md)。
 
 ## 12. 覆盖率矩阵
 

@@ -1,19 +1,19 @@
 # XA-Guard 下一步 TODO 与交付收束计划
 
-> 快照时间：2026-06-30 19:28 PDT
+> 快照时间：2026-06-30 20:xx PDT（docs 物理重构后）
 > 适用目录：`D:\race\XA_guard\jiebang`
-> 最高依据：`docs/XA-202620中国雄安集团数字城市科技有限公司-面向政企场景的大模型智能体安全关键技术研究比赛方案.pdf`
-> 配套状态文件：`../status.md`
+> 最高依据：`docs/source-of-truth/XA-202620中国雄安集团数字城市科技有限公司-面向政企场景的大模型智能体安全关键技术研究比赛方案.pdf`
+> 配套状态文件：`../../status.md`
 > 本文件目标：把“现在是什么状态”和“下一步具体做什么”放在一个可执行入口里。
 
 ## 0. 先读结论
 
 当前仓库的主要矛盾已经不是“有没有安全原型”，而是“比赛交付证据还没有收束”。
 
-- 代码层：XA-Guard 六关卡、bench、审计、AIBOM、Docker/OPA/gVisor 静态配置、R2/R3 预算型 runner 已经很完整。
+- 代码层：XA-Guard 六关卡、bench、审计、AIBOM、Docker/OPA/gVisor 静态配置、R2/R3 预算型 runner、Agent Governance v1 已经很完整。
 - 证据层：L3 静态验收通过，部分真实验收通过，但真实 Trae、Linux gVisor、外部 AIBOM、第三方 TSA/HSM、R2/R3 sampled 正式结果、R1 独立 holdout 仍未闭环。
 - 交付层：仓库内没有发现 D1 技术方案 PDF 成稿、D3 演示视频、D4 审核通过报名表证据。官方交付最看重这三件和可复现代码链接。
-- 文档层：`docs/` 内容很丰富，但入口混合了赛题、PRD、架构、L2/L3、R2/R3、Gate 指南、研究资料和证据。现在应先靠本 TODO 和 `docs/README.md` 建立导航，不建议立刻大规模搬文件。
+- 文档层：`docs/` 已完成物理重构。顶层只保留 `docs/README.md`，本 TODO 已迁入 `docs/workplan/`；后续工作设计见 [NEXT-WORK-DESIGN.md](./NEXT-WORK-DESIGN.md)。
 
 **下一步第一优先级**：确认 D4 报名表是否已经在 2026-06-30 截止前系统审核通过。仓库没有证据能证明这一点，这是人工事项，不是代码事项。
 
@@ -21,9 +21,9 @@
 
 | 赛题原文要求 | 仓库对应 | 当前判断 | 下一步 |
 |---|---|---|---|
-| 技术方案报告 PDF，原则上不超过 30 页 | `docs/PRD.md`、`docs/产品架构.md`、`docs/项目总览.md`、`docs/force-ai-security-2026/` 可作为素材 | 未发现最终 D1 PDF 成稿 | 立刻起草 30 页以内 D1，所有数字只写已有证据或明确标注待测 |
+| 技术方案报告 PDF，原则上不超过 30 页 | `docs/planning/PRD.md`、`docs/planning/产品架构.md`、`docs/planning/项目总览.md`、`docs/research/force-ai-security-2026/` 可作为素材 | 未发现最终 D1 PDF 成稿 | 立刻起草 30 页以内 D1，所有数字只写已有证据或明确标注待测 |
 | 原型系统或核心算法代码，可复现关键技术验证结果，并提供运行说明、部署说明或代码仓库链接 | 根 `README.md`、`docker-compose.yml`、`configs/`、`scripts/`、`tests/` | D2 代码主体已具备，仍需最终 clean worktree、证据包和部署复验 | 做 release freeze、跑验证、生成 artifact hash 和最终说明 |
-| 演示视频，不超过 10 分钟，展示核心功能、关键流程和测试效果 | `frontend/`、`demo/`、`docs/产品架构.md` 视频脚本 | 未发现最终视频 | 按 7 段脚本录制，至少覆盖拦截、污点、审批、审计、评测 |
+| 演示视频，不超过 10 分钟，展示核心功能、关键流程和测试效果 | `frontend/`、`demo/`、`docs/planning/产品架构.md`、`docs/delivery/D3-video-script.md` | 未发现最终视频 | 按 10 分钟脚本录制，至少覆盖拦截、污点、审批、治理、审计、评测 |
 | 报名表，系统审核通过版，信息与系统一致 | 仓库无报名表证据 | 状态未知，且报名期为 2026-05-30 到 2026-06-30 | 人工确认系统审核状态和盖章扫描件 |
 | 可选补充材料：测试数据、评测脚本、攻击样例、审计日志样例 | `bench/`、`docs/evidence/`、`scripts/verify_audit.py`、`HACK-BENCH` 文档 | 已有大量素材，但尚未形成提交包索引 | 做 `artifact-hashes.json`、证据目录说明和提交邮件附件清单 |
 
@@ -57,7 +57,7 @@
 - 不能把 Trae 原生 elicitation 写成已验证。Trae 静态模板有，真实 GUI 截图/录像未补。
 - 不能把本地 TSA、软件 SM2 key 写成第三方 TSA/HSM。
 - 不能把内部 AIBOM exporter 写成合法外部 AIBOM 生成器。
-- 不能直接把 `docs/force-ai-security-2026/` 的外部事件和数字当正式引用。那是现场照片整理，正式引用前需要二次核验。
+- 不能直接把 `docs/research/force-ai-security-2026/` 的外部事件和数字当正式引用。那是现场照片整理，正式引用前需要二次核验。
 
 ## 3. P0 - 官方交付必做
 
@@ -82,13 +82,12 @@
 
 ### P0.2 收束 Git 状态和工作区归属
 
-当前 `jiebang` 工作树已有大量未提交修改；根目录下还有 `jiebang-agent-governance`，看起来是另一个 worktree/分支快照，并且 git 元数据指向异常。不能把两个状态混在一起写最终报告。
+状态：`DONE`。当前主线是 `D:\race\XA_guard\jiebang` 的 `main` 分支；此前重复的 `jiebang-agent-governance` worktree 已合并、清理，Agent Governance v1 已进入 main 并推送远端。
 
-- [ ] 在 `D:\race\XA_guard\jiebang` 执行 `git status --short`，列出所有变更。
-- [ ] 把变更分成四类：本轮文档整理、R2/R3 runner、force-ai-security 资料、其他旧变更。
-- [ ] 决定是否把当前 `jiebang` 作为唯一提交主线。
-- [ ] 检查 `jiebang-agent-governance` 中 Agent Governance v1 是否要合并到主线；不要直接混写状态。
-- [ ] 若要合并治理能力，先做单独设计评审：它是否进入 D1/D3，是否会扩大测试负担。
+- [x] 在 `D:\race\XA_guard\jiebang` 执行 `git status --short`，列出所有变更。
+- [x] 把当前 `jiebang` 作为唯一提交主线。
+- [x] 合并 Agent Governance v1 到 main。
+- [x] 清理重复 worktree 和过期本地分支。
 - [ ] 正式跑 R2/R3 或做 release 前，必须形成 clean worktree 或明确记录 dirty hash。
 - [ ] 不修改测试代码来掩盖失败；测试确实有问题时先单独提请审核。
 
@@ -117,7 +116,7 @@
 
 写作 TODO：
 
-- [ ] 先建 D1 草稿文件，例如 `docs/delivery/D1-technical-report-draft.md`，不要直接在 PRD 上改。
+- [x] 先建 D1 草稿文件：[../delivery/D1-technical-report-draft.md](../delivery/D1-technical-report-draft.md)，不要直接在 PRD 上改。
 - [ ] 用赛题 PDF 的四方向作为章节锚点，避免只写内部 L3 口径。
 - [ ] 每个技术点后面都写“当前实现证据”和“未完成边界”。
 - [ ] 图表至少准备 10 张草图：总架构、六 Gate、Agent Gateway、Policy DSL、污点传播、沙箱、审计链、benchmark 流程、提交物关系、风险矩阵。
@@ -212,8 +211,8 @@
 当前资产：
 
 - Gate1 规则检测、Spotlighting、模型检测后端壳。
-- `docs/gate1-real-model-verification.md`
-- `docs/gate1-holdout-protocol.md`
+- `docs/gates/gate1-real-model-verification.md`
+- `docs/gates/gate1-holdout-protocol.md`
 - 双 500 candidate 语料。
 - CSAB-Gov-mini seed。
 
@@ -260,7 +259,7 @@
 - AIBOM gateway。
 - 本地 artifact/hash 和离线镜像扫描。
 - CycloneDX 1.6 导入适配。
-- `docs/L3-aibom-external-generator.md`
+- `docs/acceptance/L3-aibom-external-generator.md`
 
 必须补：
 
@@ -308,7 +307,7 @@
 | 项 | 为什么重要 | 下一步动作 | 外部依赖 |
 |---|---|---|---|
 | R1 formal 双 500 + Gate1 holdout | 证明输入检测不是开发集自嗨 | 找独立评测人封存数据和 threshold lock | 独立评测方 |
-| R5 真实 Trae GUI | 国产生态硬承诺 | 按 `docs/L3-trae-static-integration.md` 录屏和验审计 | Trae 客户端 |
+| R5 真实 Trae GUI | 国产生态硬承诺 | 按 `docs/acceptance/L3-trae-static-integration.md` 录屏和验审计 | Trae 客户端 |
 | R6 Linux/gVisor runsc | 证明沙箱不是静态配置 | 在 Linux 主机安装 runsc，跑 no-egress/readonly/rootless 负测 | Linux 主机 |
 | R7 OPA 完整 parity | 策略引擎可信 | 固定 OPA image digest，跑全 fixture 和 drift 负测 | OPA 镜像/二进制 |
 | R8 外部 AIBOM | 方向 3 真实性 | 选定合法外部生成器并归档 BOM | 外部工具 |
@@ -319,58 +318,46 @@
 
 这些不是 9 月提交前必须完成，但适合进入未来工作或决赛打磨。
 
-- [ ] 决定是否合并 `jiebang-agent-governance` 的 Agent Governance v1：Agent identity、运行时治理预检、`gen_ai.governance.*` 审计、控制台。
-- [ ] 在 D1 中把 XA-Guard 表述成 Agent Gateway，而不是“过滤器集合”。
-- [ ] 增加“第三类身份”叙事：human principal、agent identity、task、scope、duration。
-- [ ] 设计 Capability Token：绑定 user、agent、action、resource、data label、expiry、approval id、policy hash。
+- [x] 合并 Agent Governance v1：Agent identity、运行时治理预检、`gen_ai.governance.*` 审计、静态治理控制台。
+- [x] 在项目叙事中把 XA-Guard 补充为 Agent Gateway，而不是“过滤器集合”。
+- [x] 增加“第三类身份”基础字段：human principal、agent identity、task、data domain、resource owner。
+- [x] Capability Token 审计摘要化：白名单字段保留，secret/token/signature 只落 hash。
 - [ ] 补工具组合风险测试：单工具 allow 但组合越权、RAG 隐藏指令到外发工具、审批拒绝后仍不得执行后续工具。
 - [ ] 补 Undo/补偿元数据：`side_effect_level`、`reversible`、`undo_tool`、`compensation_hint`。
 - [ ] 做 CodeBuddy / Qoder CN 基础 MCP 接入验证。
 - [ ] 如果资源允许，做 `research_full_matrix` 或本地/免费模型替代评测。
 
-## 7. docs 整理计划
+## 7. docs 整理状态
 
-### 7.1 现在不建议做的大动作
+### 7.1 已完成的物理重构
 
-不要马上把所有顶层文档搬到子目录。原因：
-
-- 当前 docs 内部相对链接很多，搬动会产生链接维护成本。
-- 很多文件已经被 README、status、PRD、日志引用。
-- 比赛提交前最重要的是收束交付，不是重构文档目录。
-
-### 7.2 当前采用的轻整理方式
-
-- `docs/README.md` 作为总入口。
-- `docs/TODO.md` 作为下一步执行入口。
-- `../status.md` 作为仓库状态和验收边界。
-- `../log.md` 作为客观工作历史。
-
-### 7.3 后续可执行的目录重构
-
-等 D1/D2/D3 收束后，再考虑把顶层文档整理成：
+状态：`DONE`。`docs/` 顶层现在只保留 `README.md`，其他顶层文档已按职责迁入分类目录。
 
 ```text
 docs/
 ├── README.md
-├── TODO.md
 ├── source-of-truth/
 │   ├── 事实源.md
 │   └── XA-202620...比赛方案.pdf
-├── product/
+├── planning/
 │   ├── PRD.md
 │   ├── 产品架构.md
 │   └── 项目总览.md
+├── workplan/
+│   ├── TODO.md
+│   └── NEXT-WORK-DESIGN.md
 ├── acceptance/
 │   ├── L2-acceptance-checklist.md
 │   ├── L2-verification-commands.md
 │   ├── L3-test-and-acceptance.md
 │   ├── R2-R3矩阵自动验收使用说明.md
 │   └── R2-R3完整矩阵预算分析.md
-├── gate-guides/
+├── gates/
 │   ├── gate1-real-model-verification.md
 │   ├── gate1-holdout-protocol.md
 │   ├── Gate2-3-4策略审核指南.md
 │   └── L3-trae-static-integration.md
+├── bench-redteam/
 ├── delivery/
 │   ├── D1-technical-report-draft.md
 │   ├── D3-video-script.md
@@ -380,38 +367,38 @@ docs/
 └── references/
 ```
 
-迁移前必须：
+### 7.2 后续维护要求
 
-- [ ] 用 `rg` 找所有引用。
-- [ ] 批量修相对链接。
-- [ ] 跑链接检查。
-- [ ] 更新根 README 和 docs README。
-- [ ] 在 `log.md` 记录迁移。
+- 新增交付文件放 `docs/delivery/`。
+- 新增工作安排放 `docs/workplan/`。
+- 新增验收说明放 `docs/acceptance/`。
+- 新增 Gate 级策略/风险说明放 `docs/gates/`。
+- 新增研究资料放 `docs/research/` 或 `docs/references/`。
+- 移动文件后必须跑链接检查，并更新 `docs/README.md`。
 
-### 7.4 顶层文档当前角色
+### 7.3 旧顶层文档现在的位置
 
-| 文档 | 当前角色 | 是否建议保留在顶层 |
+| 文档 | 当前位置 | 状态 |
 |---|---|---|
-| `README.md` | docs 总入口 | 是 |
-| `TODO.md` | 下一步执行入口 | 是 |
-| `事实源.md` | 事实权威 | 是 |
-| `PRD.md` | KPI 和验收标尺 | 是 |
-| `产品架构.md` | 产品/技术架构 | 是 |
-| `项目总览.md` | 新人全员手册 | 是，但后续可精简 |
-| `L3-test-and-acceptance.md` | 当前验收主口径 | 是 |
-| `R2-R3*.md` | 外部 benchmark 专题 | 可后续入 `acceptance/` |
-| `HACK-BENCH-组员提交规范.md` | red-team 协作 | 可后续入 `bench/` 或 `acceptance/` |
-| `XA-Bench-对抗测试规则.md` | bench 维护 | 可后续入 `acceptance/` |
-| `force-ai-security-2026/` | 研究/答辩素材 | 已是子目录，保持 |
+| `TODO.md` | `docs/workplan/TODO.md` | `TODO` |
+| `事实源.md` | `docs/source-of-truth/事实源.md` | `DONE` |
+| `PRD.md` | `docs/planning/PRD.md` | `PARTIAL` |
+| `产品架构.md` | `docs/planning/产品架构.md` | `PARTIAL` |
+| `项目总览.md` | `docs/planning/项目总览.md` | `REFERENCE` |
+| `L3-test-and-acceptance.md` | `docs/acceptance/L3-test-and-acceptance.md` | `PARTIAL/BLOCKED` |
+| `R2-R3*.md` | `docs/acceptance/` | `TODO/BLOCKED` |
+| `HACK-BENCH-组员提交规范.md` | `docs/bench-redteam/` | `REFERENCE` |
+| `XA-Bench-对抗测试规则.md` | `docs/bench-redteam/` | `REFERENCE` |
+| `force-ai-security-2026/` | `docs/research/force-ai-security-2026/` | `REFERENCE` |
 
 ## 8. 建议的执行顺序
 
 ### 第 0 步：当天立即做
 
 1. 确认 D4 报名是否审核通过。
-2. 确认以 `jiebang` 还是 `jiebang-agent-governance` 为主线。
-3. 检查当前工作树，决定哪些变更先 commit 或另存。
-4. 建 D1 草稿目录和视频脚本草稿。
+2. 检查当前工作树，确认 release 前 clean。
+3. 基于 `docs/delivery/` 完成 D1 草稿和 D3 视频脚本。
+4. 按 `docs/workplan/NEXT-WORK-DESIGN.md` 执行 P0。
 
 ### 第 1 步：不花钱验证
 

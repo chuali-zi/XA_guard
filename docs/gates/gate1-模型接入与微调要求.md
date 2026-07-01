@@ -6,7 +6,7 @@
 > - 选型留痕：`status.md` §"Gate 1 模型选型留痕（2026-05-27 子 agent 调研结论）"  
 > - 现有规则实现：`src/xa_guard/gates/gate1_input.py`  
 > - 危险模式类目：`policies/dangerous_patterns.yaml`  
-> - 产品架构：`docs/产品架构.md` §关卡 1  
+> - 产品架构：`docs/planning/产品架构.md` §关卡 1
 >
 > **更新时间**：2026-05-28  
 > **维护者**：文档子 agent

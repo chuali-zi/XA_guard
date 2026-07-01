@@ -4,7 +4,7 @@
 >
 > 核心原则：这是比赛项目。任何 hack 工作都必须服务于赛题要求、可复现评测和客观证据，不做脱离 XA-Guard MCP 防护栏的零散攻击脑暴。
 >
-> 权威顺序：官方赛题 PDF > [`事实源.md`](./事实源.md) > [`PRD.md`](./PRD.md) > 本规范 > 当前代码与 [`../status.md`](../status.md) 的客观状态。
+> 权威顺序：官方赛题 PDF > [`事实源.md`](../source-of-truth/事实源.md) > [`PRD.md`](../planning/PRD.md) > 本规范 > 当前代码与 [`../status.md`](../../status.md) 的客观状态。
 
 ## 1. 你的任务是什么
 
@@ -87,7 +87,7 @@
 
 ## 5. 三种提交位置
 
-使用 [`../bench/cases/hack-submission-template.yaml`](../bench/cases/hack-submission-template.yaml) 作为模板。
+使用 [`../bench/cases/hack-submission-template.yaml`](../../bench/cases/hack-submission-template.yaml) 作为模板。
 
 ### 5.1 `cases`
 

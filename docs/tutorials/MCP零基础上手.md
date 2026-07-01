@@ -2,9 +2,9 @@
 
 > **这份文档的目标**：让团队里**零经验**的组员，在**3 小时内**搞懂 MCP 是什么 + 跑出一个能用的 MCP Server + 接入**国产 AI 工具（Trae / CodeBuddy / 通义灵码等）**实际看到效果。
 >
-> **配套**：本文是动手指南。`docs/产品架构.md` 是项目设计文档。`docs/references/literature/INDEX.md` 是文献库。
+> **配套**：本文是动手指南。`docs/planning/产品架构.md` 是项目设计文档。`docs/references/literature/INDEX.md` 是文献库。
 
-> ⚠ **本文档遵循 [`docs/事实源.md`](../事实源.md) v1.1 作为权威事实源**。上次纠偏：2026-05-24
+> ⚠ **本文档遵循 [`docs/source-of-truth/事实源.md`](../source-of-truth/事实源.md) v1.1 作为权威事实源**。上次纠偏：2026-05-24
 
 ---
 
@@ -59,7 +59,7 @@
 
 ### 2.1 我们的产品形态选择
 
-我们项目的产品形态是 **「XA-Guard MCP Server」**——一个"装在 LLM 客户端和工具之间"的安全代理。详见 [产品架构.md](../产品架构.md)。
+我们项目的产品形态是 **「XA-Guard MCP Server」**——一个"装在 LLM 客户端和工具之间"的安全代理。详见 [产品架构.md](../planning/产品架构.md)。
 
 ```
 [国产 AI 工具：Trae / CodeBuddy / 通义灵码 / Qcoder / ...]
@@ -672,7 +672,7 @@ xa_guard:
 
 1. **MCP 协议规范**：https://spec.modelcontextprotocol.io
 2. **MCP 安全研究**（这是我们的方向）：
-   - 我们 reference 库的 [02_tool_security/](../references/literature/02_tool_security/) 全部
+   - 我们 reference 库的 [02_tool_security/](../references/literature/02_tool_security) 全部
    - GitHub 上搜 "mcp security" / "mcp guardrail"
 
 ### 10.4 实战示例
@@ -785,8 +785,8 @@ OpenAPI 和 gRPC 是 RPC 协议——为人写的代码调用设计。MCP 专为
 
 ## 相关文档
 
-- [项目总览.md](../项目总览.md) — 项目全局
-- [产品架构.md](../产品架构.md) — XA-Guard 三件套设计
+- [项目总览.md](../planning/项目总览.md) — 项目全局
+- [产品架构.md](../planning/产品架构.md) — XA-Guard 三件套设计
 - [文献库 INDEX.md](../references/literature/INDEX.md) — 文献库
 - [../../status.md](../../status.md) — 当前仓库能力和缺口
 - [../../log.md](../../log.md) — 客观工作日志

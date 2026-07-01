@@ -1,6 +1,6 @@
 # reference/ 文献库总索引
 
-> ⚠ **本文档遵循 [`docs/事实源.md`](../../事实源.md) v1.1 作为权威事实源**。上次纠偏：2026-05-24
+> ⚠ **本文档遵循 [`docs/source-of-truth/事实源.md`](../../source-of-truth/事实源.md) v1.1 作为权威事实源**。上次纠偏：2026-05-24
 
 > **欢迎来到我们的本地文献库**。这里是项目所有学术论文 + 行业标准 + 真实事件的归档地。
 >
@@ -12,11 +12,11 @@
 
 | 方向 | 内容 | PDF | MD | README |
 |---|---|---|---|---|
-| [01_input_attack](./01_input_attack/) | 输入链路防御（提示注入 / RAG 投毒 / 越狱 / 间接注入） | 22 | 22 | ✓ |
-| [02_tool_security](./02_tool_security/) | 工具调用安全（评测基准 / 中间策略 / 异常检测 / 沙箱） | 18 | 21 | ✓ |
-| [03_supply_chain](./03_supply_chain/) | 第三方组件可信审计（AIBOM / 开源工具 / 真实事件） | 2 | 11 | ✓ |
-| [04_eval_audit](./04_eval_audit/) | 评测审计（评测基准 / 运行追溯 / CoT 忠实度） | 13 | 18 | ✓ |
-| [05_standards](./05_standards/) | 合规标准（中国 / 国际） | 0 | 14 | ✓ |
+| [01_input_attack](./01_input_attack) | 输入链路防御（提示注入 / RAG 投毒 / 越狱 / 间接注入） | 22 | 22 | ✓ |
+| [02_tool_security](./02_tool_security) | 工具调用安全（评测基准 / 中间策略 / 异常检测 / 沙箱） | 18 | 21 | ✓ |
+| [03_supply_chain](./03_supply_chain) | 第三方组件可信审计（AIBOM / 开源工具 / 真实事件） | 2 | 11 | ✓ |
+| [04_eval_audit](./04_eval_audit) | 评测审计（评测基准 / 运行追溯 / CoT 忠实度） | 13 | 18 | ✓ |
+| [05_standards](./05_standards) | 合规标准（中国 / 国际） | 0 | 14 | ✓ |
 | **总计** | | **55** | **86** | **5** |
 
 > 注：方向 5 的合规文档基本无公开 PDF（需到官方网站访问），故只有 md 介绍。
@@ -29,7 +29,7 @@
 如果你只有 5 分钟，请按这条路径读：
 
 1. **本文件**（你正在看）—— 整体导览
-2. **[项目总览.md](../../项目总览.md)** —— 项目方案总览（如未读）
+2. **[项目总览.md](../../planning/项目总览.md)** —— 项目方案总览（如未读）
 3. **[status.md](../../../status.md)** —— 当前仓库能力与未决问题（如未读）
 
 ---
@@ -70,7 +70,7 @@
 ### 我要做关卡 3（规则编译器）★ 核心创新
 - **DSL 设计**：[AgentSpec](./02_tool_security/2.2_middle_policy/2026-AgentSpec.md), [ShieldAgent](./02_tool_security/2.2_middle_policy/2025-ShieldAgent.md)
 - **运行时执行**：[Conseca](./02_tool_security/2.2_middle_policy/2025-Conseca.md), [GuardAgent](./02_tool_security/2.2_middle_policy/2024-GuardAgent.md)
-- **合规来源**：[05_standards](./05_standards/) 全部
+- **合规来源**：[05_standards](./05_standards) 全部
 - **特别推荐**：[TC260-003](./05_standards/TC260-003.md), [GBT-45654-2025](./05_standards/GBT-45654-2025.md), [Equal-Protection-2.0](./05_standards/Equal-Protection-2.0.md)
 
 ### 我要做关卡 4（机密文件袋·三色污点）
@@ -96,7 +96,7 @@
 - **多维度评测**：[TrustLLM](./04_eval_audit/4.1_benchmarks/2024-TrustLLM.md), [DecodingTrust](./04_eval_audit/4.1_benchmarks/2023-DecodingTrust.md)
 - **合规对齐**：[AIR-Bench](./04_eval_audit/4.1_benchmarks/2024-AIR-Bench.md), [ASB](./04_eval_audit/4.1_benchmarks/2024-ASB.md)
 - **间接注入**：[InjecAgent](./01_input_attack/1.4_indirect_injection/2024-InjecAgent.md)
-- **政企用例设计参考**：[05_standards](./05_standards/) 全部
+- **政企用例设计参考**：[05_standards](./05_standards) 全部
 
 ### 我要做 AIBOM 准入网关（加分项）
 - **学术框架**：[Agentic-AIBOM](./03_supply_chain/2026-Agentic-AIBOM.md), [AIRS-Framework](./03_supply_chain/2025-AIRS-Framework.md)
@@ -122,7 +122,7 @@
 ### M3（2026-08）三大核心创新
 - 必读：方向 2 子方向 2.2（中间策略）全部
 - 必读：[CaMeL](./02_tool_security/2.2_middle_policy/2025-CaMeL.md), [IsolateGPT](./02_tool_security/2.2_middle_policy/2025-IsolateGPT.md), [AgentSpec](./02_tool_security/2.2_middle_policy/2026-AgentSpec.md)
-- 必读：[05_standards](./05_standards/) 中国部分全部
+- 必读：[05_standards](./05_standards) 中国部分全部
 - 必读：方向 1 子方向 1.2 RAG 投毒全部（关卡 4 需要）
 
 ### M4（2026-09）审计 + 评测 + 提交

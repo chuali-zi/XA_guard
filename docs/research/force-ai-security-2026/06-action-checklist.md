@@ -14,8 +14,8 @@
 
 建议落到：
 
-- `docs/产品架构.md`
-- `docs/项目总览.md`
+- `docs/planning/产品架构.md`
+- `docs/planning/项目总览.md`
 - 最终 PPT
 
 ### 1.2 增加“第三类身份”章节

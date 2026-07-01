@@ -1,5 +1,28 @@
 # 工作日志
 
+## 2026-06-30 20:30 PDT docs 物理重构与下一步工作设计
+
+起因：用户要求按既定计划实现 `docs/` 内部物理重构，把混乱的顶层文档分类存储，并为接下来要做的工作留下规范设计文档，同时标注已完成、部分完成、阻塞和待办状态。
+
+已完成：
+- 使用 `git mv` 将 `docs/` 顶层文件迁入分类目录：`source-of-truth/`、`planning/`、`workplan/`、`delivery/`、`acceptance/`、`gates/`、`bench-redteam/`、`research/`。
+- `docs/` 顶层现在只保留 `README.md`；`evidence/`、`references/`、`tutorials/` 内部结构未改。
+- 将赛题 PDF 和事实源迁入 `docs/source-of-truth/`；PRD、产品架构、项目总览迁入 `docs/planning/`；L2/L3/R2-R3/Trae/AIBOM/external benchmark 说明迁入 `docs/acceptance/`；Gate 专题迁入 `docs/gates/`；HACK-BENCH 与 XA-Bench 规则迁入 `docs/bench-redteam/`；FORCE 会议资料迁入 `docs/research/force-ai-security-2026/`。
+- 重写 `docs/README.md` 为唯一文档入口，加入 30 秒目录树、下一步入口、目录职责和 `DONE/PARTIAL/BLOCKED/TODO/REFERENCE/ARCHIVE` 状态标签。
+- 新增 `docs/workplan/NEXT-WORK-DESIGN.md`，固定当前总体结论、D1-D4 状态、四个赛题方向状态、L3/R1-R9 状态、P0/P1/P2 执行顺序和不可夸大声明。
+- 新增 `docs/delivery/D1-technical-report-draft.md`、`docs/delivery/D3-video-script.md`、`docs/delivery/submission-checklist.md`，作为 D1 PDF、D3 视频和最终提交包的工作区骨架。
+- 更新 `docs/workplan/TODO.md`：标记 docs 物理重构已完成，Agent Governance v1 已合入 main；保留 D1/D3/D4、R2/R3 sampled、真实 Trae、Linux gVisor、外部 AIBOM、第三方 TSA/HSM 等待办或阻塞状态。
+- 批量修复 Markdown 相对链接，并同步更新根 `README.md`、`status.md` 和 docs 内引用路径。
+
+验证：
+- 本地 Markdown 链接检查：`missing_links=0`。
+- 旧核心路径扫描未发现残留：`docs/TODO.md`、`docs/PRD.md`、`docs/产品架构.md`、`docs/L3-test-and-acceptance.md`、`docs/R2-R3矩阵自动验收使用说明.md`、`docs/事实源.md`、`docs/force-ai-security-2026`。
+
+未完成 / 客观边界：
+- 本轮只整理文档结构和工作设计，不修改产品代码、测试代码、runner、配置或验收脚本。
+- 本轮不新增代码能力、测试结论、L3 最终验收结论、R2/R3 sampled 成绩或正式比赛交付物。
+- D1 PDF、D3 视频、D4 报名材料、真实 Trae、Linux gVisor、外部 AIBOM、第三方 TSA/HSM 仍需后续执行。
+
 ## 2026-06-30 19:48 PDT Agent Governance 合入 main 与身份鉴权状态收束
 
 起因：用户要求直接修复，把身份管理和鉴权并到 `main`，整理仓库中重复或异常的文件夹/分支，并在完成后提交、推送。
@@ -32,11 +55,11 @@
 起因：用户要求详细分析赛题、已有 docs 和当前仓库状态，把“下一步该干什么”的详细 TODO 放到 docs，并整理混乱的 docs 入口。
 
 已完成：
-- 读取 `AGENTS.md`、`status.md`、根 `README.md`、`docs/README.md`、`docs/PRD.md`、`docs/事实源.md`、`docs/L3-test-and-acceptance.md`、`docs/R2-R3完整矩阵预算分析.md`、`docs/R2-R3矩阵自动验收使用说明.md`、`docs/产品架构.md`、`docs/项目总览.md`、Trae/AIBOM/force-ai 相关文档。
+- 读取 `AGENTS.md`、`status.md`、根 `README.md`、`docs/README.md`、`docs/planning/PRD.md`、`docs/source-of-truth/事实源.md`、`docs/acceptance/L3-test-and-acceptance.md`、`docs/acceptance/R2-R3完整矩阵预算分析.md`、`docs/acceptance/R2-R3矩阵自动验收使用说明.md`、`docs/planning/产品架构.md`、`docs/planning/项目总览.md`、Trae/AIBOM/force-ai 相关文档。
 - 使用 `pypdf` 抽取并核对赛题 PDF 9 页正文，确认官方交付物为 D1 技术方案 PDF、D2 原型代码/仓库链接、D3 10 分钟内视频、D4 审核通过报名表；评分维度为实际效果 30%、技术创新性 25%、方案完整性 20%、应用价值 20%、展示表达 5%。
-- 新增 `docs/TODO.md`，按官方交付物、当前状态分层、P0/P1/P2、四个赛题方向、L3 真实验收、docs 整理计划、执行顺序、不做清单和最小完成定义整理下一步。
-- 更新 `docs/README.md`，把 `docs/TODO.md` 放入 30 秒目录树和核心入口，新增“当前最该看的 5 个入口”和“我要推进当前交付”的阅读路径。
-- 更新 `status.md`，记录 `docs/TODO.md` 已成为当前执行入口，并说明本轮只改变文档导航和状态口径，不改变代码能力、测试结果或 L3 验收状态。
+- 新增 `docs/workplan/TODO.md`，按官方交付物、当前状态分层、P0/P1/P2、四个赛题方向、L3 真实验收、docs 整理计划、执行顺序、不做清单和最小完成定义整理下一步。
+- 更新 `docs/README.md`，把 `docs/workplan/TODO.md` 放入 30 秒目录树和核心入口，新增“当前最该看的 5 个入口”和“我要推进当前交付”的阅读路径。
+- 更新 `status.md`，记录 `docs/workplan/TODO.md` 已成为当前执行入口，并说明本轮只改变文档导航和状态口径，不改变代码能力、测试结果或 L3 验收状态。
 - 识别根目录下还有 `jiebang-agent-governance` 另一工作树/分支快照，且其 git 元数据访问异常；本轮没有混合两个目录的状态，整理落在 `D:\race\XA_guard\jiebang`。
 
 未完成 / 客观边界：
@@ -44,19 +67,19 @@
 - 没有修改产品代码、测试代码、benchmark、配置或 runner。
 - 没有运行 pytest、ruff、L3 verifier、Docker、Trae 或任何付费模型调用。
 - 没有生成 D1 PDF、D3 视频、D4 报名表或正式提交包。
-- `docs/TODO.md` 中关于 D4 报名状态、真实 Trae、Linux gVisor、外部 AIBOM、第三方 TSA/HSM、R2/R3 sampled 结果等仍是待办或 blocker，不代表已完成。
+- `docs/workplan/TODO.md` 中关于 D4 报名状态、真实 Trae、Linux gVisor、外部 AIBOM、第三方 TSA/HSM、R2/R3 sampled 结果等仍是待办或 blocker，不代表已完成。
 
 下一步：
 - 先人工确认 D4 报名是否已在 2026-06-30 截止前审核通过。
 - 再收束 `jiebang` 工作树和分支归属，决定是否合并 `jiebang-agent-governance` 的治理能力。
-- 按 `docs/TODO.md` 的 P0 顺序推进：D1 草稿、D2 证据包、D3 视频脚本/录制、R2/R3 sampled dry-run 与授权后实跑。
+- 按 `docs/workplan/TODO.md` 的 P0 顺序推进：D1 草稿、D2 证据包、D3 视频脚本/录制、R2/R3 sampled dry-run 与授权后实跑。
 
 ## 2026-06-23 05:58 PDT 原动力大会 AI 安全 PPT 照片整理
 
 起因：用户提供 22 张 2026 原动力大会现场 PPT 照片，要求不要按固定字数凑一篇，而是自主分析、拆分成若干 Markdown，全面细致且好读懂，放入 `docs` 新目录中。同时按仓库规则维护 `status.md` 和 `log.md`。
 
 已完成：
-- 新增 `docs/force-ai-security-2026/` 专题目录。
+- 新增 `docs/research/force-ai-security-2026/` 专题目录。
 - 新增 `README.md` 作为总览，说明来源、性质、核心判断和 6 个子文档导航。
 - 新增 `01-slide-notes.md`，按 22 张照片顺序转写可辨识 PPT 信息，并对每页补充项目理解；未强行补全看不清的文字。
 - 新增 `02-risk-landscape.md`，抽象出企业智能体安全风险图谱，覆盖六大挑战、数据路径全链攻击、Computer Use Agent、Shadow AI、基础设施错配、责任量化和 OWASP AT0-AT8 成熟度。
@@ -112,7 +135,7 @@
 - 将 R2/R3 正式预算口径从 `$20 competition_budget_v1` 调整为 `subscription_budget60_v1`：总 cap `$60`，分桶为 calibration `$6`、R2 main `$32`、R3 main `$16`、retry `$6`。
 - `configs/r2-r3-acceptance.example.json` 与 `configs/r2-r3-acceptance.local.json` 改为新输出目录 `D:/evidence/r2-r3-subscription-budget60-v1`，保留 `max_invocation_reserve_usd=0.20`，新增 `max_jobs_per_invocation=8`。
 - `scripts/run_r2_r3_acceptance.py` 新增配置级批次上限：`budget-run`/`budget-resume` 未显式传 `--max-jobs` 时默认最多执行 8 个未完成 jobs，便于按 5h/周额度窗口分批 resume；已完成且锁匹配的 job 继续跳过。
-- 更新 `README.md`、`docs/PRD.md`、`docs/L3-test-and-acceptance.md`、`docs/R2-R3矩阵自动验收使用说明.md`、`docs/R2-R3完整矩阵预算分析.md` 和 `status.md`，明确旧 `$10` 首批失败校准/历史 smoke 不进入新正式分母，后续必须新输出目录、新 manifest。
+- 更新 `README.md`、`docs/planning/PRD.md`、`docs/acceptance/L3-test-and-acceptance.md`、`docs/acceptance/R2-R3矩阵自动验收使用说明.md`、`docs/acceptance/R2-R3完整矩阵预算分析.md` 和 `status.md`，明确旧 `$10` 首批失败校准/历史 smoke 不进入新正式分母，后续必须新输出目录、新 manifest。
 - 新增单测覆盖默认批次上限。
 
 未完成 / 边界：
@@ -184,7 +207,7 @@
 - 在 MCP upstream 支持保留入参 `_xa_guard` envelope：提取治理字段写入 `GateContext`，并在调用下游前从工具参数中剥离，避免治理元数据泄露给业务工具；pending ledger 同步保留治理字段。
 - 扩展 Gate3 predicate 环境，使策略表达可读取 `principal`、`agent_id`、`tenant`、`data_domain`、`resource_owner`、`task_id` 等治理变量。
 - 新增 `frontend/governance.html`、`governance.js`、`governance.css`、`sample_governance_registry.json`、`sample_governance_audit.ndjson`，提供静态私有化治理控制台：资产盘点、员工-数据域矩阵、工资条越权/HR 审批样例、成本估算和治理审计时间线。
-- 更新 README、`docs/产品架构.md`、`docs/PRD.md`、`frontend/__init__.py` 和 `status.md`，将项目叙事补充为 Agent Gateway + 治理控制面，同时明确 v1 不是 SaaS，不声明完整 Shadow AI / 多 Agent 编排治理。
+- 更新 README、`docs/planning/产品架构.md`、`docs/planning/PRD.md`、`frontend/__init__.py` 和 `status.md`，将项目叙事补充为 Agent Gateway + 治理控制面，同时明确 v1 不是 SaaS，不声明完整 Shadow AI / 多 Agent 编排治理。
 - 新增 `tests/unit/test_governance.py` 和 `tests/integration/test_governance_mcp.py`；更新配置测试。
 
 验证：
@@ -247,10 +270,10 @@
 
 已完成：
 - 复核比赛方案 PDF 第 3-4 页：原文要求原型/核心算法可复现关键技术验证结果，并展示量化测试效果；未指定 AgentDojo/InjecAgent，更未要求 2,986-job 全矩阵。由此将后续自设的“全矩阵才算比赛完成”纠正为研究级扩展口径。
-- 修改 `docs/PRD.md`：比赛正式目标定义为 `competition_budget_v1`；未来新增模型 API 总成本 ≤ `$20`，R2/R3 固定模型、预注册分层样本、baseline/defended 成对，报告点估计和 95% Wilson 区间。2,986-job 全矩阵移入 Could/研究级扩展，不再作为 Must 或比赛 blocker。
-- 修改 `docs/L3-test-and-acceptance.md`：明确这是项目自定义 L3 而非比赛官方规范；拆分 `competition_budget_v1` 与 `research_full_matrix`。预算型结果使用 `MEETS_SAMPLED_POINT_TARGET` / `CONFIDENCE_SUPPORTED` / `DOES_NOT_MEET_SAMPLED_TARGET` / `INCONCLUSIVE`，不得冒充 full/official；完整矩阵未执行记 `DEFERRED_OPTIONAL`。
-- 修改 `docs/R2-R3矩阵自动验收使用说明.md`：删除“用户确认约 `$289` 后直接去掉 `--max-jobs`”的正式任务目标；固定未来预算为校准 `$2`、主评测 `$16`（R2 `$10` + R3 `$6`）、重试 `$2`，seed `20260622`，R2 各 suite 至少 8 个配对 case。明确当前 `--max-jobs` 只是完整 plan 前缀，不能冒充分层抽样。
-- 更新 `docs/R2-R3完整矩阵预算分析.md`：记录用户已选择双基准分层抽样，现有 `$0.39` smoke 不进入未来预算和 sampled 分母，完整矩阵只保留成本分析与可选研究价值。
+- 修改 `docs/planning/PRD.md`：比赛正式目标定义为 `competition_budget_v1`；未来新增模型 API 总成本 ≤ `$20`，R2/R3 固定模型、预注册分层样本、baseline/defended 成对，报告点估计和 95% Wilson 区间。2,986-job 全矩阵移入 Could/研究级扩展，不再作为 Must 或比赛 blocker。
+- 修改 `docs/acceptance/L3-test-and-acceptance.md`：明确这是项目自定义 L3 而非比赛官方规范；拆分 `competition_budget_v1` 与 `research_full_matrix`。预算型结果使用 `MEETS_SAMPLED_POINT_TARGET` / `CONFIDENCE_SUPPORTED` / `DOES_NOT_MEET_SAMPLED_TARGET` / `INCONCLUSIVE`，不得冒充 full/official；完整矩阵未执行记 `DEFERRED_OPTIONAL`。
+- 修改 `docs/acceptance/R2-R3矩阵自动验收使用说明.md`：删除“用户确认约 `$289` 后直接去掉 `--max-jobs`”的正式任务目标；固定未来预算为校准 `$2`、主评测 `$16`（R2 `$10` + R3 `$6`）、重试 `$2`，seed `20260622`，R2 各 suite 至少 8 个配对 case。明确当前 `--max-jobs` 只是完整 plan 前缀，不能冒充分层抽样。
+- 更新 `docs/acceptance/R2-R3完整矩阵预算分析.md`：记录用户已选择双基准分层抽样，现有 `$0.39` smoke 不进入未来预算和 sampled 分母，完整矩阵只保留成本分析与可选研究价值。
 - 更新 `README.md` 与 `status.md`：当前 R2/R3 状态为 smoke 已完成、`competition_budget_v1` 工具与真实结果待完成；2,986-job 全矩阵为 `DEFERRED_OPTIONAL`，不再列入比赛差距或 BLOCKED 清单。
 
 未完成 / 边界：
@@ -266,12 +289,12 @@
 起因：用户明确表示学生经费上限为 20 美元，要求先详细判断现有完整 R2/R3 矩阵预算是否合理、费用为何高，再讨论压缩方案。本轮只做证据分析与文档维护，没有启动新模型调用，没有修改产品代码、benchmark、scorer、parser、测试或验收门槛。
 
 已完成：
-- 对照 `docs/R2-R3矩阵自动验收使用说明.md`、`configs/r2-r3-acceptance.example.json`、`scripts/run_r2_r3_acceptance.py`、两个单 case runner 和 AgentDojo 已安装上游实现，复核冻结 plan 的规模：R2 949 case×2 arms=1,898 jobs；R3 DS/base 544 case×2 arms=1,088 jobs；总计 2,986 jobs。
+- 对照 `docs/acceptance/R2-R3矩阵自动验收使用说明.md`、`configs/r2-r3-acceptance.example.json`、`scripts/run_r2_r3_acceptance.py`、两个单 case runner 和 AgentDojo 已安装上游实现，复核冻结 plan 的规模：R2 949 case×2 arms=1,898 jobs；R3 DS/base 544 case×2 arms=1,088 jobs；总计 2,986 jobs。
 - 从 `D:/evidence/r2-r3-20260621b/jobs/*/logs/opencode-invocations.jsonl` 的 provider `cost` 字段独立重算 4-job smoke：总成本 `$0.38763088`，日志均值 `$0.09690772/job`；四 job 分别为 `$0.12214694 / $0.09391146 / $0.06793390 / $0.10363858`。
 - 核查 `state.json` 与调用序列，确认首个 baseline 第一次 benchmark attempt 在产生约 `$0.0632` 费用后因响应 schema 不兼容失败，第二次成功；该兼容问题已修复。排除此一次性损耗后，4 个成功结果对应约 `$0.3244`、均值约 `$0.0811/job`。
 - 认定旧 `$289` 的算术来源正确（4 个 R2/workspace job 的未修正均价×2,986），适合作为保守额度 cap；但它不是可靠账单预测，因为样本只有同一 workspace user task、完全不含 R3、含一次已修复的付费失败。反向风险包括复杂 case、R3 第二阶段、限流和格式重试。
 - 发现当前 AgentDojo 单 case 子进程架构存在显著重复：四 suite 仅 35 个唯一 injection tasks，但两个 arm 的 1,898 个组合会各自进入 injection-task utility 计算；按 suite/arm 批量执行并复用官方 trace cache，理论上可把这类入口从 1,898 降至 70（核心的 1,898 个 injected 组合仍必须真实运行）。
-- 新增 `docs/R2-R3完整矩阵预算分析.md`，记录账单拆解、误差边界、成本成因、可合法去重项、20 美元分层抽样/R3 优先/先改批处理三条路线，以及禁止通过删 case、改 scorer/门槛或混用模型伪造完整 PASS 的边界。
+- 新增 `docs/acceptance/R2-R3完整矩阵预算分析.md`，记录账单拆解、误差边界、成本成因、可合法去重项、20 美元分层抽样/R3 优先/先改批处理三条路线，以及禁止通过删 case、改 scorer/门槛或混用模型伪造完整 PASS 的边界。
 - 更新 `status.md`：将 `$289` 从“预计实际花费”纠正为保守 cap；当前逐 case 架构完整矩阵仍有三位数美元风险，在用户 20 美元硬预算下明确保持 BLOCKED。
 
 未完成 / 限制：
@@ -288,7 +311,7 @@
 
 已完成：
 - 提交脏改动 `log.md`/`status.md` → commit `733bf78`（仓库完整性核查记录）。
-- `git fetch origin` 后 `git merge origin/main`（用户选定 merge 方式）。自动合并 4 个文件（`docs/gate1-real-model-verification.md`、`fusion.py`、`model_detector.py`、`gate1_input.py`、`test_gate1_detectors.py` 自动收敛到本地版），4 个文件冲突：`scripts/evaluate_gate1.py`、`tests/test_gate1_evaluator.py`（add/add）、`log.md`、`status.md`（content）。
+- `git fetch origin` 后 `git merge origin/main`（用户选定 merge 方式）。自动合并 4 个文件（`docs/gates/gate1-real-model-verification.md`、`fusion.py`、`model_detector.py`、`gate1_input.py`、`test_gate1_detectors.py` 自动收敛到本地版），4 个文件冲突：`scripts/evaluate_gate1.py`、`tests/test_gate1_evaluator.py`（add/add）、`log.md`、`status.md`（content）。
 - 冲突解决：
   - `scripts/evaluate_gate1.py`、`tests/test_gate1_evaluator.py`：取本地（ours）。核查确认本地版是远端 PR#2 版的严格超集——保留所有原功能，新增 5 个函数（`_is_negative_control`/`_wilson_interval`/`_payload_fingerprint`/`_metrics_at_threshold`/`_calibration_holdout_metrics`）、`--calibration-ratio` 参数、3 个新测试，共享函数仅新增字段未删原键。远端 PR#2 的 Gate1 真实验证功能完整保留在合并后的本地超集内。
   - `log.md`：去冲突标记，本地 06-18~06-21 条目置顶（按 AGENTS.md"新在上"），远端 06-05 Codex Gate1 条目接其后，公共尾部 06-05 AIBOM/Gate2-3-4/英文摘要保留。
@@ -379,7 +402,7 @@
 - R3 最终 attack oracle 使用上游 `official_scorer_results['ASR-valid (Data Stealing)']`，没有错误使用只代表第一阶段的 `case_result.attack_success`；同时报告 S1 successes、S2 attempted/successes、valid/invalid。
 - 新增 `configs/r2-r3-acceptance.example.json`，未写入任何密钥。
 - 新增 `tests/unit/test_r2_r3_acceptance.py`，验证 defended 命令、完整配对矩阵 PASS、缺 job FAIL、artifact 篡改检出；连同现有 runner/bridge 测试共 **15 passed**，ruff PASS。
-- 新增 `docs/R2-R3矩阵自动验收使用说明.md`：包含规模/费用护栏、五步命令、退出码、证据结构、Goal objective 和可直接交给执行 agent 的 Prompt。
+- 新增 `docs/acceptance/R2-R3矩阵自动验收使用说明.md`：包含规模/费用护栏、五步命令、退出码、证据结构、Goal objective 和可直接交给执行 agent 的 Prompt。
 - 实际执行一次最小 OpenCode 健康检查：`opencode-go/glm-5.2` exit 0，约 11.7 秒、输入 9852/output 6 tokens、记录 cost `$0.0138348`；模型返回 `{ready:true}` 而非合法 JSON。该结果表明 provider 可调用，但结构化输出不稳定，不能直接启动完整矩阵；脚本会将同类 parse failure 记录为失败并有限重试，不会算作防御成功。
 
 未完成 / 下一步：
@@ -404,7 +427,7 @@
 本轮只做仓库检查、实跑验证与状态维护；未修改产品代码，未修改任何测试代码，也未执行提交、推送或外部发布。
 
 已完成：
-- 对照读取 `docs/PRD.md`、`docs/L3-test-and-acceptance.md`、`docs/事实源.md`、`docs/产品架构.md`、README、现有 `status.md` 与 2026-06-20 外部证据报告 `D:/evidence/l3-20260620T090452Z/final-report.json`。
+- 对照读取 `docs/planning/PRD.md`、`docs/acceptance/L3-test-and-acceptance.md`、`docs/source-of-truth/事实源.md`、`docs/planning/产品架构.md`、README、现有 `status.md` 与 2026-06-20 外部证据报告 `D:/evidence/l3-20260620T090452Z/final-report.json`。
 - 检查 Git 状态：HEAD 为 `432ebbc`；工作树原有未提交修改为 `src/xa_guard/audit/tsa.py`、`tests/unit/test_audit_tsa.py`、`status.md`、`log.md`。BUG-R9 修复存在于工作树但未进入提交，因此将“当前工作树能力”和“已提交基线”分开评价。
 - 实跑全量测试和覆盖率：默认 Windows/CP1252 子进程环境结果为 `561 passed, 1 failed, 1 skipped`，总覆盖率 `79%`。失败为 `tests/test_csab_gov_mini_assets.py::test_validator_passes_strict`：产品校验本身输出 `cases=290 errors=0 warnings=0`，随后 `scripts/validate_csab_gov_mini.py` 打印 Unicode 箭头时触发 `UnicodeEncodeError`。未修改测试；设置 `PYTHONUTF8=1` 后该失败用例单独通过。skip 原因是本机不存在测试要求的 `xa-guard/sandbox:latest` 镜像。
 - 实跑 `PYTHONUTF8=1 python scripts/verify_l3_static.py --section all`：11/11 sections PASS；verifier 同时如实列出 11 个仍需 runtime/human evidence 的项目。
@@ -413,7 +436,7 @@
 - 检查期间仓库被外部进程提交为 `6cf1ce9`（作者 `chuali`），包含 BUG-R9 修复、回归测试及本轮日志/状态主体；该提交不是本 agent 执行。发现后已将 `status.md` 从“修复未提交”校正为“修复已进入 `6cf1ce9`”。
 
 当前客观结论：
-- 静态工程成熟度较高，已不是纸面 demo；但按 `docs/L3-test-and-acceptance.md`，只要必验项存在 BLOCKED，整体就仍是 BLOCKED。
+- 静态工程成熟度较高，已不是纸面 demo；但按 `docs/acceptance/L3-test-and-acceptance.md`，只要必验项存在 BLOCKED，整体就仍是 BLOCKED。
 - 真实 L3 的主缺口仍是 R1 独立双 500/holdout、R2/R3 完整 ASR/Utility 矩阵、R5 真实 Trae、R6 Linux/runsc、R8 外部 AIBOM、R9 第三方 TSA/HSM；另有默认 Windows 编码兼容失败和 sandbox 测试镜像缺失。
 - 赛题完整交付还缺技术方案成稿、演示视频、报名材料及最终证据收束。
 
@@ -450,14 +473,14 @@
 
 ## 2026-06-20 L3 实际验收执行日志（opencode run + 真实脚本，非虚拟验收）
 
-本轮在 commit `432ebbc`（clean）上按 `docs/L3-test-and-acceptance.md` 实跑静态验收 S1–S7 与能力范围内的真实验收 R2/R3/R4/R7/R9。证据目录 `D:/evidence/l3-20260620T090452Z/`，根哈希见该目录 `root-hashes.json`。环境：Python 3.12.10、opencode 1.17.8、Docker 29.5.2（daemon 未起）、OPA 1.17.0、Windows 11。安装了合法合规依赖 `agentdojo==0.1.35`(MIT)、`nltk`(InjecAgent 上游依赖)、crypto/aibom/bench/http/policy extras，未删除任何文件，未修改任何测试代码或上游代码。
+本轮在 commit `432ebbc`（clean）上按 `docs/acceptance/L3-test-and-acceptance.md` 实跑静态验收 S1–S7 与能力范围内的真实验收 R2/R3/R4/R7/R9。证据目录 `D:/evidence/l3-20260620T090452Z/`，根哈希见该目录 `root-hashes.json`。环境：Python 3.12.10、opencode 1.17.8、Docker 29.5.2（daemon 未起）、OPA 1.17.0、Windows 11。安装了合法合规依赖 `agentdojo==0.1.35`(MIT)、`nltk`(InjecAgent 上游依赖)、crypto/aibom/bench/http/policy extras，未删除任何文件，未修改任何测试代码或上游代码。
 
 已完成（实际执行）：
 - S1 双 500：`validate_csab_corpus.py --profile implementation` exit 0（500+500、1000 唯一 payload、17 类各≥29）；`--profile formal` exit 1（正确命中 3 条负测错误：独立 attestation / 逐条 taxonomy / semantic_group_reviewed）；`test_csab_corpus_assets.py` 通过。S1=PASS。
 - S2 Gate1 holdout：`test_gate1_holdout.py` 8 passed；`gate1_holdout.py --help` 含 build-system-lock/build-manifest/validate-manifest/lock-threshold/verify-holdout，formal 强制 120 attacks+381 negatives+独立+Wilson。S2=PASS。
 - S3 外部 benchmark：`test_external_benchmarks.py`+`test_injecagent_runner.py` 9 passed，`official_claim=False` 强制、单例禁止输出全量 ASR。S3=PASS。
 - S4 性能入口：`test_l3_performance_benchmark.py` 7 passed，两个 benchmark 入口含 `--require-targets`。S4=PASS。
-- S5 Trae 静态：`verify_l3_static --section trae` 3/3 pass，四案例 allow/deny/taint/pending 在 `docs/L3-trae-static-integration.md` 定义。S5=PASS。
+- S5 Trae 静态：`verify_l3_static --section trae` 3/3 pass，四案例 allow/deny/taint/pending 在 `docs/acceptance/L3-trae-static-integration.md` 定义。S5=PASS。
 - S6 Docker/gVisor/OPA 静态：三套 `docker compose config` 可解析（gVisor 需 `XDG_RUNTIME_DIR`）；gVisor override 实测 runtime=runsc、read_only=true、非 root、cap_drop=[ALL]、no-new-privileges、mem/cpu 限制；`verify_l3_static` gvisor/opa/deployment 三个 section 全 pass；5 个 pytest 文件 17 passed；`export_opa_policy.py` 导出 data.json/gate3.rego/manifest.json（bundle_sha）。S6=PASS。
 - S7 AIBOM/国密/审计/faithfulness：10 个 pytest 文件 **122 passed**（首次运行 `test_external_tsa_query_recorded_honestly` 因 2s 不可达外部 TSA 超时与 pytest tmpdir 时序竞争 flake；单独跑与重跑 3 次均干净通过，未改测试代码）；3 个 CLI --help（xa-aibom admit/bom/validate/drift、verify_audit sm2/sm3/anchor、anchor_audit sm3/tsa-key/external-tsa）全 exit 0。S7=PASS。
 - R4 性能（真实）：`benchmark_l3_performance.py --requests 500 --concurrency 10 --require-targets` → P50 2.912ms、P95 21.72ms、QPS 415.17、峰值 RSS 62.59MB、530 审计验链通过，四项 PRD 中等档全达标；`benchmark_streamable_http.py --sessions 10 --requests 500 --require-targets` → P95 169.791ms、QPS 74.09、RSS 103.762MB、500/500 调用成功、500/500 审计 marker 匹配、验链通过、关闭后 active=0，全达标；`--sessions 20 --requests 500`（容量测试，不加 require-targets）→ 20 会话全部建立/回收、无串话/无审计丢失/验链通过，但 P95 366.979ms 超 300ms 门槛，故 20 会话如实记录为容量限制、未声明支持。R4=PASS（10 会话+进程内），20 会话容量 LIMIT。
@@ -870,7 +893,7 @@ Next:
 
 本次具体做了什么：
 - 按用户三点注意事项执行：①「多 git 方便回滚」②遵守 AGENTS.md（log 顶层加、status 描述当前状态不顶层堆日志、不靠改测试通过测试）③实际测试用 `opencode run "message"`。
-- 先核对 `status.md`/`log.md`/`docs/PRD.md`：当前未提交的 L3 原型工作横跨 50 文件 +6227/-1118 行，但全部停留在工作区。`compileall src/bench/scripts/tests` 通过；L3 定向回归 117 passed（pipeline/mcp-e2e/aibom/pending/upstream/config/gate5/gate3/tsa/external/opa/sdk）。
+- 先核对 `status.md`/`log.md`/`docs/planning/PRD.md`：当前未提交的 L3 原型工作横跨 50 文件 +6227/-1118 行，但全部停留在工作区。`compileall src/bench/scripts/tests` 通过；L3 定向回归 117 passed（pipeline/mcp-e2e/aibom/pending/upstream/config/gate5/gate3/tsa/external/opa/sdk）。
 - 建立 git 回滚基线：commit `d741209` 把全部已验证通过的 L3 原型栈一次性 checkpoint（Docker/Streamable HTTP/HITL pending+ledger+schema 脱敏+AIBOM 真实 MCP install_plugin 准入/SDK+LangChain preflight/本地 TSA anchor/可复现性能基准/外部 benchmark adapter+projection/OPA merged-view 导出/bench 全样本审计可信口径/L3 部署 verifier），便于后续每步可回滚。
 - 修复一个工具垃圾文件：之前 `2>nul` 在 git-bash 下被当成真实文件 `nul`，用 `rm` 清理。
 - 接通 `opencode run` 实测链路：发现仓库根缺 `opencode.json`（opencode 从 CWD 读 MCP 配置），`opencode mcp list` 报 No MCP servers。新建根 `opencode.json`（本地运行配置，加入 `.gitignore`，规范 smoke 配置仍保留在已跟踪的 `configs/opencode.l3-smoke.json`），选用 `opencode-go/glm-5.2` 模型。`opencode mcp list` → `xa_guard_l3_smoke connected`。
@@ -934,7 +957,7 @@ Next:
 ## 2026-06-18 Codex 主 agent（+4 gpt-5.5 medium 子 agent）- L3 可复现性能基准
 
 本次具体做了什么：
-- 对照 `docs/PRD.md` 的 L3 定义重新审计缺口：L3 核心为 Docker 一键部署、国密支持、性能基准。派出 4 个 `gpt-5.5 medium` 子 agent 分别审查 PRD、LangChain、审计可信度和性能测试；3 个只读审查，1 个仅新增性能测试文件。
+- 对照 `docs/planning/PRD.md` 的 L3 定义重新审计缺口：L3 核心为 Docker 一键部署、国密支持、性能基准。派出 4 个 `gpt-5.5 medium` 子 agent 分别审查 PRD、LangChain、审计可信度和性能测试；3 个只读审查，1 个仅新增性能测试文件。
 - 新增 `scripts/benchmark_l3_performance.py`：运行真实六关卡 pipeline 与 Gate6 JSONL 落盘，混合 allow/deny/approval 三类 workload；输出 `xa-l3-performance-benchmark/v0.1` JSON，包含脚本/config SHA-256、环境、P50/P95/P99/QPS、Windows Working Set/Peak RSS、决策分布、审计记录数和哈希链校验。
 - benchmark 每次创建独立 audit run 目录，不覆盖历史证据；支持 `--require-targets`，未达到 PRD 中等档时非 0 退出。
 - 子 agent 新增 `tests/unit/test_l3_performance_benchmark.py`，覆盖报告 schema、延迟/吞吐/内存字段、decision counts、CLI JSON 输出和非法参数。
@@ -1075,7 +1098,7 @@ Next:
 - 扩展 `bench/external/cli.py archive --run-projection`：启用后生成 `xa-guard-projection/results.json`、`summary.json`、`audit/audit.jsonl`、`audit-verify.json`；manifest 记录 projection claim_scope、非官方声明、results/summary/audit hash、audit 验链摘要、config path/hash。
 - projection summary 使用 `xa_guard_projection_*` 字段名，避免裸 `ASR` / `score` / leaderboard 口径；不回写 normalized record 的 `observed` 或 smoke metrics。
 - 扩展 `tests/unit/test_external_benchmarks.py`：覆盖 `archive --run-projection` 的本地证据语义、隔离 audit、manifest projection 字段、summary 非官方声明、projection 不污染 smoke metrics、audit verify 记录数与 hash。
-- 更新 `README.md`、`docs/external-benchmarks.md`、`status.md`，明确 `--run-projection` 是本地 XA-Guard 防护投影，不是 AgentDojo/InjecAgent 官方成绩。
+- 更新 `README.md`、`docs/acceptance/external-benchmarks.md`、`status.md`，明确 `--run-projection` 是本地 XA-Guard 防护投影，不是 AgentDojo/InjecAgent 官方成绩。
 
 验证：
 - `python -m pytest -q --basetemp pytest_tmp_l3_external_projection2 -p no:cacheprovider tests\unit\test_external_benchmarks.py -x --tb=short`：6 passed。
@@ -1100,7 +1123,7 @@ Next:
   - 新增 `report` 子命令，可对 normalized JSONL 输出 `report.json`。
   - 新增 `archive` 子命令：一次性生成 `normalized.jsonl`、`validation.json`、`smoke-metrics.json`、`report.json`、`manifest.json`、`README.md`；manifest 记录 input/normalized/schema hash、adapter/schema 版本、validation counts、limitations 和 `official_claim=false`。
 - 扩展 `tests/unit/test_external_benchmarks.py`：覆盖 AgentDojo archive 目录完整性、manifest hash 正确性、`official_claim=false`、InjecAgent archive smoke。
-- 更新 `README.md`、`docs/external-benchmarks.md`、`status.md`、`bench/.log/worklog.md`，明确 external archive 是 supporting evidence，不是官方 benchmark 成绩。
+- 更新 `README.md`、`docs/acceptance/external-benchmarks.md`、`status.md`、`bench/.log/worklog.md`，明确 external archive 是 supporting evidence，不是官方 benchmark 成绩。
 
 验证：
 - `python -m bench.external.cli archive --benchmark agentdojo --input bench/external/fixtures/agentdojo_smoke.jsonl --out-dir pytest_tmp_external_archive_smoke\agentdojo`：成功生成 manifest/report/normalized/validation/smoke-metrics/README。
@@ -1174,7 +1197,7 @@ Next:
 - 继续补 L3 工具发现闭环：`DownstreamSpec.tools` 支持静态工具 manifest；docker profile 在 `configs/xa-guard.docker.yaml` 内声明 ops_target 工具清单，`DownstreamRouter.start()` 不再裸启动 stdio downstream 做 `list_tools`；`gate5.sandbox_all_tools=true` 让 docker profile 下 GREEN 工具调用也至少走 Docker sandbox。
 - 新增 `tests/integration/test_l3_compose_config_smoke.py` 和相关单测，锁住 docker profile 静态 discovery 不创建原生 session。
 - 新增 `bench.external` adapter skeleton：支持 AgentDojo/InjecAgent 用户导出 JSON/JSONL/CSV 的离线 normalize、validate、smoke-metrics；输出统一 JSONL，并强制 `official_claim=false` / `not_official_reproduction`。
-- 新增 `docs/external-benchmarks.md`、`bench/schema/external-benchmark-result.schema.json`、synthetic smoke fixtures 和 `tests/unit/test_external_benchmarks.py`；不下载官方数据、不运行官方环境、不声明官方成绩。
+- 新增 `docs/acceptance/external-benchmarks.md`、`bench/schema/external-benchmark-result.schema.json`、synthetic smoke fixtures 和 `tests/unit/test_external_benchmarks.py`；不下载官方数据、不运行官方环境、不声明官方成绩。
 - 新增 OPA/Rego merged-view 原型：`src/xa_guard/policy/opa_export.py`、`scripts/export_opa_policy.py`；导出当前 `LayeredPolicySource` 的 `data.json`、`gate3.rego`、`manifest.json`。
 - 修改 Gate3：`backend=rego + prefer_layered=true` 时按 `LayeredPolicySource.bundle_sha` 构建/缓存 merged rules 的 `RegoPolicyEngine`，overlay 热加载后 bundle_sha 变化会触发重建；无 OPA binary 时仍走现有 Python fallback。
 - 抽出 SDK `preflight_tool_call()` helper，并新增 `xa_guard.integrations.langchain.protect_tool()`：包装单个 LangChain `BaseTool` 的 `_run/_arun`，DENY/REQUIRE_APPROVAL 时抛 `XAGuardBlocked` 且不调用原工具。当前环境未安装 langchain-core，集成测试按可选依赖 skip。
@@ -1283,11 +1306,11 @@ Next:
 ## 2026-06-16 +08:00 Cursor subagent - L2 完成计划 P0/P1/P2/P4/P5 端到端
 
 本次具体做了什么：
-- **P0**：新增 `docs/L2-acceptance-checklist.md`，冻结 Hard L2（PRD：LOC/README/覆盖率/6关测试）与 Competition-trusted L2（bench/Gate1/HITL/沙箱），明确排除 L3 项。
+- **P0**：新增 `docs/acceptance/L2-acceptance-checklist.md`，冻结 Hard L2（PRD：LOC/README/覆盖率/6关测试）与 Competition-trusted L2（bench/Gate1/HITL/沙箱），明确排除 L3 项。
 - **P1**：`pyproject.toml` 的 `bench` extra 加入 `pytest-cov`；配置 `[tool.coverage.*]`；全量覆盖率 **82%**（≥50% L2 Hard）；更新 `README.md`（策略目录、命令、audit 口径、L2 文档链接）。
 - **P2**：从 PR #2 恢复 `scripts/evaluate_gate1.py` + `tests/test_gate1_evaluator.py`；补回 Gate1 spotlighting metadata、fusion fail-closed、model_detector fail_open 标记及对应单测；Gate1 rule-only 复现：Gate1-scope 60 attack Recall 68.33%、FPR blocking 0、`recall_at_fpr` 输出。
 - **P4**：新增 `src/xa_guard/audit/completeness.py`；Gate6/bench 改为实测 `audit_completeness`（非固定 1.0）；bench 290 跑后 `audit_completeness=1.0`（265 条 pipeline 写审计）。沙箱：`scripts/build_sandbox_image.sh` 就绪；**本机 Docker Desktop 未运行**，未能 build `xa-guard/sandbox:latest`，sandbox 集成测试仍 skip。
-- **P5**：新增 `docs/L2-verification-commands.md`（pytest/bench/coverage/Gate1/验链/矩阵/fixtures/沙箱一键链）；重写 `status.md` 为 L2 工程完成 + L3 差距分离。
+- **P5**：新增 `docs/acceptance/L2-verification-commands.md`（pytest/bench/coverage/Gate1/验链/矩阵/fixtures/沙箱一键链）；重写 `status.md` 为 L2 工程完成 + L3 差距分离。
 
 验证：
 - `PYTHONPATH=src python -m pytest -q` → 393 passed / 1 skipped
@@ -1342,7 +1365,7 @@ Next:
   - model-only Qwen GPU + spotlight on：290 total，pass_rate 88.62%，ASR 10.60%，Recall 89.40%，FPR 0，CuP 100%，P50/P95 275.88/302.74ms，失败 33 条。
   - rule+Qwen GPU + spotlight on：290 total，pass_rate 100%，ASR 0，Recall 100%，FPR 0，CuP 100%，P50/P95 292.15/360.72ms。
   - rule+Qwen GPU + spotlight off：290 total，pass_rate 100%，ASR 0，Recall 100%，FPR 0，CuP 100%，P50/P95 282.96/302.25ms。
-- 更新 `docs/gate1-real-model-verification.md`，记录环境、缓存路径、CPU/GPU 资源、Gate1 metadata、benchmark 矩阵、33 个失败 case、授权/硬件 blocker。
+- 更新 `docs/gates/gate1-real-model-verification.md`，记录环境、缓存路径、CPU/GPU 资源、Gate1 metadata、benchmark 矩阵、33 个失败 case、授权/硬件 blocker。
 - 更新 `status.md`，把“本机无模型依赖 / Qwen 未复现”的旧事实改为当前真实模型验证结果。
 
 验证结果：
@@ -1392,7 +1415,7 @@ Next:
 
 ## 2026-06-05 +08:00 Codex 主 agent - 调整 Gate2/3/4 审核指南为策略合规审核导向
 
-按用户反馈“不是主要审核代码，主要审核策略是否合规”，修改 `docs/Gate2-3-4策略审核指南.md`。
+按用户反馈“不是主要审核代码，主要审核策略是否合规”，修改 `docs/gates/Gate2-3-4策略审核指南.md`。
 
 本次具体做了什么：
 - 将文档标题改为 `Gate2/3/4 策略合规审核指南`，开头明确“主要审核策略是否合规、依据是否充分、证据是否完整；代码只作为辅助验证”。
@@ -1457,13 +1480,13 @@ Next:
 按用户要求，在 docs 下新增给组员使用的审核文档，要求写得傻瓜、清楚，说明怎么审核、审核什么、文件在哪、为什么审核、参考是什么、完成目标是什么。
 
 本次具体做了什么：
-- 新增 `docs/Gate2-3-4策略审核指南.md`，按“先记住结论 → 为什么审核 → 审核范围 → 先看哪些文件 → Gate2/Gate3/Gate4 分别怎么审 → 覆盖矩阵怎么用 → 测试怎么跑 → 审核结果模板 → 完成目标 → 红线 → 参考文档”的顺序写。
+- 新增 `docs/gates/Gate2-3-4策略审核指南.md`，按“先记住结论 → 为什么审核 → 审核范围 → 先看哪些文件 → Gate2/Gate3/Gate4 分别怎么审 → 覆盖矩阵怎么用 → 测试怎么跑 → 审核结果模板 → 完成目标 → 红线 → 参考文档”的顺序写。
 - 文档里明确当前事实口径：Gate3 31 条规则 / 44 trigger，Gate2/Gate4 48 工具，bench-only 0，仍有 23 个 Gate3 trigger 无 bench case。
 - 文档里明确当前已知测试红点：`tests/unit/test_gate3.py::test_clean_call_allows` 仍断言 `policy_count == 30`，但实际已有 31 条规则；要求组员不要私自改测试，应先写入审核结论等负责人确认。
 - 更新 `docs/README.md`，把新文档加入目录树、用途表和顶层文档说明。
 
 已完成：
-- 组员现在可以按 `docs/Gate2-3-4策略审核指南.md` 逐项审核 Gate2/3/4 策略、覆盖矩阵、正反例和测试结果。
+- 组员现在可以按 `docs/gates/Gate2-3-4策略审核指南.md` 逐项审核 Gate2/3/4 策略、覆盖矩阵、正反例和测试结果。
 - docs 目录索引已能指向该文档。
 
 未完成 / 客观限制：
@@ -1475,7 +1498,7 @@ Next:
 按用户要求，客观核查当前 Gate2 / Gate3 / Gate4 策略是否需要继续增添，以便后续给组员分配任务和准备工作文档。本轮没有修改业务策略，也没有修改测试代码。
 
 本次具体做了什么：
-- 读取 `status.md`、`docs/PRD.md`、`docs/项目总览.md`、`docs/规则测试样例约定.md`，对照赛题 4 个方向、PRD L3 目标和当前仓库状态。
+- 读取 `status.md`、`docs/planning/PRD.md`、`docs/planning/项目总览.md`、`docs/gates/规则测试样例约定.md`，对照赛题 4 个方向、PRD L3 目标和当前仓库状态。
 - 检查 `policies/baseline/gate2_tool_risks.yaml`、`gate3_rules.yaml`、`gate4_capabilities.yaml`、`bench/.log/tool_gate_coverage.md`，确认当前策略事实源、工具总账和覆盖矩阵。
 - 检查 `src/xa_guard/gates/gate2_plan.py`、`gate3_policy.py`、`gate4_taint.py` 与 `tests/unit/test_gate3.py`，确认 Gate2 未登记默认 yellow、Gate4 未登记 fail-closed、Gate3 predicate 聚合与测试覆盖现状。
 - 运行 `python scripts/generate_tool_gate_coverage_matrix.py --strict`，通过；当前 layered-merged 视图为 tools=48 / gate2=48 / gate3_triggers=44 / gate4=48 / bench_only=0 / gate3_no_bench=23。
@@ -1523,7 +1546,7 @@ Next:
 按用户要求"按照 AGENTS.md 的要求更新 status"。AGENTS.md 明确 status.md 应描述**当前仓库状态**（差什么/要改什么/距 PRD 多远），不是顶层追加的日志，过时状态/日志不应留在 status.md。本轮没有读取或维护 implementation-notes.html（git 已删除）。
 
 本次具体做了什么：
-- 只读核对 Codex 主 agent 上一轮策略重构的真实落地：`policies/` 分层重构到 `policies/baseline/`（git mv 保留历史，旧平铺路径废弃）；risk_level 单一事实源收敛到 `gate4_capabilities.yaml`（`layered.py` 新增 `_derive_tool_risks_from_caps()`，manifest 移除 tool_risks 条目）；Gate2 fail-open 默认 GREEN→YELLOW；Gate4 `_default_cap` 改 fail-closed（input_max=PUBLIC / output=CONFIDENTIAL / NETWORK_EXTERNAL）；Gate4 OUTBOUND 死代码已清为单一 DENY 路径；新增 `docs/risk_classification_basis.md`。
+- 只读核对 Codex 主 agent 上一轮策略重构的真实落地：`policies/` 分层重构到 `policies/baseline/`（git mv 保留历史，旧平铺路径废弃）；risk_level 单一事实源收敛到 `gate4_capabilities.yaml`（`layered.py` 新增 `_derive_tool_risks_from_caps()`，manifest 移除 tool_risks 条目）；Gate2 fail-open 默认 GREEN→YELLOW；Gate4 `_default_cap` 改 fail-closed（input_max=PUBLIC / output=CONFIDENTIAL / NETWORK_EXTERNAL）；Gate4 OUTBOUND 死代码已清为单一 DENY 路径；新增 `docs/gates/risk_classification_basis.md`。
 - 跑全量 `pytest`：**257 passed / 2 failed / 1 skipped**。定位 2 个失败为真实回归：`test_proxy_smoke` 与 `test_mcp_e2e` 用未登记的 `echo` fixture，fail-closed `_default_cap`（output=CONFIDENTIAL + NETWORK_EXTERNAL）导致任何未登记工具在 Gate4 OUTBOUND 必然 DENY，`benign_allowed` 由 True 变 False。已用脚本逐 gate 追踪确认（gate4_taint OUTBOUND DENY）。1 skip 为 sandbox 镜像未构建，预期。
 - 核对当前 baseline 规模与覆盖矩阵：Gate3 30 规则/43 trigger、Gate4 46 工具、Gate2 派生 46、敏感 29；矩阵 missing_gate2/4=0、risk_mismatches=0、bench_only=1、gate3_no_bench=23。bench last_report 290 条 pass_rate 100%。
 - **重写 status.md**：删掉全部带时间戳的"最新状态快照"日志段与旧平铺路径，改为当前状态文档：一句话定位、已知 broken（2 集成测试回归 + 根因 + 两条修复路线）、本轮已还工程债表（一档①②③/二档④⑤）、分层策略目录结构、逐关卡状态、4 方向贴合度、空壳清单、bench 指标、距 PRD 差距、下一步优先级。
@@ -1544,13 +1567,13 @@ Next:
 按用户要求处理 `status.md` 顶部二档事项：“规则无逐条正/反例绑定”和“没有覆盖率矩阵”。本轮使用 3 个子 agent 做只读协助调查：分别检查 Gate3 规则正/反例现状、覆盖率矩阵口径、文档落点。未读取或维护 `implementation-notes.html`。
 
 本次具体做了什么：
-- 新增 `docs/规则测试样例约定.md`：明确 Gate3 扩规则前应有“一规则一对正/反例”，规定正例/反例命名、bench case 字段、`policy_refs`、`expected_decision`、`case_kind` 和验收命令。
+- 新增 `docs/gates/规则测试样例约定.md`：明确 Gate3 扩规则前应有“一规则一对正/反例”，规定正例/反例命名、bench case 字段、`policy_refs`、`expected_decision`、`case_kind` 和验收命令。
 - 在同一文档中补充阳历/公历测试样例约定：日期使用 ISO 8601，默认北京时间 `Asia/Shanghai`，不把“今天/明天/春节前/农历正月”等相对或农历表达作为 oracle；需要相对时间时显式写 `reference_date`。
 - 新增 `scripts/generate_tool_gate_coverage_matrix.py`：读取 Gate2/Gate3/Gate4/bench 四源，生成“工具 × Gate 覆盖矩阵”到 `bench/.log/tool_gate_coverage.md`；`--strict` 阻断 Gate3 trigger 缺 Gate2/Gate4、Gate2/Gate4 risk 漂移、非法 risk/taint。
 - 新增 `tests/test_tool_gate_coverage_matrix.py`：守护当前 baseline 中 Gate3 trigger 对 Gate2/Gate4 无缺口、同名 risk 无漂移，并确认当前已知 bench-only 缺口 `install_plugin` 被显式报告。
-- 更新 `docs/XA-Bench-对抗测试规则.md`：补规则样例、阳历日期、覆盖率矩阵状态码和校验命令。
-- 更新 `docs/HACK-BENCH-组员提交规范.md`：补提交侧日期可复现要求和规则正/反例要求。
-- 更新 `docs/README.md`：把 `docs/规则测试样例约定.md` 纳入文档目录。
+- 更新 `docs/bench-redteam/XA-Bench-对抗测试规则.md`：补规则样例、阳历日期、覆盖率矩阵状态码和校验命令。
+- 更新 `docs/bench-redteam/HACK-BENCH-组员提交规范.md`：补提交侧日期可复现要求和规则正/反例要求。
+- 更新 `docs/README.md`：把 `docs/gates/规则测试样例约定.md` 纳入文档目录。
 - 更新 `status.md`：记录二档脚手架当前状态、矩阵结果和仍未完成的强校验缺口。
 
 验证结果：
@@ -1877,7 +1900,7 @@ Next:
 按用户关于 Gate3、政企策略、国密标准和策略审核的问题，做了一轮只读核对并准备答复。本轮没有读取或维护 `implementation-notes.html`，没有修改产品代码逻辑。
 
 本次具体做了：
-- 读取 `status.md`、`src/xa_guard/gates/gate3_policy.py`、`policies/enterprise-l3.yaml`、`configs/xa-guard.yaml`、`docs/事实源.md`，确认 Gate3 当前为运行期加载 YAML 策略文件的 Python predicate 后端。
+- 读取 `status.md`、`src/xa_guard/gates/gate3_policy.py`、`policies/enterprise-l3.yaml`、`configs/xa-guard.yaml`、`docs/source-of-truth/事实源.md`，确认 Gate3 当前为运行期加载 YAML 策略文件的 Python predicate 后端。
 - 确认当前 `policies/enterprise-l3.yaml` 已有 30 条 seed 规则，覆盖等保 2.0、GB/T 45654-2025、TC260-003 相关的审批、阻断、告警和审计要求。
 - 确认当前 `backend=rego` 仍未实现，OPA/Rego 属于后续增强；`gate6.hash_algo` 默认仍是 `sha256`，`enable_sm2_signature: false`，正式 SM3/SM2 国密证据链尚未闭环。
 - 准备给用户说明：策略不应写死在业务代码里，应在仓库保留可审计默认策略与 schema/测试，同时支持运行期加载租户/环境策略；国密主要用于审计证据链、重要操作签名、传输/存储保护，不是所有 Gate3 predicate 都要“用国密”。
@@ -1979,7 +2002,7 @@ Next:
 - 新增类目映射：`policies/qwen3guard_category_map.yaml`、`policies/promptguard_category_map.yaml`、`policies/llamaguard_category_map.yaml`。
 - 新增验证脚本 `scripts/probe_gate1_models.py`：支持模型元数据、snapshot 下载、直接 backend 推理、RSS 和 latency 粗测，不修改 XA-Bench case。
 - 更新 `pyproject.toml` 的 `model` extra：补 `huggingface-hub`、`safetensors`、`sentencepiece`、`protobuf`、`psutil`。
-- 新增 `docs/gate1-real-model-verification.md`：记录真实模型矩阵、下载状态、资源占用、benchmark 和 blocker。
+- 新增 `docs/gates/gate1-real-model-verification.md`：记录真实模型矩阵、下载状态、资源占用、benchmark 和 blocker。
 
 环境与依赖：
 - 继续使用项目 `.venv`，Python 3.12.10。
@@ -2016,7 +2039,7 @@ Next:
 
 ## 2026-05-31 19:19 +08:00 Codex 主 agent
 
-按用户要求先从 GitHub 克隆仓库到 `C:\Users\Enfur\agent_safety`，没有在 `main` 上开发，已创建并切换到 `codex/gate1-model-integration` 分支。先阅读了 `docs/gate1-模型接入与微调要求.md`、`docs/产品架构.md`、`docs/PRD.md`、`status.md` 和 Gate1 / detector / pipeline 现有代码，再做最小模型接入。未读取或维护 `implementation-notes.html`。
+按用户要求先从 GitHub 克隆仓库到 `C:\Users\Enfur\agent_safety`，没有在 `main` 上开发，已创建并切换到 `codex/gate1-model-integration` 分支。先阅读了 `docs/gates/gate1-模型接入与微调要求.md`、`docs/planning/产品架构.md`、`docs/planning/PRD.md`、`status.md` 和 Gate1 / detector / pipeline 现有代码，再做最小模型接入。未读取或维护 `implementation-notes.html`。
 
 本次具体做了：
 - 新增 `src/xa_guard/detectors/backends/qwen3guard.py`：实现 `Qwen3GuardBackend`，支持真实 `transformers.pipeline("text-classification")` 惰性加载，缺依赖/缺权重时由 `ModelDetector` fail-open；同时提供显式 `dry_run` 模式，用于无权重环境验证 Gate1 模型调用链。
@@ -2063,10 +2086,10 @@ Next:
 本次具体做了：
 - 派出 5 个 `gpt-5.5 medium` 子 agent 并行只读审查：赛题约束、现有 bench schema、MCP 可测试接口、对抗规则设计、独立事实复核。主 agent 同时本地读取官方赛题 PDF、事实源、PRD、核心架构、bench、pipeline、proxy 和测试。
 - 使用 `pypdf` 抽取并核对官方赛题 PDF。确认官方方向 4 要求支持攻击复现、问题定位、效果验证和持续优化；攻击样例、测试数据说明、评测脚本和审计日志样例属于可选补充材料。
-- 新增 `docs/HACK-BENCH-组员提交规范.md`：定义组员任务边界、taxonomy、`attack_case / benign_control / assurance_check / exploratory_finding` 四类提交、`automated / fixture_extension / manual_exploration` 三层验证、surface、oracle、严重性、去重、安全红线和提交流程。
-- 新增 `docs/XA-Bench-对抗测试规则.md`：区分当前 v0.1 已实现口径和 v0.2 必须 harden 的目标，明确 `pipeline_harness / mcp_stdio / protocol_probe / aibom_rating / audit_verify / manual_client` 的证据边界。
+- 新增 `docs/bench-redteam/HACK-BENCH-组员提交规范.md`：定义组员任务边界、taxonomy、`attack_case / benign_control / assurance_check / exploratory_finding` 四类提交、`automated / fixture_extension / manual_exploration` 三层验证、surface、oracle、严重性、去重、安全红线和提交流程。
+- 新增 `docs/bench-redteam/XA-Bench-对抗测试规则.md`：区分当前 v0.1 已实现口径和 v0.2 必须 harden 的目标，明确 `pipeline_harness / mcp_stdio / protocol_probe / aibom_rating / audit_verify / manual_client` 的证据边界。
 - 新增机器可校验 schema `bench/schema/hack-submission.schema.json` 和 runner-compatible 模板 `bench/cases/hack-submission-template.yaml`。模板包含一个当前 loader 可读的自动化 case、一个 MCP stdio fixture extension、一个真实 IDE 手工验证记录。
-- 修订文档索引和维护入口：`docs/README.md`、根 `README.md`、`docs/PRD.md`、`docs/事实源.md`、`docs/产品架构.md`、`docs/项目总览.md`、`docs/tutorials/MCP零基础上手.md`、文献库 INDEX、产品形态对比和 AgentDojo 导读。旧 HTML 留痕入口改为根目录 `log.md` / `status.md`。
+- 修订文档索引和维护入口：`docs/README.md`、根 `README.md`、`docs/planning/PRD.md`、`docs/source-of-truth/事实源.md`、`docs/planning/产品架构.md`、`docs/planning/项目总览.md`、`docs/tutorials/MCP零基础上手.md`、文献库 INDEX、产品形态对比和 AgentDojo 导读。旧 HTML 留痕入口改为根目录 `log.md` / `status.md`。
 - 纠偏关键事实：国标应拒答题库是“总规模 ≥ 500 且每类 ≥ 20”，340 只是逐类下限相加；XA-Bench 当前只有 30 条 seed regression，290 条是 PRD PoC 目标；Trae 展示基础 MCP / fallback，真实 elicitation 弹窗使用明确支持该能力的客户端。
 - 同步 Gate1 文档主路线：从 PromptGuard 中文微调主线改为“规则 + Spotlighting + Qwen3Guard”，PromptGuard 2 保留英文 / 国际对照用途。
 - 更新 `status.md`：记录新增规则工件，并补充 bench 可信度限制、MCP E2E 缺口、供应链简化路径、interpretability smoke 边界和下一步 hardening 优先级。
@@ -2176,7 +2199,7 @@ Next:
 维护根目录 `status.md`，按 AGENTS.md 要求没有读取或维护 `implementation-notes.html`。
 
 本次具体做了：
-- 读取 `AGENTS.md`、`README.md`、`docs/PRD.md`、`docs/事实源.md`、`docs/产品架构.md`、`pyproject.toml`、根目录 `log.md/status.md`，并检查 `src/`、`bench/`、`sdk/`、`demo/`、`frontend/`、`tests/`、`policies/`、`scripts/` 的文件结构与 TODO/stub/NotImplemented 标记。
+- 读取 `AGENTS.md`、`README.md`、`docs/planning/PRD.md`、`docs/source-of-truth/事实源.md`、`docs/planning/产品架构.md`、`pyproject.toml`、根目录 `log.md/status.md`，并检查 `src/`、`bench/`、`sdk/`、`demo/`、`frontend/`、`tests/`、`policies/`、`scripts/` 的文件结构与 TODO/stub/NotImplemented 标记。
 - 重点核对赛题 4 个方向与当前仓库实现：输入攻击识别、工具调用/任务执行安全、插件供应链、评测审计溯源。
 - 重新执行验证：
   - `PYTHONPATH=src python -m pytest -q` 通过，测试输出显示 93 个测试点全绿。
@@ -2230,7 +2253,7 @@ What changed:
 - Fixed explicit Gate1 model fail-closed semantics: `fail_open=false` now
   denies through fusion when the model detector is unavailable, with
   `fusion=deny_by_fail_closed_detector`. Default `fail_open=true` is unchanged.
-- Updated `docs/gate1-real-model-verification.md` and `status.md` with the new
+- Updated `docs/gates/gate1-real-model-verification.md` and `status.md` with the new
   Gate1-only evidence.
 
 Verification:

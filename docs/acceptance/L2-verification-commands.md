@@ -144,4 +144,4 @@ python scripts/validate_gate3_rule_fixtures.py --strict
 python -m bench.cli run --suite bench/cases/csab-gov-mini-seed.yaml --config configs/xa-guard.yaml
 ```
 
-完整清单说明见 [`docs/L2-acceptance-checklist.md`](./L2-acceptance-checklist.md)。
+完整清单说明见 [`docs/acceptance/L2-acceptance-checklist.md`](./L2-acceptance-checklist.md)。

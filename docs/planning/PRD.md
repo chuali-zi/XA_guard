@@ -1,6 +1,6 @@
 # XA-Guard PRD · 产品需求文档
 
-> ⚠ **本文档遵循 [`docs/事实源.md`](./事实源.md) 作为权威事实源**。如有冲突以事实源为准。
+> ⚠ **本文档遵循 [`docs/source-of-truth/事实源.md`](../source-of-truth/事实源.md) 作为权威事实源**。如有冲突以事实源为准。
 > 上次纠偏：2026-05-24（基于事实源 v1.1）
 >
 > **文档定位**：项目最重要的"标尺"。让团队知道"什么时候算做完"、"做到什么程度算好"。**所有目标量化、客观、可勾选**。
@@ -158,7 +158,7 @@
 | **CSAB-Gov-mini 误拒率** | ≤ 5% | **≤ 3%** | ≤ 1% | P3: GB/T 45654-2025 硬指标 ≤ 5% |
 | **Gate1 攻击识别 Recall @ 1% FPR** | 85% | **95%** | 97% | P1: Meta PG2 86M = 97.5%（仅作国际对照基线） |
 
-> **R2/R3 证据范围（2026-06-22/23 调整）**：上表门槛不变，但比赛正式评测采用 `subscription_budget60_v1`，在 OpenCode Go 订阅约 `$60` 硬上限内，对 AgentDojo 与 InjecAgent 做预注册、baseline/defended 成对的分层抽样，同时报告点估计、95% Wilson 区间、valid/invalid、timeout 和 retry。因存在 5h/周额度限制，正式运行必须按批次 resume，默认每次最多 8 jobs。点估计达标写 `MEETS_SAMPLED_POINT_TARGET`；只有置信区间也支持门槛时才加写 `CONFIDENCE_SUPPORTED`。该结果不得写成完整矩阵或官方排行榜成绩。[比赛方案原文](./XA-202620中国雄安集团数字城市科技有限公司-面向政企场景的大模型智能体安全关键技术研究比赛方案.pdf)第 3-4 页仅要求可复现关键技术验证结果及量化测试效果，没有规定必须执行 2,986-job 全矩阵。
+> **R2/R3 证据范围（2026-06-22/23 调整）**：上表门槛不变，但比赛正式评测采用 `subscription_budget60_v1`，在 OpenCode Go 订阅约 `$60` 硬上限内，对 AgentDojo 与 InjecAgent 做预注册、baseline/defended 成对的分层抽样，同时报告点估计、95% Wilson 区间、valid/invalid、timeout 和 retry。因存在 5h/周额度限制，正式运行必须按批次 resume，默认每次最多 8 jobs。点估计达标写 `MEETS_SAMPLED_POINT_TARGET`；只有置信区间也支持门槛时才加写 `CONFIDENCE_SUPPORTED`。该结果不得写成完整矩阵或官方排行榜成绩。[比赛方案原文](../source-of-truth/XA-202620中国雄安集团数字城市科技有限公司-面向政企场景的大模型智能体安全关键技术研究比赛方案.pdf)第 3-4 页仅要求可复现关键技术验证结果及量化测试效果，没有规定必须执行 2,986-job 全矩阵。
 
 ### 3.2 性能维度 KPI 三档表
 
@@ -182,7 +182,7 @@
 
 ### 3.4 关键纠偏说明（**已对齐事实源 v1.1**）
 
-⚠ **以下事实以 [`docs/事实源.md`](./事实源.md) 为准**：
+⚠ **以下事实以 [`docs/source-of-truth/事实源.md`](../source-of-truth/事实源.md) 为准**：
 
 1. **风险类目**（事实源 F-2.2）：GB/T 45654-2025 附录 A 含**两个切片**——
    - **31 类**（A.1+A.2+A.3+A.4+A.5 全部）：用于"标注规则 + 生成内容题库"全覆盖
@@ -604,7 +604,7 @@ benchmarks/
 
 ### 10.2 决策记录
 
-所有 PRD 变更必须在根目录 [`../log.md`](../log.md) 留痕（决策 + 时间戳 + 理由）；若仓库状态发生变化，同时更新 [`../status.md`](../status.md)。
+所有 PRD 变更必须在根目录 [`../log.md`](../../log.md) 留痕（决策 + 时间戳 + 理由）；若仓库状态发生变化，同时更新 [`../status.md`](../../status.md)。
 
 ### 10.3 量化指标的来源约束
 
@@ -624,16 +624,16 @@ benchmarks/
 |---|---|
 | [产品架构.md](./产品架构.md) | "造什么"——本 PRD 的技术对象 |
 | [项目总览.md](./项目总览.md) | 项目全局视图 |
-| [tutorials/MCP零基础上手.md](./tutorials/MCP零基础上手.md) | 团队学习路径 |
-| [references/product-forms/产品形态-对比分析.md](./references/product-forms/产品形态-对比分析.md) | 形态决策依据 |
-| [references/literature/INDEX.md](./references/literature/INDEX.md) | 学术文献库 |
-| [references/prd-research/p1-industry-baseline.md](./references/prd-research/p1-industry-baseline.md) | 业界基线（KPI 性能档来源） |
-| [references/prd-research/p2-academic-sota.md](./references/prd-research/p2-academic-sota.md) | 学术 SOTA（KPI 评测档来源） |
-| [references/prd-research/p3-gov-enterprise-standards.md](./references/prd-research/p3-gov-enterprise-standards.md) | 政企标准（合规验收来源） |
-| [HACK-BENCH-组员提交规范.md](./HACK-BENCH-组员提交规范.md) | hack 组员的攻击样例提交格式 |
-| [XA-Bench-对抗测试规则.md](./XA-Bench-对抗测试规则.md) | bench 维护者的接入和验收规则 |
-| [../status.md](../status.md) | 当前仓库能力与差距 |
-| [../log.md](../log.md) | 客观工作日志 |
+| [tutorials/MCP零基础上手.md](../tutorials/MCP零基础上手.md) | 团队学习路径 |
+| [references/product-forms/产品形态-对比分析.md](../references/product-forms/产品形态-对比分析.md) | 形态决策依据 |
+| [references/literature/INDEX.md](../references/literature/INDEX.md) | 学术文献库 |
+| [references/prd-research/p1-industry-baseline.md](../references/prd-research/p1-industry-baseline.md) | 业界基线（KPI 性能档来源） |
+| [references/prd-research/p2-academic-sota.md](../references/prd-research/p2-academic-sota.md) | 学术 SOTA（KPI 评测档来源） |
+| [references/prd-research/p3-gov-enterprise-standards.md](../references/prd-research/p3-gov-enterprise-standards.md) | 政企标准（合规验收来源） |
+| [HACK-BENCH-组员提交规范.md](../bench-redteam/HACK-BENCH-组员提交规范.md) | hack 组员的攻击样例提交格式 |
+| [XA-Bench-对抗测试规则.md](../bench-redteam/XA-Bench-对抗测试规则.md) | bench 维护者的接入和验收规则 |
+| [../status.md](../../status.md) | 当前仓库能力与差距 |
+| [../log.md](../../log.md) | 客观工作日志 |
 
 ---
 
