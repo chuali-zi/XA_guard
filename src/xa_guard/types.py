@@ -257,6 +257,11 @@ class AuditRecord:
     gen_ai_governance_cost_estimate_usd: float = 0.0
     gen_ai_governance_output_estimate: str = ""
     gen_ai_governance_capability_token: dict[str, Any] = field(default_factory=dict)
+    gen_ai_governance_registry_version: str = ""
+    gen_ai_governance_policy_version: str = ""
+    gen_ai_governance_decision_reason_code: str = ""
+    gen_ai_governance_role_ids: list[str] = field(default_factory=list)
+    gen_ai_governance_approval_policy_id: str = ""
 
     # 链式签名（关卡 6）
     record_hash: str = ""                                         # 本条记录的哈希
@@ -302,6 +307,11 @@ class AuditRecord:
             "gen_ai.governance.cost_estimate_usd": self.gen_ai_governance_cost_estimate_usd,
             "gen_ai.governance.output_estimate": self.gen_ai_governance_output_estimate,
             "gen_ai.governance.capability_token": self.gen_ai_governance_capability_token,
+            "gen_ai.governance.registry_version": self.gen_ai_governance_registry_version,
+            "gen_ai.governance.policy_version": self.gen_ai_governance_policy_version,
+            "gen_ai.governance.decision_reason_code": self.gen_ai_governance_decision_reason_code,
+            "gen_ai.governance.role_ids": self.gen_ai_governance_role_ids,
+            "gen_ai.governance.approval_policy_id": self.gen_ai_governance_approval_policy_id,
             "record_hash": self.record_hash,
             "signature": self.signature,
         }

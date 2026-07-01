@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xa-guard.local/schemas/governance-registry.schema.json",
+  "title": "XA-Guard static enterprise governance registry",
+  "type": "object",
+  "required": ["schema_version", "default_tenant", "tenants", "principals", "roles", "role_bindings", "agents", "data_domains", "budgets"],
+  "properties": {
+    "schema_version": { "const": "xa-guard-governance/v0.2" },
+    "registry_version": { "type": "string" },
+    "default_tenant": { "type": "string", "minLength": 1 },
+    "tenants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tenant_id", "status"],
+        "properties": {
+          "tenant_id": { "type": "string", "minLength": 1 },
+          "name": { "type": "string" },
+          "status": { "$ref": "#/$defs/status" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "principals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["principal_id", "tenant_id", "status", "department"],
+        "properties": {
+          "principal_id": { "type": "string", "minLength": 1 },
+          "display_name": { "type": "string" },
+          "tenant_id": { "type": "string", "minLength": 1 },
+          "status": { "$ref": "#/$defs/status" },
+          "department": { "type": "string" },
+          "manager": { "type": "string" },
+          "groups": { "$ref": "#/$defs/stringList" },
+          "roles": { "$ref": "#/$defs/stringList" },
+          "allowed_agents": { "$ref": "#/$defs/stringList" },
+          "data_domains": { "$ref": "#/$defs/stringList" },
+          "attributes": { "type": "object" },
+          "budget": {
+            "type": "object",
+            "properties": {
+              "limit_usd": { "type": "number", "minimum": 0 },
+              "spent_usd": { "type": "number", "minimum": 0 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["group_id", "tenant_id", "status", "members"],
+        "properties": {
+          "group_id": { "type": "string", "minLength": 1 },
+          "tenant_id": { "type": "string", "minLength": 1 },
+          "status": { "$ref": "#/$defs/status" },
+          "members": { "$ref": "#/$defs/stringList" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "budgets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["principal_id", "limit_usd", "spent_usd"],
+        "properties": {
+          "principal_id": { "type": "string", "minLength": 1 },
+          "limit_usd": { "type": "number", "minimum": 0 },
+          "spent_usd": { "type": "number", "minimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["role_id", "tenant_id", "status", "permissions"],
+        "properties": {
+          "role_id": { "type": "string", "minLength": 1 },
+          "tenant_id": { "type": "string", "minLength": 1 },
+          "name": { "type": "string" },
+          "status": { "$ref": "#/$defs/status" },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["action"],
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": ["use_agent", "call_tool", "access_data_domain", "cross_subject_access"]
+                },
+                "tools": { "$ref": "#/$defs/stringList" },
+                "agents": { "$ref": "#/$defs/stringList" },
+                "data_domains": { "$ref": "#/$defs/stringList" },
+                "resource_owners": { "$ref": "#/$defs/stringList" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "role_bindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["binding_id", "tenant_id", "role_id", "status"],
+        "properties": {
+          "binding_id": { "type": "string", "minLength": 1 },
+          "tenant_id": { "type": "string", "minLength": 1 },
+          "role_id": { "type": "string", "minLength": 1 },
+          "principals": { "$ref": "#/$defs/stringList" },
+          "groups": { "$ref": "#/$defs/stringList" },
+          "status": { "$ref": "#/$defs/status" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "agents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["agent_id", "tenant_id", "owner", "allowed_tools", "allowed_data_domains", "status"],
+        "properties": {
+          "agent_id": { "type": "string", "minLength": 1 },
+          "name": { "type": "string" },
+          "tenant_id": { "type": "string", "minLength": 1 },
+          "owner": { "type": "string" },
+          "purpose": { "type": "string" },
+          "allowed_tools": { "$ref": "#/$defs/stringList" },
+          "allowed_data_domains": { "$ref": "#/$defs/stringList" },
+          "risk_level": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+          "max_autonomy": { "type": "string", "enum": ["assistive", "approval_required", "autonomous"] },
+          "requires_human_approval_for": { "$ref": "#/$defs/stringList" },
+          "status": { "$ref": "#/$defs/status" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "data_domains": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["domain_id", "tenant_id", "sensitivity", "status"],
+        "properties": {
+          "domain_id": { "type": "string", "minLength": 1 },
+          "name": { "type": "string" },
+          "tenant_id": { "type": "string", "minLength": 1 },
+          "sensitivity": { "type": "string", "enum": ["PUBLIC", "INTERNAL", "CONFIDENTIAL"] },
+          "allowed_departments": { "$ref": "#/$defs/stringList" },
+          "allowed_roles": { "$ref": "#/$defs/stringList" },
+          "allow_cross_subject_roles": { "$ref": "#/$defs/stringList" },
+          "requires_approval": { "type": "boolean" },
+          "status": { "$ref": "#/$defs/status" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "approval_policies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["policy_id", "tenant_id", "status", "decision", "when"],
+        "properties": {
+          "policy_id": { "type": "string", "minLength": 1 },
+          "tenant_id": { "type": "string", "minLength": 1 },
+          "status": { "$ref": "#/$defs/status" },
+          "decision": { "type": "string", "enum": ["deny", "require_approval"] },
+          "reason": { "type": "string" },
+          "when": {
+            "type": "object",
+            "properties": {
+              "sensitivity_in": { "$ref": "#/$defs/stringList" },
+              "data_domains": { "$ref": "#/$defs/stringList" },
+              "tool_risk_in": { "$ref": "#/$defs/stringList" },
+              "max_autonomy_in": { "$ref": "#/$defs/stringList" },
+              "cross_subject_only": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "status": { "type": "string", "enum": ["active", "disabled", "suspended"] },
+    "stringList": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

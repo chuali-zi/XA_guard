@@ -124,6 +124,7 @@ def _ctx_with_governance(name: str, arguments: dict[str, Any], envelope: dict[st
         tenant_id=str(envelope.get("tenant_id") or envelope.get("tenant") or ""),
         human_principal=str(
             envelope.get("human_principal")
+            or envelope.get("principal_id")
             or envelope.get("principal")
             or envelope.get("employee_id")
             or ""

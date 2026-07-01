@@ -103,9 +103,14 @@ class Gate6Audit(Gate):
         layered = get_global_source()
         bundle_sha = layered.bundle_sha if layered is not None else ""
         sandbox_metadata = {}
+        governance_metadata = {}
         for gate_result in reversed(ctx.gate_results):
             if gate_result.gate_name in ("gate5_sandbox", "gate5"):
                 sandbox_metadata = gate_result.metadata or {}
+                break
+        for gate_result in reversed(ctx.gate_results):
+            if gate_result.gate_name == "governance_preflight":
+                governance_metadata = gate_result.metadata or {}
                 break
 
         faithfulness = assess_decision_faithfulness(ctx)
@@ -147,6 +152,11 @@ class Gate6Audit(Gate):
             gen_ai_governance_cost_estimate_usd=ctx.cost_estimate_usd,
             gen_ai_governance_output_estimate=ctx.output_estimate,
             gen_ai_governance_capability_token=dict(ctx.capability_token_summary or {}),
+            gen_ai_governance_registry_version=str(governance_metadata.get("registry_version") or ""),
+            gen_ai_governance_policy_version=str(governance_metadata.get("policy_version") or ""),
+            gen_ai_governance_decision_reason_code=str(governance_metadata.get("decision_reason_code") or ""),
+            gen_ai_governance_role_ids=list(governance_metadata.get("role_ids") or []),
+            gen_ai_governance_approval_policy_id=str(governance_metadata.get("approval_policy_id") or ""),
         )
 
         # 6. 序列化 → ChainStore 追加（落盘并计算 record_hash）

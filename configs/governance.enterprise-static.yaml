@@ -1,0 +1,309 @@
+schema_version: xa-guard-governance/v0.2
+registry_version: enterprise-static-2026-07-01
+default_tenant: acme-corp
+
+tenants:
+  - tenant_id: acme-corp
+    name: Acme Corp
+    status: active
+  - tenant_id: beta-corp
+    name: Beta Corp
+    status: active
+
+principals:
+  - principal_id: alice.hr@acme.local
+    display_name: Alice HR
+    tenant_id: acme-corp
+    status: active
+    department: HR
+    manager: dora.security@acme.local
+    groups: [hr-team]
+    attributes:
+      employment_type: employee
+    allowed_agents: [hr-assistant, general-office-agent]
+    budget:
+      limit_usd: 20.00
+      spent_usd: 3.25
+
+  - principal_id: bob.dev@acme.local
+    display_name: Bob Engineer
+    tenant_id: acme-corp
+    status: active
+    department: Engineering
+    groups: [engineering-team]
+    allowed_agents: [general-office-agent]
+    budget:
+      limit_usd: 8.00
+      spent_usd: 1.10
+
+  - principal_id: carol.finance@acme.local
+    display_name: Carol Finance
+    tenant_id: acme-corp
+    status: active
+    department: Finance
+    groups: [finance-team]
+    allowed_agents: [finance-agent, general-office-agent]
+    budget:
+      limit_usd: 15.00
+      spent_usd: 4.40
+
+  - principal_id: mallory.disabled@acme.local
+    display_name: Mallory Disabled
+    tenant_id: acme-corp
+    status: disabled
+    department: Security
+    groups: [security-team]
+    allowed_agents: [security-review-agent]
+    budget:
+      limit_usd: 5.00
+      spent_usd: 0.00
+
+  - principal_id: eve.ops@beta.local
+    display_name: Eve Beta Ops
+    tenant_id: beta-corp
+    status: active
+    department: Ops
+    groups: [beta-ops]
+    allowed_agents: [beta-ops-agent]
+    budget:
+      limit_usd: 5.00
+      spent_usd: 0.20
+
+groups:
+  - group_id: hr-team
+    tenant_id: acme-corp
+    status: active
+    members: [alice.hr@acme.local]
+  - group_id: engineering-team
+    tenant_id: acme-corp
+    status: active
+    members: [bob.dev@acme.local]
+  - group_id: finance-team
+    tenant_id: acme-corp
+    status: active
+    members: [carol.finance@acme.local]
+  - group_id: security-team
+    tenant_id: acme-corp
+    status: active
+    members: [mallory.disabled@acme.local]
+  - group_id: beta-ops
+    tenant_id: beta-corp
+    status: active
+    members: [eve.ops@beta.local]
+
+budgets:
+  - principal_id: alice.hr@acme.local
+    limit_usd: 20.00
+    spent_usd: 3.25
+  - principal_id: bob.dev@acme.local
+    limit_usd: 8.00
+    spent_usd: 1.10
+  - principal_id: carol.finance@acme.local
+    limit_usd: 15.00
+    spent_usd: 4.40
+  - principal_id: mallory.disabled@acme.local
+    limit_usd: 5.00
+    spent_usd: 0.00
+  - principal_id: eve.ops@beta.local
+    limit_usd: 5.00
+    spent_usd: 0.20
+
+roles:
+  - role_id: hr_staff
+    tenant_id: acme-corp
+    name: HR staff
+    status: active
+    permissions:
+      - action: use_agent
+        agents: [hr-assistant, general-office-agent]
+      - action: call_tool
+        agents: [hr-assistant, general-office-agent]
+        tools: [echo, read_log, content_generation, send_email]
+      - action: access_data_domain
+        data_domains: [employee_profile, payroll]
+      - action: cross_subject_access
+        data_domains: [payroll]
+        resource_owners: ["*"]
+
+  - role_id: engineer
+    tenant_id: acme-corp
+    name: Engineer
+    status: active
+    permissions:
+      - action: use_agent
+        agents: [general-office-agent]
+      - action: call_tool
+        agents: [general-office-agent]
+        tools: [echo, content_generation, read_log]
+      - action: access_data_domain
+        data_domains: [engineering_docs]
+
+  - role_id: finance_staff
+    tenant_id: acme-corp
+    name: Finance staff
+    status: active
+    permissions:
+      - action: use_agent
+        agents: [finance-agent, general-office-agent]
+      - action: call_tool
+        agents: [finance-agent, general-office-agent]
+        tools: [echo, content_generation, send_email]
+      - action: access_data_domain
+        data_domains: [finance_report]
+      - action: cross_subject_access
+        data_domains: [finance_report]
+        resource_owners: ["*"]
+
+  - role_id: beta_ops
+    tenant_id: beta-corp
+    name: Beta ops
+    status: active
+    permissions:
+      - action: use_agent
+        agents: [beta-ops-agent]
+      - action: call_tool
+        agents: [beta-ops-agent]
+        tools: [echo]
+      - action: access_data_domain
+        data_domains: [beta_ops_notes]
+
+role_bindings:
+  - binding_id: bind-hr
+    tenant_id: acme-corp
+    role_id: hr_staff
+    groups: [hr-team]
+    status: active
+  - binding_id: bind-engineering
+    tenant_id: acme-corp
+    role_id: engineer
+    groups: [engineering-team]
+    status: active
+  - binding_id: bind-finance
+    tenant_id: acme-corp
+    role_id: finance_staff
+    groups: [finance-team]
+    status: active
+  - binding_id: bind-beta-ops
+    tenant_id: beta-corp
+    role_id: beta_ops
+    groups: [beta-ops]
+    status: active
+
+agents:
+  - agent_id: general-office-agent
+    name: 通用办公智能体
+    tenant_id: acme-corp
+    owner: platform-team
+    purpose: 通用摘要、邮件草拟和内部资料检索
+    allowed_tools: [echo, content_generation, send_email, read_log]
+    allowed_data_domains: [employee_profile, engineering_docs, finance_report]
+    risk_level: medium
+    max_autonomy: assistive
+    status: active
+
+  - agent_id: hr-assistant
+    name: HR 薪酬智能体
+    tenant_id: acme-corp
+    owner: hr-security-owner
+    purpose: HR 授权薪酬查询、员工资料整理和审批材料生成
+    allowed_tools: [echo, read_log, content_generation, send_email]
+    allowed_data_domains: [employee_profile, payroll]
+    risk_level: high
+    max_autonomy: approval_required
+    requires_human_approval_for: [payroll]
+    status: active
+
+  - agent_id: finance-agent
+    name: 财务分析智能体
+    tenant_id: acme-corp
+    owner: finance-security-owner
+    purpose: 财报摘要和预算分析
+    allowed_tools: [echo, content_generation, send_email]
+    allowed_data_domains: [finance_report]
+    risk_level: high
+    max_autonomy: assistive
+    status: active
+
+  - agent_id: security-review-agent
+    name: 停用安全复核智能体
+    tenant_id: acme-corp
+    owner: security-owner
+    purpose: 停用样例
+    allowed_tools: [echo]
+    allowed_data_domains: [engineering_docs]
+    risk_level: high
+    max_autonomy: assistive
+    status: disabled
+
+  - agent_id: beta-ops-agent
+    name: Beta 运维智能体
+    tenant_id: beta-corp
+    owner: beta-platform
+    purpose: Beta 租户运维笔记
+    allowed_tools: [echo]
+    allowed_data_domains: [beta_ops_notes]
+    risk_level: medium
+    max_autonomy: assistive
+    status: active
+
+data_domains:
+  - domain_id: employee_profile
+    name: 员工基础资料
+    tenant_id: acme-corp
+    sensitivity: INTERNAL
+    allowed_departments: [HR]
+    allowed_roles: [hr_staff]
+    status: active
+
+  - domain_id: payroll
+    name: 工资条与薪酬明细
+    tenant_id: acme-corp
+    sensitivity: CONFIDENTIAL
+    allowed_departments: [HR]
+    allowed_roles: [hr_staff]
+    allow_cross_subject_roles: [hr_staff]
+    requires_approval: true
+    status: active
+
+  - domain_id: engineering_docs
+    name: 研发内部资料
+    tenant_id: acme-corp
+    sensitivity: INTERNAL
+    allowed_departments: [Engineering]
+    allowed_roles: [engineer]
+    status: active
+
+  - domain_id: finance_report
+    name: 财务报表
+    tenant_id: acme-corp
+    sensitivity: CONFIDENTIAL
+    allowed_departments: [Finance]
+    allowed_roles: [finance_staff]
+    allow_cross_subject_roles: [finance_staff]
+    status: active
+
+  - domain_id: beta_ops_notes
+    name: Beta 运维笔记
+    tenant_id: beta-corp
+    sensitivity: INTERNAL
+    allowed_departments: [Ops]
+    allowed_roles: [beta_ops]
+    status: active
+
+approval_policies:
+  - policy_id: GOV-APPROVAL-CONFIDENTIAL-CROSS-SUBJECT
+    tenant_id: acme-corp
+    status: active
+    decision: require_approval
+    reason: confidential cross-subject data requires HR approval
+    when:
+      sensitivity_in: [CONFIDENTIAL]
+      cross_subject_only: true
+
+  - policy_id: GOV-APPROVAL-HIGH-AUTONOMY
+    tenant_id: acme-corp
+    status: active
+    decision: require_approval
+    reason: high-risk or approval-required agent autonomy requires review
+    when:
+      max_autonomy_in: [approval_required, autonomous]

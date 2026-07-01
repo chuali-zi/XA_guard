@@ -49,7 +49,12 @@ function parseJsonl(raw) {
 function hasDomain(employee, domain) {
   if ((employee.data_domains || []).includes(domain.domain_id)) return true;
   if ((domain.allowed_departments || []).includes(employee.department)) return true;
-  return (employee.roles || []).some((role) => (domain.allowed_roles || []).includes(role));
+  const directRoles = employee.roles || [];
+  const boundRoles = state.registry.role_bindings
+    .filter((binding) => (binding.principals || []).includes(employee.principal_id)
+      || (binding.groups || []).some((group) => (employee.groups || []).includes(group)))
+    .map((binding) => binding.role_id);
+  return [...directRoles, ...boundRoles].some((role) => (domain.allowed_roles || []).includes(role));
 }
 
 function metric(label, value) {
@@ -66,6 +71,7 @@ function renderMetrics() {
   document.getElementById("metric-strip").innerHTML = [
     metric("员工", registry.employees.length),
     metric("智能体", registry.agents.length),
+    metric("角色 / 策略", `${registry.roles.length} / ${registry.approval_policies.length}`),
     metric("数据域", registry.data_domains.length),
     metric("拦截 / 待审批", `${denied} / ${approvals}`),
     metric("估算成本 USD", cost.toFixed(2)),
@@ -118,6 +124,29 @@ function renderAgents() {
   `;
 }
 
+function renderRoles() {
+  const roles = state.registry.roles;
+  const policies = state.registry.approval_policies;
+  document.getElementById("role-count").textContent = `${roles.length} 个角色 · ${policies.length} 条审批策略`;
+  document.getElementById("role-table").innerHTML = `
+    <thead><tr><th>角色</th><th>租户</th><th>权限动作</th><th>审批策略</th></tr></thead>
+    <tbody>
+      ${roles.map((role, idx) => {
+        const policy = policies[idx] || {};
+        const actions = (role.permissions || []).map((permission) => permission.action);
+        return `
+          <tr>
+            <td><strong>${text(role.name || role.role_id)}</strong><br><span class="meta">${text(role.role_id)}</span></td>
+            <td>${text(role.tenant_id)}</td>
+            <td>${actions.map((item) => `<span class="pill">${text(item)}</span>`).join("") || "-"}</td>
+            <td><strong>${text(policy.policy_id)}</strong><br><span class="meta">${text(policy.reason)}</span></td>
+          </tr>
+        `;
+      }).join("")}
+    </tbody>
+  `;
+}
+
 function renderMatrix() {
   const employees = state.registry.employees;
   const domains = state.registry.data_domains;
@@ -129,7 +158,7 @@ function renderMatrix() {
     <tbody>
       ${employees.map((employee) => `
         <tr>
-          <td><strong>${text(employee.name)}</strong><br><span class="meta">${text(employee.department)} · ${text(employee.roles)}</span></td>
+          <td><strong>${text(employee.name)}</strong><br><span class="meta">${text(employee.department)} · ${text(employee.groups || employee.roles)}</span></td>
           ${domains.map((domain) => {
             const ok = hasDomain(employee, domain);
             return `<td class="${ok ? "cell-ok" : "cell-no"}">${ok ? "允许" : "禁止"}</td>`;
@@ -155,6 +184,8 @@ function renderAudit() {
           <div class="audit-extra">
             ${text(record["gen_ai.governance.human_principal"])} 使用 ${text(record["gen_ai.governance.agent_id"])}
             访问 ${text(record["gen_ai.governance.data_domain"])}
+            <br>角色：${text(record["gen_ai.governance.role_ids"])}
+            · 原因码：${text(record["gen_ai.governance.decision_reason_code"])}
             <br>命中规则：${hits.map((hit) => `<span class="pill">${text(hit)}</span>`).join("") || "-"}
           </div>
         </div>
@@ -165,10 +196,18 @@ function renderAudit() {
 }
 
 function normalizeRegistry(raw) {
+  const employees = raw.principals || raw.employees || [];
   return {
-    employees: raw.employees || [],
+    employees: employees.map((employee) => ({
+      ...employee,
+      principal_id: employee.principal_id || employee.principal,
+      name: employee.display_name || employee.name || employee.principal_id || employee.principal,
+    })),
     agents: raw.agents || [],
     data_domains: raw.data_domains || [],
+    roles: raw.roles || [],
+    role_bindings: raw.role_bindings || [],
+    approval_policies: raw.approval_policies || [],
   };
 }
 
@@ -181,6 +220,7 @@ async function loadAll() {
   renderMetrics();
   renderScenarios();
   renderAgents();
+  renderRoles();
   renderMatrix();
   renderAudit();
 }
