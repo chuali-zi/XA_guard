@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -13,7 +14,29 @@ from agentdojo.types import (
     text_content_block_from_string,
 )
 
-from bench.external.opencode_bridge import invoke_opencode_json
+from bench.external.opencode_bridge import (
+    ProviderQuotaPaused,
+    budget_bucket_for_attempt,
+    invoke_opencode_json,
+)
+from bench.external.budget import BudgetError
+
+
+def normalize_text_content(value: Any) -> str | None:
+    if value is None or isinstance(value, str):
+        return value
+    if not isinstance(value, list):
+        raise ValueError("OpenCode response content must be a string, null, or text block list")
+    parts: list[str] = []
+    for block in value:
+        if not isinstance(block, dict):
+            raise ValueError("OpenCode response content block must be an object")
+        block_type = block.get("type")
+        text = block.get("text", block.get("content"))
+        if block_type != "text" or not isinstance(text, str):
+            raise ValueError("OpenCode response content block list must contain only text blocks")
+        parts.append(text)
+    return "".join(parts)
 
 
 def _message_payload(message: ChatMessage) -> dict[str, Any]:
@@ -57,8 +80,10 @@ class OpenCodeLLM(BasePipelineElement):
         invocation_log: str | Path | None = None,
         budget_ledger: str | Path | None = None,
         budget_bucket: str | None = None,
+        retry_budget_bucket: str | None = None,
         budget_job_id: str | None = None,
         max_invocation_reserve_usd: float | None = None,
+        max_turn_retries: int = 1,
     ) -> None:
         self.executable = executable
         self.model = model
@@ -69,8 +94,10 @@ class OpenCodeLLM(BasePipelineElement):
         self.invocation_log = invocation_log
         self.budget_ledger = budget_ledger
         self.budget_bucket = budget_bucket
+        self.retry_budget_bucket = retry_budget_bucket
         self.budget_job_id = budget_job_id
         self.max_invocation_reserve_usd = max_invocation_reserve_usd
+        self.max_turn_retries = max(1, int(max_turn_retries))
         # AgentDojo's attacks infer a prose model family from this official token.
         self.name = f"openai-compatible-opencode-{model.replace('/', '_')}"
 
@@ -109,24 +136,37 @@ class OpenCodeLLM(BasePipelineElement):
             "response_schema. Use an empty tool_calls list when answering without a tool.\n\n"
             + json.dumps(request, ensure_ascii=False, default=str)
         )
-        response = invoke_opencode_json(
-            prompt,
-            executable=self.executable,
-            model=self.model,
-            cwd=self.cwd,
-            config_home=self.config_home,
-            data_home=self.data_home,
-            timeout_seconds=self.timeout_seconds,
-            invocation_log=self.invocation_log,
-            budget_ledger=self.budget_ledger,
-            budget_bucket=self.budget_bucket,
-            budget_job_id=self.budget_job_id,
-            max_invocation_reserve_usd=self.max_invocation_reserve_usd,
-        )
+        last_error: Exception | None = None
+        for attempt in range(1, self.max_turn_retries + 1):
+            try:
+                response = invoke_opencode_json(
+                    prompt,
+                    executable=self.executable,
+                    model=self.model,
+                    cwd=self.cwd,
+                    config_home=self.config_home,
+                    data_home=self.data_home,
+                    timeout_seconds=self.timeout_seconds,
+                    invocation_log=self.invocation_log,
+                    budget_ledger=self.budget_ledger,
+                    budget_bucket=budget_bucket_for_attempt(
+                        attempt, self.budget_bucket, self.retry_budget_bucket
+                    ),
+                    budget_job_id=self.budget_job_id,
+                    max_invocation_reserve_usd=self.max_invocation_reserve_usd,
+                )
+                break
+            except (BudgetError, ProviderQuotaPaused):
+                raise
+            except (RuntimeError, ValueError) as exc:
+                last_error = exc
+                if attempt >= self.max_turn_retries:
+                    raise
+                time.sleep(0.5 * attempt)
+        else:  # pragma: no cover - loop always raises or breaks
+            raise RuntimeError("OpenCode turn retry failed") from last_error
 
-        content = response.get("content", response.get("response"))
-        if content is not None and not isinstance(content, str):
-            raise ValueError("OpenCode response content must be a string or null")
+        content = normalize_text_content(response.get("content", response.get("response")))
         raw_calls = response.get("tool_calls", [])
         if not isinstance(raw_calls, list):
             raise ValueError("OpenCode response tool_calls must be a list")

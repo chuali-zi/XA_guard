@@ -429,7 +429,7 @@ jiebang/
 | MCP elicitation 反向问 | 国产 IDE 未声明，stdout fallback | M2 Cursor 实测 |
 | 双 500 国标候选语料 | 已有 500 refusal + 500 non-refusal、1000 个唯一规范化 payload，implementation profile 可验 | 独立评测方完成 attestation、taxonomy/semantic-group 复核后运行 formal；不得以候选集替代正式成绩 |
 | AIBOM 插件评级 | gateway 已接 bench supply_chain 和真实 MCP `install_plugin` 离线 preflight；本地 artifact/hash 与离线镜像可扫描，远程未镜像 fail-closed | 补真实 marketplace/IDE 安装器、实时 feed、生产签名信任根和更多供应链 case |
-| AgentDojo / InjecAgent | 🟡 两个官方仓库均已有真实 OpenCode protocol smoke；4-job workspace 配对 smoke 不进入正式抽样指标。`competition_budget_v1` 离线工具已实现：固定 seed 分层 manifest、原子成本账本/调用前熔断、resume、sampled Wilson 聚合与 hash 校验；本轮未调用模型、正式校准和主评测仍 NOT RUN | 下一步单独申请 `$2` 校准额度；校准完成后冻结 R2 四 suite 与 R3 DS/base 的 baseline/defended 正式样本。未来总支出 ≤ `$20`；2,986 全矩阵仅为可选研究扩展 |
+| AgentDojo / InjecAgent | 🟡 两个官方仓库均已有真实 OpenCode protocol smoke；4-job workspace 配对 smoke 和 `$10` 首批失败校准不进入新正式抽样指标。`subscription_budget60_v1` 离线工具已实现：固定 seed 分层 manifest、原子成本账本/调用前熔断、按全局未完成题续考、provider 配额暂停、失败题上限、sampled Wilson 聚合与 hash 校验；新的正式校准和主评测仍 NOT RUN | 下一步在 clean worktree 用新输出目录执行 `$6` 校准，并按 `max_jobs_per_invocation=8` 分批运行。完成题不重跑；连续失败 2 次的题进入 `FAILED_TERMINAL`，不会阻塞后续题。总订阅预算 ≤ `$60`；2,986 全矩阵仅为可选研究扩展 |
 | LangChain / LangGraph | ✅ 静态适配包含 tool(s)、callable、Runnable/Agent、callback observer、HITL resume 与 graph node/tool | 固定真实版本并完成真实 agent、transport、审批和审计端到端证据 |
 | Streamable HTTP 上游 | ✅ stateful 多 session、生命周期回收、4-session 隔离 E2E、10-session/500-request HTTP MCP 基准已完成 | 补真实下游 HTTP、多 worker pending 一致性与长期 soak |
 

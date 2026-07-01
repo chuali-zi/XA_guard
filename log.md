@@ -1,5 +1,124 @@
 # 工作日志
 
+## 2026-06-30 19:28 PDT docs 当前状态分析与下一步 TODO 整理
+
+起因：用户要求详细分析赛题、已有 docs 和当前仓库状态，把“下一步该干什么”的详细 TODO 放到 docs，并整理混乱的 docs 入口。
+
+已完成：
+- 读取 `AGENTS.md`、`status.md`、根 `README.md`、`docs/README.md`、`docs/PRD.md`、`docs/事实源.md`、`docs/L3-test-and-acceptance.md`、`docs/R2-R3完整矩阵预算分析.md`、`docs/R2-R3矩阵自动验收使用说明.md`、`docs/产品架构.md`、`docs/项目总览.md`、Trae/AIBOM/force-ai 相关文档。
+- 使用 `pypdf` 抽取并核对赛题 PDF 9 页正文，确认官方交付物为 D1 技术方案 PDF、D2 原型代码/仓库链接、D3 10 分钟内视频、D4 审核通过报名表；评分维度为实际效果 30%、技术创新性 25%、方案完整性 20%、应用价值 20%、展示表达 5%。
+- 新增 `docs/TODO.md`，按官方交付物、当前状态分层、P0/P1/P2、四个赛题方向、L3 真实验收、docs 整理计划、执行顺序、不做清单和最小完成定义整理下一步。
+- 更新 `docs/README.md`，把 `docs/TODO.md` 放入 30 秒目录树和核心入口，新增“当前最该看的 5 个入口”和“我要推进当前交付”的阅读路径。
+- 更新 `status.md`，记录 `docs/TODO.md` 已成为当前执行入口，并说明本轮只改变文档导航和状态口径，不改变代码能力、测试结果或 L3 验收状态。
+- 识别根目录下还有 `jiebang-agent-governance` 另一工作树/分支快照，且其 git 元数据访问异常；本轮没有混合两个目录的状态，整理落在 `D:\race\XA_guard\jiebang`。
+
+未完成 / 客观边界：
+- 本轮没有移动大量 docs 文件，也没有重构目录结构；只通过 `TODO.md` 和 `docs/README.md` 建立入口，避免破坏现有相对链接。
+- 没有修改产品代码、测试代码、benchmark、配置或 runner。
+- 没有运行 pytest、ruff、L3 verifier、Docker、Trae 或任何付费模型调用。
+- 没有生成 D1 PDF、D3 视频、D4 报名表或正式提交包。
+- `docs/TODO.md` 中关于 D4 报名状态、真实 Trae、Linux gVisor、外部 AIBOM、第三方 TSA/HSM、R2/R3 sampled 结果等仍是待办或 blocker，不代表已完成。
+
+下一步：
+- 先人工确认 D4 报名是否已在 2026-06-30 截止前审核通过。
+- 再收束 `jiebang` 工作树和分支归属，决定是否合并 `jiebang-agent-governance` 的治理能力。
+- 按 `docs/TODO.md` 的 P0 顺序推进：D1 草稿、D2 证据包、D3 视频脚本/录制、R2/R3 sampled dry-run 与授权后实跑。
+
+## 2026-06-23 05:58 PDT 原动力大会 AI 安全 PPT 照片整理
+
+起因：用户提供 22 张 2026 原动力大会现场 PPT 照片，要求不要按固定字数凑一篇，而是自主分析、拆分成若干 Markdown，全面细致且好读懂，放入 `docs` 新目录中。同时按仓库规则维护 `status.md` 和 `log.md`。
+
+已完成：
+- 新增 `docs/force-ai-security-2026/` 专题目录。
+- 新增 `README.md` 作为总览，说明来源、性质、核心判断和 6 个子文档导航。
+- 新增 `01-slide-notes.md`，按 22 张照片顺序转写可辨识 PPT 信息，并对每页补充项目理解；未强行补全看不清的文字。
+- 新增 `02-risk-landscape.md`，抽象出企业智能体安全风险图谱，覆盖六大挑战、数据路径全链攻击、Computer Use Agent、Shadow AI、基础设施错配、责任量化和 OWASP AT0-AT8 成熟度。
+- 新增 `03-governance-architecture.md`，整理顶层设计、Agent Gateway、第三类身份、JIT/JEA/JLA、Substrate、安全能力层和运行阶段管控架构。
+- 新增 `04-data-and-control-security.md`，集中整理控制流/数据流隔离、数据可用不可见、AICC、PrivLLM、可信环境和统一目标函数。
+- 新增 `05-xaguard-mapping.md`，将会议观点映射到 XA-Guard Gate1-Gate6，并列出当前项目在多 Agent 编排治理、Agent 身份、数据可用不可见、韧性撤销、风险量化方面的表达和实现缺口。
+- 新增 `06-action-checklist.md`，拆出 P0/P1/P2 落地清单，明确哪些适合马上补文档，哪些需要后续代码或测试实现。
+- 更新 `docs/README.md`，把新专题目录纳入文档总入口。
+- 更新 `status.md`，记录新增研究/答辩资料的当前状态和边界，明确这只是文档沉淀，不改变 L3 验收状态。
+
+未完成 / 客观边界：
+- 本轮没有修改产品代码、测试代码、benchmark、配置或验收脚本。
+- 没有运行 pytest、ruff 或 L3 verifier；本轮交付是文档整理，不涉及代码路径。
+- 会议照片中的外部事件、金额、厂商信息、法律案例和标准版本未做联网或官方来源核验，正式引用前仍需二次查证。
+- PrivLLM、TEE、AICC、UndoAI、多 Agent 编排治理等只作为会议启发和后续路线记录，不能写成当前仓库已实现能力。
+- 新增资料尚未并入 D1 技术方案、最终 PPT 或 README 主叙事。
+
+下一步：如继续推进，优先把本专题中的 Agent Gateway、第三类身份、控制流/数据流隔离、AI Resilience 和 AT0-AT8 成熟度，吸收到 D1 技术方案与答辩 PPT；再决定是否实现 Agent 身份注册表、Capability Token、数据来源 taint 标签和动作级 Undo 元数据。
+
+## 2026-06-22 05:33 PDT R2/R3 续考、重试与预算运行静态纠偏
+
+起因：用户要求检查此前修复并完成静态分析发现的问题，重点确认考试可以续考，不能每次从第一题重新开始。本轮只修改代码、配置、测试和文档；没有启动 OpenCode、没有模型调用、没有新增 provider 成本，也没有修改 benchmark/scorer 或既有测试断言。
+
+已完成：
+- 修复批次选择顺序：`run_jobs` 现在先遍历完整 manifest，排除结果完整且 provenance/版本锁匹配的 jobs，再从全局未完成列表取 `max_jobs`。此前先执行 `plan["jobs"][:max_jobs]`，导致前 8 题完成后每次 resume 仍只检查前 8 题；现已消除这一根因，中间存在已完成空洞时也会补足下一批。
+- AgentDojo runner 将官方 `force_rerun` 从强制 true 改为 false；同一 job 子进程中断后可复用 OutputLogger 已完成 task trace，只重跑中断/未完成 task，不从该 job 的第一项内部任务重新开始。
+- 为预算运行增加跨 resume 的基础设施失败上限 `max_job_resume_attempts=2`。达到上限的题记为 `FAILED_TERMINAL`，不再永久占用后续批次名额；后续题继续，但 phase 保持非零退出，不能被误聚合成完整结果。
+- AgentDojo 与 InjecAgent 都实现单 turn 有界重试；首次调用记入 calibration/R2/R3 主桶，后续 turn retry 记入 `retry` 桶。预算错误和明确 provider 配额暂停不会被盲目重试。
+- OpenCode bridge 识别“无响应、零 step、明确 weekly/usage/rate quota”拒绝：以零成本结算本次预留并抛出 `ProviderQuotaPaused`；orchestrator 写 `PAUSED_PROVIDER_QUOTA` 后停止本批，不把后续题错误标成预算耗尽。真正缺失成本仍保留预留并 halt ledger。
+- 两个 runner 均写出 runner/adapter commit、dirty 状态、acceptance config hash 和 OpenCode permission config hash。预算结果必须与冻结锁一致；实际付费子进程启动前再次检查主仓库、AgentDojo、InjecAgent 的 commit/clean 状态及权限配置 hash，漂移时在调用前拒绝执行。
+- 修复正式口径 provenance：budget plan 不再硬编码旧 `competition_budget_v1`，而是保存配置冻结的 `evaluation_profile`；sample manifest/report 的 claim scope 由该 profile 生成。当前 `$60` 配置会一致写出 `subscription_budget60_v1`，同时保留旧 `$20` 产物读取兼容。
+- 更新示例与本地配置、README、R2/R3 使用说明、预算分析、L3 验收说明和 `status.md`，明确“续考”准确语义、失败题上限、配额暂停与仍未解决的边界。
+
+验证：
+- 目标测试：`32 passed`，覆盖顺序无关的下一批选择、完成空洞、terminal 失败题不阻塞、provider 配额暂停、retry 分桶、profile 贯穿、provenance/dirty 拒绝、执行锁复核、content 规范化和预算熔断。
+- changed-file `ruff`：PASS；`git diff --check`：无 whitespace error（仅 Git 的 LF→CRLF 环境提示）。
+- `PYTHONUTF8=1 python -m pytest -q`：585 collected，`584 passed, 1 skipped`；唯一 skip 为本机不存在 `xa-guard/sandbox:latest` 镜像。
+- `PYTHONUTF8=1 python scripts/verify_l3_static.py --section all`：11/11 sections PASS，同时仍客观列出 11 项 runtime/human evidence requirement。
+
+未完成 / 客观边界：
+- 没有进行新的 `$60` 校准或 sampled 主评测；续考结论来自静态实现、单元/全仓测试和 dry-run 路径，不是新的付费实跑证据。
+- OpenCode 内部工具禁用仍依赖 `--pure`、隔离运行目录和冻结的权限配置；仓库没有一个已经通过真实 CLI 验证的更细粒度硬禁用参数。`max_invocation_reserve_usd=0.20` 是调用前保守预留，不是对 provider 单次响应最大费用的理论证明。
+- AgentDojo suite/arm 级批量运行与官方 utility trace 的跨 job 批量复用仍未实现；本轮只保证同一 job 内部已完成 task 不因恢复而强制重跑。
+- 工作树在开始本轮前已包含未提交修改，本轮没有提交、推送或清理他人/此前产物。正式付费前仍需收束为 clean worktree，并使用新的输出目录和 manifest。
+
+下一步：人工复核 diff 后，在 clean worktree 先运行新输出目录的 `budget-plan` 与 `budget-run --phase calibration --dry-run`，观察打印出的第一批与第二批续考选择；只有锁、权限配置和账本都一致时，再由用户单独授权真实校准。
+
+## 2026-06-22 R2/R3 预算调整为 `$60` 订阅分批方案（OpenCode）
+
+起因：用户说明已订阅 OpenCode Go 套餐，可用额度约 `$60`，但存在 5h 和周额度限制，要求调整整体预算并做好分批试题准备。本轮没有启动 OpenCode 或任何付费模型调用。
+
+已完成：
+- 将 R2/R3 正式预算口径从 `$20 competition_budget_v1` 调整为 `subscription_budget60_v1`：总 cap `$60`，分桶为 calibration `$6`、R2 main `$32`、R3 main `$16`、retry `$6`。
+- `configs/r2-r3-acceptance.example.json` 与 `configs/r2-r3-acceptance.local.json` 改为新输出目录 `D:/evidence/r2-r3-subscription-budget60-v1`，保留 `max_invocation_reserve_usd=0.20`，新增 `max_jobs_per_invocation=8`。
+- `scripts/run_r2_r3_acceptance.py` 新增配置级批次上限：`budget-run`/`budget-resume` 未显式传 `--max-jobs` 时默认最多执行 8 个未完成 jobs，便于按 5h/周额度窗口分批 resume；已完成且锁匹配的 job 继续跳过。
+- 更新 `README.md`、`docs/PRD.md`、`docs/L3-test-and-acceptance.md`、`docs/R2-R3矩阵自动验收使用说明.md`、`docs/R2-R3完整矩阵预算分析.md` 和 `status.md`，明确旧 `$10` 首批失败校准/历史 smoke 不进入新正式分母，后续必须新输出目录、新 manifest。
+- 新增单测覆盖默认批次上限。
+
+未完成 / 边界：
+- 仍未进行新的 `$6` 正式校准或主评测，未产生 sampled 指标。
+- `max_jobs_per_invocation=8` 是防止一次跑完的默认护栏，不等于 provider 真实 5h/周额度检测；额度窗口仍需人工观察 OpenCode 账户/CLI 状态后分批继续。
+- AgentDojo suite/arm 批量运行和官方 utility trace 复用仍未实现；完整 2,986-job 矩阵仍为 `DEFERRED_OPTIONAL`。
+
+下一步：先运行目标单测/ruff/dry-run；正式付费前在 clean worktree 执行新输出目录的 `budget-plan` 和 `budget-run --phase calibration --dry-run`，确认 8-job 批次命令无误后，再按用户单批授权移除 `--dry-run`。
+
+## 2026-06-22 R2/R3 预算评测离线修复（OpenCode）
+
+起因：用户给出 `$10` 首批 R2/R3 预算运行后的简要修复方案，要求先解决 content block 兼容、重试粒度、预算耗尽行为、预留过低与结果版本隔离问题。本轮没有启动 OpenCode 或任何付费模型调用。
+
+已完成：
+- `bench/external/agentdojo_opencode.py` 新增 `normalize_text_content`：接受 `str`/`None`，接受纯 text block list 并拼接；兼容 block 文本字段为 `text` 或 `content`；非 text/mixed/tool block 继续拒绝。
+- AgentDojo adapter 增加 `max_turn_retries`，只在单次模型 turn 内重试 `RuntimeError`/`ValueError`，`BudgetError` 不重试；预算型 plan 强制 job 级 `max_attempts=1`，避免重跑已成功 benchmark 步骤。
+- `scripts/run_r2_r3_acceptance.py` 在启动子进程前检查 ledger 余额；余额不足时停止 phase，当前及后续 job 写 `NOT_RUN_BUDGET`/`BUDGET_EXHAUSTED`，不再记为 `infra_error` 或进入 retry。
+- 默认和示例单调用预留从 `$0.05` 改为 `$0.20`；本地/示例配置同步改为 job 不重跑、单 turn 最多 2 次。
+- AgentDojo 结果新增 `runner_commit`、`adapter_commit`、`acceptance_config_sha256`、`opencode_permission_config_sha256`；真实 budget plan 对新 AgentDojo 结果要求这些字段，防止混用旧 adapter 版本结果。
+- 新增/更新单测覆盖 text block list、mixed block 拒绝、预算前置停止。
+
+验证：
+- 零费用 replay `D:/evidence/r2-r3-budget10-20260622` 下 9 个调用日志、87 条记录：84 条有响应的历史调用均通过新 content 规范化；其中 1 条 text block list 已兼容。剩余 3 条为历史 `response=null` 失败调用，不是 content block schema 问题。
+- `python -m pytest tests/unit/test_opencode_bridge.py tests/unit/test_r2_r3_acceptance.py tests/unit/test_budget_evaluation.py -q` → 21 passed。
+- `python -m ruff check ...` changed files → All checks passed。
+
+未完成 / 边界：
+- 未实现 AgentDojo suite/arm 批量运行与官方 utility trace 复用；当前仍是逐 job 子进程架构，只是避免预算耗尽后继续启动。
+- 未进行 `$0.50` 微型付费验证，未重新冻结 sample manifest，旧 7 个 complete 结果仍不得混入正式样本。
+- OpenCode 内部工具限制仍依赖 `--pure`、隔离 runtime cwd、临时 turn 文件和权限配置 hash 记录；未新增经真实 CLI 证明的更细粒度权限 flag。
+
+下一步：先实现/验证 AgentDojo 批量缓存或进一步降本，再在新输出目录做不超过 `$0.50` 的微型验证；确认成本可装入剩余预算后，才能重新 `budget-plan`/`budget-freeze` 并付费运行正式样本。
+
 ## 2026-06-22 `$10` 首批 R2/R3 预算运行（Codex）
 
 起因：用户授权先运行最多 `$10`，并明确允许为付费运行建立本地 commit。执行前将已验证的预算工具提交为本地 commit `b871281`；没有推送。

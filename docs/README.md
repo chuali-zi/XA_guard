@@ -14,6 +14,7 @@
 ```
 docs/
 ├── README.md                ← 你在这里
+├── TODO.md                  ← 当前状态分析 + 下一步执行 TODO（先看这个）
 ├── 事实源.md                ← 维护口径与纠偏清单
 ├── PRD.md                   ← 验收目标与 KPI
 ├── 产品架构.md              ← XA-Guard 三件套设计（产品级核心）
@@ -23,6 +24,7 @@ docs/
 ├── 规则测试样例约定.md      ← Gate3 规则正/反例、bench 绑定和阳历日期样例约定
 ├── Gate2-3-4策略审核指南.md ← 组员审核 Gate2/3/4 策略合规性、依据和证据的傻瓜手册
 ├── XA-202620…比赛方案.pdf   ← 赛题原文
+├── force-ai-security-2026/ ← 原动力大会企业 AI / 智能体安全现场照片整理
 │
 ├── tutorials/               ← 教学文档：上手 / 学习类
 │   └── MCP零基础上手.md
@@ -46,10 +48,23 @@ docs/
 
 ---
 
+## 当前最该看的 5 个入口
+
+| 入口 | 什么时候看 | 作用 |
+|---|---|---|
+| [`TODO.md`](./TODO.md) | 不知道下一步干什么时 | 当前状态分析、官方交付物、P0/P1/P2 TODO、docs 整理计划 |
+| [`../status.md`](../status.md) | 判断仓库到底完成到哪时 | 当前能力、验收边界、BLOCKED 清单和 PRD 距离 |
+| [`PRD.md`](./PRD.md) | 判断指标和交付是否够用时 | D1-D4、评分拆解、KPI、MoSCoW 和里程碑 |
+| [`L3-test-and-acceptance.md`](./L3-test-and-acceptance.md) | 跑验收或写证据时 | L3 静态/真实验收、R1-R9 成功标准和证据要求 |
+| [`R2-R3矩阵自动验收使用说明.md`](./R2-R3矩阵自动验收使用说明.md) | 准备 AgentDojo/InjecAgent 预算评测时 | `subscription_budget60_v1` 分批运行、resume、成本账本和 claim scope |
+
+---
+
 ## 各目录用途（1 行版）
 
 | 路径 | 用途 |
 |---|---|
+| `docs/TODO.md` | 当前下一步执行总入口：官方交付、四方向证据、L3 blocker、docs 整理 |
 | `docs/事实源.md` | 核心事实和纠偏清单，内部衍生文档冲突时优先采用 |
 | `docs/PRD.md` | 验收目标、KPI、里程碑和交付物边界 |
 | `docs/产品架构.md` | XA-Guard MCP Server + Protocol + SDK + Bench 的产品级技术设计，**新人第二份必读** |
@@ -58,6 +73,7 @@ docs/
 | `docs/XA-Bench-对抗测试规则.md` | bench 维护者的接入层、oracle、指标和演进规则 |
 | `docs/规则测试样例约定.md` | Gate3 规则逐条正/反例、bench case 绑定和阳历日期样例口径 |
 | `docs/Gate2-3-4策略审核指南.md` | 组员审核 Gate2/3/4 策略合规性、风险分级依据、能力边界和证据样例的操作手册 |
+| `docs/force-ai-security-2026/` | 2026 原动力大会企业 AI / 智能体安全 PPT 照片整理：风险图谱、治理架构、XA-Guard 映射和落地清单 |
 | `docs/XA-202620…比赛方案.pdf` | 赛题原文，遇到分歧以此为准 |
 | `docs/tutorials/` | 教学文档。当前只有 MCP 入门指南，未来加入沙盒、审计等手把手教程 |
 | `docs/references/product-forms/` | 产品形态可行性评估的 4 篇方案 + 横向对比 |
@@ -70,6 +86,7 @@ docs/
 ## 推荐阅读顺序
 
 ### 我是新加入的队员
+0. 先读 [TODO.md](./TODO.md) 第 0-3 节 —— 先知道项目现在卡在哪里
 1. 先读 [项目总览.md](./项目总览.md) —— 理解我们在做什么、为什么、什么时候交付（约 45 分钟）
 2. 再读 [产品架构.md](./产品架构.md) —— 理解 XA-Guard 三件套的设计（约 30 分钟）
 3. 看 [tutorials/MCP零基础上手.md](./tutorials/MCP零基础上手.md) —— 跑通第一个 MCP Server（约 2-3 小时实操）
@@ -98,6 +115,12 @@ docs/
 ### 我在准备答辩
 跨方向必读 Top 10、常见评委问题应答清单都在 [references/literature/INDEX.md](./references/literature/INDEX.md) 第 35-165 行。
 
+### 我要推进当前交付
+1. 先读 [TODO.md](./TODO.md) —— 里面按 P0/P1/P2 写了下一步。
+2. 再读 [status.md](../status.md) —— 确认哪些可以宣称、哪些仍是 BLOCKED。
+3. 按 [L3-test-and-acceptance.md](./L3-test-and-acceptance.md) 收证据。
+4. 若涉及 R2/R3 外部评测，按 [R2-R3矩阵自动验收使用说明.md](./R2-R3矩阵自动验收使用说明.md) 执行，不能把抽样写成完整矩阵。
+
 ---
 
 ## 文档维护说明
@@ -124,9 +147,9 @@ docs/
 2. 用 grep 搜其他引用了它的文件，一并修复
 3. 移动后跑一遍链接检查（建议用 markdown-link-check 工具，未来集成到 CI）
 
-### 当前顶层文档（2026-05-31）
+### 当前顶层文档（2026-06-30）
 
-顶层包含：赛题 PDF、事实源、PRD、产品架构、项目总览、Gate1 接入说明、HACK-BENCH 提交规范、XA-Bench 对抗测试规则、规则测试样例约定和 Gate2/3/4 策略审核指南。研究资料和历史快照继续放在 `references/`。
+顶层包含：赛题 PDF、`TODO.md`、事实源、PRD、产品架构、项目总览、L2/L3 验收说明、R2/R3 预算评测说明、Gate1 接入说明、HACK-BENCH 提交规范、XA-Bench 对抗测试规则、规则测试样例约定和 Gate2/3/4 策略审核指南。研究资料和历史快照继续放在 `references/`；正式证据继续放在 `docs/evidence/` 或仓库外证据目录。
 
 ---
 

@@ -26,6 +26,34 @@ def _git(upstream: Path, *args: str) -> str:
     ).stdout.strip()
 
 
+def _repo_git(*args: str) -> str:
+    root = Path(__file__).resolve().parents[1]
+    return subprocess.run(
+        ["git", "-c", f"safe.directory={root.as_posix()}", *args],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+
+
+def _config_hash(path: str | None) -> str | None:
+    if path is None:
+        return None
+    root = Path(path)
+    if root.is_file():
+        return _sha256(root)
+    if not root.is_dir():
+        return None
+    digest = hashlib.sha256()
+    for item in sorted(p for p in root.rglob("*") if p.is_file()):
+        digest.update(str(item.relative_to(root)).replace("\\", "/").encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(item.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
 @contextmanager
 def _working_directory(path: Path) -> Iterator[None]:
     previous = Path.cwd()
@@ -153,8 +181,11 @@ def main() -> None:
     parser.add_argument("--xa-guard-defense", action="store_true")
     parser.add_argument("--budget-ledger")
     parser.add_argument("--budget-bucket")
+    parser.add_argument("--retry-budget-bucket")
     parser.add_argument("--budget-job-id")
     parser.add_argument("--max-invocation-reserve-usd", type=float)
+    parser.add_argument("--max-turn-retries", type=int, default=2)
+    parser.add_argument("--acceptance-config-sha256")
     args = parser.parse_args()
 
     upstream = Path(args.upstream_dir).resolve()
@@ -222,8 +253,10 @@ def main() -> None:
         invocation_log=invocation_log,
         budget_ledger=args.budget_ledger,
         budget_bucket=args.budget_bucket,
+        retry_budget_bucket=args.retry_budget_bucket,
         budget_job_id=args.budget_job_id,
         max_invocation_reserve_usd=args.max_invocation_reserve_usd,
+        max_turn_retries=args.max_turn_retries,
     )
 
     started_at = datetime.now(timezone.utc)
@@ -321,6 +354,11 @@ def main() -> None:
         },
         "run": {
             "model_adapter": "opencode-run-json",
+            "runner_commit": _repo_git("rev-parse", "HEAD"),
+            "runner_dirty": bool(_repo_git("status", "--porcelain")),
+            "adapter_commit": _repo_git("rev-parse", "HEAD"),
+            "acceptance_config_sha256": args.acceptance_config_sha256,
+            "opencode_permission_config_sha256": _config_hash(args.opencode_config_home),
             "model": args.opencode_model,
             "setting": args.setting,
             "prompt_type": args.prompt_type,

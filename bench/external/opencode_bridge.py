@@ -12,6 +12,30 @@ from typing import Any
 from bench.external.budget import reserve_cost, settle_cost
 
 
+class ProviderQuotaPaused(RuntimeError):
+    """Provider rejected an unbilled call because a usage window is exhausted."""
+
+
+def budget_bucket_for_attempt(
+    attempt: int, primary_bucket: str | None, retry_bucket: str | None
+) -> str | None:
+    return primary_bucket if attempt <= 1 else retry_bucket or primary_bucket
+
+
+def _is_provider_quota_error(stderr: str, stdout: str) -> bool:
+    text = f"{stderr}\n{stdout}".lower()
+    markers = (
+        "quota exceeded",
+        "quota exhausted",
+        "usage limit",
+        "weekly limit",
+        "rate limit exceeded",
+        "too many requests",
+        "resource_exhausted",
+    )
+    return any(marker in text for marker in markers)
+
+
 def parse_opencode_json_events(stdout: str) -> dict[str, Any]:
     text_parts: list[str] = []
     for line_no, raw_line in enumerate(stdout.splitlines(), 1):
@@ -204,6 +228,14 @@ def invoke_opencode_json(
         parse_error = "" if response is not None else str(exc)
 
     usage = parse_opencode_usage(completed.stdout)
+    provider_quota_paused = (
+        completed.returncode != 0
+        and usage["step_count"] == 0
+        and _is_provider_quota_error(completed.stderr, completed.stdout)
+    )
+    if provider_quota_paused:
+        usage["cost_usd"] = 0.0
+        usage["provider_quota_paused"] = True
     record = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "model": model,
@@ -216,6 +248,7 @@ def invoke_opencode_json(
         "response_source": response_source,
         "response": response,
         "usage": usage,
+        "error_kind": "provider_quota_paused" if provider_quota_paused else "",
     }
     if reservation_id is not None:
         settle_cost(
@@ -230,6 +263,10 @@ def invoke_opencode_json(
         with path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
     if completed.returncode != 0:
+        if provider_quota_paused:
+            raise ProviderQuotaPaused(
+                f"OpenCode provider quota paused: {completed.stderr[-1000:]}"
+            )
         raise RuntimeError(
             f"OpenCode exited {completed.returncode}: {completed.stderr[-1000:]}"
         )

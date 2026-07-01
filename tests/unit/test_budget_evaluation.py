@@ -16,11 +16,13 @@ from bench.external.budget import (
 from bench.external.opencode_bridge import parse_opencode_usage
 from scripts.run_r2_r3_acceptance import (
     BUDGET_PLAN_SCHEMA,
+    _budget_settings,
     _case_key,
     _rank,
     _with_hash,
     _write_json,
     aggregate_sampled,
+    build_budget_plan,
     freeze_sample_manifest,
     verify_sampled,
     wilson_interval,
@@ -50,6 +52,14 @@ def test_ledger_fails_closed_on_unknown_cost_and_before_cap(tmp_path: Path):
     assert ledger_totals(ledger)["total_usd"] == pytest.approx(0.06)
     with pytest.raises(BudgetError, match="halted"):
         reserve_cost(path, bucket="calibration", amount_usd=0.01, job_id="three")
+
+
+def test_budget_settings_default_batch_limit():
+    settings = _budget_settings({})
+
+    assert settings["max_invocation_reserve_usd"] == 0.20
+    assert settings["max_jobs_per_invocation"] == 8
+    assert settings["max_job_resume_attempts"] == 2
 
 
 def _budget_plan() -> dict:
@@ -84,6 +94,36 @@ def _budget_plan() -> dict:
         "calibration_case_keys": calibration_keys,
     }
     return _with_hash(plan, "budget_plan_sha256")
+
+
+def test_budget_plan_preserves_configured_evaluation_profile(monkeypatch, tmp_path: Path):
+    source = _budget_plan()
+    jobs = [
+        {"id": f"job-{index}", "benchmark": item["benchmark"], "arm": "baseline", "case": item["case"]}
+        for index, item in enumerate(source["universe"])
+    ]
+    full = {
+        "schema_version": "xa-r2-r3-plan/v1",
+        "config_sha256": "config-hash",
+        "locks": {},
+        "execution": {},
+        "thresholds": {},
+        "benchmark_config": source["benchmark_config"],
+        "jobs": jobs,
+        "job_count": len(jobs),
+    }
+    monkeypatch.setattr("scripts.run_r2_r3_acceptance.build_plan", lambda config_path, config: full)
+    config = {
+        "evaluation_profile": "subscription_budget60_v1",
+        "budget": {
+            "total_usd": 60, "calibration_usd": 6, "r2_main_usd": 32,
+            "r3_main_usd": 16, "retry_usd": 6,
+        },
+    }
+
+    plan, _ = build_budget_plan(tmp_path / "config.json", config)
+
+    assert plan["profile"] == "subscription_budget60_v1"
 
 
 def test_freeze_keeps_pairs_floor_and_excludes_calibration(tmp_path: Path):

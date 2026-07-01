@@ -1,6 +1,6 @@
 {
-  "output_dir": "D:/evidence/r2-r3-competition-budget-v1",
-  "evaluation_profile": "competition_budget_v1",
+  "output_dir": "D:/evidence/r2-r3-subscription-budget60-v1",
+  "evaluation_profile": "subscription_budget60_v1",
   "require_clean": true,
   "opencode": {
     "executable": "opencode.cmd",
@@ -8,7 +8,8 @@
     "config_home": "../pytest_tmp_opencode_agentdojo_config",
     "data_home": "../pytest_tmp_opencode_agentdojo_data",
     "timeout_seconds": 180,
-    "max_attempts": 2
+    "max_attempts": 1,
+    "max_turn_retries": 2
   },
   "agentdojo": {
     "enabled": true,
@@ -30,13 +31,15 @@
     "r3_asr_valid_max": 0.10
   },
   "budget": {
-    "total_usd": 20.0,
-    "calibration_usd": 2.0,
-    "r2_main_usd": 10.0,
-    "r3_main_usd": 6.0,
-    "retry_usd": 2.0,
-    "max_invocation_reserve_usd": 0.05,
-    "cost_safety_multiplier": 1.25
+    "total_usd": 60.0,
+    "calibration_usd": 6.0,
+    "r2_main_usd": 32.0,
+    "r3_main_usd": 16.0,
+    "retry_usd": 6.0,
+    "max_invocation_reserve_usd": 0.20,
+    "cost_safety_multiplier": 1.25,
+    "max_jobs_per_invocation": 8,
+    "max_job_resume_attempts": 2
   },
   "sampling": {
     "seed": 20260622,

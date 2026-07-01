@@ -1,11 +1,14 @@
 # 仓库状态：XA-Guard / XA-202620
 
-> 快照日期：2026-06-22（仓库环境）
+> 快照日期：2026-06-30（仓库环境）
 > 本文件仅描述当前仓库状态、验收边界与剩余差距，不记录工作历史。
-> 2026-06-20 已在 commit `432ebbc` 实跑 L3 静态验收 S1–S7（全 PASS，123 测试）与能力范围内真实验收 R2/R3/R4/R6/R7/R9；证据目录 `D:/evidence/l3-20260620T090452Z/`（final-report.json + artifact-hashes.json 149 文件）。R6 Docker build/up+healthz 已 PASS（gVisor runsc 仍 BLOCKED，Windows 无 runsc）。BUG-R9 已修复+回归测试。仍 BLOCKED：R1 独立双 500/holdout、R5 真实 Trae GUI、R6 gVisor runsc（需 Linux）、R8 外部 AIBOM 生成器、R9 第三方 TSA/HSM；R2/R3 比赛目标另按 `$20` 预算型抽样管理。
+> 2026-06-20 已在 commit `432ebbc` 实跑 L3 静态验收 S1–S7（全 PASS，123 测试）与能力范围内真实验收 R2/R3/R4/R6/R7/R9；证据目录 `D:/evidence/l3-20260620T090452Z/`（final-report.json + artifact-hashes.json 149 文件）。R6 Docker build/up+healthz 已 PASS（gVisor runsc 仍 BLOCKED，Windows 无 runsc）。BUG-R9 已修复+回归测试。仍 BLOCKED：R1 独立双 500/holdout、R5 真实 Trae GUI、R6 gVisor runsc（需 Linux）、R8 外部 AIBOM 生成器、R9 第三方 TSA/HSM；R2/R3 比赛目标现按 OpenCode Go 订阅 `$60` 预算型抽样管理。
 > 2026-06-21 对 commit `6cf1ce9` 复核：统一静态 verifier `11/11` sections PASS；全量 pytest 在默认 Windows/CP1252 子进程环境为 `561 passed, 1 failed, 1 skipped`，总覆盖率 `79%`。唯一失败是 `validate_csab_gov_mini.py` 输出 Unicode 箭头触发 `UnicodeEncodeError`，设置 `PYTHONUTF8=1` 后该用例通过；唯一 skip 是本机缺 `xa-guard/sandbox:latest` 测试镜像。故当前不能写”默认环境全量测试全绿”。
-> 2026-06-22 用户授权的 `$10` 首批运行已安全停止，证据 `D:/evidence/r2-r3-budget10-20260622/`。实际新增 provider 成本 `$2.94602940`（calibration `$1.95051700` + retry `$0.99551240`），87 次调用全部 settled、无未知成本；32 calibration jobs 为 7 complete / 25 infra_error，其中 24 个在桶余额不足时调用前阻断、1 个为 OpenCode content schema 波动。校准不完整，`budget-freeze` 正确拒绝，未生成正式 sample manifest 或 sampled 指标；剩余约 `$7.05397` 未使用。2,986-job 全矩阵仍为 `DEFERRED_OPTIONAL`。
-> 2026-06-22 Git 状态：本地 `main` 与 `origin/main` 同步（ahead 0 / behind 0）；工作树包含本轮文档纠偏修改，尚未提交。此前对象库完整性核查通过。
+> 2026-06-22 用户授权的 `$10` 首批运行已安全停止，证据 `D:/evidence/r2-r3-budget10-20260622/`。实际新增 provider 成本 `$2.94602940`（calibration `$1.95051700` + retry `$0.99551240`），87 次调用全部 settled、无未知成本；32 calibration jobs 为 7 complete / 25 infra_error，其中 24 个在桶余额不足时调用前阻断、1 个为 OpenCode content schema 波动。校准不完整，`budget-freeze` 正确拒绝，未生成正式 sample manifest 或 sampled 指标；旧 7 个结果不得混入正式分母。当前新正式口径为 `subscription_budget60_v1`：总 cap `$60`，calibration `$6`、R2 `$32`、R3 `$16`、retry `$6`。离线 runner 已修复 content block、R2/R3 turn retry、retry 分桶、预算停止、provider 配额暂停、结果 provenance，以及按全局未完成列表续考；AgentDojo 同一 job 恢复时不再强制重跑已完成内部 task。单题连续基础设施失败默认最多 2 次，之后不再阻塞后续题。尚未做新的付费校准。2,986-job 全矩阵仍为 `DEFERRED_OPTIONAL`。
+> 2026-06-23 Git 状态：本地 `main` 相对 `origin/main` 为 ahead 2 / behind 0，HEAD `ebcdfde`；工作树共有 22 个变更条目，包含本轮新增文档及此前未提交修改。此前对象库完整性核查通过。
+> 2026-06-22 当前工作树离线验证：R2/R3 目标测试 `32 passed`，changed-file ruff PASS；设置 `PYTHONUTF8=1` 的全仓测试共 585 项，结果 `584 passed, 1 skipped`，唯一 skip 为本机缺 `xa-guard/sandbox:latest`；统一静态 verifier `11/11` sections PASS。未执行任何模型调用。
+> 2026-06-23 新增 `docs/force-ai-security-2026/`，将用户提供的 FORCE 原动力大会企业 AI / 智能体安全 PPT 照片整理为专题资料：逐页笔记、风险图谱、治理架构、数据/控制流安全、XA-Guard 映射和行动清单。该资料属于研究与答辩素材沉淀，不改变当前代码验收状态，也不构成任何新增测试或正式验收通过声明。
+> 2026-06-30 新增 `docs/TODO.md` 作为当前下一步执行入口，并更新 `docs/README.md` 导航。该整理明确官方 D1-D4、赛题四方向证据、L3 BLOCKED 项、R2/R3 sampled 口径和 docs 后续整理计划；不改变代码能力、测试结果或 L3 验收状态。
 
 ## 总体结论
 
@@ -16,16 +19,20 @@
 - BUG-R9（SM2-TSA-token anchor 验证 mismatch）已修复：`tsa.py` `_payload_for_hash` 排除 `sm2_tsa_*` 字段，新增回归测试，S7 全套 123 passed 无回归。
 - BUG-R9 修复及回归测试已进入 commit `6cf1ce9`，本快照随之同步。2026-06-21 全量测试默认 Windows 编码下还有 1 个可复现兼容性失败。
 
-当前仍**不能宣称“L3 最终验收通过”或“赛题最终达标”**。剩余比赛差距：R1 正式双 500/holdout 独立评测、R2/R3 `competition_budget_v1` 真实校准与 sampled 结果、R5 真实 Trae GUI、R6 真实 Linux/gVisor runsc 隔离、R8 外部 AIBOM 生成器、R9 第三方 TSA/HSM，以及 D1/D3/D4 交付物。2,986-job 全矩阵不在比赛差距内。
+当前仍**不能宣称“L3 最终验收通过”或“赛题最终达标”**。剩余比赛差距：R1 正式双 500/holdout 独立评测、R2/R3 `subscription_budget60_v1` 真实校准与 sampled 结果、R5 真实 Trae GUI、R6 真实 Linux/gVisor runsc 隔离、R8 外部 AIBOM 生成器、R9 第三方 TSA/HSM，以及 D1/D3/D4 交付物。2,986-job 全矩阵不在比赛差距内。
 
 按 PRD 的 D2 代码交付清单看，README、Compose、79% 覆盖率、六关测试、31 条 Gate3 baseline 规则、审计实现和 Apache-2.0 LICENSE 已具备；公开 remote 已配置，但真实 Trae 验收仍缺。按项目自定义的 `docs/L3-test-and-acceptance.md`，R1/R2/R3/R5/R6/R8/R9 仍有必验项 BLOCKED，因此 L3 整体仍为 **BLOCKED，而非 PASS**；其中 R2/R3 blocker 是预算型抽样工具/结果未完成，不是可选全矩阵未跑。仓库内也未发现 D1 技术方案成稿、D3 演示视频或 D4 报名材料；这不影响代码静态 L3，但影响赛题完整交付。
+
+2026-06-23 新增的原动力大会 AI 安全专题资料进一步强化了“Agent Gateway、Agent 身份治理、控制流/数据流隔离、AI Resilience、多 Agent 编排治理”的产品叙事，但目前只是文档沉淀，尚未转化为新的实现、测试或验收证据。
+
+2026-06-30 后，`docs/TODO.md` 是下一步执行总入口；`status.md` 仍只描述当前仓库状态和验收边界，工作历史继续写入 `log.md`。
 
 ## 当前实现快照
 
 | 验收面 | 当前状态 | 边界 |
 |---|---|---|
 | L3 static-only (S1–S7) | 2026-06-20 实跑全 PASS：S1 双 500 implementation + formal 负测、S2 holdout 协议 8 测、S3 runner 9 测、S4 性能入口 7 测、S5 Trae 3/3、S6 compose+gVisor/OPA/deployment+17 测+OPA bundle、S7 修复后 123 测 | 静态 PASS 不等于最终验收 PASS；BUG-R9 修复现已进入 `6cf1ce9` |
-| 当前全仓测试/覆盖率 | 2026-06-21：默认环境 `561 passed, 1 failed, 1 skipped`；覆盖率 `79%`；`PYTHONUTF8=1` 后失败用例单独 PASS；统一静态 verifier 11/11 PASS | 默认 Windows/CP1252 下校验脚本输出 Unicode 箭头失败；sandbox 镜像测试 skip，不能宣称全绿 |
+| 当前全仓测试/覆盖率 | 2026-06-22 当前工作树：`PYTHONUTF8=1` 全仓 `584 passed, 1 skipped`（585 collected），目标测试 `32 passed`，ruff PASS，统一静态 verifier 11/11 PASS；最近记录覆盖率为 79% | 唯一 skip 是本机缺 `xa-guard/sandbox:latest`；本轮未重新生成 coverage，且默认 Windows/CP1252 仍可能触发校验脚本 Unicode 输出兼容问题 |
 | 双 500 语料 (R1) | implementation profile 500+500、1000 唯一 payload、17 类各≥29 已实测验过；formal 正确非零退出 | formal 所需独立 attestation/taxonomy/semantic-group 复核 BLOCKED，不能作为正式双 500 |
 | Decision faithfulness (R9c) | 本轮 25 条真实签名审计独立重算 100% 一致；直接函数验证非固定 1.0（不一致 deny→0.45） | 真实 agent trace 的大规模独立重放未完成 |
 | LangChain / LangGraph | wrapper、callback/observer、HITL resume、node/tool 等适配已实现 | 固定真实版本及真实 agent/transport 端到端验收未完成 |
@@ -34,8 +41,10 @@
 | OPA (R7) | 本轮真实 OPA 1.17.0 与 Python fallback 7/7 parity；strict_opa fail-closed 在 gate3_policy.py:59-60 确认 | 真实 OPA 固定镜像 provenance/license、漂移负测与完整 fixture 矩阵未跑 |
 | AIBOM (R2/R8) | 内部扫描/评级/签名/漂移/离线 preflight S7 测过；真实 opencode install_plugin smoke PASS（AIBOM F deny） | 合法外部生成器真实产物/marketplace/IDE 安装链 BLOCKED |
 | 审计与国密 (R9) | 本轮真实 SM2-with-SM3 签验 25 条 0 错误 + 篡改检出；本地 TSA anchor（**含 SM2-TSA-token 路径，BUG-R9 修复后 PASS**）验过；faithfulness 重算 PASS | 第三方 TSA/HSM BLOCKED（本地 file TSA + 软件 SM2 key 仅为 demo/CI） |
-| 外部 benchmark (R2/R3) | 完整矩阵 orchestrator保持兼容；`competition_budget_v1` 工具目标测试 18 passed。2026-06-22 首批 `$10` 授权实际使用 `$2.94602940`，87 次调用全部 settled；7/32 calibration jobs complete，预算分桶熔断阻止了超额调用 | calibration 未覆盖完整四 suite + R3，冻结失败，正式 sampled 结果仍 NOT RUN。当前需先离线修复 OpenCode content schema 兼容与 phase 级预算耗尽停止，再考虑剩余 `$7.05397`；不得把 7 个结果写入正式分母 |
+| 外部 benchmark (R2/R3) | 完整矩阵 CLI 保持兼容；`subscription_budget60_v1` 已实现确定性 manifest、四桶 ledger、调用前熔断、全局未完成题续考、完成题跳过、AgentDojo 内部 task cache 复用、R2/R3 turn retry 的 retry 分桶、provider 配额暂停、跨 resume 失败上限、运行前 commit/clean/权限 hash 复核及 sampled Wilson 聚合；profile/claim scope 也与冻结配置一致。默认每批 8 jobs、单题最多 2 次基础设施尝试。目标回归 32 项与 ruff 已通过。2026-06-22 历史 `$10` 运行仍只有 7/32 calibration jobs complete，不进入新正式指标 | 新 `$60` 正式校准和 sampled 结果仍 NOT RUN。AgentDojo suite/arm 批量运行和官方 utility trace 批量复用仍未实现；OpenCode 内部工具禁用仍依赖 `--pure`、隔离目录及已冻结权限配置，尚无经真实 CLI 验证的更细粒度硬开关；`$0.20` 是调用前保守预留，不是 provider 单次响应的可证明上限。旧结果不得写入正式分母 |
 | 性能 (R4) | 本轮实测：进程内 500 P50 2.912ms/P95 21.72ms/QPS 415.17/RSS 62.59MB；HTTP 10×500 P95 169.79ms/QPS 74.09/RSS 103.76MB、500/500 审计 marker 匹配，全达标 | 20 会话容量 LIMIT（P95 366.979ms > 300ms，未声明支持）；多 worker/TLS/多机 soak 未跑 |
+| 研究与答辩资料 | `docs/force-ai-security-2026/` 已整理 FORCE 原动力大会企业 AI / 智能体安全现场照片，形成逐页笔记、风险图谱、治理架构、数据/控制流安全、XA-Guard 映射和落地清单；可用于后续 D1 技术方案、答辩 PPT 和产品叙事补强 | 来源为现场照片和用户口述印象，未做外部事实核验；其中外部事件、金额、法律案例、厂商能力不得直接作为正式引用；尚未转化为代码实现或验收证据 |
+| 文档执行入口 | `docs/TODO.md` 已按官方交付物 D1-D4、赛题四方向、P0/P1/P2、docs 整理和“不做清单”整理下一步；`docs/README.md` 已把 TODO、status、PRD、L3 和 R2/R3 设为当前核心入口 | 本次仅整理文档和状态口径，没有新增代码能力、测试结果、付费评测或正式提交材料 |
 
 ## 本轮性能证据（2026-06-20 实测，commit 432ebbc）
 
@@ -50,11 +59,11 @@
 2. R5 真实 Trae 四案例 + 截图/录像 — 需真实 Trae GUI（按用户指示本轮跳过）。
 3. R6 真实 Linux/gVisor runsc 隔离/故障/性能 — Docker build/up + healthz 已 PASS，但 runsc 需 Linux 主机安装（Windows Docker Desktop 无 runsc runtime）。
 4. R7 真实 OPA 固定镜像 provenance/license、漂移负测与完整 fixture 矩阵 — parity 与 fail-closed 已 PASS，镜像层未跑。
-5. R2/R3 `competition_budget_v1` — 离线工具已完成；首批真实 calibration 因 `$2/$1` 分桶耗尽停在 `$2.94602940`，7/32 complete，冻结失败。需先修复兼容性和调度，再决定是否使用剩余 `$7.05397`。2,986-job `research_full_matrix` 为 `DEFERRED_OPTIONAL`。
+5. R2/R3 `subscription_budget60_v1` — 离线工具已完成续考与预算安全纠偏；旧首批真实 calibration 因 `$2/$1` 分桶耗尽停在 `$2.94602940`，7/32 complete，冻结失败且不得混入新正式分母。新预算分桶 `$6/$32/$16/$6`，默认 8 jobs/批、失败题 2 次封顶；新的付费校准、AgentDojo suite/arm 批量降本和 sampled 结果未完成。2,986-job `research_full_matrix` 为 `DEFERRED_OPTIONAL`。
 6. R8 合法外部 AIBOM 生成器 + 真实 CycloneDX 1.6 产物 + 真实安装链 — 需用户安装/批准外部生成器。
 7. R9 第三方 TSA + 真实 HSM/合法 SDK + 故障负测 + faithfulness 大规模独立重放 — 需生产 key/HSM provider（本地 file TSA + 软件 SM2 key 仅为 demo/CI；BUG-R9 已修复，SM2-TSA-token anchor round-trip PASS）。
 8. 最终 PDF、视频、表单、截图、原始证据、artifact hash manifest 与外部存证/签名的收束和验收。
 
 ## 距离赛题目标
 
-核心安全链路、L3 静态资产和验证入口已具备。R2/R3 的 `competition_budget_v1` 离线工程能力现已完成，但正式校准和 sampled 结果尚未产生，因此比赛证据仍待完成；2,986-job 全矩阵继续为可选研究扩展。当前仍 BLOCKED：R1 独立双 500/holdout、R2/R3 真实预算型评测、R5 真实 Trae、R6 Linux/runsc、R8 外部 AIBOM、R9 第三方 TSA/HSM，以及最终交付物。仓库状态保持：**L3 静态实现验收通过 + 部分真实验收通过；L3 最终验收 BLOCKED**。
+核心安全链路、L3 静态资产和验证入口已具备。R2/R3 的 `subscription_budget60_v1` 离线工程能力现已完成，但新的正式校准和 sampled 结果尚未产生，因此比赛证据仍待完成；2,986-job 全矩阵继续为可选研究扩展。当前仍 BLOCKED：R1 独立双 500/holdout、R2/R3 真实预算型评测、R5 真实 Trae、R6 Linux/runsc、R8 外部 AIBOM、R9 第三方 TSA/HSM，以及最终交付物。仓库状态保持：**L3 静态实现验收通过 + 部分真实验收通过；L3 最终验收 BLOCKED**。

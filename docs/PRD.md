@@ -157,7 +157,7 @@
 | **CSAB-Gov-mini 误拒率** | ≤ 5% | **≤ 3%** | ≤ 1% | P3: GB/T 45654-2025 硬指标 ≤ 5% |
 | **Gate1 攻击识别 Recall @ 1% FPR** | 85% | **95%** | 97% | P1: Meta PG2 86M = 97.5%（仅作国际对照基线） |
 
-> **R2/R3 证据范围（2026-06-22 纠偏）**：上表门槛不变，但比赛正式评测采用 `competition_budget_v1`，在未来新增 API 支出不超过 `$20` 的前提下，对 AgentDojo 与 InjecAgent 做预注册、baseline/defended 成对的分层抽样，同时报告点估计、95% Wilson 区间、valid/invalid、timeout 和 retry。点估计达标写 `MEETS_SAMPLED_POINT_TARGET`；只有置信区间也支持门槛时才加写 `CONFIDENCE_SUPPORTED`。该结果不得写成完整矩阵或官方排行榜成绩。[比赛方案原文](./XA-202620中国雄安集团数字城市科技有限公司-面向政企场景的大模型智能体安全关键技术研究比赛方案.pdf)第 3-4 页仅要求可复现关键技术验证结果及量化测试效果，没有规定必须执行 2,986-job 全矩阵。
+> **R2/R3 证据范围（2026-06-22/23 调整）**：上表门槛不变，但比赛正式评测采用 `subscription_budget60_v1`，在 OpenCode Go 订阅约 `$60` 硬上限内，对 AgentDojo 与 InjecAgent 做预注册、baseline/defended 成对的分层抽样，同时报告点估计、95% Wilson 区间、valid/invalid、timeout 和 retry。因存在 5h/周额度限制，正式运行必须按批次 resume，默认每次最多 8 jobs。点估计达标写 `MEETS_SAMPLED_POINT_TARGET`；只有置信区间也支持门槛时才加写 `CONFIDENCE_SUPPORTED`。该结果不得写成完整矩阵或官方排行榜成绩。[比赛方案原文](./XA-202620中国雄安集团数字城市科技有限公司-面向政企场景的大模型智能体安全关键技术研究比赛方案.pdf)第 3-4 页仅要求可复现关键技术验证结果及量化测试效果，没有规定必须执行 2,986-job 全矩阵。
 
 ### 3.2 性能维度 KPI 三档表
 
@@ -313,7 +313,7 @@
 | OpenTelemetry 审计日志 | 14 字段完整 |
 | Docker 沙箱 | gVisor 可选，Docker 必选 |
 | **CSAB-Gov-mini 290 用例**（**PoC 缩减版**）| 同时覆盖 31 类生成内容 + 17 类应拒答 |
-| AgentDojo / InjecAgent 预算型复现 | `competition_budget_v1`：总新增 API 成本 ≤ `$20`，固定模型、预注册分层样本、baseline/defended 成对，输出可复核 ASR/Utility/区间；2,986 全矩阵不是比赛 Must |
+| AgentDojo / InjecAgent 预算型复现 | `subscription_budget60_v1`：OpenCode Go 订阅预算 ≤ `$60`，固定模型、预注册分层样本、baseline/defended 成对，按批次 resume，输出可复核 ASR/Utility/区间；2,986 全矩阵不是比赛 Must |
 | 30 页方案 + 10 分钟视频 + 代码仓库 | 必交三大件 |
 | **轻量演示前端**（HTML/React 时间线） | 最小可演示 trace 时间线 |
 | **Trae 接入实测**（**国产 IDE 硬承诺只此一个**） | 国产生态证据 |
@@ -392,7 +392,7 @@
 - [ ] 国密 SM3 哈希链 + SM2 签名（gmssl）
 - [ ] **关卡 6 KPI**：100% 操作有 trace + 可验证签名
 - [ ] CSAB-Gov-mini 290 用例 + 评测脚本（pytest 风格）
-- [ ] `competition_budget_v1`：AgentDojo / InjecAgent 分层抽样 baseline/defended 复现（新增 API 成本 ≤ `$20`）
+- [ ] `subscription_budget60_v1`：AgentDojo / InjecAgent 分层抽样 baseline/defended 复现（订阅预算 ≤ `$60`，分批执行）
 - [ ] **核心 KPI 结果自测**（达标与否均须如实记录）：
   - [ ] AgentDojo sampled Targeted ASR / Utility 点估计与 95% Wilson 区间已记录（目标 ASR ≤ 10%、Utility ≥ 75%）
   - [ ] InjecAgent sampled ASR-valid 点估计与 95% Wilson 区间已记录（目标 ≤ 10%）
@@ -471,8 +471,8 @@
 
 | 基准 | 用途 | 我们的目标数字 |
 |---|---|---|
-| **AgentDojo**（NeurIPS'24, 英文，工业标杆） | Targeted ASR + Utility | `competition_budget_v1` 分层抽样：点目标 ASR ≤ 10%、Utility ≥ 75%，附 95% Wilson 区间 |
-| **InjecAgent**（ACL'24, 数据外泄专项） | 数据外泄 ASR | `competition_budget_v1` DS/base 抽样：点目标 ≤ 10%，附 95% Wilson 区间 |
+| **AgentDojo**（NeurIPS'24, 英文，工业标杆） | Targeted ASR + Utility | `subscription_budget60_v1` 分层抽样：点目标 ASR ≤ 10%、Utility ≥ 75%，附 95% Wilson 区间 |
+| **InjecAgent**（ACL'24, 数据外泄专项） | 数据外泄 ASR | `subscription_budget60_v1` DS/base 抽样：点目标 ≤ 10%，附 95% Wilson 区间 |
 | **Agent-SafetyBench**（清华 2024-12, 中文） | 多维 Safety Score | ≥ 65 |
 | **CHiSafetyBench**（TC260 中文合规） | 合规拒答率 | ≥ 95% |
 | **CSAB-Gov-mini**（我们自建） | 中文政企场景 | 290 用例覆盖 31 类 |

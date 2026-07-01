@@ -48,6 +48,22 @@ def _sha256_file(path: Path) -> str:
     return _sha256_bytes(path.read_bytes())
 
 
+def _path_tree_sha256(path: Path | None) -> str | None:
+    if path is None:
+        return None
+    if path.is_file():
+        return _sha256_file(path)
+    if not path.is_dir():
+        return None
+    digest = hashlib.sha256()
+    for item in sorted(candidate for candidate in path.rglob("*") if candidate.is_file()):
+        digest.update(str(item.relative_to(path)).replace("\\", "/").encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(item.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
 def _read_json(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
@@ -239,6 +255,8 @@ def build_plan(config_path: Path, config: dict[str, Any]) -> dict[str, Any]:
             "data_home": str(data_home) if data_home else "default",
             "timeout_seconds": float(oc.get("timeout_seconds", 180)),
             "max_attempts": int(oc.get("max_attempts", 2)),
+            "max_turn_retries": int(oc.get("max_turn_retries", 2)),
+            "opencode_permission_config_sha256": _path_tree_sha256(config_home),
         },
         "thresholds": config.get(
             "thresholds",
@@ -264,13 +282,54 @@ def _budget_settings(config: dict[str, Any]) -> dict[str, Any]:
         "r2_main_usd": float(budget.get("r2_main_usd", 10.0)),
         "r3_main_usd": float(budget.get("r3_main_usd", 6.0)),
         "retry_usd": float(budget.get("retry_usd", 2.0)),
-        "max_invocation_reserve_usd": float(budget.get("max_invocation_reserve_usd", 0.05)),
+        "max_invocation_reserve_usd": float(budget.get("max_invocation_reserve_usd", 0.20)),
         "cost_safety_multiplier": float(budget.get("cost_safety_multiplier", 1.25)),
+        "max_jobs_per_invocation": int(budget.get("max_jobs_per_invocation", 8)),
+        "max_job_resume_attempts": int(budget.get("max_job_resume_attempts", 2)),
         "seed": int(sampling.get("seed", 20260622)),
         "r2_calibration_pairs_per_suite": int(sampling.get("r2_calibration_pairs_per_suite", 2)),
         "r3_calibration_pairs": int(sampling.get("r3_calibration_pairs", 8)),
         "r2_min_main_pairs_per_suite": int(sampling.get("r2_min_main_pairs_per_suite", 8)),
     }
+
+
+def _can_reserve(ledger_path: Path, bucket: str, amount_usd: float) -> tuple[bool, str]:
+    ledger = load_ledger(ledger_path)
+    if ledger.get("halted"):
+        return False, f"budget ledger halted: {ledger.get('halt_reason')}"
+    totals = ledger_totals(ledger)
+    if totals["total_usd"] + amount_usd > float(ledger["total_cap_usd"]) + 1e-12:
+        return False, "total budget would be exceeded before call"
+    if totals["buckets_usd"].get(bucket, 0.0) + amount_usd > float(ledger["bucket_caps_usd"][bucket]) + 1e-12:
+        return False, f"{bucket} budget would be exceeded before call"
+    return True, ""
+
+
+def _write_not_run_budget(output_dir: Path, jobs: list[dict[str, Any]], reason: str) -> None:
+    for job in jobs:
+        state_path = output_dir / "jobs" / job["id"] / "state.json"
+        if state_path.is_file():
+            continue
+        _write_json(state_path, {
+            "job_id": job["id"],
+            "status": "NOT_RUN_BUDGET",
+            "budget_status": "BUDGET_EXHAUSTED",
+            "reason": reason,
+            "attempts": [],
+            "result": str(output_dir / "jobs" / job["id"] / "result.json"),
+            "result_sha256": None,
+        })
+
+
+def _is_budget_block(stderr: str, stdout: str) -> bool:
+    text = f"{stderr}\n{stdout}"
+    markers = (
+        "BudgetError",
+        "budget would be exceeded before call",
+        "total budget would be exceeded before call",
+        "budget ledger halted",
+    )
+    return any(marker in text for marker in markers)
 
 
 def _unique_cases(full_plan: dict[str, Any]) -> list[dict[str, Any]]:
@@ -287,6 +346,12 @@ def _unique_cases(full_plan: dict[str, Any]) -> list[dict[str, Any]]:
 def build_budget_plan(config_path: Path, config: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     full = build_plan(config_path, config)
     settings = _budget_settings(config)
+    profile = str(config.get("evaluation_profile", "competition_budget_v1")).strip()
+    if not profile or any(
+        char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-"
+        for char in profile
+    ):
+        raise ValueError("evaluation_profile must be a non-empty identifier")
     if abs(
         settings["calibration_usd"] + settings["r2_main_usd"]
         + settings["r3_main_usd"] + settings["retry_usd"] - settings["total_usd"]
@@ -312,12 +377,13 @@ def build_budget_plan(config_path: Path, config: dict[str, Any]) -> tuple[dict[s
     budget_plan = {
         **{key: value for key, value in full.items() if key not in {"created_at", "jobs", "job_count", "plan_sha256"}},
         "schema_version": BUDGET_PLAN_SCHEMA,
-        "profile": "competition_budget_v1",
+        "profile": profile,
         "budget": settings,
         "universe": cases,
         "universe_count": len(cases),
         "calibration_case_keys": [item["case_key"] for item in selected],
     }
+    budget_plan["execution"] = {**budget_plan["execution"], "max_attempts": 1}
     _with_hash(budget_plan, "budget_plan_sha256")
     calibration = {
         "schema_version": SAMPLE_MANIFEST_SCHEMA,
@@ -418,7 +484,10 @@ def freeze_sample_manifest(budget_plan: dict[str, Any], ledger: dict[str, Any]) 
         "phase": "main",
         "seed": settings["seed"],
         "budget_plan_sha256": budget_plan["budget_plan_sha256"],
-        "claim_scope": "competition_budget_v1_sampled_not_full_matrix_or_leaderboard",
+        "claim_scope": (
+            f"{budget_plan.get('profile', 'competition_budget_v1')}"
+            "_sampled_not_full_matrix_or_leaderboard"
+        ),
         "status": "INCONCLUSIVE_BUDGET" if infeasible else "FROZEN",
         "errors": infeasible,
         "conservative_pair_cost_usd": estimates,
@@ -453,9 +522,13 @@ def _job_command(
         common.extend([
             "--budget-ledger", str(budget_ledger),
             "--budget-bucket", str(budget_bucket),
+            "--retry-budget-bucket", "retry",
             "--budget-job-id", job["id"],
             "--max-invocation-reserve-usd", str(plan["budget"]["max_invocation_reserve_usd"]),
         ])
+    common.extend(["--max-turn-retries", str(plan["execution"].get("max_turn_retries", 2))])
+    if plan.get("config_sha256"):
+        common.extend(["--acceptance-config-sha256", plan["config_sha256"]])
     case = job["case"]
     if job["benchmark"] == "agentdojo":
         command = [
@@ -493,16 +566,104 @@ def _result_matches(plan: dict[str, Any], job: dict[str, Any], result_path: Path
     run = payload.get("run", {})
     if run.get("model") != plan["execution"]["model"]:
         return False
+    if (
+        plan.get("schema_version") == BUDGET_PLAN_SCHEMA
+        and "repository" in plan.get("locks", {})
+        and plan.get("config_sha256")
+    ):
+        required = ("adapter_commit", "runner_commit", "acceptance_config_sha256", "opencode_permission_config_sha256")
+        if any(key not in run for key in required):
+            return False
+    if "adapter_commit" in run and run.get("adapter_commit") != plan["locks"]["repository"]["commit"]:
+        return False
+    if "runner_commit" in run and run.get("runner_commit") != plan["locks"]["repository"]["commit"]:
+        return False
+    if run.get("runner_dirty") is True:
+        return False
+    if "acceptance_config_sha256" in run and run.get("acceptance_config_sha256") != plan.get("config_sha256"):
+        return False
+    if (
+        "opencode_permission_config_sha256" in run
+        and run.get("opencode_permission_config_sha256")
+        != plan["execution"].get("opencode_permission_config_sha256")
+    ):
+        return False
     if bool(run.get("xa_guard_defense")) != (job["arm"] == "defended"):
         return False
     return payload.get("upstream", {}).get("commit") == plan["locks"][job["benchmark"]]["commit"]
+
+
+def _execution_lock_errors(plan: dict[str, Any]) -> list[str]:
+    """Recheck frozen repositories and OpenCode permissions before paid execution."""
+    if plan.get("schema_version") != BUDGET_PLAN_SCHEMA:
+        return []
+    errors: list[str] = []
+    for name in ("repository", "agentdojo", "injecagent"):
+        lock = plan.get("locks", {}).get(name)
+        if not isinstance(lock, dict) or not lock.get("path"):
+            errors.append(f"missing_execution_lock:{name}")
+            continue
+        path = Path(lock["path"])
+        try:
+            current_commit = _git(path, "rev-parse", "HEAD")
+            dirty = bool(_git(path, "status", "--porcelain"))
+        except (OSError, subprocess.SubprocessError):
+            errors.append(f"unreadable_execution_lock:{name}")
+            continue
+        if current_commit != lock.get("commit"):
+            errors.append(f"execution_commit_changed:{name}")
+        if dirty:
+            errors.append(f"execution_repository_dirty:{name}")
+    config_home = plan.get("execution", {}).get("config_home")
+    config_path = None if config_home in {None, "default"} else Path(config_home)
+    if _path_tree_sha256(config_path) != plan.get("execution", {}).get("opencode_permission_config_sha256"):
+        errors.append("opencode_permission_config_changed")
+    return errors
+
+
+def _job_state(output_dir: Path, job: dict[str, Any]) -> dict[str, Any]:
+    path = output_dir / "jobs" / job["id"] / "state.json"
+    if not path.is_file():
+        return {}
+    try:
+        value = _read_json(path)
+        return value if isinstance(value, dict) else {}
+    except (OSError, ValueError, json.JSONDecodeError):
+        return {}
 
 
 def run_jobs(
     plan: dict[str, Any], output_dir: Path, *, max_jobs: int | None, dry_run: bool,
     budget_ledger: Path | None = None, phase_bucket: str | None = None,
 ) -> int:
-    jobs = plan["jobs"][:max_jobs] if max_jobs is not None else plan["jobs"]
+    pending_jobs: list[dict[str, Any]] = []
+    terminal_jobs: list[dict[str, Any]] = []
+    max_resume_attempts = int(plan.get("budget", {}).get("max_job_resume_attempts", 2))
+    for job in plan["jobs"]:
+        result_path = output_dir / "jobs" / job["id"] / "result.json"
+        if _result_matches(plan, job, result_path):
+            continue
+        state = _job_state(output_dir, job)
+        prior_attempts = state.get("attempts", []) if state.get("status") in {"infra_error", "FAILED_TERMINAL"} else []
+        if (
+            plan.get("schema_version") == BUDGET_PLAN_SCHEMA
+            and (state.get("status") == "FAILED_TERMINAL" or len(prior_attempts) >= max_resume_attempts)
+        ):
+            terminal_jobs.append(job)
+            continue
+        pending_jobs.append(job)
+    jobs = pending_jobs[:max_jobs] if max_jobs is not None else pending_jobs
+    if not jobs:
+        if terminal_jobs:
+            print(f"BATCH_INCOMPLETE terminal_failed_jobs={len(terminal_jobs)}", file=sys.stderr)
+            return 1
+        print("BATCH_COMPLETE no pending jobs")
+        return 0
+    if not dry_run:
+        lock_errors = _execution_lock_errors(plan)
+        if lock_errors:
+            print(f"EXECUTION_LOCK_FAILED {','.join(lock_errors)}", file=sys.stderr)
+            return 3
     failed = 0
     for ordinal, job in enumerate(jobs, 1):
         job_phase_bucket = (
@@ -516,6 +677,13 @@ def run_jobs(
         if _result_matches(plan, job, result_path):
             print(f"[{ordinal}/{len(jobs)}] SKIP complete {job['id']}")
             continue
+        if budget_ledger is not None and job_phase_bucket is not None:
+            ok, reason = _can_reserve(budget_ledger, job_phase_bucket, float(plan["budget"]["max_invocation_reserve_usd"]))
+            if not ok:
+                remaining = pending_jobs[ordinal - 1 :]
+                _write_not_run_budget(output_dir, remaining, reason)
+                print(f"[{ordinal}/{len(jobs)}] BUDGET_EXHAUSTED {reason}", file=sys.stderr)
+                return 2
         command = _job_command(
             plan, job, result_path, job_root / "logs",
             budget_ledger=budget_ledger, budget_bucket=job_phase_bucket,
@@ -523,10 +691,16 @@ def run_jobs(
         if dry_run:
             print(subprocess.list2cmdline(command))
             continue
-        attempts: list[dict[str, Any]] = []
+        previous_state = _job_state(output_dir, job)
+        attempts: list[dict[str, Any]] = (
+            list(previous_state.get("attempts", []))
+            if previous_state.get("status") == "infra_error"
+            else []
+        )
         success = False
-        for attempt in range(1, int(plan["execution"]["max_attempts"]) + 1):
-            attempt_bucket = job_phase_bucket if attempt == 1 else "retry"
+        for local_attempt in range(1, int(plan["execution"]["max_attempts"]) + 1):
+            attempt = len(attempts) + 1
+            attempt_bucket = job_phase_bucket if local_attempt == 1 else "retry"
             command = _job_command(
                 plan, job, result_path, job_root / "logs",
                 budget_ledger=budget_ledger, budget_bucket=attempt_bucket,
@@ -554,11 +728,43 @@ def run_jobs(
             success = completed.returncode == 0 and _result_matches(plan, job, result_path)
             if success:
                 break
-            if attempt < int(plan["execution"]["max_attempts"]):
+            if budget_ledger is not None and _is_budget_block(completed.stderr, completed.stdout):
+                state = {
+                    "job_id": job["id"],
+                    "status": "NOT_RUN_BUDGET",
+                    "budget_status": "BUDGET_EXHAUSTED",
+                    "reason": "budget blocked during model turn",
+                    "attempts": attempts,
+                    "result": str(result_path),
+                    "result_sha256": None,
+                }
+                _write_json(state_path, state)
+                remaining = pending_jobs[ordinal:]
+                _write_not_run_budget(output_dir, remaining, state["reason"])
+                print(f"[{ordinal}/{len(jobs)}] BUDGET_EXHAUSTED {job['id']}", file=sys.stderr)
+                return 2
+            if "ProviderQuotaPaused" in completed.stderr or "provider quota paused" in completed.stderr.lower():
+                state = {
+                    "job_id": job["id"],
+                    "status": "PAUSED_PROVIDER_QUOTA",
+                    "reason": "provider usage window exhausted before a billed response",
+                    "attempts": attempts,
+                    "result": str(result_path),
+                    "result_sha256": None,
+                }
+                _write_json(state_path, state)
+                print(f"[{ordinal}/{len(jobs)}] PROVIDER_QUOTA_PAUSED {job['id']}", file=sys.stderr)
+                return 4
+            if local_attempt < int(plan["execution"]["max_attempts"]):
                 time.sleep(float(plan["benchmark_config"].get("retry_delay_seconds", 2)))
+        terminal = (
+            not success
+            and plan.get("schema_version") == BUDGET_PLAN_SCHEMA
+            and len(attempts) >= max_resume_attempts
+        )
         state = {
             "job_id": job["id"],
-            "status": "complete" if success else "infra_error",
+            "status": "complete" if success else "FAILED_TERMINAL" if terminal else "infra_error",
             "attempts": attempts,
             "result": str(result_path),
             "result_sha256": _sha256_file(result_path) if success else None,
@@ -567,7 +773,10 @@ def run_jobs(
         if not success:
             failed += 1
             print(f"[{ordinal}/{len(jobs)}] FAILED {job['id']}", file=sys.stderr)
-    return 1 if failed else 0
+    remaining_count = max(0, len(pending_jobs) - len(jobs))
+    if remaining_count:
+        print(f"BATCH_COMPLETE remaining_jobs={remaining_count}")
+    return 1 if failed or terminal_jobs else 0
 
 
 def _mean(values: list[bool]) -> float | None:
@@ -809,7 +1018,10 @@ def aggregate_sampled(
     report = {
         "schema_version": SAMPLED_REPORT_SCHEMA,
         "generated_at": _utc_now(),
-        "claim_scope": "competition_budget_v1_sampled_not_full_matrix_or_official_leaderboard",
+        "claim_scope": (
+            f"{budget_plan.get('profile', 'competition_budget_v1')}"
+            "_sampled_not_full_matrix_or_official_leaderboard"
+        ),
         "official_leaderboard_claim": False,
         "budget_plan_sha256": budget_plan["budget_plan_sha256"],
         "manifest_sha256": manifest["manifest_sha256"],
@@ -947,8 +1159,11 @@ def main() -> int:
             if manifest.get("phase") == "main" and manifest.get("status") != "FROZEN":
                 raise RuntimeError("main sample is not feasible/frozen")
             execution_plan = _sample_execution_plan(budget_plan, manifest)
+            max_jobs = args.max_jobs
+            if max_jobs is None:
+                max_jobs = int(budget_plan.get("budget", {}).get("max_jobs_per_invocation", 8))
             return run_jobs(
-                execution_plan, output_dir, max_jobs=args.max_jobs, dry_run=args.dry_run,
+                execution_plan, output_dir, max_jobs=max_jobs, dry_run=args.dry_run,
                 budget_ledger=output_dir / "budget-ledger.json",
                 phase_bucket="calibration" if args.phase == "calibration" else "main",
             )

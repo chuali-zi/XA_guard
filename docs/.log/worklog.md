@@ -1,5 +1,15 @@
 # docs 模块工作日志
 
+## 2026-06-30 19:28 PDT
+
+任务：基于赛题 PDF、现有 docs、`status.md` 和根 README，整理当前状态和下一步 TODO。
+
+读取并核对了赛题 PDF、`docs/README.md`、`docs/PRD.md`、`docs/事实源.md`、`docs/L3-test-and-acceptance.md`、`docs/R2-R3矩阵自动验收使用说明.md`、`docs/R2-R3完整矩阵预算分析.md`、`docs/产品架构.md`、`docs/项目总览.md`、Trae/AIBOM/force-ai 相关文档和根目录状态文件。
+
+新增文档：`docs/TODO.md`。内容包括官方 D1-D4 交付物复核、当前状态分层、P0/P1/P2 待办、四个赛题方向的证据收束、L3 真实验收补证、docs 整理计划、执行顺序、不做清单和最小完成定义。
+
+同步更新：`docs/README.md`，把 TODO、status、PRD、L3 验收和 R2/R3 使用说明列为当前核心入口；同时更新根 `status.md` 和 `log.md`。本轮没有移动既有 docs 文件，没有运行测试或模型调用，没有改变代码能力。
+
 ## 2026-05-28
 
 任务：撰写《关卡1 输入检测模型接入与微调要求》需求规格说明书。

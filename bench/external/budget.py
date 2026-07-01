@@ -117,7 +117,7 @@ def reserve_cost(
             raise BudgetError(f"unknown budget bucket: {bucket}")
         totals = ledger_totals(ledger)
         if totals["total_usd"] + amount_usd > float(ledger["total_cap_usd"]) + 1e-12:
-            raise BudgetError("$20 total budget would be exceeded before call")
+            raise BudgetError("total budget would be exceeded before call")
         if (
             totals["buckets_usd"].get(bucket, 0.0) + amount_usd
             > float(ledger["bucket_caps_usd"][bucket]) + 1e-12
