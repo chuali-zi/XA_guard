@@ -1,5 +1,9 @@
 # Enterprise Agent Range 工作日志
 
+## 2026-07-02（P2 能力实现）
+
+在 P2 脚手架基础上，push 分支后派 5 个 sonnet 并行子 agent 实现全部 10 个能力（一 agent 一对相关能力，严格文件隔离：只改自己两个模块 + 自建单测 + 各自 `p2/.log/*.md`）。tenancy/discovery/identity/permissions/risk/remediation/scale/benchmark/evidence/dashboard 均从接口桩替换为真实、确定性、仅 stdlib 逻辑，`SPEC.status` 置 `implemented`。主线程先放宽 `test_p2_scaffold` 的"全是桩"断言，集成后跑全量：199 tests PASS（40 结构 + 159 能力单测），`p2-status` 全 `implemented`，`validate p1` 仍 242/44 不变，p2 无 `xa_guard`/核心运行时耦合。未做：接入 runner/oracle/metrics/report、真实 P2 case/fixture、大屏产物、能力联动。
+
 ## 2026-07-02
 
 搭建 P2 研究级靶场脚手架（纯骨架，经 brainstorming 确认：新建 p2/ 子包 + 全部 10 项建桩）。新建 `range_src/enterprise_agent_range/p2/`：base、registry(10 项)、schema(计划中 expected/metrics，未接入 oracle)，及 tenancy/discovery/identity/permissions/risk/remediation/scale/benchmark/evidence/dashboard 十个模块（dataclass + 接口桩，调用均抛 `P2NotImplementedError`）。`cli.py` 新增 `p2-status` 子命令 + UTF-8 stdout 兜底。新增 `cases/p2_manifest.example.json` 模板、`fixtures/p2/README.md` 占位、`tests/test_p2_scaffold.py`。P0/P1 runtime 与 oracle 零改动。验证：compileall PASS；unittest 41 tests PASS；`p2-status` 文本/JSON 均列出 10 项；`validate p1` 仍 242 cases/44 fixtures 不变。未做：任何 P2 真实逻辑与数据、真实 TSA/HSM/benchmark。

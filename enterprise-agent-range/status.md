@@ -9,11 +9,26 @@ P1 已完成 review 修复后的本地基线：当前目录包含独立 Python r
 
 最新 P1 本地验收使用 Null Adapter 跑完 `cases/p1_manifest.json`，输出在 `reports/run-p1-null-verify/`：242 个 case 全部有效，`INFRA_ERROR=0`，`INVALID=0`，run-level audit hash chain valid。Null Adapter 是无防护基线，attack case 的 FAIL 是预期暴露风险，不代表任何外部 SUT 的评测结论。
 
-## P2 脚手架（2026-07-02）
+## P2 能力实现（2026-07-02）
 
-P2 研究级能力已搭好纯骨架，尚未实现任何真实逻辑。新增独立子包 `range_src/enterprise_agent_range/p2/`，含能力注册表和 10 个能力模块（多租户、Shadow AI 发现、Agent 身份生命周期、JIT/JEA/JLA 权限、风险金额量化、Undo/补偿、大规模 red-team runner、外部 benchmark 融合、TSA/HSM 证据、攻防大屏复盘），每个模块只有 frozen dataclass 数据结构和接口桩，调用抛 `P2NotImplementedError`。P0/P1 runtime 与 oracle 零改动；唯一改动的既有文件是 `cli.py`（新增 `p2-status` 子命令，并为非 ASCII 输出加 UTF-8 stdout 兜底）。计划中的 P2 oracle/metrics 字段记录在 `p2/schema.py`，尚未接入现有 oracle（不影响 manifest 校验）。另新增 `cases/p2_manifest.example.json` 模板、`fixtures/p2/README.md` 占位、`tests/test_p2_scaffold.py`。设计文档见 `docs/superpowers/specs/2026-07-02-p2-scaffolding-design.md`。
+P2 研究级靶场先搭骨架，再由 5 个并行子 agent（一 agent 负责一对相关能力，严格文件隔离）实现全部 10 个能力模块。独立子包 `range_src/enterprise_agent_range/p2/` 含能力注册表和 10 个能力模块，每个模块现有真实、确定性、仅依赖 stdlib 的逻辑 + frozen dataclass + 独立单测：
 
-验证：`python -m unittest discover -s tests` 41 tests PASS；`python -m enterprise_agent_range p2-status` 列出 10 项能力；`validate --manifest cases/p1_manifest.json` 仍 242 cases / 44 fixtures，输出不变。
+- tenancy：租户注册 + 按租户隔离视图 + 跨租户泄漏检测。
+- discovery：声明清单 vs 观测清单 diff，输出 Shadow AI 发现。
+- identity：Agent 身份生命周期状态机（provision/active/rotate/suspend/revoke/retire）+ `can_act` 门禁。
+- permissions：JIT/JEA/JLA 授予签发与校验（整数 epoch 时间、scope 子集、过期/撤销拒绝）。
+- risk：按权重表量化合成风险金额（`RANGE` 单位，非真实货币）。
+- remediation：对已提交副作用给出补偿/undo 建议（仅建议，不执行）。
+- scale：确定性 manifest 分片（sha256 分桶，真分区）。
+- benchmark：离线外部 benchmark 载入 + 与内部结果融合（无网络）。
+- evidence：mock TSA/HSM 的 HMAC 签发与校验（假密钥、可检测篡改）。
+- dashboard：从 run 输出只读构建大屏 feed 与复盘报告对象。
+
+边界不变：P0/P1 runtime 与 oracle 仍零改动；p2 只依赖 `.base` + stdlib，无 `import xa_guard`、无核心运行时耦合。唯一改动的既有文件仍是 `cli.py`（`p2-status` 子命令 + UTF-8 stdout 兜底）。计划中的 P2 oracle/metrics 字段记录在 `p2/schema.py`，尚未接入现有 oracle（不影响 manifest 校验）。设计文档见 `docs/superpowers/specs/2026-07-02-p2-scaffolding-design.md`。
+
+验证：`python -m unittest discover -s tests` 199 tests PASS（40 骨架/结构 + 159 能力单测）；`python -m enterprise_agent_range p2-status` 10 项均为 `implemented`；`validate --manifest cases/p1_manifest.json` 仍 242 cases / 44 fixtures，输出不变。
+
+未做（下一步）：把各能力接入 runner/oracle/metrics/report（新增 oracle handler 与风险加权指标）、编写真实 P2 case 与 fixture、生成大屏/复盘产物文件、多能力联动（identity↔permissions、risk↔remediation）。
 
 ## 已完成
 
