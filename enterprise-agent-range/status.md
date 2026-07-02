@@ -9,6 +9,12 @@ P1 已完成 review 修复后的本地基线：当前目录包含独立 Python r
 
 最新 P1 本地验收使用 Null Adapter 跑完 `cases/p1_manifest.json`，输出在 `reports/run-p1-null-verify/`：242 个 case 全部有效，`INFRA_ERROR=0`，`INVALID=0`，run-level audit hash chain valid。Null Adapter 是无防护基线，attack case 的 FAIL 是预期暴露风险，不代表任何外部 SUT 的评测结论。
 
+## P2 脚手架（2026-07-02）
+
+P2 研究级能力已搭好纯骨架，尚未实现任何真实逻辑。新增独立子包 `range_src/enterprise_agent_range/p2/`，含能力注册表和 10 个能力模块（多租户、Shadow AI 发现、Agent 身份生命周期、JIT/JEA/JLA 权限、风险金额量化、Undo/补偿、大规模 red-team runner、外部 benchmark 融合、TSA/HSM 证据、攻防大屏复盘），每个模块只有 frozen dataclass 数据结构和接口桩，调用抛 `P2NotImplementedError`。P0/P1 runtime 与 oracle 零改动；唯一改动的既有文件是 `cli.py`（新增 `p2-status` 子命令，并为非 ASCII 输出加 UTF-8 stdout 兜底）。计划中的 P2 oracle/metrics 字段记录在 `p2/schema.py`，尚未接入现有 oracle（不影响 manifest 校验）。另新增 `cases/p2_manifest.example.json` 模板、`fixtures/p2/README.md` 占位、`tests/test_p2_scaffold.py`。设计文档见 `docs/superpowers/specs/2026-07-02-p2-scaffolding-design.md`。
+
+验证：`python -m unittest discover -s tests` 41 tests PASS；`python -m enterprise_agent_range p2-status` 列出 10 项能力；`validate --manifest cases/p1_manifest.json` 仍 242 cases / 44 fixtures，输出不变。
+
 ## 已完成
 
 | 项 | 状态 | 说明 |

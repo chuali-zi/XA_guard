@@ -36,6 +36,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("tools", help="print tool surface definitions")
 
+    p2_status = subparsers.add_parser("p2-status", help="print P2 capability scaffold registry")
+    p2_status.add_argument("--json", action="store_true", help="emit JSON instead of a table")
+
     stdio = subparsers.add_parser("serve-stdio", help="serve MCP-like JSON-lines protocol on stdio")
     stdio.add_argument("--manifest-root", default=Path.cwd(), type=Path)
     stdio.add_argument("--run-id", default="stdio-local")
@@ -57,6 +60,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Emit UTF-8 so non-ASCII output (e.g. Chinese capability titles) survives a
+    # legacy Windows console codepage. No-op for ASCII output and for streams
+    # (like StringIO) that do not support reconfigure.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+    except (AttributeError, ValueError):
+        pass
+
     parser = build_parser()
     args = parser.parse_args(argv)
 
@@ -100,6 +111,17 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "tools":
         print(json.dumps(TOOL_DEFINITIONS, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0
+
+    if args.command == "p2-status":
+        from .p2.registry import as_dicts
+
+        rows = as_dicts()
+        if args.json:
+            print(json.dumps(rows, ensure_ascii=False, indent=2, sort_keys=True))
+        else:
+            for row in rows:
+                print(f"{row['key']:12} [{row['status']}] {row['title']}")
         return 0
 
     if args.command == "serve-stdio":

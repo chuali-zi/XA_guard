@@ -1,5 +1,9 @@
 # Enterprise Agent Range 工作日志
 
+## 2026-07-02
+
+搭建 P2 研究级靶场脚手架（纯骨架，经 brainstorming 确认：新建 p2/ 子包 + 全部 10 项建桩）。新建 `range_src/enterprise_agent_range/p2/`：base、registry(10 项)、schema(计划中 expected/metrics，未接入 oracle)，及 tenancy/discovery/identity/permissions/risk/remediation/scale/benchmark/evidence/dashboard 十个模块（dataclass + 接口桩，调用均抛 `P2NotImplementedError`）。`cli.py` 新增 `p2-status` 子命令 + UTF-8 stdout 兜底。新增 `cases/p2_manifest.example.json` 模板、`fixtures/p2/README.md` 占位、`tests/test_p2_scaffold.py`。P0/P1 runtime 与 oracle 零改动。验证：compileall PASS；unittest 41 tests PASS；`p2-status` 文本/JSON 均列出 10 项；`validate p1` 仍 242 cases/44 fixtures 不变。未做：任何 P2 真实逻辑与数据、真实 TSA/HSM/benchmark。
+
 ## 2026-07-01 21:16 PDT
 
 按 P1 review fix 计划修复三个问题：fixture 路径越界、P1 manifest 未覆盖新增工具、委托链 oracle 缺少显式证据。使用子 agent 协助：Worker C 写 protocol/path traversal 测试，Worker A 只读梳理 44 个未覆盖工具，Worker B 只读梳理 20 个委托相关 case；主线程完成 runtime 修复、manifest 集成、测试和证据重生成。
