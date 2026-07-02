@@ -1,5 +1,31 @@
 # 工作日志
 
+## 2026-07-01 21:16 PDT Enterprise Agent Range P1 review 修复
+
+起因：用户要求按已确认的 P1 review fix 计划修复 `codex/enterprise-range-p1` 相较 `main` 的问题，包括 fixture 路径越界、P1 manifest 未覆盖新增工具、委托链 oracle 缺证据，并继续使用子 agent 协助。
+
+已完成：
+- 使用 gpt-5.5 medium 子 agent 协助：Worker C 写 protocol/path traversal 测试；Worker A 只读梳理未覆盖工具；Worker B 只读梳理委托链 case。主线程完成 runtime 修复、manifest 集成、测试、证据重生成和文档状态更新。
+- 修复 `enterprise-agent-range/range_src/enterprise_agent_range/tools.py`：fixture ref 解析拒绝绝对路径、`..` traversal 和解析后越出 manifest root 的路径。
+- 更新 `enterprise-agent-range/cases/p1_manifest.json`：P1 增至 242 cases（108 attack、116 benign、18 assurance），新增良性 coverage case，使 P1 execution steps 覆盖全部 66 个 mock tool。
+- 为 20 个委托相关 P1 case 补齐显式 `delegation_chain`，并调整 `build_actual` 对 original principal 的判定，避免把 hop `principal_id` 误当作 original principal 证据。
+- 新增/扩展协议路径穿越、P1 tool coverage、P1 delegation evidence 回归测试。
+- 重生成 `enterprise-agent-range/reports/run-p1-null-verify/` 和 `enterprise-agent-range/reports/compare-p0-p1-null/`。
+- 更新 `enterprise-agent-range/README.md`、`enterprise-agent-range/status.md`、`enterprise-agent-range/log.md`、`enterprise-agent-range/.log/worklog.md` 和本文件 / 父仓库 `status.md`。
+
+验证：
+- `python -m compileall range_src`：PASS。
+- `python -m unittest discover -s tests`：PASS，30 tests。
+- `PYTHONPATH=range_src python -m enterprise_agent_range validate --manifest cases/p0_manifest.json`：PASS。
+- `PYTHONPATH=range_src python -m enterprise_agent_range validate --manifest cases/p1_manifest.json`：PASS，242 cases / 44 fixtures。
+- `PYTHONPATH=range_src python -m enterprise_agent_range run --manifest cases/p1_manifest.json --out reports --run-id run-p1-null-verify --adapter null_adapter --sut-id null-baseline --mode local --operator codex`：PASS，242 valid / 0 infra error / 0 invalid，FPR 0.0，utility 1.0，audit integrity 1.0。
+- `PYTHONPATH=range_src python -m enterprise_agent_range compare --baseline reports/run-p0-null-verify --candidate reports/run-p1-null-verify --out reports/compare-p0-p1-null`：PASS。
+
+边界：
+- 本轮仍不接真实公网、生产 API、真实邮件、真实 shell 副作用或真实插件安装。
+- Enterprise Agent Range 仍是独立靶场工作区，不改变 XA-Guard L3 验收结论。
+- Null Adapter 仍是无防护基线；attack case 失败只说明基线风险，不代表任何外部 SUT 的评测结论。
+
 ## 2026-07-01 19:44 PDT Enterprise Agent Range P1 扩展与提交推送
 
 起因：用户要求先提交并推送当前全部改动，然后按已制定计划实现 `enterprise-agent-range/` P1，并明确使用子 agent 协助单一扩展任务。

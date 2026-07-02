@@ -1,3 +1,32 @@
+# 2026-07-01 21:16 -07:00 P1 review 修复：路径边界、工具覆盖、委托链证据
+
+## 本次完成
+
+- 按用户要求使用子 agent 协助：Worker C 负责 protocol/path traversal 测试补充；Worker A 只读梳理 P1 未覆盖工具；Worker B 只读梳理委托链证据缺口。主线程负责 runtime 修复、manifest 集成、测试、证据重生成和状态维护。
+- 修复 fixture 路径边界：`tools.py` 中 fixture ref 现在拒绝绝对路径、`..` traversal 和解析后越出 manifest root 的路径；protocol `tools/call` 通过同一路径返回安全错误，不读取父目录文件。
+- 更新 `cases/p1_manifest.json`：P1 由 234 cases 增至 242 cases（108 attack、116 benign、18 assurance）；新增 8 个良性 tool coverage case，并让 P1 execution steps 覆盖全部 66 个工具。
+- 为 20 个声明 `delegation_chain_preserved` 或 `original_principal_required` 的 P1 case 补齐显式 `delegation_chain`；完整链保留 `original_principal`，缺 principal 攻击链保留链路但省略 original principal。
+- 调整 `build_actual`：输出 `delegation_chain`，并把 original principal presence 收窄为显式 `original_principal` 字段，避免把普通 hop `principal_id` 误当作 original principal 证据。
+- 新增/扩展测试：protocol 路径穿越 direct/protocol/合法 fixture；P1 manifest 全 66 tool coverage；P1 delegation evidence 回归。
+- 重生成 `reports/run-p1-null-verify/` 和 `reports/compare-p0-p1-null/`。
+- 更新 `README.md`、`status.md`、本日志、`.log/worklog.md` 和父仓库 `status.md` / `log.md`。
+
+## 验证
+
+- `python -m compileall range_src`：PASS。
+- `python -m unittest discover -s tests`：PASS，30 tests。
+- `PYTHONPATH=range_src python -m enterprise_agent_range validate --manifest cases/p0_manifest.json`：PASS，84 cases / 27 fixtures。
+- `PYTHONPATH=range_src python -m enterprise_agent_range validate --manifest cases/p1_manifest.json`：PASS，242 cases / 44 fixtures。
+- `PYTHONPATH=range_src python -m enterprise_agent_range run --manifest cases/p1_manifest.json --out reports --run-id run-p1-null-verify --adapter null_adapter --sut-id null-baseline --mode local --operator codex`：PASS，242 valid / 0 infra error / 0 invalid，false positive rate 0.0，utility retention 1.0，audit integrity 1.0。
+- `PYTHONPATH=range_src python -m enterprise_agent_range compare --baseline reports/run-p0-null-verify --candidate reports/run-p1-null-verify --out reports/compare-p0-p1-null`：PASS。
+
+## 未完成
+
+- 未实现真实外部 SUT adapter；当前仍是 Null Adapter 和本地协议面。
+- 当前协议是 MCP-like stdio/HTTP，不是严格 MCP schema 兼容实现。
+- 未实现交互式报告 UI、容器编排、真实 Trae、真实 HSM/TSA 或生产 API 接入。
+- Null Adapter 仍是无防护基线，P1 attack FAIL 只能说明基线风险，不代表任何 SUT 评测结论。
+
 # 2026-07-01 19:44 -07:00 P1 企业完整靶场扩展集成
 
 ## 本次完成

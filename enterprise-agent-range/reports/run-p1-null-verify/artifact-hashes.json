@@ -1,5 +1,5 @@
 {
-  "cases/p1_manifest.json": "sha256:89f5925cb867432930e1be5b7a48a6ff6e0f1246611887953677db9866141a6a",
+  "cases/p1_manifest.json": "sha256:59aa33e532499910f6c2c7280f7afaebbf1856bada4470d37782f5059d69629e",
   "fixtures/audit/approval-tokens.json": "sha256:7b388bb195154b58779a4a52fd3074d00bd29428eb9737880aa28092db5feec6",
   "fixtures/audit/audit-clean.json": "sha256:0e5e4afe35b2d6112ac2e99c61c23b5bc6d636e49169de2c45b2ca861b752ba4",
   "fixtures/audit/audit-tampered.json": "sha256:9285c2cd05d9fee5b0cc3daa46b4284d1dbe3a33e2c54cc0dc55f22307013940",
@@ -44,12 +44,12 @@
   "fixtures/rag/meeting-note-clean.md": "sha256:7e0d282d975fb312936e9cbe691bc36a6cdc67514ad35076d0f479bc836ba2c5",
   "fixtures/rag/meeting-note-poisoned.md": "sha256:74f1b1e2c00394510c0a452c2afb3523562b2a6ddd6e27168131cfed043739b1",
   "fixtures/rag/policy-poisoned-access.md": "sha256:51e19764588a15fbb2b77a41715bbac7b78ce4a5be014212c6e87bf2810f959f",
-  "reports/run-p1-null-verify/audit-records.jsonl": "sha256:33728441beb317c36d7265a07d9ac4b3a5e95fd480206b4ce8a68d3930be1f4a",
-  "reports/run-p1-null-verify/case-results.jsonl": "sha256:4e283392c97dc5545dcb4ed9b9d79c87eae141d7641bdf13f21f6def6b9a954e",
+  "reports/run-p1-null-verify/audit-records.jsonl": "sha256:5b867076258aa496bf6699d3d91e7fae5dfbd7d8f01b92f5ba3ccb167f973ee9",
+  "reports/run-p1-null-verify/case-results.jsonl": "sha256:28c7785fa279a0c4ce065ad4992030fafb222d2a67916627dd0605c906ff42ff",
   "reports/run-p1-null-verify/environment.json": "sha256:245856d18c6763cc906df66c0f86929a5056c66bc6748ff91b38e403f856a1d3",
-  "reports/run-p1-null-verify/metrics.json": "sha256:4d7cfd4460292312dc153188d1a9f01994db8666c3f0cd10dcef6c7d999302d6",
-  "reports/run-p1-null-verify/report.html": "sha256:5a7c1b8b1972cf0a3e41198a4526969f2d6f7b715bae368e80bc33fb9a31737c",
-  "reports/run-p1-null-verify/report.md": "sha256:7fe7433dfe34d6615654d7cbd7601b307856e7bfd4a3ff4a36253514ae72d802",
-  "reports/run-p1-null-verify/run-manifest.json": "sha256:713c5ae7ec33ba59256a7a6d7b587d1e89c349fccec15318b6c0a171c7141202",
-  "reports/run-p1-null-verify/side-effects.jsonl": "sha256:f3cc36f82584e17dea588a9dff4baf95c9fb1c80885aaab49f3cf8bd50eef9ed"
+  "reports/run-p1-null-verify/metrics.json": "sha256:a6bc05f4eb0c012bee5ebf096bc16e6d701ec433133a10a55ee230f744cc9fa9",
+  "reports/run-p1-null-verify/report.html": "sha256:cdbdb162a94229bdb85d63411f918ad6bebe7b6cff619aa3f314759318b04a1b",
+  "reports/run-p1-null-verify/report.md": "sha256:edd266845e5db9d67b3f27345e91a73a2bf57f5166c30f8632ec3f270b1631fb",
+  "reports/run-p1-null-verify/run-manifest.json": "sha256:0d4845842b844f68f7524a952de21083c17f9ba97d28ed77f14942864df5cc09",
+  "reports/run-p1-null-verify/side-effects.jsonl": "sha256:925c5d496645e8e2bb29e1f10bf27c7d4eadf038d29ea0173b0f119cd1c90bdc"
 }

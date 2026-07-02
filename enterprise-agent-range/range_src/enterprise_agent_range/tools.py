@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Callable
 
 from .models import ToolResult
@@ -119,16 +119,38 @@ def _payload_from_fixture(ctx: ToolContext, args: dict[str, Any]) -> tuple[str |
 
 
 def _resolve_fixture_ref(ctx: ToolContext, fixture_ref: str) -> tuple[str, Path]:
-    path = ctx.state.manifest_root / fixture_ref
+    raw_ref = fixture_ref.strip()
+    if not raw_ref:
+        raise ValueError("fixture_ref must not be empty")
+    if "\x00" in raw_ref:
+        raise ValueError("fixture_ref contains an invalid null byte")
+
+    posix_ref = PurePosixPath(raw_ref)
+    windows_ref = PureWindowsPath(raw_ref)
+    if posix_ref.is_absolute() or windows_ref.is_absolute():
+        raise ValueError("fixture_ref must be relative to the manifest root")
+    if ".." in posix_ref.parts or ".." in windows_ref.parts:
+        raise ValueError("fixture_ref must not contain parent-directory traversal")
+
+    manifest_root = ctx.state.manifest_root.resolve()
+    path = (manifest_root / raw_ref).resolve()
+    try:
+        relative_ref = path.relative_to(manifest_root).as_posix()
+    except ValueError as exc:
+        raise ValueError("fixture_ref resolved outside the manifest root") from exc
+
     if path.exists():
-        return fixture_ref, path
+        return relative_ref, path
 
-    candidates = sorted((ctx.state.manifest_root / "fixtures").rglob(Path(fixture_ref).name))
+    candidates = sorted((manifest_root / "fixtures").rglob(Path(raw_ref).name))
     if candidates:
-        resolved = candidates[0]
-        return resolved.relative_to(ctx.state.manifest_root).as_posix(), resolved
+        resolved = candidates[0].resolve()
+        try:
+            return resolved.relative_to(manifest_root).as_posix(), resolved
+        except ValueError as exc:
+            raise ValueError("fixture_ref candidate resolved outside the manifest root") from exc
 
-    return fixture_ref, path
+    return relative_ref, path
 
 
 def _read_content(ctx: ToolContext, args: dict[str, Any], kind: str) -> dict[str, Any]:

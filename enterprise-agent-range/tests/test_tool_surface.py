@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -70,6 +71,19 @@ class ToolSurfaceTest(unittest.TestCase):
                 self.assertGreater(len(definition["allowed_data_classes"]), 0)
                 self.assertIsInstance(definition["forbidden_data_classes"], list)
                 self.assertIs(definition["synthetic_only"], True)
+
+    def test_p1_manifest_execution_steps_cover_all_tool_definitions(self) -> None:
+        manifest_path = Path(__file__).resolve().parents[1] / "cases" / "p1_manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        used_tools = {
+            step["tool"]
+            for case in manifest["cases"]
+            for step in case.get("execution", {}).get("steps", [])
+        }
+
+        self.assertFalse(used_tools - set(TOOL_DEFINITIONS), f"unknown P1 tools: {sorted(used_tools - set(TOOL_DEFINITIONS))}")
+        self.assertFalse(set(TOOL_DEFINITIONS) - used_tools, f"uncovered P1 tools: {sorted(set(TOOL_DEFINITIONS) - used_tools)}")
+        self.assertEqual(len(used_tools), len(TOOL_DEFINITIONS))
 
     def test_new_p1_write_tool_records_synthetic_side_effect(self) -> None:
         state = RangeState(

@@ -1,5 +1,15 @@
 # Enterprise Agent Range 工作日志
 
+## 2026-07-01 21:16 PDT
+
+按 P1 review fix 计划修复三个问题：fixture 路径越界、P1 manifest 未覆盖新增工具、委托链 oracle 缺少显式证据。使用子 agent 协助：Worker C 写 protocol/path traversal 测试，Worker A 只读梳理 44 个未覆盖工具，Worker B 只读梳理 20 个委托相关 case；主线程完成 runtime 修复、manifest 集成、测试和证据重生成。
+
+已完成：`tools.py` 的 fixture ref 解析拒绝绝对路径、`..` traversal 和解析后越出 manifest root 的路径；`protocol.py` 通过同一路径安全返回 bad request；`cases/p1_manifest.json` 更新为 242 cases（108 attack、116 benign、18 assurance），P1 execution steps 覆盖全部 66 个 mock tool；20 个委托相关 case 补齐 `delegation_chain`；`build_actual` 输出 chain，并用显式 `original_principal` 判断 original principal preservation；新增路径穿越、工具覆盖和委托链证据回归测试；重生成 `reports/run-p1-null-verify/` 和 `reports/compare-p0-p1-null/`；同步 README、status 和日志。
+
+验证通过：`python -m compileall range_src`；`python -m unittest discover -s tests`（30 tests）；`PYTHONPATH=range_src python -m enterprise_agent_range validate --manifest cases/p0_manifest.json`；`PYTHONPATH=range_src python -m enterprise_agent_range validate --manifest cases/p1_manifest.json`；`PYTHONPATH=range_src python -m enterprise_agent_range run --manifest cases/p1_manifest.json --out reports --run-id run-p1-null-verify --adapter null_adapter --sut-id null-baseline --mode local --operator codex`（242 valid / 0 infra error / 0 invalid，FPR 0.0，utility 1.0，audit integrity 1.0）；P0/P1 compare CLI。
+
+未完成：真实外部 SUT adapter、严格 MCP schema 兼容层、交互式报告 UI、容器编排、真实 Trae、真实 HSM/TSA 和生产 API 接入。Null Adapter 仍是无防护基线，attack case 失败不代表任何外部 SUT 的评测结论。
+
 ## 2026-07-01 19:44 PDT
 
 按用户要求实施 P1 企业完整靶场扩展。执行顺序：先在父仓库提交并推送当前全部改动（commit `85ea632`，已推送 `main` 到 `origin/main`），再创建并切换到 `codex/enterprise-range-p1` 分支。随后使用 4 个 gpt-5.5 medium worker 子 agent 分工：Worker A 扩展 P1 case/fixture，Worker B 扩展 tool surface，Worker C 实现本地协议面，Worker D 实现 HTML/compare 报告；主线程负责接口收口、冲突检查、验证和状态维护。

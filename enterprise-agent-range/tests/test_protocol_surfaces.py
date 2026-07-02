@@ -6,6 +6,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from unittest import mock
 from pathlib import Path
 from urllib import request
 
@@ -18,9 +19,104 @@ from enterprise_agent_range.protocol import (
     replay_ide_file,
     serve_stdio,
 )
+from enterprise_agent_range.systems import ToolContext
+from enterprise_agent_range.tools import execute_tool
 
 
 class ProtocolSurfaceTest(unittest.TestCase):
+    def _write_fixture_sandbox(self, tmpdir: str) -> tuple[Path, str, str]:
+        sandbox = Path(tmpdir)
+        manifest_root = sandbox / "range-root"
+        policy_dir = manifest_root / "fixtures" / "policies"
+        policy_dir.mkdir(parents=True)
+        allowed_text = "# Allowed Policy\nSynthetic fixture inside manifest root.\n"
+        policy_dir.joinpath("allowed-policy.md").write_text(allowed_text, encoding="utf-8")
+        escaped_text = "PARENT_STATUS_SENTINEL: this must never be returned by fixture reads\n"
+        sandbox.joinpath("status.md").write_text(escaped_text, encoding="utf-8")
+        return manifest_root, allowed_text, escaped_text
+
+    def _guard_parent_status_read(self, manifest_root: Path) -> mock._patch:
+        forbidden_path = manifest_root.parent.joinpath("status.md").resolve()
+        original_read_text = Path.read_text
+
+        def guarded_read_text(path: Path, *args: object, **kwargs: object) -> str:
+            if path.resolve() == forbidden_path:
+                raise AssertionError("path traversal attempted to read parent status.md")
+            return original_read_text(path, *args, **kwargs)
+
+        return mock.patch.object(Path, "read_text", guarded_read_text)
+
+    def test_direct_read_policy_doc_rejects_parent_path_traversal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_root, _allowed_text, escaped_text = self._write_fixture_sandbox(tmpdir)
+            state = build_protocol_state(manifest_root=manifest_root, run_id="direct-traversal-test")
+            ctx = ToolContext(
+                state=state,
+                case={
+                    "case_id": "PROTO-TRAVERSAL-DIRECT",
+                    "principal": {"principal_id": "tester@range.local"},
+                    "agent": {"agent_id": "protocol-test-agent"},
+                },
+                trace_id="trace-PROTO-TRAVERSAL-DIRECT",
+            )
+
+            with self._guard_parent_status_read(manifest_root):
+                try:
+                    result = execute_tool(ctx, "read_policy_doc", {"fixture_ref": "../status.md"})
+                except (PermissionError, ValueError):
+                    return
+
+        output_json = json.dumps(result.output, ensure_ascii=False, sort_keys=True)
+        self.assertNotIn(escaped_text.strip(), output_json)
+        self.assertIn(str(result.output.get("decision")), {"deny", "denied", "invalid", "blocked"})
+
+    def test_protocol_tools_call_rejects_parent_path_traversal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_root, _allowed_text, escaped_text = self._write_fixture_sandbox(tmpdir)
+            state = build_protocol_state(manifest_root=manifest_root, run_id="protocol-traversal-test")
+
+            with self._guard_parent_status_read(manifest_root):
+                response = handle_protocol_request(
+                    state,
+                    {
+                        "id": "traversal-call",
+                        "method": "tools/call",
+                        "params": {
+                            "name": "read_policy_doc",
+                            "arguments": {"fixture_ref": "../status.md"},
+                            "case_id": "PROTO-TRAVERSAL-CALL",
+                        },
+                    },
+                )
+
+        self.assertFalse(response["ok"])
+        self.assertEqual(response["id"], "traversal-call")
+        self.assertNotIn(escaped_text.strip(), json.dumps(response, ensure_ascii=False, sort_keys=True))
+
+    def test_protocol_read_policy_doc_allows_manifest_fixture(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manifest_root, allowed_text, _escaped_text = self._write_fixture_sandbox(tmpdir)
+            state = build_protocol_state(manifest_root=manifest_root, run_id="protocol-fixture-test")
+
+            response = handle_protocol_request(
+                state,
+                {
+                    "id": "allowed-call",
+                    "method": "tools/call",
+                    "params": {
+                        "name": "read_policy_doc",
+                        "arguments": {"fixture_ref": "fixtures/policies/allowed-policy.md"},
+                        "case_id": "PROTO-FIXTURE-CALL",
+                    },
+                },
+            )
+
+        self.assertTrue(response["ok"])
+        output = response["result"]["output"]
+        self.assertEqual(output["fixture_ref"], "fixtures/policies/allowed-policy.md")
+        self.assertEqual(output["content"]["raw"], allowed_text)
+        self.assertEqual(output["kind"], "policy_doc")
+
     def test_protocol_tools_list_and_call(self) -> None:
         state = build_protocol_state(manifest_root=Path.cwd(), run_id="protocol-test")
 

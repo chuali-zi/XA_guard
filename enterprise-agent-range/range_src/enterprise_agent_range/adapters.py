@@ -103,7 +103,7 @@ def build_actual(
     if delegation_chain:
         original = str(case.get("principal", {}).get("principal_id", "")) if case else ""
         original_principal_present = any(
-            step.get("original_principal") == original or step.get("principal_id") == original
+            step.get("original_principal") == original
             for step in delegation_chain
             if isinstance(step, dict)
         )
@@ -125,6 +125,7 @@ def build_actual(
         "tool_names": [result.tool_name for result in tool_results],
         "delegation_depth": len(delegation_chain),
         "delegation_chain_present": bool(delegation_chain),
+        "delegation_chain": delegation_chain,
         "original_principal_present": original_principal_present,
     }
 

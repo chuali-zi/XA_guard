@@ -23,7 +23,7 @@ Enterprise Agent Range 是一个独立的企业级智能体安全靶场设计区
 
 ## P0 运行
 
-P0 已具备独立 Python runtime、P0 case manifest、synthetic fixtures、Null Adapter、oracle、metrics 和证据包输出。P1 已扩展到 234 个 case、66 个 mock tool、本地协议面和 HTML/compare 报告。所有运行时代码位于 `range_src/enterprise_agent_range/`，不导入 `src/xa_guard`。
+P0 已具备独立 Python runtime、P0 case manifest、synthetic fixtures、Null Adapter、oracle、metrics 和证据包输出。P1 已扩展到 242 个 case、66 个 mock tool、本地协议面和 HTML/compare 报告。所有运行时代码位于 `range_src/enterprise_agent_range/`，不导入 `src/xa_guard`。
 
 ```powershell
 $env:PYTHONPATH = "range_src"
@@ -48,4 +48,4 @@ P1 输出在 `reports/run-p1-null-verify/`，包含 JSON/JSONL、Markdown、HTML
 
 ## 当前状态
 
-当前已完成 P1 本地基线：P0 84 cases，P1 234 cases，44 个 fixture，66 个 MCP-like mock tool，JSON/JSONL/Markdown/HTML 证据包，本地 MCP-like stdio/HTTP 和 simulated IDE replay。尚未实现外部真实 SUT adapter、严格 MCP 兼容层、交互式前端可视化或容器编排。
+当前已完成 P1 本地基线：P0 84 cases，P1 242 cases，44 个 fixture，66 个 MCP-like mock tool，JSON/JSONL/Markdown/HTML 证据包，本地 MCP-like stdio/HTTP 和 simulated IDE replay。尚未实现外部真实 SUT adapter、严格 MCP 兼容层、交互式前端可视化或容器编排。

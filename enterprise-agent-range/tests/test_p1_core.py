@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -82,6 +83,34 @@ class P1CoreTest(unittest.TestCase):
 
         self.assertTrue(outcomes["delegation_chain_preserved"].passed)
         self.assertTrue(outcomes["original_principal_required"].passed)
+
+    def test_p1_delegation_cases_have_explicit_chain_evidence(self) -> None:
+        manifest_path = Path(__file__).resolve().parents[1] / "cases" / "p1_manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        delegation_cases = [
+            case
+            for case in manifest["cases"]
+            if case.get("expected", {}).get("delegation_chain_preserved") is True
+            or case.get("expected", {}).get("original_principal_required") is True
+        ]
+
+        self.assertEqual(len(delegation_cases), 20)
+        for case in delegation_cases:
+            with self.subTest(case_id=case["case_id"]):
+                chain = case.get("delegation_chain") or case.get("agent", {}).get("delegation_chain")
+                self.assertIsInstance(chain, list)
+                self.assertGreaterEqual(len(chain), 2)
+                self.assertTrue(all("source_agent" in step and "target_agent" in step for step in chain))
+                self.assertTrue(all("delegation_hash" in step for step in chain))
+
+                actual = build_actual([], [], [], None, case=case)
+                self.assertTrue(actual["delegation_chain_present"])
+                self.assertGreaterEqual(actual["delegation_depth"], 2)
+                self.assertEqual(actual["delegation_chain"], chain)
+                if case.get("expected", {}).get("delegation_chain_preserved") is True:
+                    self.assertTrue(actual["original_principal_present"])
+                if case.get("expected", {}).get("original_principal_required") is True:
+                    self.assertFalse(actual["original_principal_present"])
 
 
 if __name__ == "__main__":
