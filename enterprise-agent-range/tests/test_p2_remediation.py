@@ -134,6 +134,31 @@ class ActionIdTest(unittest.TestCase):
         action_b = RemediationPlanner().plan([row_b]).actions[0]
         self.assertNotEqual(action_a.action_id, action_b.action_id)
 
+    def test_action_id_differs_for_same_payload_in_different_traces(self) -> None:
+        side_effects = [
+            {
+                "sink_type": "ticket",
+                "operation": "submit_approval",
+                "payload_hash": "sha256:same-payload",
+                "trace_id": "trace-1",
+                "committed": True,
+            },
+            {
+                "sink_type": "ticket",
+                "operation": "submit_approval",
+                "payload_hash": "sha256:same-payload",
+                "trace_id": "trace-2",
+                "committed": True,
+            },
+        ]
+        actions = RemediationPlanner().plan(side_effects).actions
+        self.assertEqual(len(actions), 2)
+        self.assertEqual(len({action.action_id for action in actions}), 2)
+        self.assertEqual(
+            {action.metadata["trace_id"] for action in actions},
+            {"trace-1", "trace-2"},
+        )
+
     def test_target_side_effect_hash_references_payload_hash(self) -> None:
         row = {"sink_type": "payment", "payload_hash": "sha256:abc", "committed": True}
         action = RemediationPlanner().plan([row]).actions[0]
@@ -162,6 +187,18 @@ class OrderingTest(unittest.TestCase):
         forward_hashes = [a.target_side_effect_hash for a in log_forward.actions]
         reversed_hashes = [a.target_side_effect_hash for a in log_reversed.actions]
         self.assertEqual(forward_hashes, reversed_hashes)
+
+    def test_duplicate_payload_ordering_independent_of_input_order(self) -> None:
+        side_effects = [
+            {"sink_type": "ticket", "payload_hash": "same", "trace_id": "trace-1", "committed": True},
+            {"sink_type": "ticket", "payload_hash": "same", "trace_id": "trace-2", "committed": True},
+        ]
+        log_forward = RemediationPlanner().plan(side_effects)
+        log_reversed = RemediationPlanner().plan(list(reversed(side_effects)))
+        self.assertEqual(
+            [action.action_id for action in log_forward.actions],
+            [action.action_id for action in log_reversed.actions],
+        )
 
 
 class DeterminismTest(unittest.TestCase):

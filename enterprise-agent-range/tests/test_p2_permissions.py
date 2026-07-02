@@ -101,6 +101,20 @@ class CheckTest(unittest.TestCase):
             )
         )
 
+    def test_grant_rejected_before_issued_at(self) -> None:
+        self.assertFalse(
+            self.authority.check(
+                self.grant, "read_orders", ("orders:read",), when_epoch=999
+            )
+        )
+
+    def test_grant_valid_at_issued_at(self) -> None:
+        self.assertTrue(
+            self.authority.check(
+                self.grant, "read_orders", ("orders:read",), when_epoch=1_000
+            )
+        )
+
     def test_grant_valid_one_second_before_expiry(self) -> None:
         self.assertTrue(
             self.authority.check(

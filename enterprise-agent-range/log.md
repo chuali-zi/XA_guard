@@ -1,3 +1,45 @@
+# 2026-07-02 01:36 -07:00 P2 review finding 修复与回归
+
+## 本次完成
+
+- 按审查建议修复 `permissions`：`GrantAuthority.check()` 现在要求 `issued_at <= when_epoch < expires_at`，拒绝签发前使用 grant。
+- 修复 `remediation`：`action_id` 现在基于稳定 side-effect 行身份生成，包含 sink_type、operation、payload_hash、trace_id、metadata 与重复计数；相同 payload hash 出现在不同 trace 时不再撞 ID，同时保留 `target_side_effect_hash=payload_hash` 以减少消费方破坏。
+- 补充回归测试：签发前 grant 拒绝、签发瞬间 grant 允许、重复 payload hash 不同 trace 生成不同 undo action id、重复 payload 输入顺序不影响输出排序。
+- 顺手修复实现中局部 `trace_id` 遮蔽 `UndoLog.trace_id` 参数的问题，避免 planner 返回的 undo log trace_id 被 side-effect 行覆盖。
+
+## 验证
+
+- `python -m unittest tests.test_p2_permissions tests.test_p2_remediation`：PASS，41 tests。
+- `python -m compileall range_src`：PASS。
+- `python -m unittest discover -s tests`：PASS，203 tests。
+- `PYTHONPATH=range_src python -m enterprise_agent_range p2-status --json`：PASS，10 个 P2 capability 均为 `implemented`。
+- `PYTHONPATH=range_src python -m enterprise_agent_range validate --manifest cases/p1_manifest.json`：PASS，242 cases / 44 fixtures（fixture hash pending warning 仍为预期）。
+
+## 未完成
+
+- P2 能力仍未接入 runner/oracle/metrics/report，也还没有真实 P2 case/fixture 与大屏/复盘文件产物。
+- 本次未提交、未推送；当前分支还有本次修复与文档更新的未提交改动。
+
+# 2026-07-02 01:34 -07:00 P2 分支代码审查
+
+## 本次完成
+
+- 按用户要求审查 `codex/enterprise-range-p2` 相对 merge base `d990ae5c9aed66371e98c0023b34ac5466f5732d` 的变更，执行了 `git diff d990ae5c9aed66371e98c0023b34ac5466f5732d --stat` 与针对 P2 模块/CLI 的 diff 阅读。
+- 作为 review agent，先阅读了 `status.md`，再检查新增 `range_src/enterprise_agent_range/p2/` 十个能力模块、`cli.py` 的 `p2-status` 接入、P2 单测和真实 `reports/run-p1-null-verify/` 输出形状。
+- 复现并确认两个 review finding：`GrantAuthority.check` 在 `when_epoch < issued_at` 时仍允许授权；`RemediationPlanner` 对相同 `sink_type` + `payload_hash` 的多条 side-effect 会生成重复 `action_id`，真实 P1 side-effects 中存在重复 payload hash。
+- 执行测试验证：沙箱内第一次 `python -m unittest discover -s tests` 因 Python `tempfile` 无可用临时目录失败；经审批在沙箱外重跑同一命令，199 tests 全部通过。
+- 清理了本次沙箱外测试在仓库根目录留下的 8600 个 8 位随机名、4 字节临时文件，清理后 `git status --short` 为空。
+
+## 未完成
+
+- 未修改实现代码和测试代码；两个 finding 仍需后续作者修复。
+- 未重新生成 run/report 证据包；本次工作是代码审查，不是功能修复。
+
+## 下一步建议
+
+- 在 `permissions.py` 中让授权校验同时要求 `issued_at <= when_epoch < expires_at`，并补充 pre-issue 拒绝测试。
+- 在 `remediation.py` 中让 `action_id`/目标引用包含可区分 side-effect 行的稳定字段（例如 trace_id、operation 或行级 hash），并补充重复 payload hash 的回归测试。
+
 # 2026-07-01 21:16 -07:00 P1 review 修复：路径边界、工具覆盖、委托链证据
 
 ## 本次完成

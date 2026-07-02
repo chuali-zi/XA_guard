@@ -100,14 +100,16 @@ class GrantAuthority:
     ) -> bool:
         """True iff the grant authorizes ``capability``/``scope_needed`` at ``when_epoch``.
 
-        All four conditions must hold:
+        All five conditions must hold:
         - not revoked
-        - ``when_epoch < grant.expires_at`` (JLA: not expired)
+        - ``grant.issued_at <= when_epoch < grant.expires_at`` (JLA: active window)
         - ``capability == grant.request.capability`` (exact capability match)
         - ``set(scope_needed) <= set(grant.request.scope)`` (JEA: no over-scoping)
         """
 
         if grant.revoked:
+            return False
+        if when_epoch < grant.issued_at:
             return False
         if when_epoch >= grant.expires_at:
             return False
