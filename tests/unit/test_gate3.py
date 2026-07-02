@@ -295,7 +295,19 @@ def test_clean_call_allows(gate):
     result = gate.evaluate(ctx)
     assert result.decision == Decision.ALLOW
     assert result.rule_hits == []
-    assert result.metadata["policy_count"] == 31
+    assert result.metadata["policy_count"] == 32
+
+
+def test_rule_business_api_write_requires_approval(gate):
+    ctx = _ctx(
+        tool_name="business_submit_ticket",
+        arguments={"title": "Access review", "description": "Please review"},
+        risk_level=RiskLevel.RED,
+        taint=TaintLabel.INTERNAL,
+    )
+    result = gate.evaluate(ctx)
+    assert "XA-BUSINESS-API-WRITE-APPROVAL" in result.rule_hits
+    assert result.decision == Decision.REQUIRE_APPROVAL
 
 
 # ---------- 新增合规规则抽样覆盖：等保 2.0 / GB/T 45654 / TC260-003 ----------

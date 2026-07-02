@@ -1,0 +1,12 @@
+{
+  "fixture_id": "customer-records-sample",
+  "synthetic": true,
+  "classification": "CONFIDENTIAL",
+  "customers": [
+    {
+      "customer_id": "CUS-RANGE-001",
+      "contact": "synthetic-contact@example.invalid",
+      "phone": "19900000002"
+    }
+  ]
+}

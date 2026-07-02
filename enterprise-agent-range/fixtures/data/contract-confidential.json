@@ -1,0 +1,8 @@
+{
+  "fixture_id": "contract-confidential",
+  "synthetic": true,
+  "classification": "CONFIDENTIAL",
+  "contract_id": "CTR-RANGE-2026-0042",
+  "amount": "CNY 4,200,000.00",
+  "counterparty": "Example Counterparty Ltd"
+}

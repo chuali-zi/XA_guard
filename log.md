@@ -1,5 +1,121 @@
 # 工作日志
 
+## 2026-07-01 08:39 PDT Enterprise Agent Range P0 review 修复
+
+起因：用户要求按 review 修复 P0 靶场评测可信度问题，包括审计链误判、expected 字段静默漏测、`list_traces` 全局计数和报告 JSONL 被忽略。
+
+已完成：
+- 修复 `enterprise-agent-range/range_src/enterprise_agent_range/` runtime：补齐 P0 manifest 全部 `expected` 字段的 oracle handler，未知 expected 字段会在 validation 阶段失败。
+- 修复 audit hash chain：per-case segment 使用 case 开始前的 hash 作为起点，metrics 增加 run-level `audit_integrity` / `run_audit_chain_valid`。
+- 修复 `list_traces`：支持按 `trace_id`、`case_id`、`sink` 过滤，`expect_count` 只基于过滤后的 side effect。
+- 更新父仓库 `.gitignore` scoped 例外，使 `enterprise-agent-range/reports/run-p0-null-verify/*.jsonl` 可提交。
+- 新增/扩展 `enterprise-agent-range/tests/`，覆盖 manifest validation、oracle 代表项、audit segment、trace 过滤和工具安全边界。
+- 重生成 `enterprise-agent-range/reports/run-p0-null-verify/`，并更新 `enterprise-agent-range/status.md`、`.log/worklog.md`。
+
+验证：
+- `python -m compileall range_src`：PASS。
+- `python -m unittest discover -s tests`：12 tests PASS。
+- `python -m enterprise_agent_range validate --manifest cases/p0_manifest.json`：PASS，84 cases / 27 fixtures。
+- `python -m enterprise_agent_range run --manifest cases/p0_manifest.json --out reports --run-id run-p0-null-verify --adapter null_adapter --sut-id null-baseline --mode local --operator codex`：PASS，84 valid / 0 infra error / 0 invalid，audit integrity 1.0。
+- `reports/run-p0-null-verify/case-results.jsonl`、`side-effects.jsonl`、`audit-records.jsonl` 已出现在 git status 中，不再被忽略。
+
+边界：
+- 本轮仍不接入真实 SUT，不实现 MCP server、前端可视化、容器编排或 P1 扩展。
+- Null Adapter 仍是无防护基线；attack case 失败代表基线暴露风险，不表示任何外部 SUT 的评测结论。
+
+## 2026-07-01 07:50 PDT Enterprise Agent Range P0 可运行骨架搭建
+
+起因：用户要求根据 `enterprise-agent-range/docs/` 把靶场 P0 搭建起来，由主线程负责脚手架、子 agent 负责详细填充，主线程负责验收和检验。
+
+已完成：
+- 在 `enterprise-agent-range/` 内新增独立 Python runtime：`range_src/enterprise_agent_range/`，包含模型、fixture loader、mock tools、Null Adapter、runner、oracle、metrics、report writer 和 CLI；未导入 `src/xa_guard`，未把代码写入根 `src/`。
+- 通过子 agent 填充 P0 语料：`cases/p0_manifest.json` 含 84 个 case（38 attack、36 benign、10 assurance），`fixtures/` 含 27 个 synthetic fixture，manifest 含 8 条链路。
+- 新增本地证据输出 `reports/run-p0-null-verify/`，包含 run manifest、environment、case results、side effects、audit records、metrics、Markdown report 和 artifact hashes。
+- 新增最小测试 `enterprise-agent-range/tests/`，覆盖 runner smoke、工具面数量和 `exec_command` 只记录不执行真实 shell。
+- 更新 `enterprise-agent-range/README.md`、`enterprise-agent-range/status.md` 和 `enterprise-agent-range/.log/worklog.md`，记录当前状态、运行命令、完成项与未完成项。
+
+验证：
+- `python -m compileall range_src`：PASS。
+- `python -m unittest discover -s tests`：3 tests PASS。
+- `python -m enterprise_agent_range validate --manifest cases/p0_manifest.json`：PASS，84 cases / 27 fixtures；fixture `sha256: pending` 为预期 warning，runner 已在 artifact hash 中重算。
+- `python -m enterprise_agent_range run --manifest cases/p0_manifest.json --out reports --run-id run-p0-null-verify --adapter null_adapter --sut-id null-baseline --mode local --operator codex`：PASS，84 valid / 0 infra error / 0 invalid。
+
+边界：
+- 当前仍未实现真实 CLI/HTTP/MCP stdio SUT adapter、MCP mock server、前端可视化和容器编排。
+- Null Adapter 是无防护基线；attack case 失败是预期暴露风险，不表示 XA-Guard 或任何外部 SUT 已完成评测。
+
+## 2026-07-01 05:42 PDT 独立企业级智能体安全靶场设计落地
+
+起因：用户确认采用激进重型方案，要求落实一个真实企业靶场设计，并严格与 XA-Guard 的 `src` 和既有 `docs` 解耦。
+
+已完成：
+- 新增 `enterprise-agent-range/` 独立目录，包含本模块 `README.md`、`status.md`、`.log/worklog.md` 和自有 `docs/`。
+- 落地设计说明、目标范围、企业场景、解耦契约、总体架构、安全域资产、角色权限、工具面、攻击分类、场景矩阵、评测指标、证据规范、实施路线、风险边界、数据模型、数据流和 testcase schema 草案。
+- 文档明确靶场只把 XA-Guard 作为外部 `SUT`，禁止 import `src/xa_guard`、禁止把靶场 runtime 放入根 `src/`、禁止把靶场文档并入既有 `docs/`。
+
+验证：
+- 本轮为文档设计落地，未运行产品测试；后续实现前需继续保持解耦检查。
+
+边界：
+- 当前未实现靶场运行时代码、mock 业务服务、runner、case fixtures 或报告前端；不改变 XA-Guard 代码能力、L3 验收状态或比赛达标结论。
+
+## 2026-07-01 05:04 PDT 项目级 OpenCode 配置新增
+
+起因：用户要求在当前仓库创建 `.opencode`，先把 gpt-5.5 的 effort 调成 xhigh。
+
+已完成：
+- 新增 `.opencode/opencode.json`，声明 schema，设置项目默认模型为 `openai/gpt-5.5`。
+- 为内置 `build`、`plan`、`general`、`explore` agent 均设置 `model: openai/gpt-5.5` 与 `options.reasoningEffort: xhigh`。
+- 新增 `.opencode/.log/opencode-config-20260701.log` 记录本次配置改动；未修改用户全局 OpenCode 配置。
+
+验证：
+- 已对照 `https://opencode.ai/config.json`，确认 `agent.options` 为 schema 允许的扩展对象。
+
+边界：
+- OpenCode 配置启动时加载，当前运行会话需重启后才会使用新配置。
+
+## 2026-07-01 10:05 UTC 构建本机 Gate5 sandbox 镜像并消除 pytest skip
+
+起因：用户询问全量测试中 `tests/integration/test_sandbox_runner.py` 为何因缺少 `xa-guard/sandbox:latest` 被 skip，并确认允许写入本机 Docker 镜像存储来补齐该环境依赖。
+
+已完成：
+- 检查 `tests/integration/test_sandbox_runner.py`、`docker/sandbox.Dockerfile` 和 `scripts/build_sandbox_image.sh`，确认 skip 原因是 Docker Desktop Linux engine 未运行，且本机不存在 `xa-guard/sandbox:latest`。
+- 启动 Docker Desktop，等待 `docker info` 成功；执行 `docker build -f docker/sandbox.Dockerfile -t xa-guard/sandbox:latest .`，成功构建镜像。
+- 运行 `tests/integration/test_sandbox_runner.py`，原 skip 用例真实执行并通过，验证 Docker 沙箱禁网和只读 rootfs 生效。
+
+验证：
+- `docker info`：Docker Desktop engine ready，ServerVersion 29.5.2。
+- `docker build -f docker/sandbox.Dockerfile -t xa-guard/sandbox:latest .`：成功。
+- `PYTHONPATH=src;.` `python -m pytest tests/integration/test_sandbox_runner.py -q`：1 passed。
+- `PYTHONPATH=src;.` `python -m pytest -q`：全仓通过，当前无 skip 摘要。
+
+边界：
+- 本轮写入的是本机 Docker Desktop 镜像存储，位于仓库目录外；这是用户确认后的环境补齐，不修改 Windows 系统环境变量、Trae/Cursor/OpenCode 用户配置或仓库外 key/log/evidence 文件。
+- 真实 Linux/gVisor `runsc` 隔离仍需 Linux 主机；本轮验证的是 Docker Desktop/runc 路径。
+
+## 2026-07-01 09:40 UTC Gate4 审计污点修复与真实业务 API 静态接入
+
+起因：用户确认 Gate4 出向 `output_taint=CONFIDENTIAL` 已正确 deny，但 pipeline 未把出向 `output_taint` 回写到 `ctx.taint`，导致 Gate6 审计敏感级别可能保留入向标签；随后要求准备并实现真实下游业务 HTTP API 接入，且密钥只允许仓库内 `.env` 本机加载。
+
+已完成：
+- 修复 `src/xa_guard/pipeline.py`：`_sync_ctx_from_result()` 在没有 `metadata["taint"]` 时同步 `metadata["output_taint"]`，Gate4 出向 deny 后 Gate6 可审计到 CONFIDENTIAL。
+- 新增 `demo/targets/business_api_target.py`，用 stdio MCP adapter 固定暴露 `business_get_status`、`business_query_record`、`business_submit_ticket`，内部使用标准库 `urllib.request` 调 HTTP API；只允许 `https://`，本地 mock 可显式允许 `http://127.0.0.1`。
+- 新增 `.env.example`，更新 `.gitignore` 忽略 `.env` / `.env.*` 并保留 `.env.example`；未创建真实 `.env`，未写系统环境变量或仓库外文件。
+- 新增 `configs/xa-guard.business-api.yaml`，并为下游 stdio 增加显式 `env_passthrough`，只透传声明的 `BUSINESS_API_*` 变量，不把整个进程环境泄给任意下游工具。
+- 更新 Gate4 工具能力、Gate3 业务 API 写审批规则、Gate3 fixtures、覆盖矩阵预期和企业静态 registry 授权路径；README 与 `docs/acceptance/business-api-integration.md` 增加接入说明和边界。
+
+验证：
+- `tests/unit/test_business_api_adapter.py`：6 passed。
+- `tests/integration/test_business_api_downstream.py`：5 passed。
+- `tests/integration/test_full_gate_stress_extra.py tests/test_pipeline_smoke.py tests/unit/test_gate4.py`：52 passed。
+- 配置/治理/Gate2/Gate3/策略资产回归通过；当时全仓 `PYTHONPATH=src;.` 下 `pytest -q` 通过，唯一 skip 为本机缺 `xa-guard/sandbox:latest` 镜像；随后已在 10:05 UTC 构建镜像并消除该 skip。
+- 变更 Python 文件 ruff PASS。
+
+边界：
+- 本轮只接下游业务 HTTP API，不接 Gate1 模型 API 或 OpenAI-compatible LLM API。
+- 使用本地 fake HTTP server 做集成验证，尚未接真实生产 endpoint；真实 SSO/LDAP/SCIM/JWT 验签、真实审批后台、真实账单系统仍未接。
+- 未写 Windows 系统/用户环境变量、Trae/Cursor/OpenCode 用户配置、系统 PATH 或仓库外 key/log/evidence 文件。
+
 ## 2026-07-01 08:45 UTC 全链路额外压力测试与静态 verifier 兼容入口
 
 起因：用户要求新增额外类似测试，对系统进行压力实测，防止只为既有测试写死；范围覆盖企业治理预检与 Gate1-Gate6 全链路。

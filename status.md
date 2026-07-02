@@ -1,6 +1,6 @@
 # 仓库状态：XA-Guard / XA-202620
 
-> 快照日期：2026-06-30 20:30 PDT（仓库环境；docs 已完成物理重构；Agent Governance v1 已合入 main 工作树）
+> 快照日期：2026-07-01 05:42 PDT（仓库环境；docs 已完成物理重构；Agent Governance v1、业务 API 静态接入、项目级 OpenCode gpt-5.5 xhigh 配置与独立 Enterprise Agent Range 靶场设计文档已在当前工作树）
 > 本文件仅描述当前仓库状态、验收边界与剩余差距，不记录工作历史。
 > 2026-06-20 已在 commit `432ebbc` 实跑 L3 静态验收 S1–S7（全 PASS，123 测试）与能力范围内真实验收 R2/R3/R4/R6/R7/R9；证据目录 `D:/evidence/l3-20260620T090452Z/`（final-report.json + artifact-hashes.json 149 文件）。R6 Docker build/up+healthz 已 PASS（gVisor runsc 仍 BLOCKED，Windows 无 runsc）。BUG-R9 已修复+回归测试。仍 BLOCKED：R1 独立双 500/holdout、R5 真实 Trae GUI、R6 gVisor runsc（需 Linux）、R8 外部 AIBOM 生成器、R9 第三方 TSA/HSM；R2/R3 比赛目标现按 OpenCode Go 订阅 `$60` 预算型抽样管理。
 > 2026-06-21 对 commit `6cf1ce9` 复核：统一静态 verifier `11/11` sections PASS；全量 pytest 在默认 Windows/CP1252 子进程环境为 `561 passed, 1 failed, 1 skipped`，总覆盖率 `79%`。唯一失败是 `validate_csab_gov_mini.py` 输出 Unicode 箭头触发 `UnicodeEncodeError`，设置 `PYTHONUTF8=1` 后该用例通过；唯一 skip 是本机缺 `xa-guard/sandbox:latest` 测试镜像。故当前不能写”默认环境全量测试全绿”。
@@ -12,6 +12,10 @@
 > 2026-06-30 合并后验证：治理单测/集成/配置 20 passed；pipeline/Gate3/Gate6/pending/MCP e2e 回归通过；R2/R3 预算关键测试 32 passed；ruff 针对变更 Python 文件通过；`node --check frontend/governance.js` 通过；治理样例 JSON/NDJSON 解析通过；设置 `PYTHONPATH=src;.` 与 `PYTHONUTF8=1` 后全仓 `pytest -q` 通过，唯一 skip 仍为本机缺 `xa-guard/sandbox:latest` 镜像。
 > 2026-06-30 docs 已完成物理重构：`docs/` 顶层只保留 `README.md`，原顶层文档迁入 `source-of-truth/`、`planning/`、`workplan/`、`delivery/`、`acceptance/`、`gates/`、`bench-redteam/`、`research/`；新增 `docs/workplan/NEXT-WORK-DESIGN.md`、D1 草稿、D3 视频脚本和提交清单骨架。该整理不改变代码能力、测试结果、L3 验收或比赛达标结论。
 > 2026-07-01 新增全链路额外压力测试 `tests/integration/test_full_gate_stress_extra.py`：覆盖企业治理预检与 Gate1-Gate6 的 allow/deny/require_approval/warn、审批恢复、审批篡改、出向拦截、executor 异常和审计链。为保持既有静态 verifier 路径契约，补充 docs 顶层兼容入口指向重构后的真实文档；这不改变 L3 真实验收 blocker。
+> 2026-07-01 修复 Gate4 出向 `output_taint` 未回写 `ctx.taint` 导致 Gate6 审计敏感级别可能保留入向标签的问题；新增真实下游业务 HTTP API stdio adapter、仓库内 `.env.example`、业务 API 配置、Gate3/Gate4 策略登记、企业 registry 授权路径和验收文档。新增业务 API 单测/集成 11 passed；ruff 通过。
+> 2026-07-01 用户确认后启动 Docker Desktop 并构建本机 `xa-guard/sandbox:latest`；`tests/integration/test_sandbox_runner.py` 从 skip 变为真实执行通过，验证禁网和只读 rootfs；全仓 `PYTHONPATH=src;.` 下 `pytest -q` 通过，当前无 skip 摘要。
+> 2026-07-01 新增项目级 `.opencode/opencode.json`，将本仓默认 OpenCode 模型与内置 build/plan/general/explore agent 配置为 `openai/gpt-5.5`，并设置 `options.reasoningEffort: xhigh`；该配置仅影响重启后的 OpenCode 会话，不改变 XA-Guard 产品能力或验收结论。
+> 2026-07-01 新增 `enterprise-agent-range/` 独立企业级智能体安全靶场设计区，包含自有 `docs/`、`status.md` 和 `.log/worklog.md`；设计覆盖重型企业场景、解耦契约、架构、数据模型、数据流、攻击分类、场景矩阵、评测指标和证据规范。该目录明确只把 XA-Guard 作为外部 `SUT`，不导入 `src/xa_guard`、不复用既有 `docs/`，当前仅为文档设计，不改变 XA-Guard 运行时能力或 L3 验收状态。
 
 ## 总体结论
 
@@ -25,9 +29,11 @@
 
 当前仍**不能宣称“L3 最终验收通过”或“赛题最终达标”**。剩余比赛差距：R1 正式双 500/holdout 独立评测、R2/R3 `subscription_budget60_v1` 真实校准与 sampled 结果、R5 真实 Trae GUI、R6 真实 Linux/gVisor runsc 隔离、R8 外部 AIBOM 生成器、R9 第三方 TSA/HSM，以及 D1/D3/D4 交付物。2,986-job 全矩阵不在比赛差距内。
 
-按 PRD 的 D2 代码交付清单看，README、Compose、79% 覆盖率、六关测试、31 条 Gate3 baseline 规则、审计实现和 Apache-2.0 LICENSE 已具备；公开 remote 已配置，但真实 Trae 验收仍缺。按项目自定义的 `docs/acceptance/L3-test-and-acceptance.md`，R1/R2/R3/R5/R6/R8/R9 仍有必验项 BLOCKED，因此 L3 整体仍为 **BLOCKED，而非 PASS**；其中 R2/R3 blocker 是预算型抽样工具/结果未完成，不是可选全矩阵未跑。仓库内也未发现 D1 技术方案成稿、D3 演示视频或 D4 报名材料；这不影响代码静态 L3，但影响赛题完整交付。
+按 PRD 的 D2 代码交付清单看，README、Compose、79% 覆盖率、六关测试、32 条 Gate3 baseline 规则、审计实现和 Apache-2.0 LICENSE 已具备；公开 remote 已配置，但真实 Trae 验收仍缺。按项目自定义的 `docs/acceptance/L3-test-and-acceptance.md`，R1/R2/R3/R5/R6/R8/R9 仍有必验项 BLOCKED，因此 L3 整体仍为 **BLOCKED，而非 PASS**；其中 R2/R3 blocker 是预算型抽样工具/结果未完成，不是可选全矩阵未跑。仓库内也未发现 D1 技术方案成稿、D3 演示视频或 D4 报名材料；这不影响代码静态 L3，但影响赛题完整交付。
 
 2026-06-23 新增的原动力大会 AI 安全专题资料进一步强化了“Agent Gateway、Agent 身份治理、控制流/数据流隔离、AI Resilience、多 Agent 编排治理”的产品叙事，但目前只是文档沉淀，尚未转化为新的实现、测试或验收证据。
+
+2026-07-01 新增的 `enterprise-agent-range/` 是独立靶场设计工作区，用于后续红队、漏洞和能力检测规划；它不属于 XA-Guard 主产品源码，不进入现有 L3 通过项，也尚未产出可执行评测结果。
 
 2026-06-30 后，`docs/README.md` 是文档唯一入口，`docs/workplan/NEXT-WORK-DESIGN.md` 是下一步工作设计入口，`docs/workplan/TODO.md` 是详细 TODO；`status.md` 仍只描述当前仓库状态和验收边界，工作历史继续写入 `log.md`。
 
@@ -36,8 +42,9 @@
 | 验收面 | 当前状态 | 边界 |
 |---|---|---|
 | L3 static-only (S1–S7) | 2026-06-20 实跑全 PASS：S1 双 500 implementation + formal 负测、S2 holdout 协议 8 测、S3 runner 9 测、S4 性能入口 7 测、S5 Trae 3/3、S6 compose+gVisor/OPA/deployment+17 测+OPA bundle、S7 修复后 123 测 | 静态 PASS 不等于最终验收 PASS；BUG-R9 修复现已进入 `6cf1ce9` |
-| 当前全仓测试/覆盖率 | 2026-07-01：新增全链路压力测试 23 passed；Gate/治理/审计相关回归 172 passed；`PYTHONPATH=src;.` + `PYTHONUTF8=1` 下全仓 `pytest -q` PASS，唯一 skip 为本机缺 `xa-guard/sandbox:latest`；新增测试 ruff PASS。最近记录覆盖率仍为 79% | 本轮未重新生成 coverage；不带 `PYTHONUTF8=1` 的默认 Windows/CP1252 子进程仍可能触发校验脚本 Unicode 输出兼容问题；Gate4 出向 `output_taint` 当前不回写 `ctx.taint`，审计敏感级别可能保留入向标签 |
+| 当前全仓测试/覆盖率 | 2026-07-01：新增全链路压力测试 23 passed；新增业务 API adapter 单测/集成 11 passed；Gate/治理/审计/配置/策略资产回归通过；已构建本机 `xa-guard/sandbox:latest`，sandbox runner 真实执行通过；`PYTHONPATH=src;.` 下全仓 `pytest -q` PASS，当前无 skip 摘要；ruff PASS。最近记录覆盖率仍为 79% | 本轮未重新生成 coverage；真实业务 API 使用本地 fake server 验证，尚未接生产 endpoint；Docker 镜像存在于本机 Docker Desktop 存储，不属于仓库内容 |
 | Agent Governance v1 | 已合入 main 工作树：本地 registry、运行时 preflight、MCP `_xa_guard` envelope、审计扩展字段、`frontend/governance.html` 控制台和工资条越权/HR 审批样例；包含 fail-closed allow-list、跨主体访问限制、token 摘要审计、前端 HTML 转义和默认 tenant 一致性修复；合并后目标测试与相关回归通过 | 默认关闭；v1 是私有化演示控制面，不是 SaaS；成本为估算归属，不是供应商账单；尚未接真实企业 SSO/IAM、真实 Trae GUI 或多 Agent 编排治理 |
+| 真实业务 API adapter | 新增 `demo.targets.business_api_target` stdio MCP adapter，固定暴露 `business_get_status`、`business_query_record`、`business_submit_ticket`；仓库内 `.env.example`、`.gitignore` 忽略真实 `.env`、`configs/xa-guard.business-api.yaml`、Gate3/Gate4 策略和企业 registry 授权路径已具备；API key 不进入工具参数、pending ledger 或 Gate6 audit | 本轮只用本地 fake HTTP server 做成功/401/429/5xx/timeout/非 JSON/脱敏和 pipeline 集成验证；不写系统环境变量，不写用户目录配置，不代表真实业务 API 已上线 |
 | 双 500 语料 (R1) | implementation profile 500+500、1000 唯一 payload、17 类各≥29 已实测验过；formal 正确非零退出 | formal 所需独立 attestation/taxonomy/semantic-group 复核 BLOCKED，不能作为正式双 500 |
 | Decision faithfulness (R9c) | 本轮 25 条真实签名审计独立重算 100% 一致；直接函数验证非固定 1.0（不一致 deny→0.45） | 真实 agent trace 的大规模独立重放未完成 |
 | LangChain / LangGraph | wrapper、callback/observer、HITL resume、node/tool 等适配已实现 | 固定真实版本及真实 agent/transport 端到端验收未完成 |
@@ -50,6 +57,8 @@
 | 性能 (R4) | 本轮实测：进程内 500 P50 2.912ms/P95 21.72ms/QPS 415.17/RSS 62.59MB；HTTP 10×500 P95 169.79ms/QPS 74.09/RSS 103.76MB、500/500 审计 marker 匹配，全达标 | 20 会话容量 LIMIT（P95 366.979ms > 300ms，未声明支持）；多 worker/TLS/多机 soak 未跑 |
 | 研究与答辩资料 | `docs/research/force-ai-security-2026/` 已整理 FORCE 原动力大会企业 AI / 智能体安全现场照片，形成逐页笔记、风险图谱、治理架构、数据/控制流安全、XA-Guard 映射和落地清单；可用于后续 D1 技术方案、答辩 PPT 和产品叙事补强 | 来源为现场照片和用户口述印象，未做外部事实核验；其中外部事件、金额、法律案例、厂商能力不得直接作为正式引用；尚未转化为代码实现或验收证据 |
 | 文档执行入口 | `docs/README.md` 已成为唯一文档入口；`docs/workplan/NEXT-WORK-DESIGN.md` 汇总下一步工作设计；`docs/workplan/TODO.md` 保留详细 TODO；`docs/delivery/` 已有 D1 草稿、D3 视频脚本和提交清单骨架 | 本次仅重构文档结构、修链接和补工作设计，不新增代码能力、测试结果、付费评测或正式提交材料 |
+| OpenCode 项目配置 | 仓库内新增 `.opencode/opencode.json`，项目默认模型为 `openai/gpt-5.5`，内置 build/plan/general/explore agent 均设置 `options.reasoningEffort: xhigh` | 配置需重启 OpenCode 后生效；未改全局用户配置，不改变 XA-Guard 运行时或验收状态 |
+| Enterprise Agent Range | 新增 `enterprise-agent-range/` 独立靶场设计区：自有 `docs/` 覆盖设计说明、目标范围、企业场景、解耦契约、架构、资产、角色、工具面、攻击分类、场景矩阵、指标、证据、路线、风险、数据模型、数据流和 testcase schema；自有 `status.md` 与 `.log/worklog.md` 已建立 | 当前仅为文档设计；未实现 runtime、mock 业务服务、runner、case fixtures 或报告前端；严格作为独立工作区，不导入 `src/xa_guard`、不复用既有 `docs/`，不改变 L3 验收结论 |
 
 ## 本轮性能证据（2026-06-20 实测，commit 432ebbc）
 

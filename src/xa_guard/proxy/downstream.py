@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import AsyncExitStack
 from pathlib import Path
 from typing import Any
@@ -57,6 +58,7 @@ class DownstreamRouter:
                 params = StdioServerParameters(
                     command=spec.command[0],
                     args=list(spec.command[1:]),
+                    env=self._child_env(spec),
                 )
                 read_stream, write_stream = await stack.enter_async_context(stdio_client(params))
                 session = await stack.enter_async_context(ClientSession(read_stream, write_stream))
@@ -153,7 +155,7 @@ class DownstreamRouter:
             raise NotImplementedError("sandboxed downstream calls currently require stdio transport")
 
         command = build_docker_command(spec.command, policy, workspace_root=Path.cwd())
-        params = StdioServerParameters(command=command[0], args=command[1:])
+        params = StdioServerParameters(command=command[0], args=command[1:], env=self._child_env(spec))
         log.debug("sandbox routing %s -> downstream %s via %s", ctx.tool_name, spec.name, policy.mode)
 
         async with AsyncExitStack() as stack:
@@ -161,3 +163,12 @@ class DownstreamRouter:
             session = await stack.enter_async_context(ClientSession(read_stream, write_stream))
             await session.initialize()
             return await session.call_tool(ctx.tool_name, ctx.arguments or {})
+
+    def _child_env(self, spec: DownstreamSpec) -> dict[str, str] | None:
+        """Pass only explicitly declared environment variables to stdio children."""
+        env = {
+            key: os.environ[key]
+            for key in spec.env_passthrough
+            if key in os.environ
+        }
+        return env or None

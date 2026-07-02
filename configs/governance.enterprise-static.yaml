@@ -134,7 +134,7 @@ roles:
         agents: [general-office-agent]
       - action: call_tool
         agents: [general-office-agent]
-        tools: [echo, content_generation, read_log]
+        tools: [echo, content_generation, read_log, business_get_status, business_query_record, business_submit_ticket]
       - action: access_data_domain
         data_domains: [engineering_docs]
 
@@ -195,7 +195,7 @@ agents:
     tenant_id: acme-corp
     owner: platform-team
     purpose: 通用摘要、邮件草拟和内部资料检索
-    allowed_tools: [echo, content_generation, send_email, read_log]
+    allowed_tools: [echo, content_generation, send_email, read_log, business_get_status, business_query_record, business_submit_ticket]
     allowed_data_domains: [employee_profile, engineering_docs, finance_report]
     risk_level: medium
     max_autonomy: assistive

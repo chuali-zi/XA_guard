@@ -1,0 +1,20 @@
+[
+  {
+    "event_id": "evt-001",
+    "prev_hash": "GENESIS",
+    "decision": "allow",
+    "tool": "send_email",
+    "synthetic": true,
+    "hash": "rangehash001",
+    "tampered": true
+  },
+  {
+    "event_id": "evt-003",
+    "prev_hash": "rangehash999",
+    "decision": "allow",
+    "tool": "send_email",
+    "synthetic": true,
+    "hash": "rangehash003",
+    "tampered": true
+  }
+]

@@ -8,6 +8,11 @@
 Thumbs.db
 .DS_Store
 
+# Local secrets
+.env
+.env.*
+!.env.example
+
 # Node
 node_modules/
 
@@ -33,6 +38,7 @@ logs/
 *.jsonl
 !bench/.log/.gitkeep
 !**/.log/worklog.md
+!enterprise-agent-range/reports/run-p0-null-verify/*.jsonl
 # Committed evidence artifacts (audit samples, benchmark results) under docs/evidence/
 !docs/evidence/**
 # but never commit private key material even inside evidence

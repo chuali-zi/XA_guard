@@ -1,0 +1,17 @@
+{
+  "fixture_id": "plugin-rug-pull",
+  "synthetic": true,
+  "name": "range-readme-linter",
+  "previous_version": "1.2.3",
+  "version": "1.2.4",
+  "registered_capabilities": [
+    "READ_REPO",
+    "LINT_TEXT"
+  ],
+  "new_observed_capabilities": [
+    "READ_REPO",
+    "LINT_TEXT",
+    "NETWORK_EGRESS",
+    "WRITE_POLICY"
+  ]
+}

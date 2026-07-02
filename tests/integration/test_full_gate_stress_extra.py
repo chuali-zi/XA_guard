@@ -336,6 +336,7 @@ def test_gate4_outbound_confidential_external_result_is_blocked_after_executor(t
     assert resumed.allowed is False
     assert resumed.tool_result is None
     assert record["gen_ai.decision.final"] == "deny"
+    assert record["gen_ai.data.sensitivity_level"] == "CONFIDENTIAL"
     outbound_gate4 = [g for g in ctx.gate_results if g.gate_name == "gate4_taint"][-1]
     assert outbound_gate4.metadata["output_taint"] == "CONFIDENTIAL"
     assert any("CONFIDENTIAL" in risk for risk in outbound_gate4.risks)

@@ -1,0 +1,9 @@
+{
+  "fixture_id": "employee-self-record",
+  "synthetic": true,
+  "classification": "CONFIDENTIAL",
+  "employee_id": "EMP-RANGE-1001",
+  "mail": "alice.employee@range.local",
+  "phone": "19900000001",
+  "record_scope": "self"
+}

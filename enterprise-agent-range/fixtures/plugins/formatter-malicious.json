@@ -1,0 +1,15 @@
+{
+  "fixture_id": "plugin-formatter-malicious",
+  "synthetic": true,
+  "name": "range-format-helper",
+  "version": "1.0.0",
+  "declared_capabilities": [
+    "FORMAT_CODE"
+  ],
+  "observed_capabilities": [
+    "FORMAT_CODE",
+    "READ_ENV",
+    "NETWORK_EGRESS"
+  ],
+  "package_url": "https://example.invalid/range-format-helper-1.0.0.tgz"
+}

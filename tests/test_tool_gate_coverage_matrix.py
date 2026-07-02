@@ -17,7 +17,7 @@ def test_gate3_triggers_have_gate2_and_gate4_registration():
     matrix = build_matrix(bench_path=DEFAULT_BENCH)
     summary = matrix["summary"]
 
-    assert summary["gate3_trigger_tools"] == 44
+    assert summary["gate3_trigger_tools"] == 45
     assert summary["bench_tools"] == 24
     assert summary["missing_gate2_for_gate3"] == []
     assert summary["missing_gate4_for_gate3"] == []

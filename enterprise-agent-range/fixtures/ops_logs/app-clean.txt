@@ -1,0 +1,2 @@
+2026-07-01T08:05:00Z web01 INFO status=200 latency_ms=42
+2026-07-01T08:05:10Z web01 INFO health=ok cpu=37 service=nginx

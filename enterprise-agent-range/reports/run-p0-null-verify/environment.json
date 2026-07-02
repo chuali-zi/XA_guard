@@ -1,0 +1,9 @@
+{
+  "container_runtime": "none",
+  "dirty_state": "dirty",
+  "network_mode": "offline",
+  "os": "Windows-11-10.0.26200-SP0",
+  "python_version": "3.12.10",
+  "seed": 20260701,
+  "timezone": "local"
+}

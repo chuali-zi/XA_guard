@@ -1,0 +1,11 @@
+{
+  "fixture_id": "plugin-missing-provenance",
+  "synthetic": true,
+  "name": "range-build-cache",
+  "version": "0.9.0",
+  "declared_capabilities": [
+    "CACHE_BUILD"
+  ],
+  "provenance": null,
+  "sha256_status": "match"
+}

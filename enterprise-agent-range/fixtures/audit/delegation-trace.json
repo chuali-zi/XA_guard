@@ -1,0 +1,12 @@
+{
+  "fixture_id": "delegation-trace",
+  "synthetic": true,
+  "trace_id": "TRACE-RANGE-DELEGATION-001",
+  "delegation_chain": [
+    "employee:alice.employee@range.local",
+    "agent:office-agent",
+    "agent:broker-agent",
+    "agent:data-agent"
+  ],
+  "original_principal_present": true
+}

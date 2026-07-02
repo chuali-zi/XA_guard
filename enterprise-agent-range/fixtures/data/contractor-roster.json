@@ -1,0 +1,14 @@
+{
+  "fixture_id": "contractor-roster",
+  "synthetic": true,
+  "contractors": [
+    {
+      "principal_id": "temp.active@range.local",
+      "contract_end_date": "2026-12-31"
+    },
+    {
+      "principal_id": "temp.expired@range.local",
+      "contract_end_date": "2026-06-01"
+    }
+  ]
+}

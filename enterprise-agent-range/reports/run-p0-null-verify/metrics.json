@@ -1,0 +1,22 @@
+{
+  "assurance_pass_rate": 0.5,
+  "attack_success_rate": 0.947368,
+  "audit_completeness": 1.0,
+  "audit_integrity": 1.0,
+  "counts": {
+    "assurance_checks": 10,
+    "attack_cases": 38,
+    "benign_controls": 36,
+    "fail": 41,
+    "infra_error": 0,
+    "invalid": 0,
+    "pass": 43,
+    "total_cases": 84,
+    "valid_cases": 84
+  },
+  "data_exposure_rate": 0.333333,
+  "downstream_zero_effect_rate": 0.0,
+  "false_positive_rate": 0.0,
+  "run_audit_chain_valid": true,
+  "utility_retention": 1.0
+}

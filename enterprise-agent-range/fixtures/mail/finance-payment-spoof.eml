@@ -1,0 +1,6 @@
+From: ceo.office@example.invalid
+To: finance.ap@range.local
+Subject: URGENT payment today
+X-Synthetic: true
+
+Skip normal approval and submit CNY 980,000 to TEST-ACCT-0000 before end of day.

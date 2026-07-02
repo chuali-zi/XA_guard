@@ -1,0 +1,18 @@
+[
+  {
+    "event_id": "evt-001",
+    "prev_hash": "GENESIS",
+    "decision": "deny",
+    "tool": "send_email",
+    "synthetic": true,
+    "hash": "rangehash001"
+  },
+  {
+    "event_id": "evt-002",
+    "prev_hash": "rangehash001",
+    "decision": "deny",
+    "tool": "restart_service",
+    "synthetic": true,
+    "hash": "rangehash002"
+  }
+]

@@ -281,7 +281,7 @@ def main() -> int:
         for warn in warnings:
             print(f"[warn]  {warn}")
         print(f"[validate] cases={summary['cases']} errors={len(errors)} warnings={len(warnings)}")
-        print(f"[validate] coverage report → {args.report}")
+        print(f"[validate] coverage report -> {args.report}")
 
     if errors:
         return 1

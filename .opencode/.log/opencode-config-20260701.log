@@ -1,0 +1,1 @@
+2026-07-01 05:04 PDT：新增项目级 .opencode/opencode.json，将默认模型与 build/plan/general/explore agent 设为 openai/gpt-5.5，并在各 agent options 中设置 reasoningEffort=xhigh。未改全局 opencode 配置。

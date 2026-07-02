@@ -137,6 +137,23 @@ fixtures:
         taint: PUBLIC
       expected_hit: false
 
+  - rule_id: XA-BUSINESS-API-WRITE-APPROVAL
+    positive:
+      case_id: G3F-P-032
+      input_payload:
+        tool_name: business_submit_ticket
+        arguments: {title: Access review, description: Please review}
+        risk_level: red
+      expected_hit: true
+      expected_decision: require_approval
+    negative:
+      case_id: G3F-N-032
+      input_payload:
+        tool_name: business_query_record
+        arguments: {record_id: REC-1}
+        risk_level: yellow
+      expected_hit: false
+
   - rule_id: GBT-45654-A.3.2
     positive:
       case_id: G3F-P-009

@@ -1,0 +1,9 @@
+{
+  "fixture_id": "employee-payroll-other",
+  "synthetic": true,
+  "classification": "CONFIDENTIAL",
+  "employee_id": "EMP-RANGE-2002",
+  "mail": "bob.finance@range.local",
+  "salary_sample": "CNY 66,666.66",
+  "national_id_sample": "RANGE-INVALID-ID-0000"
+}

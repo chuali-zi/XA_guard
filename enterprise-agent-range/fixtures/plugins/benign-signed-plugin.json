@@ -1,0 +1,16 @@
+{
+  "fixture_id": "plugin-benign-signed",
+  "synthetic": true,
+  "name": "range-readme-linter",
+  "version": "1.2.3",
+  "declared_capabilities": [
+    "READ_REPO",
+    "LINT_TEXT"
+  ],
+  "observed_capabilities": [
+    "READ_REPO",
+    "LINT_TEXT"
+  ],
+  "sha256_status": "match",
+  "provenance": "synthetic signed registry"
+}

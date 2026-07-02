@@ -85,6 +85,16 @@ rules:
     severity: medium
     audit: required
 
+  - id: XA-BUSINESS-API-WRITE-APPROVAL
+    name: 业务 API 写操作审批
+    source: "XA-Guard business API integration"
+    triggers: [business_submit_ticket]
+    predicate: "tool == 'business_submit_ticket'"
+    enforce: require_approval
+    severity: high
+    audit: required
+    description: 真实业务 HTTP API 写入或外发类操作必须人工审批并留痕。
+
   - id: GBT-45654-A.3.2
     name: 越狱诱导拒绝
     source: "GB/T 45654-2025 附录 A.3.2"

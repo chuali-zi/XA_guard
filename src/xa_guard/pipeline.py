@@ -39,6 +39,8 @@ def _sync_ctx_from_result(ctx: GateContext, result: GateResult) -> None:
         except ValueError:
             pass
     tt = result.metadata.get("taint")
+    if tt is None:
+        tt = result.metadata.get("output_taint")
     if tt is not None:
         try:
             ctx.taint = TaintLabel(tt) if not isinstance(tt, TaintLabel) else tt

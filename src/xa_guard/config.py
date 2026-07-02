@@ -24,6 +24,7 @@ class DownstreamSpec:
     transport: Literal["stdio", "streamable-http"] = "stdio"
     url: str | None = None
     tools: list[dict[str, Any]] = field(default_factory=list)
+    env_passthrough: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -84,6 +85,7 @@ class XAGuardConfig:
                 transport=item.get("transport", "stdio"),
                 url=item.get("url"),
                 tools=list(item.get("tools") or []),
+                env_passthrough=list(item.get("env_passthrough") or []),
             )
             for item in root.get("downstream", [])
         ]

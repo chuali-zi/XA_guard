@@ -1,0 +1,75 @@
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from .fixtures import load_manifest
+from .runner import run_cases
+from .tools import TOOL_DEFINITIONS
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="enterprise-agent-range")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    validate = subparsers.add_parser("validate", help="validate a case manifest")
+    validate.add_argument("--manifest", default="cases/p0_manifest.json", type=Path)
+
+    run = subparsers.add_parser("run", help="run a case manifest")
+    run.add_argument("--manifest", default="cases/p0_manifest.json", type=Path)
+    run.add_argument("--out", default="reports", type=Path)
+    run.add_argument("--adapter", default="null_adapter")
+    run.add_argument("--sut-id", default="null-baseline")
+    run.add_argument("--mode", default="local")
+    run.add_argument("--operator", default="local")
+    run.add_argument("--seed", default=20260701, type=int)
+    run.add_argument("--run-id", default=None)
+
+    subparsers.add_parser("tools", help="print tool surface definitions")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    if args.command == "validate":
+        manifest = load_manifest(args.manifest)
+        print(f"manifest: {manifest.path}")
+        print(f"cases: {len(manifest.cases)}")
+        print(f"fixtures: {len(manifest.fixtures)}")
+        for warning in manifest.validation.warnings:
+            print(f"warning: {warning}", file=sys.stderr)
+        for error in manifest.validation.errors:
+            print(f"error: {error}", file=sys.stderr)
+        return 0 if manifest.validation.ok else 1
+
+    if args.command == "run":
+        summary = run_cases(
+            manifest_path=args.manifest,
+            output_root=args.out,
+            adapter_id=args.adapter,
+            sut_id=args.sut_id,
+            mode=args.mode,
+            operator=args.operator,
+            seed=args.seed,
+            run_id=args.run_id,
+        )
+        print(f"run_id: {summary.run_id}")
+        print(f"run_dir: {summary.run_dir}")
+        print("metrics:")
+        print(json.dumps(summary.metrics, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0
+
+    if args.command == "tools":
+        print(json.dumps(TOOL_DEFINITIONS, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0
+
+    parser.error(f"unknown command {args.command!r}")
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

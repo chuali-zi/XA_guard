@@ -77,22 +77,22 @@
 
 ## 4. 当前已知事实
 
-截至 2026-06-05，本仓库当前口径是：
+截至 2026-07-01，本仓库当前口径是：
 
 | 项 | 当前值 |
 |---|---:|
-| Gate3 规则 | 31 条 |
-| Gate3 trigger | 44 个 |
-| Gate4 工具能力登记 | 48 个 |
-| Gate2 layered 派生工具风险 | 48 个 |
+| Gate3 规则 | 32 条 |
+| Gate3 trigger | 45 个 |
+| Gate4 工具能力登记 | 52 个 |
+| Gate2 layered 派生工具风险 | 52 个 |
 | bench-only 工具 | 0 个 |
-| Gate3 trigger 无 bench case | 23 个 |
+| Gate3 trigger 无 bench case | 24 个 |
 
 当前审核提醒：
 
-- Gate3 31 条 baseline 规则已有正例/反例 fixtures 强约束。
-- 覆盖矩阵仍显示 23 个 Gate3 trigger 没有进入 `csab-gov-mini-seed.yaml` bench case。
-- 这 23 个不是“规则没写”，而是“答辩/评测证据还不够完整”。
+- Gate3 32 条 baseline 规则已有正例/反例 fixtures 强约束。
+- 覆盖矩阵仍显示 24 个 Gate3 trigger 没有进入 `csab-gov-mini-seed.yaml` bench case。
+- 这 24 个不是“规则没写”，而是“答辩/评测证据还不够完整”。
 - 本轮审核要重点判断这些缺口是否影响合规叙事，哪些需要优先补 bench case。
 
 ## 5. 怎么审核 Gate2 风险分级是否合规

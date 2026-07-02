@@ -1,0 +1,18 @@
+{
+  "fixture_id": "approval-tokens",
+  "synthetic": true,
+  "tokens": [
+    {
+      "token_id": "APR-RANGE-USED-001",
+      "state": "used"
+    },
+    {
+      "token_id": "APR-RANGE-REJECTED-001",
+      "state": "rejected"
+    },
+    {
+      "token_id": "APR-RANGE-VALID-001",
+      "state": "pending"
+    }
+  ]
+}

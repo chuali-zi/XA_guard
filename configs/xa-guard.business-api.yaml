@@ -1,0 +1,89 @@
+# XA-Guard configuration for a real downstream business HTTP API.
+# This keeps the upstream/downstream shape as stdio MCP while the adapter calls
+# the configured HTTP API using repo-local .env settings.
+
+xa_guard:
+  upstream:
+    transport: stdio
+    host: 127.0.0.1
+    port: 3000
+
+  downstream:
+    - name: business_api
+      command: ["python", "-m", "demo.targets.business_api_target"]
+      transport: stdio
+      env_passthrough:
+        - BUSINESS_API_BASE_URL
+        - BUSINESS_API_KEY
+        - BUSINESS_API_TIMEOUT_SECONDS
+        - BUSINESS_API_ALLOW_INSECURE_LOCAL
+        - BUSINESS_API_ENV_FILE
+
+  governance:
+    enabled: true
+    registry_file: configs/governance.enterprise-static.yaml
+    default_tenant: acme-corp
+
+  gates:
+    gate1:
+      enabled: true
+      detectors:
+        - name: rule
+          type: rule
+          enabled: true
+          patterns_file: policies/baseline/gate1_input_patterns.yaml
+      spotlighting:
+        enabled: true
+      patterns_file: policies/baseline/gate1_input_patterns.yaml
+
+    gate2:
+      enabled: true
+      hitl_required_for: [red]
+      elicitation_fallback: stdout
+      approval_token_ttl_seconds: 300
+      prefer_layered: true
+
+    gate3:
+      enabled: true
+      backend: python
+      policy_file: policies/baseline/gate3_rules.yaml
+      prefer_layered: true
+
+    gate4:
+      enabled: true
+      strict_mode: false
+      tool_capabilities_file: policies/baseline/gate4_capabilities.yaml
+      prefer_layered: true
+
+    gate5:
+      enabled: false
+      docker_image: xa-guard/sandbox:latest
+      runtime: runc
+      network_disabled: true
+      readonly_rootfs: true
+      memory: 256m
+      cpus: "1"
+      pids_limit: 128
+      workspace_mount: true
+      workspace_target: /workspace
+      workspace_readonly: true
+
+    gate6:
+      enabled: true
+      audit_dir: ./logs/business-api-audit
+      hash_algo: sha256
+      signature_mode: none
+      enable_sm2_signature: false
+      sm2_key_path: ""
+
+    policy_layered:
+      enabled: true
+      baseline_manifest: policies/baseline/manifest.yaml
+      overlay_root: policies/overlay
+      hot_reload: true
+
+  policy_default: enterprise-l3
+  audit_dir: ./logs/business-api-audit
+  log_dir: ./logs/runtime
+  pending_approvals_path: ./logs/runtime/business_api_pending_approvals.jsonl
+  tool_capabilities_file: policies/baseline/gate4_capabilities.yaml

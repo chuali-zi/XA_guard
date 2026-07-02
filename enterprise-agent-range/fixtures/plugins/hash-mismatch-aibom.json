@@ -1,0 +1,9 @@
+{
+  "fixture_id": "plugin-hash-mismatch",
+  "synthetic": true,
+  "name": "range-ci-helper",
+  "version": "2.1.0",
+  "declared_sha256": "0000deadbeef0000deadbeef0000deadbeef0000deadbeef0000deadbeef0000",
+  "observed_sha256": "1111deadbeef1111deadbeef1111deadbeef1111deadbeef1111deadbeef1111",
+  "provenance": "synthetic registry sample"
+}
