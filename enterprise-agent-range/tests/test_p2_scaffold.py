@@ -26,7 +26,7 @@ from enterprise_agent_range.p2 import (
     schema,
     tenancy,
 )
-from enterprise_agent_range.p2.base import CapabilityStatus, P2NotImplementedError
+from enterprise_agent_range.p2.base import CapabilityStatus
 
 EXPECTED_KEYS = (
     "tenancy",
@@ -60,9 +60,9 @@ class P2RegistryTest(unittest.TestCase):
         self.assertEqual(len(registry.CAPABILITIES), 10)
         self.assertEqual(registry.capability_keys(), EXPECTED_KEYS)
 
-    def test_all_capabilities_are_scaffold_status(self) -> None:
+    def test_all_capabilities_have_valid_status(self) -> None:
         for spec in registry.CAPABILITIES:
-            self.assertEqual(spec.status, CapabilityStatus.SCAFFOLD, spec.key)
+            self.assertIn(spec.status, CapabilityStatus.ALL, spec.key)
 
     def test_each_module_spec_is_self_consistent_and_registered(self) -> None:
         for module in CAPABILITY_MODULES:
@@ -91,39 +91,6 @@ class P2SchemaTest(unittest.TestCase):
 
         for name in schema.all_planned_expected_fields():
             self.assertNotIn(name, SUPPORTED_EXPECTED_FIELDS, name)
-
-
-class P2StubContractTest(unittest.TestCase):
-    def test_every_stub_raises_p2_not_implemented(self) -> None:
-        calls = (
-            lambda: tenancy.TenantRegistry().register(tenancy.Tenant("t1", "Tenant One")),
-            lambda: tenancy.TenantRegistry().isolate("t1", None),
-            lambda: discovery.DiscoveryScan().scan(None),
-            lambda: identity.IdentityLifecycle().transition(
-                identity.AgentIdentity("a1"), identity.IdentityState.ACTIVE
-            ),
-            lambda: permissions.GrantAuthority().issue(
-                permissions.GrantRequest("p1", "cap.read")
-            ),
-            lambda: permissions.GrantAuthority().check(
-                permissions.IssuedGrant("g1", permissions.GrantRequest("p1", "cap.read")),
-                "cap.read",
-                "2026-07-02T00:00:00Z",
-            ),
-            lambda: risk.RiskModel().score(None),
-            lambda: remediation.RemediationPlanner().plan([]),
-            lambda: scale.Sharder().shard(scale.BatchPlan("plan1", "cases/x.json")),
-            lambda: benchmark.BenchmarkAdapter().load("agentdojo", "x.json"),
-            lambda: benchmark.BenchmarkAdapter().fuse([], []),
-            lambda: evidence.TimestampAuthority().stamp("sha256:0"),
-            lambda: evidence.TimestampAuthority().verify(evidence.TimestampToken("sha256:0")),
-            lambda: evidence.HsmSigner().sign(b"payload"),
-            lambda: dashboard.DashboardBuilder().build_feed("reports/run"),
-            lambda: dashboard.DashboardBuilder().build_review("reports/run"),
-        )
-        for call in calls:
-            with self.assertRaises(P2NotImplementedError):
-                call()
 
 
 class P2DecouplingTest(unittest.TestCase):
