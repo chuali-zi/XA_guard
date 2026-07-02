@@ -1,3 +1,20 @@
+# 2026-07-02 01:51 -07:00 P1/P2 fast-forward 合并到 main
+
+## 本次完成
+
+- 将 `codex/enterprise-range-p2` 上的 P2 review finding 修复提交为 `b696244 fix: harden P2 grants and remediation ids`，并推送到 `origin/codex/enterprise-range-p2`。
+- 切换到 `main` 后按堆叠顺序执行 fast-forward 合并：先 `git merge --ff-only codex/enterprise-range-p1`，再 `git merge --ff-only codex/enterprise-range-p2`。
+- 合并结果：`main` 已包含 P1 基线和 P2 研究级能力子包，当前 HEAD 为 `b696244`；未产生 merge commit，历史保持线性。
+
+## 验证
+
+- 合并后在 `main` 执行 `python -m unittest discover -s tests`：PASS，203 tests。
+
+## 未完成
+
+- 当前 `main` 尚未推送到 `origin/main`（下一步执行推送）。
+- P2 仍未接入 runner/oracle/metrics/report，也还没有真实 P2 case/fixture 与大屏/复盘文件产物。
+
 # 2026-07-02 01:36 -07:00 P2 review finding 修复与回归
 
 ## 本次完成

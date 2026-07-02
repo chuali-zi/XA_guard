@@ -1,15 +1,15 @@
 # Enterprise Agent Range 状态
 
-> 快照日期：2026-07-02 01:36 PDT
+> 快照日期：2026-07-02 01:51 PDT
 > 本状态只描述 `enterprise-agent-range/` 独立靶场，不描述 XA-Guard 主产品状态。
 
 ## 当前结论
 
-P1 已完成 review 修复后的本地基线：当前目录包含独立 Python runtime、P0/P1 case manifest、synthetic fixtures、66 个 mock tool、Null Adapter、oracle/metrics、JSON/JSONL/Markdown/HTML 报告、baseline-vs-candidate compare 输出、MCP-like stdio、本地 MCP-like HTTP 和 simulated IDE replay。靶场仍与 XA-Guard 产品代码解耦：未导入 `src/xa_guard`，未把 runtime 放入父仓库 `src/`，未复用 XA-Guard bench/schema/helper。
+`main` 已按堆叠顺序 fast-forward 合并 `codex/enterprise-range-p1` 与 `codex/enterprise-range-p2`，当前 HEAD 为 `b696244`。当前目录包含独立 Python runtime、P0/P1 case manifest、synthetic fixtures、66 个 mock tool、Null Adapter、oracle/metrics、JSON/JSONL/Markdown/HTML 报告、baseline-vs-candidate compare 输出、MCP-like stdio、本地 MCP-like HTTP、simulated IDE replay，以及 P2 研究级能力子包。靶场仍与 XA-Guard 产品代码解耦：未导入 `src/xa_guard`，未把 runtime 放入父仓库 `src/`，未复用 XA-Guard bench/schema/helper。
 
 最新 P1 本地验收使用 Null Adapter 跑完 `cases/p1_manifest.json`，输出在 `reports/run-p1-null-verify/`：242 个 case 全部有效，`INFRA_ERROR=0`，`INVALID=0`，run-level audit hash chain valid。Null Adapter 是无防护基线，attack case 的 FAIL 是预期暴露风险，不代表任何外部 SUT 的评测结论。
 
-当前 P2 分支 review finding 已在本地修复（2026-07-02 01:36 PDT）：`permissions` 授权校验现在拒绝 `issued_at` 之前的使用；`remediation` 对重复 `payload_hash` 的 side-effect 生成稳定且不冲突的 `action_id`。新增回归后全量 `python -m unittest discover -s tests` 为 203 tests PASS。P2 仍未接入 runner/oracle/metrics/report；下一步应推进 P2 case、fixture、oracle/metrics 和报告集成。
+P2 review finding 已修复并进入 `main`：`permissions` 授权校验现在拒绝 `issued_at` 之前的使用；`remediation` 对重复 `payload_hash` 的 side-effect 生成稳定且不冲突的 `action_id`。合并后全量 `python -m unittest discover -s tests` 为 203 tests PASS。P2 仍未接入 runner/oracle/metrics/report；下一步应推进 P2 case、fixture、oracle/metrics 和报告集成。
 
 ## P2 能力实现（2026-07-02）
 
