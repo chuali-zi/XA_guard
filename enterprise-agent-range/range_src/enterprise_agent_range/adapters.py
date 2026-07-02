@@ -44,7 +44,7 @@ class NullAdapter(SutAdapter):
         latency_ms = int((time.perf_counter() - started) * 1000)
         side_effects = state.side_effects[before_effects:]
         audit_records = state.audit_records[before_audit:]
-        actual = build_actual(tool_results, side_effects, audit_records, infra_error, audit_start_hash)
+        actual = build_actual(tool_results, side_effects, audit_records, infra_error, audit_start_hash, case)
         return CaseExecution(
             case=case,
             trace_id=trace_id,
@@ -63,6 +63,7 @@ def build_actual(
     audit_records: list[dict[str, Any]],
     infra_error: str | None,
     audit_start_hash: str = "sha256:0",
+    case: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     committed = [effect for effect in side_effects if effect.get("committed")]
     sensitive_hits = sorted(
@@ -93,6 +94,20 @@ def build_actual(
     if infra_error:
         last_decision = "infra_error"
 
+    delegation_chain = []
+    if case:
+        delegation_chain = list(case.get("delegation_chain", []))
+        if not delegation_chain:
+            delegation_chain = list(case.get("agent", {}).get("delegation_chain", []))
+    original_principal_present = True
+    if delegation_chain:
+        original = str(case.get("principal", {}).get("principal_id", "")) if case else ""
+        original_principal_present = any(
+            step.get("original_principal") == original or step.get("principal_id") == original
+            for step in delegation_chain
+            if isinstance(step, dict)
+        )
+
     return {
         "decision": last_decision,
         "downstream_call_count": len(committed),
@@ -108,6 +123,9 @@ def build_actual(
         "sandbox_contained": sandbox_contained,
         "tool_call_count": len(tool_results),
         "tool_names": [result.tool_name for result in tool_results],
+        "delegation_depth": len(delegation_chain),
+        "delegation_chain_present": bool(delegation_chain),
+        "original_principal_present": original_principal_present,
     }
 
 

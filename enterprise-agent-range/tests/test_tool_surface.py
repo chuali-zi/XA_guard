@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "range_src"))
 
 from enterprise_agent_range.systems import RangeState, ToolContext
-from enterprise_agent_range.tools import TOOL_DEFINITIONS, execute_tool
+from enterprise_agent_range.tools import TOOL_DEFINITIONS, TOOL_HANDLERS, execute_tool
 
 
 class ToolSurfaceTest(unittest.TestCase):
@@ -24,6 +24,77 @@ class ToolSurfaceTest(unittest.TestCase):
             "submit_payment_request",
         ]:
             self.assertIn(name, TOOL_DEFINITIONS)
+
+    def test_p1_tool_surface_has_required_weight_and_domains(self) -> None:
+        self.assertGreaterEqual(len(TOOL_DEFINITIONS), 50)
+        required_tools = {
+            "list_calendar_events",
+            "create_task",
+            "query_hr_profile",
+            "approve_time_off_request",
+            "query_invoice",
+            "approve_invoice",
+            "create_release",
+            "rollback_release",
+            "query_customer_account",
+            "call_business_api",
+            "read_repo_file",
+            "scan_dependencies",
+            "quarantine_plugin",
+            "register_agent",
+            "grant_capability",
+            "publish_policy_copy",
+        }
+        self.assertTrue(required_tools <= set(TOOL_DEFINITIONS))
+        self.assertTrue(required_tools <= set(TOOL_HANDLERS))
+
+    def test_every_tool_definition_has_required_metadata(self) -> None:
+        required_fields = {
+            "domain",
+            "risk_level",
+            "side_effect",
+            "capabilities",
+            "requires_approval",
+            "allowed_data_classes",
+            "forbidden_data_classes",
+            "synthetic_only",
+        }
+        self.assertEqual(set(TOOL_DEFINITIONS), set(TOOL_HANDLERS))
+        for name, definition in TOOL_DEFINITIONS.items():
+            with self.subTest(tool=name):
+                self.assertTrue(required_fields <= set(definition))
+                self.assertIsInstance(definition["capabilities"], list)
+                self.assertGreater(len(definition["capabilities"]), 0)
+                self.assertIsInstance(definition["requires_approval"], bool)
+                self.assertIsInstance(definition["allowed_data_classes"], list)
+                self.assertGreater(len(definition["allowed_data_classes"]), 0)
+                self.assertIsInstance(definition["forbidden_data_classes"], list)
+                self.assertIs(definition["synthetic_only"], True)
+
+    def test_new_p1_write_tool_records_synthetic_side_effect(self) -> None:
+        state = RangeState(
+            run_id="run-test",
+            sut_id="null-baseline",
+            environment_hash="sha256:test",
+            manifest_root=Path.cwd(),
+        )
+        case = {
+            "case_id": "EAR-P1-001",
+            "principal": {"principal_id": "release.manager@range.local"},
+            "agent": {"agent_id": "release-agent"},
+        }
+        result = execute_tool(
+            ToolContext(state=state, case=case, trace_id="trace-p1"),
+            "grant_capability",
+            {"target": "finance-agent", "capability": "invoice.approve"},
+        )
+
+        self.assertTrue(result.output["recorded"])
+        self.assertTrue(result.output["synthetic"])
+        self.assertEqual(result.output["sink_type"], "agent_capability")
+        self.assertEqual(len(state.side_effects), 1)
+        self.assertEqual(state.side_effects[0]["operation"], "grant_capability")
+        self.assertEqual(len(state.audit_records), 1)
 
     def test_exec_command_records_only(self) -> None:
         state = RangeState(

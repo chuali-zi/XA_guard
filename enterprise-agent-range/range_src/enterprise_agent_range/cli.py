@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 
 from .fixtures import load_manifest
+from .protocol import build_protocol_state, replay_ide_file, serve_http, serve_stdio
+from .reports import compare_run_outputs
 from .runner import run_cases
 from .tools import TOOL_DEFINITIONS
 
@@ -27,7 +29,30 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--seed", default=20260701, type=int)
     run.add_argument("--run-id", default=None)
 
+    compare = subparsers.add_parser("compare", help="compare two run output directories")
+    compare.add_argument("--baseline", required=True, type=Path)
+    compare.add_argument("--candidate", required=True, type=Path)
+    compare.add_argument("--out", required=True, type=Path)
+
     subparsers.add_parser("tools", help="print tool surface definitions")
+
+    stdio = subparsers.add_parser("serve-stdio", help="serve MCP-like JSON-lines protocol on stdio")
+    stdio.add_argument("--manifest-root", default=Path.cwd(), type=Path)
+    stdio.add_argument("--run-id", default="stdio-local")
+    stdio.add_argument("--sut-id", default="local-protocol")
+
+    http = subparsers.add_parser("serve-http", help="serve MCP-like local HTTP protocol")
+    http.add_argument("--host", default="127.0.0.1")
+    http.add_argument("--port", default=8765, type=int)
+    http.add_argument("--manifest-root", default=Path.cwd(), type=Path)
+    http.add_argument("--run-id", default="http-local")
+    http.add_argument("--sut-id", default="local-protocol")
+
+    replay = subparsers.add_parser("ide-replay", help="replay local simulated IDE tool calls")
+    replay.add_argument("replay_file", type=Path)
+    replay.add_argument("--manifest-root", default=Path.cwd(), type=Path)
+    replay.add_argument("--run-id", default="ide-replay-local")
+    replay.add_argument("--sut-id", default="local-protocol")
     return parser
 
 
@@ -63,8 +88,33 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(summary.metrics, ensure_ascii=False, indent=2, sort_keys=True))
         return 0
 
+    if args.command == "compare":
+        paths = compare_run_outputs(
+            baseline_dir=args.baseline,
+            candidate_dir=args.candidate,
+            output_dir=args.out,
+        )
+        print("compare outputs:")
+        print(json.dumps(paths, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0
+
     if args.command == "tools":
         print(json.dumps(TOOL_DEFINITIONS, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0
+
+    if args.command == "serve-stdio":
+        state = build_protocol_state(manifest_root=args.manifest_root, run_id=args.run_id, sut_id=args.sut_id)
+        return serve_stdio(state)
+
+    if args.command == "serve-http":
+        state = build_protocol_state(manifest_root=args.manifest_root, run_id=args.run_id, sut_id=args.sut_id)
+        serve_http(state, host=args.host, port=args.port)
+        return 0
+
+    if args.command == "ide-replay":
+        state = build_protocol_state(manifest_root=args.manifest_root, run_id=args.run_id, sut_id=args.sut_id)
+        for response in replay_ide_file(state, args.replay_file):
+            print(json.dumps(response, ensure_ascii=False, sort_keys=True))
         return 0
 
     parser.error(f"unknown command {args.command!r}")

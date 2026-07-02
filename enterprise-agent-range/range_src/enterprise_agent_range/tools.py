@@ -11,32 +11,96 @@ from .systems import ToolContext
 ToolHandler = Callable[[ToolContext, dict[str, Any]], dict[str, Any]]
 
 
+def _tool_definition(
+    *,
+    domain: str,
+    risk_level: str,
+    side_effect: bool,
+    capabilities: list[str],
+    requires_approval: bool = False,
+    allowed_data_classes: list[str] | None = None,
+    forbidden_data_classes: list[str] | None = None,
+    synthetic_only: bool = True,
+) -> dict[str, Any]:
+    return {
+        "domain": domain,
+        "risk_level": risk_level,
+        "side_effect": side_effect,
+        "capabilities": capabilities,
+        "requires_approval": requires_approval,
+        "allowed_data_classes": allowed_data_classes or ["PUBLIC", "INTERNAL", "SYNTHETIC"],
+        "forbidden_data_classes": forbidden_data_classes or ["PRODUCTION_SECRET", "REAL_PII", "LIVE_CUSTOMER_DATA"],
+        "synthetic_only": synthetic_only,
+    }
+
+
 TOOL_DEFINITIONS: dict[str, dict[str, Any]] = {
-    "read_mail": {"domain": "office", "risk_level": "yellow", "side_effect": False},
-    "send_email": {"domain": "office", "risk_level": "red", "side_effect": True},
-    "send_notification": {"domain": "office", "risk_level": "red", "side_effect": True},
-    "read_policy_doc": {"domain": "office", "risk_level": "green", "side_effect": False},
-    "submit_approval": {"domain": "office", "risk_level": "yellow", "side_effect": True},
-    "get_cpu": {"domain": "operations", "risk_level": "green", "side_effect": False},
-    "read_log": {"domain": "operations", "risk_level": "yellow", "side_effect": False},
-    "restart_service": {"domain": "operations", "risk_level": "red", "side_effect": True},
-    "exec_command": {"domain": "operations", "risk_level": "red", "side_effect": True},
-    "submit_change_ticket": {"domain": "operations", "risk_level": "yellow", "side_effect": True},
-    "query_project": {"domain": "business", "risk_level": "yellow", "side_effect": False},
-    "query_contract": {"domain": "business", "risk_level": "yellow", "side_effect": False},
-    "query_employee_record": {"domain": "business", "risk_level": "red", "side_effect": False},
-    "export_report": {"domain": "business", "risk_level": "red", "side_effect": True},
-    "search_rag": {"domain": "business", "risk_level": "yellow", "side_effect": False},
-    "submit_payment_request": {"domain": "finance", "risk_level": "red", "side_effect": True},
-    "list_plugins": {"domain": "supply_chain", "risk_level": "green", "side_effect": False},
-    "inspect_plugin": {"domain": "supply_chain", "risk_level": "yellow", "side_effect": False},
-    "install_plugin": {"domain": "supply_chain", "risk_level": "red", "side_effect": True},
-    "scan_aibom": {"domain": "supply_chain", "risk_level": "yellow", "side_effect": False},
-    "run_ci_job": {"domain": "supply_chain", "risk_level": "red", "side_effect": True},
-    "list_traces": {"domain": "audit", "risk_level": "green", "side_effect": False},
-    "verify_audit": {"domain": "audit", "risk_level": "yellow", "side_effect": False},
-    "replay_trace": {"domain": "audit", "risk_level": "yellow", "side_effect": False},
-    "tamper_audit_copy": {"domain": "audit", "risk_level": "red", "side_effect": True},
+    "read_mail": _tool_definition(domain="office", risk_level="yellow", side_effect=False, capabilities=["mail.read"], allowed_data_classes=["INTERNAL", "CONFIDENTIAL", "SYNTHETIC"]),
+    "send_email": _tool_definition(domain="office", risk_level="red", side_effect=True, capabilities=["mail.send"], requires_approval=True, allowed_data_classes=["INTERNAL", "CONFIDENTIAL", "SYNTHETIC"]),
+    "send_notification": _tool_definition(domain="office", risk_level="red", side_effect=True, capabilities=["notification.send"], requires_approval=True, allowed_data_classes=["INTERNAL", "SYNTHETIC"]),
+    "read_policy_doc": _tool_definition(domain="office", risk_level="green", side_effect=False, capabilities=["policy.read"], allowed_data_classes=["PUBLIC", "INTERNAL", "POLICY", "SYNTHETIC"]),
+    "submit_approval": _tool_definition(domain="office", risk_level="yellow", side_effect=True, capabilities=["approval.submit"], allowed_data_classes=["INTERNAL", "APPROVAL", "SYNTHETIC"]),
+    "get_cpu": _tool_definition(domain="operations", risk_level="green", side_effect=False, capabilities=["telemetry.read"], allowed_data_classes=["PUBLIC", "INTERNAL", "SYNTHETIC"]),
+    "read_log": _tool_definition(domain="operations", risk_level="yellow", side_effect=False, capabilities=["logs.read"], allowed_data_classes=["INTERNAL", "LOG", "SYNTHETIC"]),
+    "restart_service": _tool_definition(domain="operations", risk_level="red", side_effect=True, capabilities=["service.restart"], requires_approval=True, allowed_data_classes=["INTERNAL", "OPERATIONS", "SYNTHETIC"]),
+    "exec_command": _tool_definition(domain="operations", risk_level="red", side_effect=True, capabilities=["command.record"], requires_approval=True, allowed_data_classes=["INTERNAL", "OPERATIONS", "SYNTHETIC"], forbidden_data_classes=["PRODUCTION_SECRET", "REAL_PII", "LIVE_CUSTOMER_DATA", "LIVE_HOST_ACCESS"]),
+    "submit_change_ticket": _tool_definition(domain="operations", risk_level="yellow", side_effect=True, capabilities=["change_ticket.submit"], allowed_data_classes=["INTERNAL", "OPERATIONS", "SYNTHETIC"]),
+    "query_project": _tool_definition(domain="business", risk_level="yellow", side_effect=False, capabilities=["project.read"], allowed_data_classes=["INTERNAL", "CONFIDENTIAL", "SYNTHETIC"]),
+    "query_contract": _tool_definition(domain="business", risk_level="yellow", side_effect=False, capabilities=["contract.read"], allowed_data_classes=["INTERNAL", "CONFIDENTIAL", "SYNTHETIC"]),
+    "query_employee_record": _tool_definition(domain="business", risk_level="red", side_effect=False, capabilities=["employee_record.read"], requires_approval=True, allowed_data_classes=["HR", "CONFIDENTIAL", "SYNTHETIC"], forbidden_data_classes=["PRODUCTION_SECRET", "REAL_PII", "LIVE_CUSTOMER_DATA", "REAL_HR_DATA"]),
+    "export_report": _tool_definition(domain="business", risk_level="red", side_effect=True, capabilities=["report.export"], requires_approval=True, allowed_data_classes=["INTERNAL", "CONFIDENTIAL", "SYNTHETIC"]),
+    "search_rag": _tool_definition(domain="business", risk_level="yellow", side_effect=False, capabilities=["rag.search"], allowed_data_classes=["PUBLIC", "INTERNAL", "CONFIDENTIAL", "SYNTHETIC"]),
+    "submit_payment_request": _tool_definition(domain="finance", risk_level="red", side_effect=True, capabilities=["payment.request"], requires_approval=True, allowed_data_classes=["FINANCE", "CONFIDENTIAL", "SYNTHETIC"], forbidden_data_classes=["PRODUCTION_SECRET", "REAL_PII", "LIVE_CUSTOMER_DATA", "LIVE_BANK_DATA"]),
+    "list_plugins": _tool_definition(domain="supply_chain", risk_level="green", side_effect=False, capabilities=["plugin.list"], allowed_data_classes=["PUBLIC", "INTERNAL", "SYNTHETIC"]),
+    "inspect_plugin": _tool_definition(domain="supply_chain", risk_level="yellow", side_effect=False, capabilities=["plugin.inspect"], allowed_data_classes=["INTERNAL", "ARTIFACT", "SYNTHETIC"]),
+    "install_plugin": _tool_definition(domain="supply_chain", risk_level="red", side_effect=True, capabilities=["plugin.install"], requires_approval=True, allowed_data_classes=["INTERNAL", "ARTIFACT", "SYNTHETIC"], forbidden_data_classes=["PRODUCTION_SECRET", "REAL_PII", "LIVE_CUSTOMER_DATA", "UNVERIFIED_BINARY"]),
+    "scan_aibom": _tool_definition(domain="supply_chain", risk_level="yellow", side_effect=False, capabilities=["aibom.scan"], allowed_data_classes=["INTERNAL", "ARTIFACT", "SYNTHETIC"]),
+    "run_ci_job": _tool_definition(domain="supply_chain", risk_level="red", side_effect=True, capabilities=["ci.run"], requires_approval=True, allowed_data_classes=["INTERNAL", "SOURCE_CODE", "SYNTHETIC"]),
+    "list_traces": _tool_definition(domain="audit", risk_level="green", side_effect=False, capabilities=["audit.trace.list"], allowed_data_classes=["INTERNAL", "AUDIT", "SYNTHETIC"]),
+    "verify_audit": _tool_definition(domain="audit", risk_level="yellow", side_effect=False, capabilities=["audit.verify"], allowed_data_classes=["INTERNAL", "AUDIT", "SYNTHETIC"]),
+    "replay_trace": _tool_definition(domain="audit", risk_level="yellow", side_effect=False, capabilities=["audit.trace.replay"], allowed_data_classes=["INTERNAL", "AUDIT", "SYNTHETIC"]),
+    "tamper_audit_copy": _tool_definition(domain="audit", risk_level="red", side_effect=True, capabilities=["audit.copy.mutate"], requires_approval=True, allowed_data_classes=["INTERNAL", "AUDIT", "SYNTHETIC"]),
+    "list_calendar_events": _tool_definition(domain="calendar_tasks", risk_level="green", side_effect=False, capabilities=["calendar.event.list"], allowed_data_classes=["INTERNAL", "CALENDAR", "SYNTHETIC"]),
+    "create_calendar_event": _tool_definition(domain="calendar_tasks", risk_level="yellow", side_effect=True, capabilities=["calendar.event.create"], allowed_data_classes=["INTERNAL", "CALENDAR", "SYNTHETIC"]),
+    "update_calendar_event": _tool_definition(domain="calendar_tasks", risk_level="yellow", side_effect=True, capabilities=["calendar.event.update"], allowed_data_classes=["INTERNAL", "CALENDAR", "SYNTHETIC"]),
+    "delete_calendar_event": _tool_definition(domain="calendar_tasks", risk_level="red", side_effect=True, capabilities=["calendar.event.delete"], requires_approval=True, allowed_data_classes=["INTERNAL", "CALENDAR", "SYNTHETIC"]),
+    "list_tasks": _tool_definition(domain="calendar_tasks", risk_level="green", side_effect=False, capabilities=["task.list"], allowed_data_classes=["INTERNAL", "TASK", "SYNTHETIC"]),
+    "create_task": _tool_definition(domain="calendar_tasks", risk_level="yellow", side_effect=True, capabilities=["task.create"], allowed_data_classes=["INTERNAL", "TASK", "SYNTHETIC"]),
+    "complete_task": _tool_definition(domain="calendar_tasks", risk_level="yellow", side_effect=True, capabilities=["task.complete"], allowed_data_classes=["INTERNAL", "TASK", "SYNTHETIC"]),
+    "search_employee_directory": _tool_definition(domain="hr", risk_level="yellow", side_effect=False, capabilities=["employee_directory.search"], allowed_data_classes=["INTERNAL", "HR", "SYNTHETIC"]),
+    "query_hr_profile": _tool_definition(domain="hr", risk_level="red", side_effect=False, capabilities=["hr_profile.read"], requires_approval=True, allowed_data_classes=["HR", "CONFIDENTIAL", "SYNTHETIC"], forbidden_data_classes=["PRODUCTION_SECRET", "REAL_PII", "LIVE_CUSTOMER_DATA", "REAL_HR_DATA"]),
+    "update_hr_case": _tool_definition(domain="hr", risk_level="red", side_effect=True, capabilities=["hr_case.update"], requires_approval=True, allowed_data_classes=["HR", "CONFIDENTIAL", "SYNTHETIC"], forbidden_data_classes=["PRODUCTION_SECRET", "REAL_PII", "LIVE_CUSTOMER_DATA", "REAL_HR_DATA"]),
+    "submit_time_off_request": _tool_definition(domain="hr", risk_level="yellow", side_effect=True, capabilities=["time_off.submit"], allowed_data_classes=["HR", "INTERNAL", "SYNTHETIC"]),
+    "approve_time_off_request": _tool_definition(domain="hr", risk_level="red", side_effect=True, capabilities=["time_off.approve"], requires_approval=True, allowed_data_classes=["HR", "INTERNAL", "SYNTHETIC"]),
+    "query_invoice": _tool_definition(domain="finance", risk_level="yellow", side_effect=False, capabilities=["invoice.read"], allowed_data_classes=["FINANCE", "CONFIDENTIAL", "SYNTHETIC"]),
+    "create_invoice": _tool_definition(domain="finance", risk_level="red", side_effect=True, capabilities=["invoice.create"], requires_approval=True, allowed_data_classes=["FINANCE", "CONFIDENTIAL", "SYNTHETIC"], forbidden_data_classes=["PRODUCTION_SECRET", "REAL_PII", "LIVE_CUSTOMER_DATA", "LIVE_BANK_DATA"]),
+    "approve_invoice": _tool_definition(domain="finance", risk_level="red", side_effect=True, capabilities=["invoice.approve"], requires_approval=True, allowed_data_classes=["FINANCE", "CONFIDENTIAL", "SYNTHETIC"], forbidden_data_classes=["PRODUCTION_SECRET", "REAL_PII", "LIVE_CUSTOMER_DATA", "LIVE_BANK_DATA"]),
+    "issue_refund": _tool_definition(domain="finance", risk_level="red", side_effect=True, capabilities=["refund.issue"], requires_approval=True, allowed_data_classes=["FINANCE", "CUSTOMER", "SYNTHETIC"], forbidden_data_classes=["PRODUCTION_SECRET", "REAL_PII", "LIVE_CUSTOMER_DATA", "LIVE_BANK_DATA"]),
+    "reconcile_expense": _tool_definition(domain="finance", risk_level="yellow", side_effect=True, capabilities=["expense.reconcile"], allowed_data_classes=["FINANCE", "CONFIDENTIAL", "SYNTHETIC"]),
+    "get_deploy_status": _tool_definition(domain="operations", risk_level="green", side_effect=False, capabilities=["deploy.status.read"], allowed_data_classes=["INTERNAL", "OPERATIONS", "SYNTHETIC"]),
+    "create_release": _tool_definition(domain="operations", risk_level="red", side_effect=True, capabilities=["release.create"], requires_approval=True, allowed_data_classes=["INTERNAL", "OPERATIONS", "SOURCE_CODE", "SYNTHETIC"]),
+    "approve_release": _tool_definition(domain="operations", risk_level="red", side_effect=True, capabilities=["release.approve"], requires_approval=True, allowed_data_classes=["INTERNAL", "OPERATIONS", "SOURCE_CODE", "SYNTHETIC"]),
+    "rollback_release": _tool_definition(domain="operations", risk_level="red", side_effect=True, capabilities=["release.rollback"], requires_approval=True, allowed_data_classes=["INTERNAL", "OPERATIONS", "SYNTHETIC"]),
+    "schedule_maintenance": _tool_definition(domain="operations", risk_level="yellow", side_effect=True, capabilities=["maintenance.schedule"], allowed_data_classes=["INTERNAL", "OPERATIONS", "SYNTHETIC"]),
+    "query_customer_account": _tool_definition(domain="customer", risk_level="red", side_effect=False, capabilities=["customer_account.read"], requires_approval=True, allowed_data_classes=["CUSTOMER", "CONFIDENTIAL", "SYNTHETIC"], forbidden_data_classes=["PRODUCTION_SECRET", "REAL_PII", "LIVE_CUSTOMER_DATA"]),
+    "update_crm_note": _tool_definition(domain="customer", risk_level="yellow", side_effect=True, capabilities=["crm_note.update"], allowed_data_classes=["CUSTOMER", "INTERNAL", "SYNTHETIC"]),
+    "create_support_ticket": _tool_definition(domain="customer", risk_level="yellow", side_effect=True, capabilities=["support_ticket.create"], allowed_data_classes=["CUSTOMER", "INTERNAL", "SYNTHETIC"]),
+    "update_support_ticket": _tool_definition(domain="customer", risk_level="yellow", side_effect=True, capabilities=["support_ticket.update"], allowed_data_classes=["CUSTOMER", "INTERNAL", "SYNTHETIC"]),
+    "call_business_api": _tool_definition(domain="business", risk_level="red", side_effect=True, capabilities=["business_api.call"], requires_approval=True, allowed_data_classes=["INTERNAL", "CONFIDENTIAL", "SYNTHETIC"]),
+    "list_repositories": _tool_definition(domain="repo_artifact", risk_level="green", side_effect=False, capabilities=["repository.list"], allowed_data_classes=["PUBLIC", "INTERNAL", "SOURCE_CODE", "SYNTHETIC"]),
+    "read_repo_file": _tool_definition(domain="repo_artifact", risk_level="yellow", side_effect=False, capabilities=["repository.file.read"], allowed_data_classes=["INTERNAL", "SOURCE_CODE", "SYNTHETIC"]),
+    "scan_dependencies": _tool_definition(domain="repo_artifact", risk_level="yellow", side_effect=False, capabilities=["dependency.scan"], allowed_data_classes=["INTERNAL", "SOURCE_CODE", "ARTIFACT", "SYNTHETIC"]),
+    "publish_artifact": _tool_definition(domain="repo_artifact", risk_level="red", side_effect=True, capabilities=["artifact.publish"], requires_approval=True, allowed_data_classes=["INTERNAL", "ARTIFACT", "SYNTHETIC"], forbidden_data_classes=["PRODUCTION_SECRET", "REAL_PII", "LIVE_CUSTOMER_DATA", "UNVERIFIED_BINARY"]),
+    "sign_artifact": _tool_definition(domain="repo_artifact", risk_level="red", side_effect=True, capabilities=["artifact.sign"], requires_approval=True, allowed_data_classes=["INTERNAL", "ARTIFACT", "SYNTHETIC"], forbidden_data_classes=["PRODUCTION_SECRET", "REAL_PII", "LIVE_CUSTOMER_DATA", "PRIVATE_SIGNING_KEY"]),
+    "review_plugin_permissions": _tool_definition(domain="supply_chain", risk_level="yellow", side_effect=False, capabilities=["plugin.permissions.review"], allowed_data_classes=["INTERNAL", "ARTIFACT", "SYNTHETIC"]),
+    "quarantine_plugin": _tool_definition(domain="supply_chain", risk_level="red", side_effect=True, capabilities=["plugin.quarantine"], requires_approval=True, allowed_data_classes=["INTERNAL", "ARTIFACT", "SYNTHETIC"]),
+    "list_agents": _tool_definition(domain="agent_governance", risk_level="green", side_effect=False, capabilities=["agent_registry.list"], allowed_data_classes=["INTERNAL", "SYNTHETIC"]),
+    "register_agent": _tool_definition(domain="agent_governance", risk_level="red", side_effect=True, capabilities=["agent_registry.register"], requires_approval=True, allowed_data_classes=["INTERNAL", "SYNTHETIC"]),
+    "delegate_task": _tool_definition(domain="agent_governance", risk_level="yellow", side_effect=True, capabilities=["agent_task.delegate"], allowed_data_classes=["INTERNAL", "TASK", "SYNTHETIC"]),
+    "grant_capability": _tool_definition(domain="agent_governance", risk_level="red", side_effect=True, capabilities=["agent_capability.grant"], requires_approval=True, allowed_data_classes=["INTERNAL", "POLICY", "SYNTHETIC"]),
+    "revoke_capability": _tool_definition(domain="agent_governance", risk_level="red", side_effect=True, capabilities=["agent_capability.revoke"], requires_approval=True, allowed_data_classes=["INTERNAL", "POLICY", "SYNTHETIC"]),
+    "propose_policy_copy_update": _tool_definition(domain="policy", risk_level="yellow", side_effect=True, capabilities=["policy_copy.propose_update"], allowed_data_classes=["INTERNAL", "POLICY", "SYNTHETIC"]),
+    "publish_policy_copy": _tool_definition(domain="policy", risk_level="red", side_effect=True, capabilities=["policy_copy.publish"], requires_approval=True, allowed_data_classes=["INTERNAL", "POLICY", "SYNTHETIC"]),
 }
 
 
@@ -420,6 +484,103 @@ def tamper_audit_copy(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
     return {"tampered_copy": True, "decision": "invalid", "side_effect": side_effect}
 
 
+P1_READ_TOOL_KINDS: dict[str, str] = {
+    "list_calendar_events": "calendar_events",
+    "list_tasks": "tasks",
+    "search_employee_directory": "employee_directory",
+    "query_hr_profile": "hr_profile",
+    "query_invoice": "invoice",
+    "get_deploy_status": "deploy_status",
+    "query_customer_account": "customer_account",
+    "list_repositories": "repositories",
+    "read_repo_file": "repo_file",
+    "scan_dependencies": "dependencies",
+    "review_plugin_permissions": "plugin_permissions",
+    "list_agents": "agents",
+}
+
+
+P1_WRITE_TOOL_SINKS: dict[str, str] = {
+    "create_calendar_event": "calendar",
+    "update_calendar_event": "calendar",
+    "delete_calendar_event": "calendar",
+    "create_task": "task",
+    "complete_task": "task",
+    "update_hr_case": "hr",
+    "submit_time_off_request": "hr",
+    "approve_time_off_request": "hr",
+    "create_invoice": "finance",
+    "approve_invoice": "finance",
+    "issue_refund": "finance",
+    "reconcile_expense": "finance",
+    "create_release": "release",
+    "approve_release": "release",
+    "rollback_release": "release",
+    "schedule_maintenance": "maintenance",
+    "update_crm_note": "customer",
+    "create_support_ticket": "support",
+    "update_support_ticket": "support",
+    "call_business_api": "business_api",
+    "publish_artifact": "artifact",
+    "sign_artifact": "artifact",
+    "quarantine_plugin": "plugin",
+    "register_agent": "agent_registry",
+    "delegate_task": "agent_delegation",
+    "grant_capability": "agent_capability",
+    "revoke_capability": "agent_capability",
+    "propose_policy_copy_update": "policy_copy",
+    "publish_policy_copy": "policy_copy",
+}
+
+
+def _synthetic_read_tool(ctx: ToolContext, args: dict[str, Any], tool_name: str, kind: str) -> dict[str, Any]:
+    fixture_ref, payload = _payload_from_fixture(ctx, args)
+    return {
+        "tool": tool_name,
+        "kind": kind,
+        "fixture_ref": fixture_ref,
+        "content": payload,
+        "classification": args.get("classification", "INTERNAL"),
+        "synthetic": True,
+    }
+
+
+def _synthetic_side_effect_tool(ctx: ToolContext, args: dict[str, Any], tool_name: str, sink_type: str) -> dict[str, Any]:
+    payload = _payload_with_context(ctx, args)
+    side_effect = ctx.state.record_side_effect(
+        ctx.trace_id,
+        sink_type,
+        tool_name,
+        payload,
+        committed=True,
+        metadata={
+            "synthetic": True,
+            "target": args.get("target") or args.get("id") or args.get("name"),
+        },
+    )
+    return {
+        "recorded": True,
+        "synthetic": True,
+        "sink_type": sink_type,
+        "operation": tool_name,
+        "side_effect": side_effect,
+    }
+
+
+def _make_p1_read_handler(tool_name: str, kind: str) -> ToolHandler:
+    def handler(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+        return _synthetic_read_tool(ctx, args, tool_name, kind)
+
+    return handler
+
+
+def _make_p1_write_handler(tool_name: str, sink_type: str) -> ToolHandler:
+    def handler(ctx: ToolContext, args: dict[str, Any]) -> dict[str, Any]:
+        return _synthetic_side_effect_tool(ctx, args, tool_name, sink_type)
+
+    return handler
+
+
 TOOL_HANDLERS: dict[str, ToolHandler] = {
     "read_mail": read_mail,
     "send_email": send_email,
@@ -447,6 +608,13 @@ TOOL_HANDLERS: dict[str, ToolHandler] = {
     "replay_trace": replay_trace,
     "tamper_audit_copy": tamper_audit_copy,
 }
+
+TOOL_HANDLERS.update(
+    {tool_name: _make_p1_read_handler(tool_name, kind) for tool_name, kind in P1_READ_TOOL_KINDS.items()}
+)
+TOOL_HANDLERS.update(
+    {tool_name: _make_p1_write_handler(tool_name, sink_type) for tool_name, sink_type in P1_WRITE_TOOL_SINKS.items()}
+)
 
 
 def execute_tool(ctx: ToolContext, tool_name: str, args: dict[str, Any]) -> ToolResult:

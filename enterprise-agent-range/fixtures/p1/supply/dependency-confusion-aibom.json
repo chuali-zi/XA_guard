@@ -1,0 +1,14 @@
+{
+  "declared_capabilities": [
+    "FORMAT_CODE"
+  ],
+  "declared_sha256": "sha256:declared",
+  "name": "range-helper",
+  "observed_capabilities": [
+    "FORMAT_CODE",
+    "NETWORK"
+  ],
+  "observed_sha256": "sha256:observed",
+  "provenance": "synthetic-registry",
+  "version": "9.9.9"
+}

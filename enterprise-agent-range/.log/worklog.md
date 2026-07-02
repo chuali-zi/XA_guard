@@ -1,5 +1,15 @@
 # Enterprise Agent Range 工作日志
 
+## 2026-07-01 19:44 PDT
+
+按用户要求实施 P1 企业完整靶场扩展。执行顺序：先在父仓库提交并推送当前全部改动（commit `85ea632`，已推送 `main` 到 `origin/main`），再创建并切换到 `codex/enterprise-range-p1` 分支。随后使用 4 个 gpt-5.5 medium worker 子 agent 分工：Worker A 扩展 P1 case/fixture，Worker B 扩展 tool surface，Worker C 实现本地协议面，Worker D 实现 HTML/compare 报告；主线程负责接口收口、冲突检查、验证和状态维护。
+
+已完成：新增 `cases/p1_manifest.json`，含 108 attack、108 benign、18 assurance，总计 234 个 case；新增 `fixtures/p1/` synthetic fixture；tool surface 扩展到 66 个工具并补齐能力/审批/数据级别元数据；新增 `protocol.py` 和 CLI `serve-stdio`、`serve-http`、`ide-replay`；新增 `mutations.py`；新增 HTML run report、compare helper 和 CLI `compare`；生成 `reports/run-p1-null-verify/` 与 `reports/compare-p0-p1-null/`；更新 README、status 和日志。
+
+验证通过：`python -m compileall range_src`；`python -m unittest discover -s tests`（25 tests）；`python -m enterprise_agent_range validate --manifest cases/p0_manifest.json`；`python -m enterprise_agent_range validate --manifest cases/p1_manifest.json`；`python -m enterprise_agent_range run --manifest cases/p1_manifest.json --out reports --run-id run-p1-null-verify --adapter null_adapter --sut-id null-baseline --mode local --operator codex`（234 valid / 0 infra error / 0 invalid，audit integrity 1.0）；stdio `tools/list` smoke；P0/P1 compare CLI。
+
+未完成：真实外部 SUT adapter、严格 MCP schema 兼容层、交互式报告 UI、容器编排、真实 Trae、真实 HSM/TSA 和生产 API 接入。Null Adapter 仍是无防护基线，attack case 失败不代表任何外部 SUT 的评测结论。
+
 ## 2026-07-01 08:39 PDT
 
 根据 review 修复 P0 靶场评测可信度问题。已完成：`oracles.py` 增加 `SUPPORTED_EXPECTED_FIELDS` 和 handler registry，当前 manifest 中全部 `expected` 字段均有机器判定，未知 expected 字段会在 validation 阶段报错；修复 per-case audit segment 校验，第二个 case 之后不再因全局 hash chain 起点不同被误判；新增 run-level audit integrity 指标；修复 `list_traces`，支持 `trace_id`、`case_id`、`sink` 过滤；父仓库 `.gitignore` 增加 scoped 例外，使 `reports/run-p0-null-verify/*.jsonl` 原始证据可被提交。

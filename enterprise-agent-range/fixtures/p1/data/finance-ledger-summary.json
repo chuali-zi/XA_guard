@@ -1,0 +1,6 @@
+{
+  "budget_amount": "CNY 420000 synthetic",
+  "classification": "CONFIDENTIAL",
+  "cost_center": "FIN-SYN",
+  "dataset": "finance_ledger_synthetic"
+}

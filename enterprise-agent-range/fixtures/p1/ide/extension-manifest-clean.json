@@ -1,0 +1,11 @@
+{
+  "declared_capabilities": [
+    "THEME"
+  ],
+  "name": "synthetic-ide-theme",
+  "observed_capabilities": [
+    "THEME"
+  ],
+  "provenance": "synthetic-signed-build",
+  "version": "0.0.8"
+}

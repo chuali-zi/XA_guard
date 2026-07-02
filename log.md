@@ -1,5 +1,28 @@
 # 工作日志
 
+## 2026-07-01 19:44 PDT Enterprise Agent Range P1 扩展与提交推送
+
+起因：用户要求先提交并推送当前全部改动，然后按已制定计划实现 `enterprise-agent-range/` P1，并明确使用子 agent 协助单一扩展任务。
+
+已完成：
+- 提交并推送父仓库当前全部改动：commit `85ea632`，message `feat: add enterprise range and business api adapter`，已推送 `main` 到 `origin/main`；随后创建并切换到 `codex/enterprise-range-p1`。
+- 使用 4 个 gpt-5.5 medium worker 子 agent 分块实施 P1：case/fixture、tool surface、协议入口、HTML/compare 报告；主线程负责接口收口、验证和日志/status 维护。
+- `enterprise-agent-range/` 新增 P1 manifest：234 cases（108 attack、108 benign、18 assurance）和 `fixtures/p1/` synthetic fixtures。
+- tool surface 扩展到 66 个 mock tool，新增本地 MCP-like stdio、MCP-like HTTP、simulated IDE replay、deterministic mutation helper、HTML run report 和 P0/P1 compare report。
+- 生成 `enterprise-agent-range/reports/run-p1-null-verify/` 和 `enterprise-agent-range/reports/compare-p0-p1-null/`。
+- 更新 `enterprise-agent-range/README.md`、`enterprise-agent-range/status.md`、`enterprise-agent-range/log.md`、`enterprise-agent-range/.log/worklog.md` 和本文件。
+
+验证：
+- 提交前 P0 与父仓库相关测试通过：`compileall`、`enterprise-agent-range` 12 tests、P0 manifest validate、业务 API/Gate 相关 pytest 通过。
+- P1 分支验证通过：`python -m compileall range_src`、`python -m unittest discover -s tests`（25 tests）、P0/P1 manifest validate。
+- P1 Null Adapter run：234 valid / 0 infra error / 0 invalid，audit integrity 1.0。
+- stdio `tools/list` smoke PASS；P0/P1 compare CLI PASS。
+
+边界：
+- 本轮 P1 是独立靶场能力扩展，不代表 XA-Guard 主产品 L3 最终验收通过。
+- 仍未实现真实外部 SUT adapter、严格 MCP schema 兼容层、交互式报告 UI、容器编排、真实 Trae、真实 HSM/TSA 或生产 API 接入。
+- Null Adapter 仍是无防护基线；attack case 失败只说明基线风险，不表示任何外部 SUT 的评测结论。
+
 ## 2026-07-01 08:39 PDT Enterprise Agent Range P0 review 修复
 
 起因：用户要求按 review 修复 P0 靶场评测可信度问题，包括审计链误判、expected 字段静默漏测、`list_traces` 全局计数和报告 JSONL 被忽略。

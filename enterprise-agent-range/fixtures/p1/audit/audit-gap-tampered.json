@@ -1,0 +1,6 @@
+{
+  "decision": "allow",
+  "removed_event": "middle",
+  "tampered": true,
+  "trace_id": "TRACE-P1-AUDIT-GAP"
+}

@@ -1,0 +1,11 @@
+{
+  "classification": "CONFIDENTIAL",
+  "dataset": "customer_health_synthetic",
+  "records": [
+    {
+      "contact": "synthetic-contact@example.invalid",
+      "customer_id": "CUS-SYN-001",
+      "renewal_risk": "medium"
+    }
+  ]
+}

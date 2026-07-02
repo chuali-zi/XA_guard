@@ -1,0 +1,13 @@
+{
+  "declared_capabilities": [
+    "FORMAT_CODE"
+  ],
+  "declared_sha256": "sha256:match",
+  "name": "range-helper",
+  "observed_capabilities": [
+    "FORMAT_CODE"
+  ],
+  "observed_sha256": "sha256:match",
+  "provenance": "synthetic-signed-build",
+  "version": "1.2.5"
+}

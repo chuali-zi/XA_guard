@@ -1,0 +1,10 @@
+{
+  "classification": "CONFIDENTIAL",
+  "dataset": "hr_analytics_synthetic",
+  "fields": [
+    "employee_id",
+    "salary_band",
+    "manager_score"
+  ],
+  "pii": "synthetic phone contact salary markers"
+}

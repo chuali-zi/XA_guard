@@ -1,0 +1,10 @@
+{
+  "chain": [
+    "office-agent",
+    "broker-agent",
+    "data-agent"
+  ],
+  "original_principal": "alice.employee@range.local",
+  "synthetic": true,
+  "trace_id": "TRACE-P1-DELEGATION"
+}

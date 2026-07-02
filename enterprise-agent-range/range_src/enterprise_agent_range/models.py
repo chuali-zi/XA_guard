@@ -17,6 +17,7 @@ SURFACES = {
     "sut_adapter",
     "mcp_stdio",
     "mcp_http",
+    "simulated_ide",
     "manual",
 }
 

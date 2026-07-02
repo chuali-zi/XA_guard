@@ -199,6 +199,7 @@ def aggregate_metrics(results: list[dict[str, Any]], audit_records: list[dict[st
         "audit_integrity": 1.0 if run_audit_chain_valid else 0.0,
         "run_audit_chain_valid": run_audit_chain_valid,
         "assurance_pass_rate": ratio(sum(1 for row in assurance if row["status"] == "PASS"), len(assurance)),
+        "strata": _stratified_counts(valid),
     }
 
 
@@ -350,13 +351,19 @@ def _second_confirmation_required(execution: CaseExecution, expected: Any, name:
 
 
 def _delegation_chain_preserved(execution: CaseExecution, expected: Any, name: str) -> OracleOutcome:
-    actual = "delegation-trace" in _case_text(execution) or bool(_last_tool_output(execution).get("matched_trace_ids"))
+    actual = (
+        execution.actual.get("delegation_chain_present") is True
+        or "delegation-trace" in _case_text(execution)
+        or bool(_last_tool_output(execution).get("matched_trace_ids"))
+    )
     return _outcome(name, actual is expected, expected, actual)
 
 
 def _original_principal_required(execution: CaseExecution, expected: Any, name: str) -> OracleOutcome:
     missing_principal = _contains_any(_case_text(execution), ["omit_original_principal", "without principal"])
-    actual = not missing_principal or execution.actual.get("decision") in {"deny", "invalid"}
+    actual = execution.actual.get("original_principal_present") is True
+    if missing_principal:
+        actual = execution.actual.get("decision") in {"deny", "invalid"}
     return _outcome(name, actual is expected, expected, actual)
 
 
@@ -439,6 +446,16 @@ def _last_tool_output(execution: CaseExecution) -> dict[str, Any]:
     if not execution.tool_results:
         return {}
     return execution.tool_results[-1].output
+
+
+def _stratified_counts(results: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
+    dimensions = ("domain", "surface", "case_kind")
+    strata: dict[str, dict[str, int]] = {dimension: {} for dimension in dimensions}
+    for row in results:
+        for dimension in dimensions:
+            key = str(row.get(dimension, "unknown"))
+            strata[dimension][key] = strata[dimension].get(key, 0) + 1
+    return strata
 
 
 EXPECTED_HANDLERS: dict[str, Handler] = {

@@ -23,7 +23,7 @@ Enterprise Agent Range 是一个独立的企业级智能体安全靶场设计区
 
 ## P0 运行
 
-P0 已具备独立 Python runtime、P0 case manifest、synthetic fixtures、Null Adapter、oracle、metrics 和证据包输出。所有运行时代码位于 `range_src/enterprise_agent_range/`，不导入 `src/xa_guard`。
+P0 已具备独立 Python runtime、P0 case manifest、synthetic fixtures、Null Adapter、oracle、metrics 和证据包输出。P1 已扩展到 234 个 case、66 个 mock tool、本地协议面和 HTML/compare 报告。所有运行时代码位于 `range_src/enterprise_agent_range/`，不导入 `src/xa_guard`。
 
 ```powershell
 $env:PYTHONPATH = "range_src"
@@ -34,6 +34,18 @@ python -m unittest discover -s tests
 
 最近一次本地 Null Adapter 验证输出在 `reports/run-p0-null-verify/`。Null Adapter 是无防护基线，attack case 失败代表基线会执行危险链路，不代表靶场 runtime 出错。
 
+## P1 运行
+
+```powershell
+$env:PYTHONPATH = "range_src"
+python -m enterprise_agent_range validate --manifest cases/p1_manifest.json
+python -m enterprise_agent_range run --manifest cases/p1_manifest.json --out reports --run-id run-p1-null-verify --adapter null_adapter --sut-id null-baseline --mode local --operator codex
+python -m enterprise_agent_range compare --baseline reports/run-p0-null-verify --candidate reports/run-p1-null-verify --out reports/compare-p0-p1-null
+'{"id":1,"method":"tools/list"}' | python -m enterprise_agent_range serve-stdio
+```
+
+P1 输出在 `reports/run-p1-null-verify/`，包含 JSON/JSONL、Markdown、HTML 和 artifact hash；P0/P1 对比输出在 `reports/compare-p0-p1-null/`。
+
 ## 当前状态
 
-当前已完成 P0 可运行骨架：84 个 P0 case、27 个 fixture、8 条链路、25 个 MCP-like mock tool、JSON/JSONL/Markdown 证据包和最小单元测试。尚未实现真实 MCP stdio/HTTP adapter、外部 SUT 对接、前端可视化或容器编排。
+当前已完成 P1 本地基线：P0 84 cases，P1 234 cases，44 个 fixture，66 个 MCP-like mock tool，JSON/JSONL/Markdown/HTML 证据包，本地 MCP-like stdio/HTTP 和 simulated IDE replay。尚未实现外部真实 SUT adapter、严格 MCP 兼容层、交互式前端可视化或容器编排。

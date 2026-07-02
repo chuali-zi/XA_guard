@@ -39,6 +39,7 @@ logs/
 !bench/.log/.gitkeep
 !**/.log/worklog.md
 !enterprise-agent-range/reports/run-p0-null-verify/*.jsonl
+!enterprise-agent-range/reports/run-p1-null-verify/*.jsonl
 # Committed evidence artifacts (audit samples, benchmark results) under docs/evidence/
 !docs/evidence/**
 # but never commit private key material even inside evidence
