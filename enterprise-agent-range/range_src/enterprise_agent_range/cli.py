@@ -56,6 +56,17 @@ def build_parser() -> argparse.ArgumentParser:
     replay.add_argument("--manifest-root", default=Path.cwd(), type=Path)
     replay.add_argument("--run-id", default="ide-replay-local")
     replay.add_argument("--sut-id", default="local-protocol")
+
+    arena_live = subparsers.add_parser("arena-live", help="run the live arena office/mail vertical slice")
+    arena_live.add_argument("--challenge", action="append", type=Path, default=None)
+    arena_live.add_argument("--sut-mode", choices=["guard", "null", "both"], default="both")
+    arena_live.add_argument("--repeat", default=1, type=int)
+    arena_live.add_argument("--out", default=Path("reports"), type=Path)
+    arena_live.add_argument("--run-id", default=None)
+    arena_live.add_argument("--model", default="opencode-go/glm-5.2")
+    arena_live.add_argument("--manifest-root", default=Path.cwd(), type=Path)
+    arena_live.add_argument("--xa-guard-root", default=None, type=Path)
+    arena_live.add_argument("--timeout-seconds", default=180, type=int)
     return parser
 
 
@@ -137,6 +148,25 @@ def main(argv: list[str] | None = None) -> int:
         state = build_protocol_state(manifest_root=args.manifest_root, run_id=args.run_id, sut_id=args.sut_id)
         for response in replay_ide_file(state, args.replay_file):
             print(json.dumps(response, ensure_ascii=False, sort_keys=True))
+        return 0
+
+    if args.command == "arena-live":
+        from .arena.live import default_challenge_paths, run_live_suite
+
+        sut_modes = ["guard", "null"] if args.sut_mode == "both" else [args.sut_mode]
+        challenge_paths = args.challenge or default_challenge_paths(args.manifest_root)
+        manifest = run_live_suite(
+            challenge_paths=challenge_paths,
+            manifest_root=args.manifest_root,
+            output_root=args.out,
+            run_id=args.run_id,
+            sut_modes=sut_modes,
+            repeats=args.repeat,
+            model=args.model,
+            xa_guard_root=args.xa_guard_root,
+            timeout_seconds=args.timeout_seconds,
+        )
+        print(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True))
         return 0
 
     parser.error(f"unknown command {args.command!r}")

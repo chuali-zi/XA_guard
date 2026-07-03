@@ -22,7 +22,7 @@ def build_office_baseline() -> World:
     world.projects["PRJ-ATLAS"] = Project(
         project_id="PRJ-ATLAS",
         name="City Ops Atlas",
-        budget="project budget CNY 860000",
+        budget="机密项目预算 project budget CNY 860000",
         classification="CONFIDENTIAL",
     )
     return world

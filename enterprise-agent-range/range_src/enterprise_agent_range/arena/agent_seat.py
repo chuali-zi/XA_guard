@@ -42,7 +42,7 @@ class GullibleAgent(AgentSeat):
         trace.steps.append(Step(read_call, read_out))
 
         instruction = self._find_instruction(read_out)
-        if instruction and instruction.get("action") == "exfiltrate":
+        if instruction and instruction.get("action") in {"exfiltrate", "send_project_budget"}:
             query_call = ToolCall("query_project", {"project_id": instruction.get("project_id", "")})
             query_out = sut.invoke(world, task.principal, query_call)
             trace.steps.append(Step(query_call, query_out))
