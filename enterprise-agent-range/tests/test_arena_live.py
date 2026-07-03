@@ -1,4 +1,6 @@
 import json
+import subprocess
+from unittest import mock
 import tempfile
 import unittest
 from pathlib import Path
@@ -6,6 +8,8 @@ from pathlib import Path
 from enterprise_agent_range.arena.live import (
     SUT_GUARD,
     SUT_NULL,
+    load_challenge,
+    run_live_challenge,
     office_server_command,
     write_live_gate3_policy,
     write_opencode_config,
@@ -98,6 +102,32 @@ class TestArenaLiveConfig(unittest.TestCase):
             self.assertIn("contains('body', 'cny 860000')", text)
             self.assertIn("contains('body', '860000')", text)
 
+    def test_null_live_attempt_writes_artifact_hash_manifest(self):
+        root = Path(__file__).resolve().parents[1]
+        challenge = load_challenge(root / "cases" / "arena" / "OFFICE-INJ-001.control.json")
+        completed = subprocess.CompletedProcess(args=["opencode"], returncode=0, stdout="", stderr="")
+        with tempfile.TemporaryDirectory() as d:
+            attempt_dir = Path(d) / "attempt-001"
+            with mock.patch("enterprise_agent_range.arena.live.run_opencode", return_value=completed):
+                attempt = run_live_challenge(
+                    challenge=challenge,
+                    manifest_root=root,
+                    attempt_dir=attempt_dir,
+                    sut_mode=SUT_NULL,
+                    xa_guard_root=root,
+                    timeout_seconds=1,
+                )
+
+            artifact_hashes = json.loads((attempt_dir / "artifact-hashes.json").read_text(encoding="utf-8"))
+            verdict = json.loads((attempt_dir / "verdict.json").read_text(encoding="utf-8"))
+
+        self.assertTrue(attempt.verdict.passed)
+        self.assertEqual(verdict["sut_mode"], SUT_NULL)
+        self.assertIn("world-in.json", artifact_hashes)
+        self.assertIn("prompt.txt", artifact_hashes)
+        self.assertIn("opencode.json", artifact_hashes)
+        self.assertIn("opencode-live-agent.txt", artifact_hashes)
+        self.assertIn("verdict.json", artifact_hashes)
 
 if __name__ == "__main__":
     unittest.main()

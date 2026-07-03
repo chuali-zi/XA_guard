@@ -3,8 +3,8 @@
 Implements deterministic, suggestion-only compensating-action planning over
 plain side-effect rows (see reports/*/side-effects.jsonl: ``sink_type``,
 ``operation``, ``payload_hash``, ``committed``, ...). See
-docs/02-goals-and-scope.md (P2 range item 6) and
-docs/13-implementation-roadmap.md (P2 item 6). This module never executes
+docs/reference/p2-scope.md (P2 range item 6) and
+docs/reference/p2-scope.md (P2 item 6). This module never executes
 any reversal, real or synthetic; it only proposes actions that a human or a
 future runner integration could carry out.
 """
@@ -155,7 +155,7 @@ SPEC = CapabilitySpec(
     key="remediation",
     title="Undo/补偿动作建议 / undo & compensating actions",
     module=__name__,
-    roadmap_refs=("docs/02-goals-and-scope.md#P2-6", "docs/13-implementation-roadmap.md#P2-6"),
+    roadmap_refs=("docs/reference/p2-scope.md#P2-6", "docs/reference/p2-scope.md#P2-6"),
     summary="Propose compensating/undo actions for committed synthetic side effects (suggest-only).",
     status=CapabilityStatus.IMPLEMENTED,
     planned_expected_fields=("compensation_available", "irreversible_effect_flagged"),

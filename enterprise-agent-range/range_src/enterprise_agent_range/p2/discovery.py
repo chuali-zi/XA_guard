@@ -2,8 +2,8 @@
 
 Implements a deterministic diff between a declared agent/tool registry and
 observed synthetic inventory rows, surfacing shadow (unregistered) usage.
-See docs/02-goals-and-scope.md (P2 range item 2) and
-docs/13-implementation-roadmap.md (P2 item 2). Still not wired into the
+See docs/reference/p2-scope.md (P2 range item 2) and
+docs/reference/p2-scope.md (P2 item 2). Still not wired into the
 P0/P1 runner/oracle/reports; operates purely on plain dict/list inputs.
 """
 
@@ -85,7 +85,7 @@ SPEC = CapabilitySpec(
     key="discovery",
     title="Shadow AI 发现模拟 / shadow AI discovery",
     module=__name__,
-    roadmap_refs=("docs/02-goals-and-scope.md#P2-2", "docs/13-implementation-roadmap.md#P2-2"),
+    roadmap_refs=("docs/reference/p2-scope.md#P2-2", "docs/reference/p2-scope.md#P2-2"),
     summary="Diff declared registries against observed traces to surface shadow agents/tools.",
     status=CapabilityStatus.IMPLEMENTED,
     planned_expected_fields=("shadow_agent_detected", "unregistered_tool_flagged"),

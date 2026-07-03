@@ -18,8 +18,8 @@ fixtures/p2/
 └── evidence/       # mock TSA/HSM tokens
 ```
 
-Rules (inherited from `docs/04-decoupling-contract.md` and
-`docs/14-risk-and-non-goals.md`):
+Rules (inherited from `docs/architecture/decoupling-contract.md` and
+`docs/architecture/decoupling-contract.md`):
 
 - Synthetic data only — no real PII, secrets, or production exports.
 - Offline only — no live third-party benchmark/TSA/HSM calls.

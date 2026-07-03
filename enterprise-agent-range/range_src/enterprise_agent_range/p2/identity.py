@@ -1,7 +1,7 @@
 """P2 capability 3: agent identity lifecycle (Agent 身份生命周期).
 
-See docs/02-goals-and-scope.md (P2 range item 3) and
-docs/13-implementation-roadmap.md (P2 item 3).
+See docs/reference/p2-scope.md (P2 range item 3) and
+docs/reference/p2-scope.md (P2 item 3).
 
 Implements a deterministic state machine over :class:`IdentityState`. No
 runtime wiring into ``oracles.py`` yet (see ``planned_expected_fields`` on
@@ -157,7 +157,7 @@ SPEC = CapabilitySpec(
     key="identity",
     title="Agent 身份生命周期 / agent identity lifecycle",
     module=__name__,
-    roadmap_refs=("docs/02-goals-and-scope.md#P2-3", "docs/13-implementation-roadmap.md#P2-3"),
+    roadmap_refs=("docs/reference/p2-scope.md#P2-3", "docs/reference/p2-scope.md#P2-3"),
     summary="Model provision/rotate/suspend/revoke/retire states and enforce them on tool use.",
     status=CapabilityStatus.IMPLEMENTED,
     planned_expected_fields=("identity_state_valid", "revoked_identity_action_blocked"),

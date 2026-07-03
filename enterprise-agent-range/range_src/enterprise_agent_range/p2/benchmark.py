@@ -1,7 +1,7 @@
 """P2 capability 8: external benchmark fusion (外部 benchmark 与内部靶场融合).
 
-See docs/02-goals-and-scope.md (P2 range item 8) and
-docs/13-implementation-roadmap.md (P2 item 8). This module only ingests local,
+See docs/reference/p2-scope.md (P2 range item 8) and
+docs/reference/p2-scope.md (P2 item 8). This module only ingests local,
 offline JSON exports (a list of ``{"external_case_id","outcome",...}`` records)
 -- it never performs network I/O or calls a live third-party benchmark service.
 """
@@ -112,7 +112,7 @@ SPEC = CapabilitySpec(
     key="benchmark",
     title="外部 benchmark 融合 / external benchmark fusion",
     module=__name__,
-    roadmap_refs=("docs/02-goals-and-scope.md#P2-8", "docs/13-implementation-roadmap.md#P2-8"),
+    roadmap_refs=("docs/reference/p2-scope.md#P2-8", "docs/reference/p2-scope.md#P2-8"),
     summary="Ingest offline external benchmark exports and map them onto the range taxonomy.",
     status=CapabilityStatus.IMPLEMENTED,
     planned_expected_fields=(),

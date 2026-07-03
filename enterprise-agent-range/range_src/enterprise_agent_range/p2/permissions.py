@@ -1,7 +1,7 @@
 """P2 capability 4: JIT/JEA/JLA permission issuance (JIT/JEA/JLA 权限签发).
 
-See docs/02-goals-and-scope.md (P2 range item 4) and
-docs/13-implementation-roadmap.md (P2 item 4).
+See docs/reference/p2-scope.md (P2 range item 4) and
+docs/reference/p2-scope.md (P2 item 4).
 
 JIT = just-in-time, JEA = just-enough-access, JLA = just-long-enough-access.
 
@@ -129,7 +129,7 @@ SPEC = CapabilitySpec(
     key="permissions",
     title="JIT/JEA/JLA 权限签发 / just-in-time permission issuance",
     module=__name__,
-    roadmap_refs=("docs/02-goals-and-scope.md#P2-4", "docs/13-implementation-roadmap.md#P2-4"),
+    roadmap_refs=("docs/reference/p2-scope.md#P2-4", "docs/reference/p2-scope.md#P2-4"),
     summary="Issue scoped, time-bounded grants and reject over-scoped or expired reuse.",
     status=CapabilityStatus.IMPLEMENTED,
     planned_expected_fields=(

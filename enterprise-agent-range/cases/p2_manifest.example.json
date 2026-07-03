@@ -6,7 +6,7 @@
     "status": "capabilities-implemented; cases and oracle wiring pending",
     "created_at": "2026-07-02",
     "owner": "range",
-    "note": "Template only. NOT run by default and NOT a validated manifest. The 10 P2 capability modules are implemented and unit-tested, but P2 cases/fixtures and oracle/metrics wiring into the runner are not built yet. See docs/superpowers/specs/2026-07-02-p2-scaffolding-design.md and range_src/enterprise_agent_range/p2/."
+    "note": "Template only. NOT run by default and NOT a validated manifest. The 10 P2 capability modules are implemented and unit-tested, but P2 cases/fixtures and oracle/metrics wiring into the runner are not built yet. See docs/reference/p2-scope.md and range_src/enterprise_agent_range/p2/."
   },
   "capabilities": [
     {"key": "tenancy", "title": "多租户企业 / multi-tenant enterprises", "status": "implemented"},

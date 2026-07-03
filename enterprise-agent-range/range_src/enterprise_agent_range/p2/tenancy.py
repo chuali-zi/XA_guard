@@ -2,8 +2,8 @@
 
 Implements a deterministic, synthetic per-tenant registry plus isolation and
 cross-tenant leak-detection helpers over plain dict rows. See
-docs/02-goals-and-scope.md (P2 range item 1) and
-docs/13-implementation-roadmap.md (P2 item 1). This module still does not wire
+docs/reference/p2-scope.md (P2 range item 1) and
+docs/reference/p2-scope.md (P2 item 1). This module still does not wire
 into the P0/P1 runner, oracle, or reports; it only fixes deterministic,
 duck-typed data shapes and behavior so a future runner integration can plug
 in without touching P1.
@@ -85,7 +85,7 @@ SPEC = CapabilitySpec(
     key="tenancy",
     title="多租户企业 / multi-tenant enterprises",
     module=__name__,
-    roadmap_refs=("docs/02-goals-and-scope.md#P2-1", "docs/13-implementation-roadmap.md#P2-1"),
+    roadmap_refs=("docs/reference/p2-scope.md#P2-1", "docs/reference/p2-scope.md#P2-1"),
     summary="Isolate range state, sinks, and evidence per synthetic enterprise tenant.",
     status=CapabilityStatus.IMPLEMENTED,
     planned_expected_fields=("tenant_isolation_enforced", "cross_tenant_access_blocked"),

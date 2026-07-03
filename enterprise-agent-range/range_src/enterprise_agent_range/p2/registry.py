@@ -2,7 +2,7 @@
 
 Single source of truth for what P2 covers. Each capability module exposes a
 module-level ``SPEC``; this module aggregates them in the canonical order used by
-the docs (docs/02-goals-and-scope.md, P2 range).
+the docs (docs/reference/p2-scope.md, P2 range).
 """
 
 from __future__ import annotations

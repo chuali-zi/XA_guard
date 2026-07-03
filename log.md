@@ -1,3 +1,53 @@
+# 2026-07-02 20:06 -07:00 Enterprise Agent Range Arena Core / 红队台实现
+
+- 按用户确认的方向执行重构：优先做 Arena Core 解耦与红队成员工作台地基，不优先扩题，不替红队成员设计攻击题。
+- 使用 3 个 gpt-5.5 medium 子 agent 协助并整合结果：证据核心、tool surface/policy overlay、redteam finding 工作流；主线程完成 live runner 集成、CLI `arena` 命令组、测试补齐和状态文档收口。
+- 新增/整合 Arena Core 模块：`arena/worlds.py`、`suite.py`、`surface.py`、`policy_overlay.py`、`evidence.py`、`opencode_seat.py`、`sut_xaguard.py`、`findings.py`；`challenge.py` 增加可选 `PolicySpec`；`mcp_office_server.py` 复用 tool surface schema；`live.py` 接入 `EvidenceStore` 并继续兼容既有 live smoke 行为。
+- CLI 新增最小红队台：`python -m enterprise_agent_range arena worlds|surfaces|challenges|init-finding|promote|show|run-ab`；旧 `arena-live`、`finding-init`、`finding-promote` 保持兼容，并给 `arena-live` 增加 `--suite`。
+- 新增测试：`test_arena_cli.py`、`test_arena_evidence.py`、`test_arena_findings.py`、`test_arena_opencode_and_sut.py`、`test_arena_policy_overlay.py`、`test_arena_surface.py`、`test_arena_worlds_and_suite.py`，并扩展 `test_arena_live.py` 验证 mocked null attempt 会写 `artifact-hashes.json`。
+- 验证：`$env:PYTHONPATH='range_src'; python -m unittest discover -s tests -v` 通过 263 tests；受影响 arena 子集 30 tests 通过；`arena worlds --json`、`arena surfaces --json` CLI smoke 通过；`validate --manifest cases\p1_manifest.json` 通过 242 cases / 44 fixtures；`rg "from xa_guard|import xa_guard" enterprise-agent-range\range_src\enterprise_agent_range` 无匹配。
+- 未做：未运行真实 OpenCode/GLM live 模型调用；未修改根 `src/xa_guard`；未把旧 242 个 P1 case 迁移到 live challenge schema；未实现 live attempt/report -> regression promotion、live N 次统计或多企业域扩展。
+# 2026-07-02 19:53 PDT Enterprise Agent Range redteam finding workflow
+
+- 在 `enterprise-agent-range/range_src/enterprise_agent_range/arena/findings.py` 新增非 live 红队 finding 工作流：`Finding` dataclass、JSON 读写、finding 初始化、可选 payload 文件落盘、finding 到 challenge dict/object 转换，以及 finding 直接 promotion 为 challenge JSON。
+- 新增 `enterprise-agent-range/tests/test_arena_findings.py`，覆盖 finding 解析/写入、payload 文件创建、challenge 转换默认 deny oracle、promotion 输出 shape。
+- 保持范围限定在 Enterprise Agent Range；未修改根 `src/`，未导入 `xa_guard`，未改既有测试，未接 live 执行路径，仅最小接入 `finding-init` / `finding-promote` CLI helper，未重写 CLI。
+- 验证：`PYTHONPATH=range_src python -m unittest tests.test_arena_findings tests.test_arena_challenge -v` 通过 7 tests；`PYTHONPYCACHEPREFIX=D:\tmp\ear-pycache python -m compileall range_src` 通过；`python -m enterprise_agent_range finding-init` / `finding-promote` 非 live smoke 通过。普通 `compileall` 首次因既有 `arena/__pycache__` Windows 权限问题写 `.pyc` 失败，改用临时 pycache 前缀后通过。
+- 未完成：promotion 目前只支持从 Finding 直接生成 Challenge JSON，未解析完整 live attempt/report；CLI 仅提供基础 helper，不是完整红队工作台。
+# 2026-07-02 19:49 PDT Enterprise Agent Range arena surface and policy overlay
+
+- 按用户限定范围实现 Enterprise Agent Range arena surface/policy overlay 竖切：新增 `enterprise-agent-range/range_src/enterprise_agent_range/arena/surface.py` 和 `policy_overlay.py`，定义 office-baseline 工具面、MCP schema 导出、Gate4 capability YAML 导出、Challenge policy 到 Gate3 rule YAML 的数据驱动生成。
+- `ToolSurface` 当前覆盖 `read_mail`、`query_project`、`send_email` 三个 office/mail baseline 工具，包含 capability、risk、input/output taint 和 MCP input schema；`PolicyOverlay` 支持 `policy.sensitive_markers` 与 `policy.deny_external_tools`，无 policy 时回落到当前 office/mail 预算泄露规则语义。
+- 为保留现有行为，`arena/live.py` 的旧 `write_live_tool_capabilities` / `write_live_gate3_policy` 入口仍存在并委托到新模块；真实 live guarded attempt 改为按 challenge policy 生成 Gate3 overlay；`mcp_office_server.tool_schemas()` 改为复用 surface schema。
+- `arena/challenge.py` 只做兼容扩展，新增 `PolicySpec` 并在 challenge JSON 中保留可选 `policy` 字段；未修改 XA-Guard 根 `src/`，未导入 `xa_guard`，未修改既有测试。
+- 新增 focused tests：`enterprise-agent-range/tests/test_arena_surface.py` 和 `enterprise-agent-range/tests/test_arena_policy_overlay.py`；验证 office surface 三工具、Gate4 metadata、generic marker 不依赖 Atlas hardcode、challenge-specific marker/tool 出现在生成规则中。
+- 验证：在 `enterprise-agent-range` 下执行 `$env:PYTHONPATH='range_src'; python -m pytest -q -p no:cacheprovider tests\test_arena_challenge.py tests\test_arena_surface.py tests\test_arena_policy_overlay.py tests\test_arena_live.py tests\test_arena_mcp_office_server.py`，结果 16 passed。首次从仓库根运行未设置 `PYTHONPATH` 导致 import collection error，随后按本包布局修正后通过。
+- 未做：未运行 live 模型调用，未改 XA-Guard 根 `src/`，未接入其他 arena 业务域，未处理其他 worker 已存在的非本切片改动；本环境没有暴露可调用子 agent 工具，因此未实际启动子 agent。
+
+# 2026-07-02 19:46 PDT Enterprise Agent Range arena evidence core
+
+- 按用户限定范围新增 `enterprise-agent-range/range_src/enterprise_agent_range/arena/evidence.py`，实现 `AttemptPaths` / `AttemptEvidence` 与 `EvidenceStore`，用于 arena live attempt 的证据目录、标准路径、JSON/JSONL/text 读写和 artifact hash manifest 生成。
+- 证据路径覆盖 `world-in.json`、`prompt.txt`、`opencode-events.jsonl`、`opencode-stderr.txt`、`office-tool-events.jsonl`、`world-effects.jsonl`、`audit/audit.jsonl`、`audit.jsonl`、`verdict.json`、`artifact-hashes.json`、`opencode.json`、`opencode-live-agent.txt`、`xa-guard.yaml`；哈希 manifest 只记录已存在文件并跳过自身。
+- 新增 focused tests：`enterprise-agent-range/tests/test_arena_evidence.py`，覆盖路径布局、证据写读、哈希清单生成和缺失可选文件跳过。
+- 验证：`python -m pytest -q -p no:cacheprovider enterprise-agent-range\tests\test_arena_evidence.py` 5 passed；`python -m pytest -q -p no:cacheprovider enterprise-agent-range\tests\test_arena_evidence.py enterprise-agent-range\tests\test_arena_live.py` 8 passed；使用临时 `PYTHONPYCACHEPREFIX=D:\tmp\ear-pycache` 后 `python -m compileall enterprise-agent-range\range_src\enterprise_agent_range\arena\evidence.py` 通过。
+- 未做：未改 `arena/live.py` 调用新 store，未改 XA-Guard 根 `src/` 或根 `tests/`，未修改任何既有测试，未运行 live 模型调用；本环境没有可调用的子 agent 工具，未实际启动子 agent。
+
+# 2026-07-02 19:05 PDT Enterprise Agent Range docs 重构与红队台计划定锚
+
+- 按用户要求将 `enterprise-agent-range/docs` 从旧编号文档与 `docs/superpowers/` 工作流痕迹中清理出来，重构为 `README.md`、`plan/`、`architecture/`、`redteam/`、`reference/` 五类入口。
+- 新增待审核计划 `enterprise-agent-range/docs/plan/redteam-arena-refactor-plan.md`，明确下一轮主线是 Arena Core 解耦与红队工作台地基，不优先扩题或替红队成员写攻击题。
+- 新增/整理架构、解耦契约、证据指标、红队操作指南、企业域参考、攻击面参考、live smoke 结论和 P2 范围参考文档。
+- 删除旧 `enterprise-agent-range/docs/00-17` 编号文档和 `enterprise-agent-range/docs/superpowers/`，避免历史 brainstorm/spec/plan/handoff 继续污染当前文档入口；有用结论已压缩进新文档，详细历史仍可通过 git 追溯。
+- 更新 `enterprise-agent-range/README.md`、`enterprise-agent-range/status.md`、P2 说明引用和 P2 示例 manifest 的文档路径。
+- 未做：未修改 runtime 行为、case 内容、测试代码或报告证据；未运行新的 live 模型调用；未开始 Arena Core 代码重构。
+# 2026-07-02 18:52 PDT Enterprise Agent Range 重构前文档研读
+
+- 按用户要求先阅读根 `docs/` 入口、`status.md`、`docs/workplan/`、`enterprise-agent-range/docs/00-17`、`enterprise-agent-range/status.md`、`enterprise-agent-range/docs/superpowers/` 下的 decoupling spec、office/mail plan、live spike 和 handoff。
+- 同步查看了 `enterprise-agent-range/` 当前代码结构、`arena/` live 竖切核心文件、旧 P0/P1 runner/report/oracle/manifest 路径和当前 git 状态；确认当前分支为 `range-decoupling`，工作区干净。
+- 形成的判断：后续大型重构应以 `arena/` 解耦主线为核心，保留旧 P0/P1 `execution.steps` 回放路径作为回归基线，不应直接删除或把 242 个旧 case 一次性强迁。
+- 未做：未修改靶场 runtime、case、测试、策略或 `status.md`；未运行新的测试、未跑 live N 次统计、未迁移旧 case、未扩展其他业务域。
+- 下一步：向用户复述目标理解、提出疑问和分阶段重构计划，待用户确认后再开始实施。
+
 # 2026-07-02 09:10 PDT Enterprise Agent Range live office/mail 竖切
 
 - 在 `enterprise-agent-range` 的 `range-decoupling` 分支实现 Plan 2 live 竖切：新增标准 MCP office/mail server、OpenCode live agent seat、外部 XA-Guard stdio adapter、`arena-live` CLI 和 live evidence 输出。

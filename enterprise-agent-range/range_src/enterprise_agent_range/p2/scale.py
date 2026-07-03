@@ -1,6 +1,6 @@
 """P2 capability 7: large-scale automated red-team runner (大规模自动化 red-team runner).
 
-See docs/02-goals-and-scope.md (P2 range item 7). This module implements
+See docs/reference/p2-scope.md (P2 range item 7). This module implements
 deterministic manifest sharding only; it does not touch the existing
 single-process ``runner.run_cases`` or any other core runtime module. It reads
 plain manifest JSON (``{"cases": [{"case_id": ...}, ...]}``) and produces a
@@ -100,7 +100,7 @@ SPEC = CapabilitySpec(
     key="scale",
     title="大规模自动化 red-team runner / large-scale red-team runner",
     module=__name__,
-    roadmap_refs=("docs/02-goals-and-scope.md#P2-7",),
+    roadmap_refs=("docs/reference/p2-scope.md#P2-7",),
     summary="Deterministically shard large manifests/mutations for reproducible batch runs.",
     status=CapabilityStatus.IMPLEMENTED,
     planned_expected_fields=(),

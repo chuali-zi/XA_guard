@@ -2,8 +2,8 @@
 
 Implements a deterministic, synthetic monetary-exposure scorer over plain
 case-result "actual" dicts (see reports/*/case-results.jsonl for the shape).
-See docs/02-goals-and-scope.md (P2 range item 5) and
-docs/13-implementation-roadmap.md (P2 item 5). Still not wired into the
+See docs/reference/p2-scope.md (P2 range item 5) and
+docs/reference/p2-scope.md (P2 item 5). Still not wired into the
 P0/P1 runner, oracle, or reports; it only fixes deterministic, duck-typed
 data shapes and scoring so a future runner integration can plug in without
 touching P1. Amounts are always expressed in the synthetic ``RANGE``
@@ -132,7 +132,7 @@ SPEC = CapabilitySpec(
     key="risk",
     title="风险金额量化 / risk-amount quantification",
     module=__name__,
-    roadmap_refs=("docs/02-goals-and-scope.md#P2-5", "docs/13-implementation-roadmap.md#P2-5"),
+    roadmap_refs=("docs/reference/p2-scope.md#P2-5", "docs/reference/p2-scope.md#P2-5"),
     summary="Quantify synthetic monetary/impact risk per case and expose risk-weighted metrics.",
     status=CapabilityStatus.IMPLEMENTED,
     planned_expected_fields=("risk_amount_le", "risk_score_present"),

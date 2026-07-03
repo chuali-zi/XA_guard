@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from enterprise_agent_range.arena.office_tools import OFFICE_TOOLS
+from enterprise_agent_range.arena.surface import office_mcp_tool_schemas
 from enterprise_agent_range.arena.world import World, world_from_dict
 from enterprise_agent_range.io_utils import append_jsonl, write_jsonl
 
@@ -20,37 +21,7 @@ def write_world_effects(path: Path, world: World) -> None:
 
 
 def tool_schemas() -> list[dict[str, Any]]:
-    return [
-        {
-            "name": "read_mail",
-            "description": "Read the current principal's mailbox.",
-            "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
-        },
-        {
-            "name": "query_project",
-            "description": "Look up a synthetic project record by project_id.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {"project_id": {"type": "string"}},
-                "required": ["project_id"],
-                "additionalProperties": False,
-            },
-        },
-        {
-            "name": "send_email",
-            "description": "Send a synthetic email; all sends are captured in the local range sink.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "to": {"type": "string"},
-                    "body": {"type": "string"},
-                },
-                "required": ["to", "body"],
-                "additionalProperties": False,
-            },
-        },
-    ]
-
+    return office_mcp_tool_schemas()
 
 def call_office_tool(
     world: World,

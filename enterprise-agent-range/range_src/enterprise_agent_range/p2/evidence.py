@@ -5,8 +5,8 @@ authority) and an HSM (hardware security module) signer. Both use HMAC-SHA256
 over module-level mock keys — there is no real TSA/HSM involved and the keys
 are obviously-fake placeholders, never production secrets.
 
-See docs/02-goals-and-scope.md (P2 range item 9) and
-docs/13-implementation-roadmap.md (P2 item 9).
+See docs/reference/p2-scope.md (P2 range item 9) and
+docs/reference/p2-scope.md (P2 item 9).
 """
 
 from __future__ import annotations
@@ -87,7 +87,7 @@ SPEC = CapabilitySpec(
     key="evidence",
     title="TSA/HSM 证据链 / third-party timestamp & HSM evidence",
     module=__name__,
-    roadmap_refs=("docs/02-goals-and-scope.md#P2-9", "docs/13-implementation-roadmap.md#P2-9"),
+    roadmap_refs=("docs/reference/p2-scope.md#P2-9", "docs/reference/p2-scope.md#P2-9"),
     summary="Countersign and timestamp evidence bundles via a mock TSA/HSM interface (offline).",
     status=CapabilityStatus.IMPLEMENTED,
     planned_expected_fields=("tsa_timestamp_valid", "evidence_countersigned"),

@@ -1,6 +1,6 @@
 # 仓库状态：XA-Guard / XA-202620
 
-> 快照日期：2026-07-01 21:16 PDT（仓库环境；docs 已完成物理重构；Agent Governance v1、业务 API 静态接入、项目级 OpenCode gpt-5.5 xhigh 配置与独立 Enterprise Agent Range P1 本地靶场已在当前工作树）
+> 快照日期：2026-07-02 20:06 -07:00（仓库环境；XA-Guard 主产品 L3 状态未变；独立 Enterprise Agent Range 已具备 P1/P2 本地能力、office/mail live 竖切、Arena Core 第一层解耦、红队靶场 docs 收束、attempt evidence store、tool surface、policy overlay、OpenCode/SUT adapter、redteam finding 工作流和最小 `arena` CLI 工作台）
 > 本文件仅描述当前仓库状态、验收边界与剩余差距，不记录工作历史。
 > 2026-06-20 已在 commit `432ebbc` 实跑 L3 静态验收 S1–S7（全 PASS，123 测试）与能力范围内真实验收 R2/R3/R4/R6/R7/R9；证据目录 `D:/evidence/l3-20260620T090452Z/`（final-report.json + artifact-hashes.json 149 文件）。R6 Docker build/up+healthz 已 PASS（gVisor runsc 仍 BLOCKED，Windows 无 runsc）。BUG-R9 已修复+回归测试。仍 BLOCKED：R1 独立双 500/holdout、R5 真实 Trae GUI、R6 gVisor runsc（需 Linux）、R8 外部 AIBOM 生成器、R9 第三方 TSA/HSM；R2/R3 比赛目标现按 OpenCode Go 订阅 `$60` 预算型抽样管理。
 > 2026-06-21 对 commit `6cf1ce9` 复核：统一静态 verifier `11/11` sections PASS；全量 pytest 在默认 Windows/CP1252 子进程环境为 `561 passed, 1 failed, 1 skipped`，总覆盖率 `79%`。唯一失败是 `validate_csab_gov_mini.py` 输出 Unicode 箭头触发 `UnicodeEncodeError`，设置 `PYTHONUTF8=1` 后该用例通过；唯一 skip 是本机缺 `xa-guard/sandbox:latest` 测试镜像。故当前不能写”默认环境全量测试全绿”。
@@ -33,7 +33,7 @@
 
 2026-06-23 新增的原动力大会 AI 安全专题资料进一步强化了“Agent Gateway、Agent 身份治理、控制流/数据流隔离、AI Resilience、多 Agent 编排治理”的产品叙事，但目前只是文档沉淀，尚未转化为新的实现、测试或验收证据。
 
-2026-07-01 `enterprise-agent-range/` 已从设计/P0 骨架推进到 P1 本地基线，并完成 review 修复：P1 manifest 含 242 cases（108 attack、116 benign、18 assurance），tool surface 扩展到 66 个 mock tool 且 P1 execution steps 全覆盖；fixture 路径解析拒绝越界读取，20 个委托相关 case 均有显式 delegation chain。它具备 Null Adapter、本地 MCP-like stdio/HTTP、simulated IDE replay、JSON/JSONL/Markdown/HTML 报告和 P0/P1 compare 证据包。它仍是独立靶场工作区，不属于 XA-Guard 主产品源码，不进入现有 L3 通过项，也不代表任何外部 SUT 已通过评测。
+2026-07-02 `enterprise-agent-range/` 当前状态：P1 回放基线保留 242 cases、66 个 mock tool、P2 能力子包已实现本地确定性能力；office/mail arena live 竖切保留既有 guard/null 2x2 smoke 证据。2026-07-02 晚已清理靶场 docs，删除旧编号文档和 `docs/superpowers/`，新增 `docs/plan/redteam-arena-refactor-plan.md`；代码侧已完成 Arena Core 第一层解耦：`WorldSpec`、`ChallengeSuite`、`ToolSurface`、`PolicyOverlay`、`EvidenceStore`、OpenCode agent seat、XA-Guard SUT adapter、redteam `Finding` 工作流均已拆出，`arena/live.py` 已接入 evidence store。CLI 已新增最小红队台 `arena worlds|surfaces|challenges|init-finding|promote|show|run-ab`，旧 `arena-live` 与 `finding-*` 入口保持兼容。本轮验证为本地非 live：263 个 unittest 通过、P1 manifest validate 通过、CLI smoke 通过、range runtime 无 `xa_guard` import；未运行真实 OpenCode/GLM live 调用。它仍是独立靶场工作区，不属于 XA-Guard 主产品源码，不进入现有 L3 通过项，也不代表任何外部 SUT 已通过正式评测。
 
 2026-06-30 后，`docs/README.md` 是文档唯一入口，`docs/workplan/NEXT-WORK-DESIGN.md` 是下一步工作设计入口，`docs/workplan/TODO.md` 是详细 TODO；`status.md` 仍只描述当前仓库状态和验收边界，工作历史继续写入 `log.md`。
 
@@ -58,7 +58,7 @@
 | 研究与答辩资料 | `docs/research/force-ai-security-2026/` 已整理 FORCE 原动力大会企业 AI / 智能体安全现场照片，形成逐页笔记、风险图谱、治理架构、数据/控制流安全、XA-Guard 映射和落地清单；可用于后续 D1 技术方案、答辩 PPT 和产品叙事补强 | 来源为现场照片和用户口述印象，未做外部事实核验；其中外部事件、金额、法律案例、厂商能力不得直接作为正式引用；尚未转化为代码实现或验收证据 |
 | 文档执行入口 | `docs/README.md` 已成为唯一文档入口；`docs/workplan/NEXT-WORK-DESIGN.md` 汇总下一步工作设计；`docs/workplan/TODO.md` 保留详细 TODO；`docs/delivery/` 已有 D1 草稿、D3 视频脚本和提交清单骨架 | 本次仅重构文档结构、修链接和补工作设计，不新增代码能力、测试结果、付费评测或正式提交材料 |
 | OpenCode 项目配置 | 仓库内新增 `.opencode/opencode.json`，项目默认模型为 `openai/gpt-5.5`，内置 build/plan/general/explore agent 均设置 `options.reasoningEffort: xhigh` | 配置需重启 OpenCode 后生效；未改全局用户配置，不改变 XA-Guard 运行时或验收状态 |
-| Enterprise Agent Range | `enterprise-agent-range/` 独立靶场已完成 P1 本地基线并修复 review 问题：P0 84 cases、P1 242 cases、44 fixtures、66 mock tools 且 P1 steps 全覆盖；Null Adapter、oracle/metrics、P1 evidence bundle、HTML run report、P0/P1 compare report、本地 MCP-like stdio/HTTP 和 simulated IDE replay 已具备；`python -m unittest discover -s tests` 为 30 tests PASS，P1 run 为 242 valid / 0 infra error / 0 invalid，FPR 0.0，utility 1.0 | 仍严格作为独立工作区，不导入 `src/xa_guard`、不复用 XA-Guard bench/schema/helper，不改变 L3 验收结论；尚未实现真实外部 SUT adapter、严格 MCP schema 兼容层、交互式报告 UI、容器编排、真实 Trae、真实 HSM/TSA 或生产 API 接入 |
+| Enterprise Agent Range | 独立靶场已具备 P1 replay 基线（242 cases / 66 mock tools / HTML+compare 报告）、P2 本地能力子包、office/mail arena live 竖切和 guard/null 2x2 smoke；Arena Core 第一层已拆出 `WorldSpec` / `ChallengeSuite` / `ToolSurface` / `PolicyOverlay` / `EvidenceStore` / OpenCode agent seat / XA-Guard SUT adapter / redteam `Finding`；`arena/live.py` 已接入 EvidenceStore；CLI 已新增最小红队台 `arena worlds|surfaces|challenges|init-finding|promote|show|run-ab`；docs 已收束为 `docs/README.md`、`docs/plan/`、`docs/architecture/`、`docs/redteam/`、`docs/reference/` | 仍严格作为独立工作区，不导入 `src/xa_guard`、不复用 XA-Guard bench/schema/helper，不改变 L3 验收结论；live 仍是 N=1 smoke，本轮未跑真实模型；attempt/report -> regression promotion、live N 次统计、完整报告层和更多企业域尚未实现；未接真实生产 API/HSM/TSA/公网目标 |
 
 ## 本轮性能证据（2026-06-20 实测，commit 432ebbc）
 

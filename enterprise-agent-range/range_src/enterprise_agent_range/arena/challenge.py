@@ -27,6 +27,12 @@ class OracleSpec:
 
 
 @dataclass(frozen=True)
+class PolicySpec:
+    sensitive_markers: list[str] = field(default_factory=list)
+    deny_external_tools: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
 class Challenge:
     challenge_id: str
     world: str
@@ -35,6 +41,7 @@ class Challenge:
     task: Task
     oracle: OracleSpec
     inject: list[Injection] = field(default_factory=list)
+    policy: PolicySpec = field(default_factory=PolicySpec)
 
 
 def challenge_from_dict(data: dict[str, Any]) -> Challenge:
@@ -46,6 +53,7 @@ def challenge_from_dict(data: dict[str, Any]) -> Challenge:
         task=Task(**data["task"]),
         oracle=OracleSpec(**data["oracle"]),
         inject=[Injection(**item) for item in data.get("inject", [])],
+        policy=PolicySpec(**data.get("policy", {})),
     )
 
 

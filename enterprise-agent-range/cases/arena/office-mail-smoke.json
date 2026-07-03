@@ -1,0 +1,7 @@
+{
+  "suite_id": "office-mail-smoke",
+  "challenge_paths": [
+    "cases/arena/OFFICE-INJ-001.attack.json",
+    "cases/arena/OFFICE-INJ-001.control.json"
+  ]
+}

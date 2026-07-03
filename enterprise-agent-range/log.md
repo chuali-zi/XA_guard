@@ -1,3 +1,27 @@
+# 2026-07-02 20:06 -07:00 Enterprise Agent Range Arena Core / 红队台实现
+
+- 按用户确认的方向执行重构：优先做 Arena Core 解耦与红队成员工作台地基，不优先扩题，不替红队成员设计攻击题。
+- 使用 3 个 gpt-5.5 medium 子 agent 协助并整合结果：证据核心、tool surface/policy overlay、redteam finding 工作流；主线程完成 live runner 集成、CLI `arena` 命令组、测试补齐和状态文档收口。
+- 新增/整合 Arena Core 模块：`arena/worlds.py`、`suite.py`、`surface.py`、`policy_overlay.py`、`evidence.py`、`opencode_seat.py`、`sut_xaguard.py`、`findings.py`；`challenge.py` 增加可选 `PolicySpec`；`mcp_office_server.py` 复用 tool surface schema；`live.py` 接入 `EvidenceStore` 并继续兼容既有 live smoke 行为。
+- CLI 新增最小红队台：`python -m enterprise_agent_range arena worlds|surfaces|challenges|init-finding|promote|show|run-ab`；旧 `arena-live`、`finding-init`、`finding-promote` 保持兼容，并给 `arena-live` 增加 `--suite`。
+- 新增测试：`test_arena_cli.py`、`test_arena_evidence.py`、`test_arena_findings.py`、`test_arena_opencode_and_sut.py`、`test_arena_policy_overlay.py`、`test_arena_surface.py`、`test_arena_worlds_and_suite.py`，并扩展 `test_arena_live.py` 验证 mocked null attempt 会写 `artifact-hashes.json`。
+- 验证：`$env:PYTHONPATH='range_src'; python -m unittest discover -s tests -v` 通过 263 tests；受影响 arena 子集 30 tests 通过；`arena worlds --json`、`arena surfaces --json` CLI smoke 通过；`validate --manifest cases\p1_manifest.json` 通过 242 cases / 44 fixtures；`rg "from xa_guard|import xa_guard" enterprise-agent-range\range_src\enterprise_agent_range` 无匹配。
+- 未做：未运行真实 OpenCode/GLM live 模型调用；未修改根 `src/xa_guard`；未把旧 242 个 P1 case 迁移到 live challenge schema；未实现 live attempt/report -> regression promotion、live N 次统计或多企业域扩展。
+# 2026-07-02 19:05 -07:00 docs 重构与红队台计划定锚
+
+## 本次完成
+
+- 删除旧编号 docs（00-17）和 `docs/superpowers/` 工作流目录，避免历史 brainstorm、spec、handoff 和过时 plan 继续作为当前入口。
+- 新建结构化文档入口：`docs/README.md`、`docs/plan/`、`docs/architecture/`、`docs/redteam/`、`docs/reference/`。
+- 新增审核版计划 `docs/plan/redteam-arena-refactor-plan.md`，明确下一轮优先做 Arena Core 解耦和红队工作台地基，不优先扩题。
+- 新增简洁活文档：Arena Core 架构、解耦契约、证据指标、红队成员操作指南、域参考、攻击面参考、live office/mail smoke 结论、P2 范围参考。
+- 更新 `README.md`、`status.md`、P2 模块注释引用、P2 manifest 示例和 fixture README 的文档路径。
+
+## 未完成
+
+- 未修改 runtime、case、测试或报告证据。
+- 未执行新的 live 模型调用。
+- Arena Core 代码重构等待用户审核计划后再开始。
 # 2026-07-02 09:10 -07:00 Plan 2 live office/mail 竖切
 
 ## 本次完成

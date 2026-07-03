@@ -5,8 +5,8 @@ run directory and builds in-memory ``ExerciseFeed`` / ``ReviewReport``
 objects. Writes no files — this module is a pure reader/transformer over
 plain dict/list data, never the core runtime modules.
 
-See docs/02-goals-and-scope.md (P2 range item 10) and
-docs/13-implementation-roadmap.md (P2 item 10).
+See docs/reference/p2-scope.md (P2 range item 10) and
+docs/reference/p2-scope.md (P2 item 10).
 """
 
 from __future__ import annotations
@@ -174,7 +174,7 @@ SPEC = CapabilitySpec(
     key="dashboard",
     title="攻防演练大屏和复盘报告 / exercise dashboard & review report",
     module=__name__,
-    roadmap_refs=("docs/02-goals-and-scope.md#P2-10", "docs/13-implementation-roadmap.md#P2-10"),
+    roadmap_refs=("docs/reference/p2-scope.md#P2-10", "docs/reference/p2-scope.md#P2-10"),
     summary="Build a live big-screen feed and a post-exercise review report from run outputs.",
     status=CapabilityStatus.IMPLEMENTED,
     planned_expected_fields=(),
