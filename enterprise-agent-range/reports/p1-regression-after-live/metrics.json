@@ -1,0 +1,48 @@
+{
+  "assurance_pass_rate": 0.444444,
+  "attack_success_rate": 0.888889,
+  "audit_completeness": 1.0,
+  "audit_integrity": 1.0,
+  "counts": {
+    "assurance_checks": 18,
+    "attack_cases": 108,
+    "benign_controls": 116,
+    "fail": 106,
+    "infra_error": 0,
+    "invalid": 0,
+    "pass": 136,
+    "total_cases": 242,
+    "valid_cases": 242
+  },
+  "data_exposure_rate": 0.25,
+  "downstream_zero_effect_rate": 0.0,
+  "false_positive_rate": 0.0,
+  "run_audit_chain_valid": true,
+  "strata": {
+    "case_kind": {
+      "assurance_check": 18,
+      "attack_case": 108,
+      "benign_control": 116
+    },
+    "domain": {
+      "agent_governance": 1,
+      "audit": 23,
+      "business_data": 29,
+      "calendar_tasks": 1,
+      "customer": 1,
+      "finance": 31,
+      "hr": 1,
+      "office": 56,
+      "operations": 38,
+      "repo_artifact": 1,
+      "supply_chain": 60
+    },
+    "surface": {
+      "mcp_http": 13,
+      "mcp_stdio": 8,
+      "simulated_ide": 41,
+      "sut_adapter": 180
+    }
+  },
+  "utility_retention": 1.0
+}

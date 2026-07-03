@@ -1,0 +1,361 @@
+# 工具能力声明 — Gate4 / Gate2 / Gate3 共用
+#
+# ★ 本文件的 risk_level 字段是全项目 risk 分级的唯一事实源。
+#   Gate2 / Gate3 运行时 risk 均由此派生（由 src/xa_guard/policy/layered.py 的
+#   _derive_tool_risks_from_caps() 在加载时派生，不再读 gate2_tool_risks.yaml）。
+#   每个新工具上线只需在此登记一次，risk_level 由此字段统一控制。
+#   分级法规依据见 docs/risk_classification_basis.md。
+#
+# capabilities: 工具能做什么（信息流可达性）
+#   NETWORK_EXTERNAL  外网访问
+#   NETWORK_INTERNAL  内网访问
+#   FS_READ           读文件
+#   FS_WRITE          写文件
+#   EXEC              执行命令
+#   NOTIFY            外发消息
+#   DATA_EXPORT       数据导出
+#   DATA_INGEST       数据采集 / 入训
+#   POLICY_ADMIN      策略变更
+#   AUTHZ_ADMIN       权限变更
+#   AUDIT_ADMIN       审计配置 / 清理
+#   MODEL_CALL        模型调用
+#   MODEL_TRAINING    模型训练 / 微调
+#   MODEL_DEPLOY      模型上线 / 切换
+#   CONTENT_PUBLISH   内容发布 / 推荐
+#   PAYMENT           支付动作
+#
+# input_max_taint: 工具能接受的最高数据敏感度
+# output_taint:    工具输出的固定标签
+# risk_level:      green / yellow / red
+
+tools:
+  # demo / 集成测试 fixture 工具（tests/integration/_fixture_*_server.py）
+  # echo 仅回显入参，无外网 / 通知 / 执行能力，故 OUTBOUND 不会触发机密外泄 DENY。
+  - tool_name: echo
+    capabilities: []
+    input_max_taint: CONFIDENTIAL
+    output_taint: PUBLIC
+    risk_level: green
+
+  - tool_name: list_servers
+    capabilities: [NETWORK_INTERNAL, FS_READ]
+    input_max_taint: PUBLIC
+    output_taint: INTERNAL
+    risk_level: green
+
+  - tool_name: get_cpu
+    capabilities: [NETWORK_INTERNAL]
+    input_max_taint: PUBLIC
+    output_taint: INTERNAL
+    risk_level: green
+
+  - tool_name: read_log
+    capabilities: [FS_READ]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: green
+
+  - tool_name: content_generation
+    capabilities: [CONTENT_PUBLISH]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: yellow
+
+  - tool_name: jailbreak
+    capabilities: []
+    input_max_taint: PUBLIC
+    output_taint: PUBLIC
+    risk_level: yellow
+
+  - tool_name: prompt_leak
+    capabilities: []
+    input_max_taint: PUBLIC
+    output_taint: PUBLIC
+    risk_level: yellow
+
+  - tool_name: tool_call_with_external_input
+    capabilities: []
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: yellow
+
+  - tool_name: user_session_risk
+    capabilities: []
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: yellow
+
+  - tool_name: write_file
+    capabilities: [FS_WRITE]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: yellow
+
+  - tool_name: append_file
+    capabilities: [FS_WRITE]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: yellow
+
+  - tool_name: restart_service
+    capabilities: [NETWORK_INTERNAL, EXEC]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: yellow
+
+  - tool_name: exec_command
+    capabilities: [EXEC, FS_WRITE]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: red
+
+  - tool_name: shell
+    capabilities: [EXEC, FS_WRITE]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: red
+
+  - tool_name: delete_file
+    capabilities: [FS_WRITE]
+    input_max_taint: INTERNAL
+    output_taint: PUBLIC
+    risk_level: red
+
+  - tool_name: drop_table
+    capabilities: [NETWORK_INTERNAL, EXEC]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: red
+
+  - tool_name: red_operation
+    capabilities: [EXEC]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: red
+
+  - tool_name: send_notification
+    capabilities: [NETWORK_EXTERNAL, NOTIFY]
+    input_max_taint: INTERNAL                # 不接受 CONFIDENTIAL
+    output_taint: PUBLIC
+    risk_level: yellow
+
+  - tool_name: send_email
+    capabilities: [NETWORK_EXTERNAL, NOTIFY]
+    input_max_taint: INTERNAL
+    output_taint: PUBLIC
+    risk_level: yellow
+
+  - tool_name: post_url
+    capabilities: [NETWORK_EXTERNAL]
+    input_max_taint: PUBLIC                  # 公网只能接受 PUBLIC
+    output_taint: PUBLIC
+    risk_level: yellow
+
+  - tool_name: cross_domain_call
+    capabilities: [NETWORK_EXTERNAL]
+    input_max_taint: PUBLIC
+    output_taint: PUBLIC
+    risk_level: yellow
+
+  - tool_name: business_get_status
+    capabilities: [NETWORK_EXTERNAL]
+    input_max_taint: PUBLIC
+    output_taint: INTERNAL
+    risk_level: green
+    description: 真实业务 HTTP API 状态查询；只允许固定 /status endpoint，不暴露任意 URL。
+
+  - tool_name: business_query_record
+    capabilities: [NETWORK_EXTERNAL]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: yellow
+    description: 真实业务 HTTP API 记录查询；外部网络能力受 Gate4 污点上限约束。
+
+  - tool_name: business_submit_ticket
+    capabilities: [NETWORK_EXTERNAL, NOTIFY]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: red
+    description: 真实业务 HTTP API 工单提交；写入/外发型操作必须进入 HITL 审批。
+
+  - tool_name: export_generated_content
+    capabilities: [NETWORK_EXTERNAL, CONTENT_PUBLISH]
+    input_max_taint: PUBLIC
+    output_taint: PUBLIC
+    risk_level: red
+
+  - tool_name: export_database
+    capabilities: [NETWORK_INTERNAL, FS_READ, DATA_EXPORT]
+    input_max_taint: INTERNAL
+    output_taint: CONFIDENTIAL
+    risk_level: red
+
+  - tool_name: update_audit_policy
+    capabilities: [AUDIT_ADMIN, POLICY_ADMIN]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: red
+
+  - tool_name: log_cleanup
+    capabilities: [AUDIT_ADMIN, FS_WRITE]
+    input_max_taint: INTERNAL
+    output_taint: PUBLIC
+    risk_level: red
+
+  - tool_name: update_backup_policy
+    capabilities: [POLICY_ADMIN]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: red
+
+  - tool_name: update_encryption_policy
+    capabilities: [POLICY_ADMIN]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: red
+
+  - tool_name: grant_permission
+    capabilities: [AUTHZ_ADMIN]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: red
+
+  - tool_name: pending_approval_op
+    capabilities: [AUTHZ_ADMIN]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: red
+
+  - tool_name: update_user_role
+    capabilities: [AUTHZ_ADMIN]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: red
+
+  - tool_name: admin_action
+    capabilities: [AUTHZ_ADMIN, POLICY_ADMIN]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: red
+
+  - tool_name: publish_system
+    capabilities: [NETWORK_INTERNAL, MODEL_DEPLOY]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: red
+
+  - tool_name: deploy_system
+    capabilities: [NETWORK_INTERNAL, MODEL_DEPLOY]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: red
+
+  - tool_name: crawl_url
+    capabilities: [NETWORK_EXTERNAL, DATA_INGEST]
+    input_max_taint: PUBLIC
+    output_taint: INTERNAL
+    risk_level: yellow
+
+  - tool_name: import_training_data
+    capabilities: [FS_READ, DATA_INGEST]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: red
+
+  - tool_name: ingest_training_data
+    capabilities: [FS_READ, DATA_INGEST]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: red
+
+  - tool_name: train_model
+    capabilities: [MODEL_TRAINING, DATA_INGEST]
+    input_max_taint: CONFIDENTIAL
+    output_taint: INTERNAL
+    risk_level: red
+
+  - tool_name: fine_tune_model
+    capabilities: [MODEL_TRAINING, DATA_INGEST]
+    input_max_taint: CONFIDENTIAL
+    output_taint: INTERNAL
+    risk_level: red
+
+  - tool_name: start_annotation
+    capabilities: [DATA_INGEST]
+    input_max_taint: CONFIDENTIAL
+    output_taint: INTERNAL
+    risk_level: yellow
+
+  - tool_name: approve_label
+    capabilities: [DATA_INGEST]
+    input_max_taint: CONFIDENTIAL
+    output_taint: INTERNAL
+    risk_level: yellow
+
+  - tool_name: ingest_labeled_data
+    capabilities: [DATA_INGEST]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: red
+
+  - tool_name: deploy_model
+    capabilities: [MODEL_DEPLOY]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: red
+
+  - tool_name: update_model
+    capabilities: [MODEL_DEPLOY, MODEL_TRAINING]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: red
+
+  - tool_name: switch_model
+    capabilities: [MODEL_DEPLOY]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: yellow
+
+  - tool_name: call_model
+    capabilities: [MODEL_CALL, NETWORK_EXTERNAL]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: yellow
+
+  - tool_name: enable_minor_service
+    capabilities: [CONTENT_PUBLISH]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: yellow
+
+  - tool_name: payment_action
+    capabilities: [NETWORK_EXTERNAL, PAYMENT]
+    input_max_taint: PUBLIC
+    output_taint: PUBLIC
+    risk_level: red
+
+  - tool_name: recommend_content
+    capabilities: [CONTENT_PUBLISH]
+    input_max_taint: INTERNAL
+    output_taint: PUBLIC
+    risk_level: yellow
+
+  - tool_name: install_plugin
+    capabilities: [NETWORK_EXTERNAL, DATA_INGEST, FS_WRITE, EXEC]
+    input_max_taint: PUBLIC
+    output_taint: INTERNAL
+    risk_level: red
+    description: 插件安装会引入外部代码、依赖和运行权限，是智能体供应链入口，纳入统一工具总账。
+
+  # Enterprise Agent Range live office/mail tools.
+  - tool_name: read_mail
+    capabilities: [NETWORK_INTERNAL, FS_READ]
+    input_max_taint: PUBLIC
+    output_taint: INTERNAL
+    risk_level: green
+
+  - tool_name: query_project
+    capabilities: [NETWORK_INTERNAL, FS_READ]
+    input_max_taint: PUBLIC
+    output_taint: CONFIDENTIAL
+    risk_level: green

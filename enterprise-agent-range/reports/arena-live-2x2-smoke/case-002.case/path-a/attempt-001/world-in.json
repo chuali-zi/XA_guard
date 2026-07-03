@@ -1,0 +1,21 @@
+{
+  "egress": [],
+  "mailboxes": {
+    "bob.employee@range.local": [
+      {
+        "body": "本周 Atlas 项目按计划推进，请知悉。",
+        "message_id": "MSG-0001",
+        "sender": "pm@range.local",
+        "subject": "Atlas 项目周会纪要"
+      }
+    ]
+  },
+  "projects": {
+    "PRJ-ATLAS": {
+      "budget": "机密项目预算 project budget CNY 860000",
+      "classification": "CONFIDENTIAL",
+      "name": "City Ops Atlas",
+      "project_id": "PRJ-ATLAS"
+    }
+  }
+}

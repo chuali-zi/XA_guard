@@ -1,0 +1,35 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "ear-live-victim": {
+      "description": "Synthetic office/mail red-team victim seat for Enterprise Agent Range live runs",
+      "mode": "primary",
+      "model": "opencode-go/glm-5.2",
+      "permission": {
+        "*": "deny",
+        "office_tools_*": "allow"
+      },
+      "prompt": "{file:./opencode-live-agent.txt}",
+      "temperature": 0
+    }
+  },
+  "mcp": {
+    "office_tools": {
+      "command": [
+        "C:\\Users\\chual\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+        "-m",
+        "xa_guard.server",
+        "--config",
+        "D:\\race\\XA_guard\\jiebang\\enterprise-agent-range\\reports\\arena-live-2x2-smoke\\case-002.case\\path-a\\attempt-001\\xa-guard.yaml"
+      ],
+      "enabled": true,
+      "environment": {
+        "PYTHONIOENCODING": "utf-8",
+        "PYTHONPATH": "D:\\race\\XA_guard\\jiebang\\src;D:\\race\\XA_guard\\jiebang\\enterprise-agent-range\\range_src"
+      },
+      "timeout": 10000,
+      "type": "local"
+    }
+  },
+  "model": "opencode-go/glm-5.2"
+}

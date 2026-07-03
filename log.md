@@ -1,4 +1,29 @@
+# 2026-07-02 09:10 PDT Enterprise Agent Range live office/mail 竖切
+
+- 在 `enterprise-agent-range` 的 `range-decoupling` 分支实现 Plan 2 live 竖切：新增标准 MCP office/mail server、OpenCode live agent seat、外部 XA-Guard stdio adapter、`arena-live` CLI 和 live evidence 输出。
+- 跑通 `OpenCode 1.17.12 -> XA-Guard stdio MCP -> Enterprise Agent Range office/mail MCP server`，最终证据在 `enterprise-agent-range/reports/arena-live-2x2-smoke/`：attack+guard 被 Gate3 deny 且无外发，attack+null 外泄，两个 benign control 均 allow/pass。
+- 更新 `enterprise-agent-range/status.md`、`enterprise-agent-range/log.md`，新增 spike 文档 `enterprise-agent-range/docs/superpowers/spikes/2026-07-02-xaguard-downstream-mcp.md`。
+- 验证：`PYTHONPATH=range_src python -m unittest discover -s tests -v` 236 tests PASS；`validate p1_manifest` PASS；旧 P1 runner `p1-regression-after-live` 242 valid / 0 infra error / 0 invalid。
+- 未完成：live 仍是 N=1 smoke；Gate3 live overlay 仍是 Atlas 预算专用规则；242 旧 case 未迁 live schema；05/15/16/17 正式文档尚未大面积回填。
+
 # 工作日志
+
+## 2026-07-02 05:00 PDT 赛题对齐与 MCP 跑题风险查证
+
+- 起因：用户担心当前 XA-Guard / MCP 服务是否偏离赛题，以及 agent 可能不调用 MCP 导致实现失效，要求严肃查证而非安慰。
+- 已读取赛题 PDF：`docs/source-of-truth/XA-202620中国雄安集团数字城市科技有限公司-面向政企场景的大模型智能体安全关键技术研究比赛方案.pdf`，确认官方四个方向为复杂输入链路攻击识别、工具调用/任务执行安全约束、插件/Skill/脚本供应链安全、政企场景安全评测与审计溯源。
+- 已核对核心实现：`src/xa_guard/proxy/upstream.py`、`proxy/downstream.py`、`pipeline.py`、`gates/gate1_input.py` 到 `gate6_audit.py`、`aibom/gateway.py`、`sdk/decorators.py`、`integrations/langchain.py`、`configs/xa-guard.yaml`、`policies/baseline/gate3_rules.yaml`、`gate4_capabilities.yaml`。
+- 查证结论：MCP 不是安全能力本体，而是工具调用入口和适配层；只要工具通过 XA-Guard MCP 网关暴露，`tools/call` 会先进入 pipeline 再决定放行、阻断或审批。若 agent 另有直连工具、内置 shell、浏览器或业务 API，XA-Guard 当前无法强制拦截，这是网关型架构的真实边界。
+- 已运行验证：`PYTHONPATH=src;.; PYTHONUTF8=1 python -m pytest tests/integration/test_mcp_e2e.py tests/integration/test_governance_mcp.py tests/integration/test_business_api_downstream.py -q`，结果 9 passed；`python -m pytest tests/test_sdk_protect.py tests/test_langchain_integration.py -q`，结果 10 passed。
+- 未做事项：未修改产品代码、策略、测试代码或 `status.md`；未执行真实 Trae GUI、Linux gVisor、外部 AIBOM 生成器、第三方 TSA/HSM 或 R2/R3 付费评测。
+
+## 2026-07-02 本地清理 pytest_tmp 临时目录
+
+- 用户要求清理仓库根目录下历史 `pytest_tmp_*` / `.pytest_*` 临时目录；删除前确认：无 pytest 正在运行、目录均在 `.gitignore` 内、非源码/配置，仅测试运行残留。
+- 第一轮普通权限删除：248 项中成功 140 项；剩余 108 项因 NTFS ACL 异常（WSL 侧可见 `d--x--x--x`，Windows 报 Access denied）无法删除。
+- 第二轮以管理员权限执行 `takeown` + `icacls` + `Remove-Item`：剩余 108 项全部删除。
+- 清理后根目录 `pytest_tmp` / `.pytest` 相关目录与文件均为 0；`.gitignore` 规则保留，后续测试仍会生成但不会再进 git。
+- 未改代码/配置；`run_agentdojo_opencode.py` 等引用的 `pytest_tmp_opencode_*` 路径下次运行会自动重建。
 
 ## 2026-07-01 21:16 PDT Enterprise Agent Range P1 review 修复
 

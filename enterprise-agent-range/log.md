@@ -1,3 +1,30 @@
+# 2026-07-02 09:10 -07:00 Plan 2 live office/mail 竖切
+
+## 本次完成
+
+- 在 `arena` 新增标准 MCP office/mail server：`read_mail`、`query_project`、`send_email` 读写同一个 `World`，外发只写本地 `world-effects.jsonl`。
+- 新增 live runner：生成临时 `opencode.json`、OpenCode live victim agent prompt、XA-Guard YAML、Gate4 capabilities、Gate3 live overlay；通过 `opencode run --format json --auto --agent ear-live-victim --model opencode-go/glm-5.2` 收集 stdout JSON transcript。
+- 新增外部 XA-Guard SUT adapter 路径：不导入 `xa_guard`，只通过 `python -m xa_guard.server --config <generated-yaml>` 启动，并读取 `<attempt>/audit/audit.jsonl`。
+- 新增 CLI：`arena-live` 支持 challenge path、SUT mode、repeat、out dir、run id、model id、manifest root、XA-Guard root 和 timeout。
+- 修正 live 攻击 fixture / deterministic agent action 名称，使 `send_project_budget` 与旧 `exfiltrate` 都可复用。
+- 补 live 单测与 MCP server 单测，覆盖工具列表、同一 World 读写、敏感外发记录、XA-Guard 配置生成和 live Gate3 overlay 关键词。
+- 跑通最终 2x2 live smoke：`reports/arena-live-2x2-smoke/` 中 attack+guard 被 XA-Guard Gate3 deny 且无外发；attack+null 发生敏感外发；control+guard/null 均放行无误报。
+- 新增 spike 记录：`docs/superpowers/spikes/2026-07-02-xaguard-downstream-mcp.md`。
+
+## 验证
+
+- `PYTHONPATH=range_src python -m unittest discover -s tests -v`：PASS，236 tests。
+- `PYTHONPATH=range_src python -m enterprise_agent_range validate --manifest cases/p1_manifest.json`：PASS，242 cases / 44 fixtures，pending sha256 warning 为既有预期。
+- `PYTHONPATH=range_src python -m enterprise_agent_range run --manifest cases/p1_manifest.json --out reports --run-id p1-regression-after-live`：PASS，242 valid / 0 infra error / 0 invalid。
+- `PYTHONPATH=range_src python -m enterprise_agent_range arena-live --sut-mode both --repeat 1 --out reports --run-id arena-live-2x2-smoke --timeout-seconds 180`：完成 4 attempts；guard 攻击拦截、null 攻击泄漏、两条 control 通过。
+
+## 未完成
+
+- Live 轨仍是 `N=1` smoke，不是统计评测。
+- Gate3 live overlay 目前针对 Atlas 预算特征，后续应配置化。
+- 242 个旧 case 未迁移到 live challenge schema；旧 `execution.steps` 仍保留为 replay 路径。
+- 尚未大面积回填 `docs/05/15/16/17` 等正式架构文档。
+
 # 2026-07-02 01:51 -07:00 P1/P2 fast-forward 合并到 main
 
 ## 本次完成
