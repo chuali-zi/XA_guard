@@ -5,10 +5,11 @@
 ## 先读顺序
 
 1. [红队靶场重构计划 / 当前执行状态](plan/redteam-arena-refactor-plan.md)
-2. [Arena Core 架构](architecture/arena-core.md)
-3. [解耦契约](architecture/decoupling-contract.md)
-4. [红队成员操作指南](redteam/operator-guide.md)
-5. [证据与指标口径](architecture/evidence-and-metrics.md)
+2. [企业级 Agent Seat 规划](plan/enterprise-seat-plan.md)
+3. [Arena Core 架构](architecture/arena-core.md)
+4. [解耦契约](architecture/decoupling-contract.md)
+5. [红队成员操作指南](redteam/operator-guide.md)
+6. [证据与指标口径](architecture/evidence-and-metrics.md)
 
 ## 目录结构
 

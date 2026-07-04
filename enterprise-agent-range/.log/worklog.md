@@ -59,3 +59,10 @@
 ## 2026-07-01
 
 创建 `enterprise-agent-range/` 独立靶场设计区，落地设计说明、范围、架构、资产、角色、工具面、攻击分类、场景矩阵、指标、证据、路线、风险、数据模型和数据流文档。当前仅为文档设计，未实现运行时代码，未耦合 `src/xa_guard` 或既有 `docs/`。
+
+# 2026-07-04 企业级 Agent Seat 规划
+
+- 用户说明这是模拟企业 Seat planning 任务，不是编码任务。按此方向在 `enterprise-agent-range/docs/plan/enterprise-seat-plan.md` 新增企业级 Seat 设计规划。
+- 设计覆盖：模拟企业"数字城市科技集团"概览、Seat 分级（L1-L4 + Test）、6 个域（Office/Operations/Business Data/Dev Supply/Governance/Audit）的 156 个 Seat 分配表、按域的 Seat 能力定义、跨域访问规则矩阵、委托链约束、Seat 生命周期（Provisioning→Active→Suspended→Retired）、成本模型（月均 ~$1,040）、与 Arena Core 各组件的映射关系、安全边界。
+- 更新 `enterprise-agent-range/docs/README.md` 添加 Seat 规划入口。
+- 本规划不修改 runtime 代码、不改变 XA-Guard 验收结论、不引入真实模型调用。

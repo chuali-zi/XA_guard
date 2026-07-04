@@ -1,3 +1,9 @@
+# 2026-07-04 Open Agent Range SP0 spike 适配性复查
+
+- 按用户要求检查 `open-agent-range/spike.py` 是否符合“真实一天沙盘，而不是复杂题目”的预期；读取了 `open-agent-range/PRD.md`、`status.md`、`docs/specs/SP0-walking-skeleton-design.md`、`spike.py` 和模块日志。
+- 本地重跑离线验收：`python spike.py`、`python spike.py --probe-violation`、AST 语法检查均通过；为避免外部成本/依赖，本次未重跑 OpenCode live 调用，只按既有日志保留其历史通过声明。
+- 结论：SP0 walking skeleton 成立，已证明世界、工具、账本、属性判据、Seat adapter 的最小闭环；但还不满足真实红队沙盘复杂度，仍缺多流程世界状态、开放注入面、SUT/XA-Guard in-loop、持久化账本、红队工作台和追责报告层。已同步更新 `open-agent-range/status.md`、`open-agent-range/log.md`、`open-agent-range/.log/worklog.md` 与根 `status.md`。
+
 # 2026-07-02 20:06 -07:00 Enterprise Agent Range Arena Core / 红队台实现
 
 - 按用户确认的方向执行重构：优先做 Arena Core 解耦与红队成员工作台地基，不优先扩题，不替红队成员设计攻击题。
@@ -2534,3 +2540,9 @@ Key finding:
   is not an effective primary detector for current MCP/tool-call, indirect
   injection, RAG poisoning, or tool-output poisoning style inputs. Current
   Gate1 detection remains rule-led.
+# 2026-07-04 企业级 Agent Seat 规划（Enterprise Agent Range）
+
+- 用户说明这是模拟企业 Seat planning 任务，不是编码任务。按此方向在 `enterprise-agent-range/docs/plan/enterprise-seat-plan.md` 新增企业级 Agent Seat 设计规划。
+- 规划范围：模拟企业"数字城市科技集团"（~500 员工、~150 Agent Seat）、L1-L4 + Test 五级 Seat 体系、6 个企业域（Office/Operations/Business Data/Dev Supply/Governance/Audit）的 Seat 分配与能力定义、跨域访问规则矩阵、委托链约束、Seat 生命周期、成本模型（月均 ~$1,040）、与 Arena Core 组件的映射关系。
+- 更新 `enterprise-agent-range/docs/README.md` 先读顺序添加该规划入口。
+- 本规划不修改 runtime 代码、不改变 XA-Guard 验收结论、不引入真实模型调用。
