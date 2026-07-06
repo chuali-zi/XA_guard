@@ -217,6 +217,8 @@ def test_budget_result_rejects_dirty_or_mismatched_runner(tmp_path: Path):
     payload["run"]["runner_dirty"] = True
     _write_json(result, payload)
     assert _result_matches(plan, job, result) is False
+    plan["require_clean"] = False
+    assert _result_matches(plan, job, result) is True
 
 
 def test_provider_quota_pauses_phase_without_marking_remaining_jobs(tmp_path: Path, monkeypatch):

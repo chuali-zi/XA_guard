@@ -247,6 +247,7 @@ def build_plan(config_path: Path, config: dict[str, Any]) -> dict[str, Any]:
         "created_at": _utc_now(),
         "config_path": str(config_path),
         "config_sha256": locks["config_sha256"],
+        "require_clean": bool(config.get("require_clean", True)),
         "locks": locks,
         "execution": {
             "opencode_executable": oc.get("executable", "opencode.cmd"),
@@ -578,7 +579,7 @@ def _result_matches(plan: dict[str, Any], job: dict[str, Any], result_path: Path
         return False
     if "runner_commit" in run and run.get("runner_commit") != plan["locks"]["repository"]["commit"]:
         return False
-    if run.get("runner_dirty") is True:
+    if plan.get("require_clean", True) and run.get("runner_dirty") is True:
         return False
     if "acceptance_config_sha256" in run and run.get("acceptance_config_sha256") != plan.get("config_sha256"):
         return False
@@ -612,7 +613,7 @@ def _execution_lock_errors(plan: dict[str, Any]) -> list[str]:
             continue
         if current_commit != lock.get("commit"):
             errors.append(f"execution_commit_changed:{name}")
-        if dirty:
+        if dirty and (plan.get("require_clean", True) or not lock.get("dirty")):
             errors.append(f"execution_repository_dirty:{name}")
     config_home = plan.get("execution", {}).get("config_home")
     config_path = None if config_home in {None, "default"} else Path(config_home)

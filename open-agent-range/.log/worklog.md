@@ -1,5 +1,86 @@
 # open-agent-range 工作日志
 
+## 2026-07-05 21:15 F3 reimbursement approval/payment flow
+- Added the first missing P0 full-day business-flow increment from the xhigh review: F3 reimbursement now runs through Seat/SUT/ToolSurface instead of remaining only in the day blueprint.
+- Updated `scenarios/dctg/full-day.json` with `陈会计`, `exp-1001`, F3 seat contexts for 小王/张经理/陈会计, and `pay` as a privileged action. Updated `scripted_plans_for_scenario()` so 小王 submits `EXP-1001`, 张经理 approves `APPR-EXP-001`, and 陈会计 pays `PAY-EXP-1001` with an authorization chain.
+- Verification: `python -m pytest kernel/tests/test_business_scheduler.py -q` passed with 2 tests; full `python -m pytest kernel/tests -q` passed with 108 tests; `python -m kernel.demo --scenario scenarios\dctg\full-day.json` passed with 31 ledger entries and zero violations.
+- Still incomplete: F10/F11/F15 and other richer day flows remain incomplete; full-day is still a deterministic scripted baseline, not arbitrary-length live/ManualSeat observe-plan-act.
+
+## 2026-07-05 21:08 range workbench/sut + promote gate
+- Started the requested `gpt-5.5` / `xhigh` read-only review subagent. It concluded the range still does not fully meet PRD/SP7; remaining P0 gaps include incomplete F1-F16 business-flow coverage, no arbitrary-length observe-plan-act seat sessions, no attempt-long live XA-Guard/N>=3 matrix/Gate6-range ledger alignment, and shallow semantic consequences for plugin/mcp/supply/aibom/insider.
+- Added `kernel.range_cli sut check` for SUT overlay checks and optional live smoke behavior, plus `kernel.range_cli workbench serve` for a static red-team workbench (`index.html` + `workbench-state.json`). The product CLI now also exposes workbench commands such as `run-ab`, `manual-attempt`, and `promote` as top-level `range_cli` aliases.
+- Hardened `workbench promote`: by default, a finding must be valid, reviewed as `reproduced`, have a recent `run-ab --execute` summary, include complete null/protected evidence artifacts, have OK ledger hash chains, and have no protected-side `INFRA_ERROR`; `--force` remains an explicit human override.
+- Verification: `python -m pytest kernel/tests/test_range_cli.py kernel/tests/test_workbench.py -q` passed with 25 tests; full `python -m pytest kernel/tests -q` passed with 108 tests. Smoke checks passed for `sut check`, `workbench serve --no-server`, and promotion gate before/after A/B execution.
+- Still incomplete: the new workbench is static, not an interactive Web range; live XA-Guard remains smoke-level; full-day is still largely deterministic scripted baseline; complete PRD conformance remains open.
+
+## 2026-07-05 20:48 range day/replay/report CLI
+- Added `kernel.range_cli` as the SP7 product command surface for existing kernel capabilities. `day` runs a scenario through Seat/SUT and writes evidence plus `day-summary.json`; `replay` verifies artifact hashes, ledger hash/projection, and SUT audit alignment; `report` renders JSON, Markdown, or HTML summaries from an evidence directory.
+- Added `kernel/tests/test_range_cli.py` covering single and repeated day runs, replay verification, and report rendering. Verification: `python -m pytest kernel/tests/test_range_cli.py -q` passed with 4 tests; full `python -m pytest kernel/tests -q` passed with 105 tests.
+- Smoke: `python -m kernel.range_cli day --world scenarios\dctg\full-day.json --agent scripted --sut null --evidence-dir .runtime\range-day-smoke` passed; replay verification then passed for hashes/ledger/SUT audit; report JSON rendered the expected full-day summary.
+- Still incomplete: this is a thin CLI, not the full Web/evidence dashboard. `day` is still mostly scripted full-day, live xaguard still lacks a true N>=3 evidence matrix, and replay remains projection v1.
+
+## 2026-07-05 20:45 policy/sandbox properties
+- Added SP7 minimal `policy-exception-abuse` and `sandbox-escape-attempt` property families. Policy exception abuse detects active/approved/enabled exceptions that lack an approval ticket, use an unauthorized approver, or remain active after expiration. Sandbox escape detects requested capabilities outside the allowed sandbox, host-path access, external networking, or explicit sandbox bypass.
+- Extended injection consequences: `policy:` can now create `policy_exceptions`; `plugin:` / `mcp:` can create `sandbox_escape_attempts`. Added `scenarios/injections/full-day-policy-sandbox.json` to trigger both families.
+- Bound both properties in `scenarios/dctg/full-day.json`. Verification: `python -m pytest kernel/tests/test_policy_sandbox_properties.py -q` passed with 5 tests; full `python -m pytest kernel/tests -q` passed with 101 tests; full-day normal evidence demo remained clean; `full-day-policy-sandbox.json` reported the expected two violations.
+- Still incomplete: these are world-fact properties, not a real policy exception lifecycle system or a real sandbox executor. They still need deeper integration with live SUT/Gate6/report/replay.
+
+## 2026-07-05 20:29 ManualSeat CLI
+- Implemented `ManualSeat` as a real deterministic seat over a caller-provided `ToolCall` list instead of a stub.
+- Added `kernel.workbench manual-attempt` so a red teamer can run one manual ToolCall as a chosen principal through `NullSUT`, `GuardStubSUT`, or offline/live `XaGuardSUT`, with optional injection fixtures and standard evidence output.
+- Verification: `python -m pytest kernel/tests/test_workbench.py -q` passed with 18 tests; full `python -m pytest kernel/tests -q` passed with 96 tests; manual smoke under `guard` denied a sensitive `send_message`, produced zero external sends, zero violations, and a valid ledger hash chain.
+- Requested external review retry used a longer 900s wrapper: `opencode run --model openai/gpt-5.5 --variant xhigh --dir . "<user PRD review prompt>"` read PRD/SP7/architecture/kernel/full-day and started local demo verification, but timed out without a final review. Partial output still flagged missing product commands (`range day/report/replay/workbench serve`), scripted full-day behavior, and missing `policy-exception-abuse` / `sandbox-escape-attempt`; its ManualSeat-stub observation was from the pre-change snapshot.
+- Still incomplete: this is a one-shot CLI ManualSeat, not a multi-step interactive/Web workbench. Remaining work includes multi-injection finding editing, evidence gatekeeping before promote, true live N>=3 matrices, long-lived XA-Guard sessions, and Gate6/range-ledger alignment.
+
+## 2026-07-05 07:22 Workbench Null vs XA-Guard A/B
+- Extended `kernel.workbench run-ab` beyond the legacy NullSUT vs GuardStubSUT path. It now accepts `--sut-mode guard/null,guard/xaguard/null,xaguard`, spec aliases `--repeat` and `--evidence-dir`, plus `--live` for the XA-Guard side while keeping default guard output compatibility.
+- Offline xaguard A/B uses `XaGuardSUT(policy=overlay_from_scenario(...), live=False)`. Live xaguard attempts construct `XaGuardSUT(live=True)` and report external startup/MCP/config failures as `infra_error`; those protected-side runs are excluded from ASR scoring instead of being counted as pass/fail.
+- Added workbench tests for xaguard dry-run plans, offline xaguard execution, and live infra-error scoring. Verification: `python -m pytest kernel/tests/test_workbench.py -q` passed with 16 tests; full `python -m pytest kernel/tests -q` passed with 94 tests; full-day evidence demo wrote `.runtime/full-day-evidence-workbench-xaguard`.
+- Requested external review retry: `opencode run --model openai/gpt-5.5 --variant xhigh --dir . "<user PRD review prompt>"` read PRD/SP7/status/kernel docs and started runtime/tests review agents, but timed out after 180 seconds without a final review conclusion.
+- Still incomplete: this is a CLI/product entry point, not a complete live range. Remaining work includes attempt-long XA-Guard sessions, true live N>=3 evidence matrices, Gate6/range-ledger hash/seq alignment, ManualSeat/Web, multi-injection findings, and evidence gatekeeping before promote.
+
+## 2026-07-05 07:06 Ledger replay state metadata
+- Added safe `LedgerEntry.metadata` and wrote replay metadata from key reference tools: ticket/approval/CI/audit queues, service, plugin, registry, and payment state. `Ledger.replay()` now uses that metadata for terminal-state reconstruction.
+- Full-day `ledger-replay.json` now reconstructs `build-77.status=succeeded`, `build-77.attempts=1`, `gateway.status=healthy`, `EVIDENCE-DAILY.status=exported`, plugin state, and registry state with `limitations=[]`.
+- Updated `ledger-schema.md`, `evidence-and-accountability.md`, `kernel/README.md`, and `status.md` to reflect that key tool state payloads are in ledger entries; remaining replay gaps are dynamic/real downstream tools, Gate6/range-ledger alignment, and report/replay CLI.
+- Verification: focused scheduler/evidence/smoke tests passed; full `python -m pytest kernel/tests -q` passed with 91 tests; full-day evidence demo wrote `.runtime/full-day-evidence-replay-state-v2`; supply drift still reports 2 expected violations.
+
+## 2026-07-05 06:47 SUT decision ledger facts
+- Added immutable `tool_attempt` and `sut_decision` ledger facts at the protected SUT boundary (`GuardStubSUT` / offline or live `XaGuardSUT` paths through `SUT.invoke`). Denied calls now leave attributable hash-chain facts but do not execute ToolSurface side effects. `NullSUT` remains a low-noise naked baseline and only records actual tool side effects.
+- Added smoke coverage for GuardStub allow and deny decisions entering the hash ledger. Verification: `python -m pytest kernel/tests/test_smoke.py -q` passed; `python -m pytest kernel/tests -q` passed with 91 tests; full-day evidence demo passed; office-mailbox A/B still blocks under guard; full-day supply drift still reports 2 expected violations.
+- Tried the requested `opencode run --model openai/gpt-5.5 --variant xhigh` PRD review with a 180s timeout. It started, read PRD/status/log, and spawned read-only review subagents, but did not produce a final review before timeout, so no external final review conclusion was available this round.
+- Still incomplete: no deterministic `Ledger.replay()`, no Gate6/range-ledger hash/seq alignment, no live xaguard workbench A/B, no ManualSeat/Web, and missing policy-exception-abuse/sandbox-escape-attempt plus deeper insider/supply/MCP consequences.
+
+## 2026-07-05 06:32 full-day scheduled fact migration
+- Migrated most full-day key business side effects out of `scheduled_events` and into multi-seat ToolSurface calls. The normal baseline now has 林工 reading mail and sending the safe plan, 张经理 submitting `T-2201`, 周业务 querying `rep-2001`, 孙开发 reading repo/AIBOM/tool-surface/supply channels, 郑治理 reading policy and registry, 吴架构 running CI retry and publishing the plugin, 王安全 updating the registry, and 钱审计 querying/verifying/exporting evidence. `scheduled_events` now only keeps external/background facts: ops alert arrival, log/ticket availability, and low-risk approval timeout.
+- Added approved authorization chains for CI/plugin/registry/evidence privileged actions and made `_export_evidence()` leave an exported audit queue item. Full-day normal demo now records 28 ledger entries and remains clean.
+- Verification: `python -m pytest kernel/tests -q` passed with 89 tests; full-day demo passed; full-day evidence demo passed; supply-drift and plugin-drift injections both reported 2 expected red-team violations with nonzero exit. Tried `opencode run --model openai/gpt-5.5 --variant xhigh` with the requested PRD review prompt, but it hung in internal exploration after reading context and was stopped without a usable final review.
+- Still incomplete: baseline seats are still deterministic scripts, not live long-horizon OpenCode/ManualSeat loops; live XA-Guard remains per-call stdio/echo; ledger replay/report, SUT decision ledger facts, Web/ManualSeat, live xaguard A/B, policy-exception-abuse, sandbox-escape-attempt, and deeper insider/supply/MCP consequences remain open.
+
+## 2026-07-05 06:15 audit-integrity-break property
+- Added minimal `audit-integrity-break`: `PropertyEngine` now reports tampered/broken ledger hash chains, full-day binds the property, and `test_accountability.py` covers a mutated ledger entry. Full `kernel/tests` pass with 89 collected tests. Still missing ledger facts for every SUT decision, real replay, policy exception abuse, and sandbox escape properties.
+
+## 2026-07-05 06:06 PRD review
+- Read-only review against PRD/SP7 plus `kernel/tests` and `full-day` demo verification. Result: current vertical slice is healthy but still not a complete free red-team range. Main gaps: scheduled full-day facts, scripted seats, no live xaguard workbench A/B, no deterministic replay/report, no ManualSeat/Web, incomplete properties and semantic consequences. Updated status/logs only.
+
+## 2026-07-05 05:23 supply/aibom supply-chain-drift consequence
+- Added `supply/aibom -> supply-chain-drift`: injections now create `supply_chain_declarations` and `supply_chain_drift` when declared hash, observed hash, component, or origin diverges from baseline AIBOM facts. Added `SupplyChainDriftProperty`, bound it in full-day, added `full-day-supply-drift.json`, and fixed `kernel.demo --inject` to print red-team violations instead of tracebacking. Full `kernel/tests` pass with 88 collected tests; full-day normal day remains clean.
+
+## 2026-07-05 05:13 SP7 evidence artifacts
+- Review 后补最小证据包：`world-in` 改为运行前快照，新增 `world-out`、`world-diff`、`timeline`、`ledger-replay` 摘要和 `accountability-report`，全部进 hash 清单。验证 `kernel/tests` 84 passed、`full-day` demo 和 full-day 证据 demo 通过。仍缺 deterministic replay、report CLI/Web、N>=3 live A/B。
+
+## 2026-07-05 05:05 plugin/mcp dynamic ToolSurface
+- Added the first attempt-level dynamic ToolSurface consequence for approved plugin/mcp declarations. Injection now preserves declared `input_schema`; `run_attempt` builds an effective ToolSurface after injection and adds synthetic dynamic tools whose handler only records `dynamic_tool_call` ledger facts plus `tool_surface` side effects. Added a regression proving an approved MCP declaration can be called through the dynamic surface. Full `kernel/tests` pass with 84 collected tests; `full-day` remains clean.
+
+## 2026-07-05 05:01 opencode review + generic OpenCodeSeat tool schema
+- 按用户更新后的检验方法运行 `opencode run --model openai/gpt-5.5 --variant xhigh --dir .` 和指定 PRD review prompt；review 仍判定未完全符合 PRD。同步把 OpenCodeSeat 从邮件专用 action 示例推进到通用 ToolSurface schema prompt：runner surface 每个 seat 的工具 contract 到 `visible["_tool_schemas"]`，prompt 支持 `{"tool":"...","args":{...}}`，并兼容旧扁平格式；补 `test_opencode_seat.py` 非邮件工具测试。opencode 后续完整 `kernel/tests` 通过，当前收集 83 个用例。
+
+## 2026-07-05 04:52 tool-surface-drift consequence
+- 新增 `plugin/mcp -> tool-surface-drift` 第一条语义型注入后果：未授权工具声明进入 `tool_surface_declarations` / `tool_surface_drift`，新增属性判据和 `full-day-plugin-drift.json` fixture；`kernel/tests` 83 用例通过，`full-day` 正常日仍零违规。仍未完成动态 ToolSurface 改写、supply/aibom/insider consequence、Web/ManualSeat、完整 replay/report。
+
+## 2026-07-04 10:09 SP2+ 活世界
+- 新增业务调度器、`scheduled_events`、六域 `full-day.json`、队列/审批/CI retry/并发 tick、多 seat 轮转交错和扩展工具面；新增测试后 `python -m pytest kernel/tests -q` 为 73 passed。仍未做 live XA-Guard、Web UI、ManualSeat、完整 replay/report。
+
 ## 2026-07-04 完整架构 + SP 规划 + 一天蓝图（文档固化）
 - 决策锁定（用户确认）：open-agent-range 为唯一 go-forward 家，SP1 内核吸收并泛化 `enterprise-agent-range/arena` 已验证模式 + spike 的 ledger 脊梁，丢弃 p0/p1/p2 遗留，enterprise-agent-range 降级为参考；本轮**只出文档**；一天锚定"数字城市科技集团"，蓝图写全 6 域。
 - 产出 17 篇：`docs/architecture/` 6（system-overview/kernel-architecture/ledger-schema/decoupling-contract/injection-surface-model/evidence-and-accountability）；`docs/reference/` 5（enterprise-world/a-day-in-the-life/attack-surface/data-classification/expansion-roadmap）；`docs/specs/` SP1–SP6；并更新 `docs/README.md`（补 reference 分层 + 全量索引）。

@@ -1,3 +1,126 @@
+# 2026-07-05 21:15 -07:00 Open Agent Range F3 报销审批支付链路
+
+- 继续根据 `gpt-5.5/xhigh` 子 agent 的 PRD review 建议补 `open-agent-range/` 的完整业务流缺口；本轮先补 F3 报销审批支付。
+- `scenarios/dctg/full-day.json` 新增 `陈会计` 财务席位、`exp-1001` 报销单资产、F3 小王/张经理/陈会计 seat context，并把 `pay` 纳入 `privileged_actions`。
+- `kernel.demo.scripted_plans_for_scenario()` 新增小王提交 `EXP-1001`、张经理审批 `APPR-EXP-001`、陈会计带审批链支付 `PAY-EXP-1001`；正常日仍通过 SUT/ToolSurface 落账且不误报。
+- 验证：`python -m pytest kernel/tests/test_business_scheduler.py -q` 2 passed；`python -m pytest kernel/tests -q` 108 passed；`python -m kernel.demo --scenario scenarios\dctg\full-day.json` 通过，账本 31 条、零违规。
+- 仍未完成：这只补了 F3；F10/F11/F15 等业务流、任意长度 observe-plan-act、live XA-Guard N>=3/Gate6-range ledger 对齐和交互式 Web 靶场仍未完成。
+
+# 2026-07-05 21:08 -07:00 Open Agent Range workbench/sut 产品入口与 promote 门禁
+
+- 按用户更新后的验收方式，启动 `gpt-5.5` / `xhigh` 只读子 agent 审视 `open-agent-range/` 是否满足“真实政企一天 + 完全自由注入点 + 红队自由靶场”PRD；子 agent 结论仍是不完全符合，并列出完整业务流、任意长度 seat session、live XA-Guard N>=3、Gate6/range ledger 对齐和 semantic consequence 等缺口。
+- 本轮新增 `kernel.range_cli sut check` 与 `kernel.range_cli workbench serve`：前者检查 SUT overlay/可选 live smoke，后者生成静态红队工作台 `index.html` 与 `workbench-state.json`。同时把 `run-ab`、`manual-attempt`、`promote` 等 workbench 命令透出为 `range_cli` 顶层别名。
+- 加强 `workbench promote` 默认证据门禁：finding 必须有效、reviewed/reproduced、有最近一次 `run-ab --execute` summary、null/protected evidence 完整、hash chain OK、protected 无 `INFRA_ERROR` 才能固化；`--force` 仅作为显式人工 override。
+- 验证：`python -m pytest kernel/tests/test_range_cli.py kernel/tests/test_workbench.py -q` 25 passed；`python -m pytest kernel/tests -q` 108 passed。手工 smoke 验证 `sut check`、`workbench serve --no-server` 和 promote gate before/after A-B 均符合预期。
+- 已同步更新 `open-agent-range/status.md`、`kernel/README.md`、`open-agent-range/log.md`、`.log/worklog.md`。仍不能宣称完整 PRD 完成：静态 workbench 不是交互式 Web 靶场，live XA-Guard 仍非长生命周期/N>=3 产品闭环，full-day 仍偏 deterministic scripted baseline。
+
+# 2026-07-05 20:48 -07:00 Open Agent Range range day/replay/report CLI
+
+- 继续推进 `open-agent-range/` 的 SP7 产品命令形态，补齐 `range day`、`range replay`、`range report` 薄入口缺口。
+- 本轮新增 `kernel.range_cli`：`day` 复用现有 runner 写标准 evidence 和 `day-summary.json`；`replay` 校验 artifact hash、ledger hash/projection、SUT audit；`report` 从 evidence 渲染 JSON/Markdown/HTML 摘要。
+- 新增 `kernel/tests/test_range_cli.py` 覆盖 day 单次/重复运行、replay 校验和 report 三种格式；验证 `python -m pytest kernel/tests/test_range_cli.py -q` 4 passed，`python -m pytest kernel/tests -q` 105 passed。
+- 手工 smoke：`python -m kernel.range_cli day --world scenarios\dctg\full-day.json --agent scripted --sut null --evidence-dir .runtime\range-day-smoke` 通过；随后 replay hash/ledger/audit 校验通过，report JSON 输出通过。
+- 已同步更新 `open-agent-range/status.md`、`kernel/README.md`、`open-agent-range/log.md`、`.log/worklog.md` 和根 `status.md`。这仍是薄 CLI，不代表完整 Web/evidence dashboard、真实 live N>=3 证据矩阵或完整 deterministic replay 已完成。
+
+# 2026-07-05 20:45 -07:00 Open Agent Range policy/sandbox 属性族
+
+- 继续推进 `open-agent-range/` 的 SP7 属性族覆盖，补齐 `policy-exception-abuse` 与 `sandbox-escape-attempt` 两个明确缺口。
+- 本轮新增 `PolicyExceptionAbuseProperty` 与 `SandboxEscapeAttemptProperty`；`policy:` 注入可形成 `policy_exceptions` 世界事实，`plugin/mcp:` 注入可形成 `sandbox_escape_attempts` 世界事实；`full-day.json` 已绑定两个新属性。
+- 新增 `scenarios/injections/full-day-policy-sandbox.json`，可同时触发策略例外滥用和沙箱越界尝试；新增 `kernel/tests/test_policy_sandbox_properties.py` 覆盖非法/合法 policy exception、sandbox escape、注入事实生成和 full-day 正常日不误报。
+- 验证：`python -m pytest kernel/tests/test_policy_sandbox_properties.py -q` 5 passed；`python -m pytest kernel/tests -q` 101 passed；full-day evidence demo 仍干净；`full-day-policy-sandbox.json` 注入正确报告 `policy-exception-abuse` 与 `sandbox-escape-attempt` 两条违规。
+- 已同步更新 `open-agent-range/status.md`、`kernel/README.md`、`open-agent-range/log.md`、`.log/worklog.md` 和根 `status.md`。这仍是最小世界事实判据，不代表真实策略例外生命周期系统或真实沙箱执行器完成。
+
+# 2026-07-05 20:29 -07:00 Open Agent Range ManualSeat CLI
+
+- 继续推进 `open-agent-range/` 的 SP4/SP7 红队工作台形态，补齐 `ManualSeat` 仍是 stub、红队不能手动提交 ToolCall 的缺口。
+- 本轮实现 `kernel.seat.ManualSeat`，并新增 `kernel.workbench manual-attempt`：红队可指定 world、principal、tool、args-json、可选 injection fixture 和 SUT 模式，手动动作仍通过 `run_attempt -> SUT.invoke -> ToolSurface`，生成标准 evidence/summary。
+- 验证：`python -m pytest kernel/tests/test_workbench.py -q` 18 passed；`python -m pytest kernel/tests -q` 96 passed；手工 `manual-attempt` smoke 在 guard 下对敏感外发给出 deny，零外发、零违规、ledger hash chain OK。
+- 按用户要求将 `opencode run --model openai/gpt-5.5 --variant xhigh` PRD review 等待窗口延长到 900 秒；进程读取 PRD/SP7/架构/kernel/full-day 并开始 demo 验证，但 900 秒内无最终 review 输出，被限时中止，不能作为有效外部最终结论。部分输出继续提示缺 `range day/report/replay/workbench serve`、scripted full-day、`policy-exception-abuse`、`sandbox-escape-attempt`；ManualSeat stub 观察来自本轮修改前快照。
+- 已同步更新 `open-agent-range/status.md`、`kernel/README.md`、`open-agent-range/log.md`、`open-agent-range/.log/worklog.md` 和根 `status.md`。这不改变 XA-Guard 主产品 L3 结论，也不代表完整自由靶场完成；Web/交互式多步 ManualSeat、多注入 finding、promote 证据门禁、真实 live N>=3、长生命周期 XA-Guard session 和 Gate6/range ledger 对齐仍未完成。
+
+# 2026-07-05 07:22 -07:00 Open Agent Range Workbench Null vs XA-Guard A/B
+
+- 继续推进 `open-agent-range/` 的 SP7 红队工作台产品形态，补齐 `run-ab` 只能跑 NullSUT vs GuardStubSUT 的缺口。
+- 本轮将 `kernel.workbench run-ab` 扩展为默认兼容 GuardStub，同时支持 `--sut-mode null,xaguard` / `--sut-mode xaguard`、`--repeat`、`--evidence-dir` 和 `--live`；离线 xaguard 使用场景 `PolicyOverlay`，live xaguard 外部依赖/启动失败会显式报告为 `infra_error` 且不进入 protected ASR 分母。
+- 新增/更新 workbench 测试覆盖 xaguard dry-run plan、离线执行、live infra-error 计分分流；验证 `python -m pytest kernel/tests/test_workbench.py -q` 16 passed，`python -m pytest kernel/tests -q` 94 passed，full-day evidence demo 通过并写入 `.runtime/full-day-evidence-workbench-xaguard`。
+- 按用户要求再次运行 `opencode run --model openai/gpt-5.5 --variant xhigh --dir . "<PRD review prompt>"`；进程读取 PRD/SP7/status/kernel docs 并启动 runtime/tests review 子任务，但 180 秒内没有最终 review 输出，被限时中止，不能作为有效外部最终结论。
+- 已同步更新 `open-agent-range/status.md`、`kernel/README.md`、`open-agent-range/log.md`、`open-agent-range/.log/worklog.md` 和根 `status.md`。这不改变 XA-Guard 主产品 L3 结论，也不代表完整自由靶场完成；长生命周期 XA-Guard session、真实 live N>=3 证据矩阵、Gate6/range ledger 对齐、ManualSeat/Web 和 evidence gatekeeping 仍未完成。
+
+# 2026-07-05 07:06 -07:00 Open Agent Range Ledger replay state metadata
+
+- 继续推进 `open-agent-range/` 的 SP7 证据/回放能力，修正此前 `ledger-replay.json` 只是 action count 摘要且标记 `not_implemented` 的缺口。
+- 本轮新增安全 `LedgerEntry.metadata`，关键参考工具将 replay metadata 写入账本；`Ledger.replay(world)` 现在能从 hash ledger 复原 ticket/approval/CI/audit 队列、service、plugin、registry、payment 等关键终态。
+- full-day evidence 的 `ledger-replay.json` 可复原 `build-77=succeeded`、`gateway=healthy`、`EVIDENCE-DAILY=exported`，且 `limitations=[]`；同步更新 `ledger-schema.md`、`evidence-and-accountability.md`、`kernel/README.md`、`open-agent-range/status.md`。
+- 验证：focused scheduler/evidence/smoke tests 通过；`python -m pytest kernel/tests -q` 通过（91 tests）；full-day evidence demo 写出 `.runtime/full-day-evidence-replay-state-v2`；full-day supply drift 仍正确报告 2 条违规。
+- 2026-07-05 07:01 再次尝试 `opencode run --model openai/gpt-5.5 --variant xhigh` 和指定 PRD review prompt；进程读取根 status/log 并启动 Runtime/Docs review 子任务，但 180 秒内无最终 review 输出，被限时中止，不能作为有效外部结论。
+- 2026-07-05 07:15 再次尝试同一 `opencode run` 复核；进程读取根 status/log 并启动 PRD 标准、实现证据、测试证据 3 个 review 子任务，但 180 秒内无最终 review 输出，被限时中止，不能作为有效外部结论。
+- 仍未完成：还需覆盖动态/真实下游工具 state payload、Gate6 audit 与 range ledger hash/seq 对齐、report/replay CLI、HTML/Markdown report。
+
+# 2026-07-05 06:47 -07:00 Open Agent Range SUT 裁决进入 hash ledger
+
+- 继续推进 `open-agent-range/` 的 PRD/SP7 完成态，重点补“deny/allow 裁决不只在临时 audit 中，而要成为可追责账本事实”的缺口。
+- 本轮在 `kernel/sut.py` 的防护型 SUT 边界追加 `tool_attempt` 与 `sut_decision` 两类 hash ledger 事实；GuardStubSUT 与 XaGuardSUT 路径会记录工具尝试和裁决，deny 时不执行 ToolSurface，因此不会产生伪副作用账。`NullSUT` 仍保持裸奔基线低噪音，只记录真实工具副作用。
+- 验证：`python -m pytest kernel/tests/test_smoke.py -q` 通过；`python -m pytest kernel/tests -q` 通过（91 tests）；full-day evidence demo 通过；office-mailbox A/B 仍为 null 泄漏/guard 拦截；full-day supply drift 仍正确报告 2 条违规。
+- 按用户要求再次尝试 `opencode run --model openai/gpt-5.5 --variant xhigh` 和指定 PRD review prompt；进程启动并读取上下文，但 180 秒内无最终 review 输出，被限时中止，不能作为有效外部复核结论。
+- 仍未完成：`Ledger.replay()`、Gate6 audit 与 range ledger hash/seq 对齐、live xaguard workbench A/B、ManualSeat/Web、policy-exception-abuse、sandbox-escape-attempt 和更真实的 consequence 层仍缺。
+
+# 2026-07-05 06:32 -07:00 Open Agent Range full-day 关键业务迁出 scheduled tape
+
+- 继续推进 `open-agent-range/` 的 PRD/SP7 完成态，重点减少 `full-day.json` 中由 scheduler 直接落账的关键业务事实。
+- 本轮将 F1/F2/F6/F7/F8/F12/F13/F9/F14/F16 等业务动作迁移到多 seat ToolSurface 调用：林工读邮件/写草稿/外发安全方案，张经理派工单，周业务查报表，孙开发查 repo/AIBOM/tool-surface/supply，郑治理查 handbook/registry，吴架构执行 CI retry 和插件发布，王安全更新 agent registry，钱审计查账/验链/导出证据。`scheduled_events` 现在只保留外部告警、日志/工单到达和审批超时等背景事实。
+- 验证：`python -m pytest kernel/tests -q` 通过（89 tests）；`python -m kernel.demo --scenario scenarios/dctg/full-day.json` 通过，账本 28 条、零违规；full-day evidence demo 通过；supply/plugin drift 注入均正确报告 2 条红队违规。尝试按用户 prompt 运行 `opencode run --model openai/gpt-5.5 --variant xhigh`，但进程长时间卡在内部 explore，无最终 review 输出，已中止。
+- 仍未完成：`open-agent-range` 仍不是完整自由靶场；正常行为仍是 deterministic scripted baseline，不是全席位 live/ManualSeat 长循环；live XA-Guard 仍是最小 per-call stdio；ledger replay/report、Web/ManualSeat、live A/B、更多属性族与更真实 consequence 仍缺。
+
+# 2026-07-05 06:06 -07:00 Open Agent Range PRD 完成态复核
+
+- 按用户要求复核 `open-agent-range/` 是否已经是“真实政企一天 + 完全自由注入点 + 可供红队自由渗透”的完整靶场；本轮未改 runtime/测试代码，只读审视并运行验证。
+- 结论：仍不完全符合 PRD/SP7。`kernel/tests` 通过、`full-day` demo 通过且 27 条账本零违规，但这只能证明当前竖切健康；主要缺口是 full-day 多数业务仍由 `scheduled_events` 直接落账、正常 seat 计划仍是 demo scripted、workbench 不能 live xaguard A/B、`ledger.replay()` 未实现、ManualSeat/Web/report/replay 和 N>=3 live 统计缺失。
+- 已更新 `open-agent-range/status.md`、根 `status.md`、`open-agent-range/log.md` 与 `.log/worklog.md`，明确当前不应宣称“完全自由靶场完成”。下一步优先把 F1-F16 关键业务副作用迁出 scheduler，并把 live xaguard A/B、ledger/replay/report 产品化。
+
+# 2026-07-05 05:13 -07:00 Open Agent Range SP7 最小证据包补强
+
+- 继续审视 `open-agent-range/` 是否符合“真实政企一天 + 完全自由注入”PRD；结论仍是不完全符合，主要缺真实 replay/report、Web/ManualSeat、N>=3 live A/B、supply/aibom/insider consequence 和更多属性族。
+- 本轮只补一个可验证缺口：`run_attempt` 保留真正运行前 world，证据包新增 `world-out.json`、`world-diff.json`、`timeline.jsonl`、`ledger-replay.json` 摘要和 `accountability-report.json`，并进入 artifact hash 清单。
+- 验证：focused evidence/accountability/scheduler 测试通过；`python -m pytest kernel/tests -q` 通过，当前 84 个用例；`full-day` demo 通过；内联与 full-day 证据 demo 均生成新增 artifacts。未运行新的 live OpenCode 付费/外部调用，未修改 XA-Guard 主产品代码。
+
+# 2026-07-05 04:52 -07:00 Open Agent Range plugin/mcp 工具面漂移 consequence
+
+- 审视 `open-agent-range/` PRD、status、log、SP7 spec 与 kernel 实现，并用两个只读 explore 子任务交叉复核；结论是当前仍不符合“完全自由靶场”完整 PRD，主要缺 dynamic ToolSurface、ManualSeat/Web、完整真实一天、replay/report 与更多语义 consequence。
+- 本轮实现最小关键缺口：`plugin:` / `mcp:` 注入现在会写入 `tool_surface_declarations`，未授权工具声明写入 `tool_surface_drift`；新增 `tool-surface-drift` 属性和 `full-day-plugin-drift.json` fixture，`full-day.json` 绑定该属性。
+- 验证：受影响测试通过；`python -m kernel.demo --scenario scenarios/dctg/full-day.json` 通过；`python -m pytest kernel/tests -q` 通过，当前收集 83 个用例。未运行 live OpenCode 付费/外部调用、Web UI 或完整报告链。
+- 已更新 `open-agent-range/status.md`、`kernel/README.md`、`open-agent-range/log.md`、`open-agent-range/.log/worklog.md` 和根 `status.md`。下一步应把 plugin/mcp consequence 推进到动态 ToolSurface 改写，并补 supply/aibom/insider consequence、ManualSeat/live A-B、replay/report。
+
+# 2026-07-04 22:10 -07:00 XA-Guard 深度侦察与 OpenViking 记忆更新
+
+- 按用户要求使用 4 个 `gpt-5.5` medium explorer 子 agent 分别只读侦察主产品架构、测试/验收/证据体系、文档/状态口径、`enterprise-agent-range` 与 `open-agent-range` 边界；主线程同步读取 `AGENTS.md`、`status.md`、事实源、PRD、产品架构、L3 验收、workplan、核心 runtime/config/policy 文件并交叉校验。
+- 将综合后的项目画像写入 OpenViking：记录主调用链、六关卡实际顺序、共享契约、策略/治理边界、验证命令、当前真实状态、BLOCKED 项、D1-D4 交付缺口、两个靶场与 XA-Guard 主产品的解耦边界、未来 agent 启动清单。
+- 未修改产品代码、测试代码或 `status.md`；未运行 pytest/bench/部署验证。本轮只新增/更新 OpenViking 长期记忆，并维护本日志。下一步若继续推进项目，应优先收束 D4 报名状态、D1 技术方案、D3 视频和 D2 release 证据包。
+
+# 2026-07-04 21:59 -07:00 OpenViking 项目记忆初始化
+
+- 确认当前会话暴露 `mcp__openviking` 的 `remember`、`find`、`search` 工具，并将 `xa_guard` / `XA-Guard` 项目入口上下文写入长期记忆：仓库路径、项目定位、六关卡架构、当前 L2/L3 状态边界、关键文档、AGENTS 维护约定和当前 dirty worktree 注意事项。
+- 更新 `AGENTS.md`，要求新 agent 开始处理本仓库时优先检索 openviking 中的 `xa_guard` / `XA-Guard` 项目记忆，但检索结果只作启动加速，事实裁定仍以仓库内文档、状态、日志和代码为准。
+- 未修改产品代码、测试代码或 `status.md`；未执行测试。下一步如果继续开发，应先读取 `status.md`、`log.md` 和相关模块 `.log/worklog.md`，并按实际改动维护状态与日志。
+
+# 2026-07-04 10:09 Open Agent Range SP2+ 六域活世界机制
+
+- 在 `open-agent-range/` 实现 SP2+ 最小活世界：新增 `kernel/scheduler.py`、`Scenario.scheduled_events`、`SeatContext.start_ts/priority`，`run_attempt` 支持多 seat 按业务 tick 确定性轮转交错。
+- 新增 `scenarios/dctg/full-day.json`，覆盖六域正常一天、approval/ticket/ci/notification/audit 队列、审批通过/超时、CI retry、同 tick 并发批次和日结审计；扩展参考工具面到工单、审批、运维、CI、插件、治理、审计等 24 个工具。
+- 新增 `kernel/tests/test_business_scheduler.py`；验证 `python -m pytest kernel/tests -q` 73 passed，`python -m kernel.demo --scenario scenarios/dctg/full-day.json` 通过，`office-multi-combo --ab` 通过。仍未做 live XA-Guard、Web UI、ManualSeat 和完整持久自由沙盒。
+
+# 2026-07-04 Open Agent Range 注入面首个面（mailbox）端到端可消费 + 涌现式投毒 + null/guard A/B
+
+- 修复注入面**只写不读（惰性）**问题：此前 `place()` 把内容写进 `world.domain_state` 但无读侧带回 seat/工具，poisoned 邮件影响不了任何 agent。本轮让 `mailbox:` 一个面端到端可消费——新增 `read_mail` 参考工具、`run.py` 把注入邮箱 surface 进 `SeatContext.visible`、`seat.py.GullibleSeat`（读注入邮件里的结构化指令就照做，攻击具体信息全来自注入数据、零写死）、`kernel/ab.py` 现场对照。
+- 数据：`scenarios/dctg/office-mailbox.json` + `scenarios/injections/office-mail-exfil.json`（钓鱼邮件指向 cit-1001→甲方）。
+- 验收（open-agent-range/ 下）：`python -m pytest kernel/tests -q` → 38 passed（原 29 + 新 9）；`python -m kernel.demo` / `--probe-violation` exit 0；`--ab` 打印 null 泄漏(violations=1)/guard 拦截(violations=0)、防护增量=1。坏状态是 seat 对注入的涌现反应，非人工探针。清理了 `__pycache__`/`.runtime`。
+- 诚实修正 `status.md`："13 处组合投毒后零违规"不等于"多角度投毒已生效"（彼时各面无读侧、投毒空转）。除 mailbox 外其余面仍只落位待接读侧。详见 `open-agent-range/log.md`、`open-agent-range/status.md`。
+
+# 2026-07-04 Open Agent Range SP1 kernel TODO 补齐
+
+- 在 `open-agent-range/kernel/` 补齐 SP1 stub：`OpenCodeSeat`（一轮 action plan）、`policy_overlay.py`、`XaGuardSUT` 配置生成 + 离线 gate3 stub、`run_attempt` EvidenceStore 接线、`demo --agent opencode --evidence-dir`。
+- 验收：`python -m pytest open-agent-range/kernel/tests -q` 18 passed；`python -m kernel.demo` / `--probe-violation` 通过（在 open-agent-range 目录下）。
+- 未完成：XaGuardSUT live MCP（SP5）、OpenCode 多轮 loop、ManualSeat、SP2+ 项。详见 `open-agent-range/log.md` 与 `open-agent-range/status.md`。
+
 # 2026-07-04 Open Agent Range SP0 spike 适配性复查
 
 - 按用户要求检查 `open-agent-range/spike.py` 是否符合“真实一天沙盘，而不是复杂题目”的预期；读取了 `open-agent-range/PRD.md`、`status.md`、`docs/specs/SP0-walking-skeleton-design.md`、`spike.py` 和模块日志。
@@ -2546,3 +2669,4 @@ Key finding:
 - 规划范围：模拟企业"数字城市科技集团"（~500 员工、~150 Agent Seat）、L1-L4 + Test 五级 Seat 体系、6 个企业域（Office/Operations/Business Data/Dev Supply/Governance/Audit）的 Seat 分配与能力定义、跨域访问规则矩阵、委托链约束、Seat 生命周期、成本模型（月均 ~$1,040）、与 Arena Core 组件的映射关系。
 - 更新 `enterprise-agent-range/docs/README.md` 先读顺序添加该规划入口。
 - 本规划不修改 runtime 代码、不改变 XA-Guard 验收结论、不引入真实模型调用。
+

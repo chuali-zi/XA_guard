@@ -31,6 +31,7 @@
 - [specs/SP4-redteam-workbench-design.md](specs/SP4-redteam-workbench-design.md) — 红队工作台（CLI 优先）。
 - [specs/SP5-multiagent-accountability-design.md](specs/SP5-multiagent-accountability-design.md) — 多 agent 与追责。
 - [specs/SP6-demo-dashboard-design.md](specs/SP6-demo-dashboard-design.md) — 现场对照 demo 与看板。
+- [specs/SP7-product-completion-spec.md](specs/SP7-product-completion-spec.md) — 产品完成态总 spec：真实一天、自由注入、live SUT、判据族与验收矩阵。
 
 ## 文档分层与职责
 
@@ -38,6 +39,7 @@
 |---|---|---|---|
 | 北极星 | `PRD.md` | 为什么 / 是什么 / 什么感觉；冻结 | 已定稿 |
 | 子项目设计 | `docs/specs/SP<N>-<topic>-design.md` | 单个 SP "怎么做"，经作者审后才进实现 | 每个 SP 开工前 |
+| 产品完成态 | `docs/specs/SP7-product-completion-spec.md` | 把 SP1-SP6 串成最终验收门槛，防止把竖切误认成完成态 | 按外部 review/验收持续校准 |
 | 架构约定 | `docs/architecture/*.md` | 跨 SP 的通用契约 / schema（如解耦契约、账本 schema） | 随内核成形产出，不预写 |
 | 参考蓝图 | `docs/reference/*.md` | 描述被建模的企业世界与"一天"（人/角色/数据/信任边界/注入面），**非题目** | 场景蓝图定稿时产出 |
 | 工作日志 | `<模块>/.log/worklog.md` | 每模块进展，每次 ≤300 字 | 持续 |

@@ -8,6 +8,9 @@
 把整套能力收敛成一条命令的**现场对照 demo** + 一个看板，让评委一眼看懂"企业为什么不敢用、XA-Guard 到底解决了什么"，
 并提供可信的 live 统计（非 smoke）。
 
+完成态 demo 不是单条外发案例，而是一段真实的一天：世界时间推进、多个 seat 并发、红队注入混在业务里、
+SUT 逐次裁决、账本与看板最后给出坏状态和追责。
+
 ## 边界
 
 - 不做真实外发/凭据/公网目标。
@@ -21,6 +24,15 @@
 - **看板**：并排展示两侧的 verdict、副作用、追责链，以及数字（ASR_null−ASR_guard、block rate、leak rate）。
 - **live 统计层**：`repeat N` 聚合 attempt 表，攻击/良性/assurance 分开分母，输出 JSON/Markdown/HTML + artifact 索引 + hash。
 
+### 看板必须展示
+
+- DCTG 一天时间线：tick、流程编号 F1-F16、活跃 seat、队列/审批/CI/审计状态。
+- 注入路径：target scheme、locator、被哪个 seat/工具消费、造成什么世界变化。
+- SUT 对照：null 与 xaguard 的每次 allow/deny/proxy、审计证据链接。
+- 坏状态族：外发、审批、供应链、审计、策略、沙箱、追责失败分别统计。
+- 追责链：original principal、执行 seat、授权票据、委托路径、broken reasons。
+- 复现性：world/injection/model/config/hash/replay 结果。
+
 ## 判据
 
 demo 两侧对照成立：null 侧"泄漏 + 不可追责"，guard 侧"拦截 + 一条清晰追责链"；数字方向正确（防护增量为正、leak 从 >0 到 0）。
@@ -33,6 +45,7 @@ range report --run <r>               # N≥2 的统计报告（ASR_null/ASR_guar
 ```
 
 预期：评委观看 demo 即理解产品价值；报告口径干净（不混 smoke/人工/INFRA_ERROR）。
+完成态还要求 demo 至少包含一条非 sensitive-egress 的坏状态族，避免产品价值被误解成"只防泄漏邮件"。
 
 ## 后续
 

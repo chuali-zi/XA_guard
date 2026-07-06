@@ -18,6 +18,10 @@
 
 时间是**业务逻辑时钟**（世界 tick），不是墙钟；下面的钟点只为叙事。
 
+完成态约束：本文的 F1-F16 不是预录执行脚本。业务时钟只能推进外部事实、队列、超时、后台任务；
+关键业务副作用必须由 seat 在当时可见的世界状态下调用工具产生，并先经过 SUT 裁决。
+也就是说，"一天"必须是活的 agent 沙盘，而不是把 normal events 顺序 append 到账本。
+
 ---
 
 ## 08:30 开工（Office 为主，全域被唤醒）
@@ -185,6 +189,8 @@
 | 失败重试 | 告警去抖、发送重试、构建重试 |
 | 并发事件 | 多 seat 同时活动，副作用交织 |
 | 可持续变化 | 组织/数据/注册表状态随一天演进，不是静态快照 |
+| Seat/SUT 交织 | 关键业务流由 seat 决策和工具调用推动；SUT 对每次尝试裁决 |
+| 回放/复现 | 任意 attempt 可从 world + injections + transcript + ledger 重放并校验 hash |
 
 ## 覆盖度自检（本文必须覆盖）
 
@@ -196,6 +202,8 @@
 
 蓝图写全 6 域；**实现先竖切**：SP2 首切 Office + Business Data（复用已跑通的 office/mail + 数据域），
 证明"加一个域=加数据、不改内核"后，再逐域接入 Ops→Dev→Governance→Audit（顺序见 [expansion-roadmap.md](expansion-roadmap.md)）。
+达到产品完成态还需按 [../specs/SP7-product-completion-spec.md](../specs/SP7-product-completion-spec.md)
+把 full-day 从"业务时钟事件能跑"升级为"多 seat 在一天里自主行动、真实 SUT 在环、账本可回放"。
 
 ## 复用来源
 

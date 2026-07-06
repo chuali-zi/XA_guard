@@ -9,6 +9,17 @@
 - **良性对照与攻击共享 world + 中性 task，只切 inject。** 这样 A/B（null vs guard）只有"有没有注入"这一个变量。
 - **判据与注入解耦。** 抓不抓得住由 PropertyEngine 的属性决定（读账本坏状态），与"攻击从哪个面来"无关。
 
+注入自由分三层，三层缺一不可：
+
+| 层 | 含义 | 不达标表现 |
+|---|---|---|
+| Placement | 任意 `scheme:locator` 可落到世界并留证 | 新 scheme 被拒绝或需要改场景专用代码 |
+| Consumption | 现实会被读/处理的入口会被 seat 消耗 | payload 只躺在 `domain_state`，没有 seat/工具会碰它 |
+| Consequence | 消耗后可能改变工具面、权限、供应链、审计或副作用 | 所有攻击都退化成"读文本后外发"一条路 |
+
+当前竖切可以先证明 Placement 和部分 Consumption；产品完成态见
+[../specs/SP7-product-completion-spec.md](../specs/SP7-product-completion-spec.md)，必须覆盖语义型 Consequence。
+
 ## 2. 注入目标分类（InjectionTarget）
 
 注入目标用 `scheme:locator` 表示，内核按 scheme 把内容落到对应世界位置：
@@ -26,6 +37,9 @@
 | `policy:` | 被引用的策略/手册文本 | 治理策略引用 | AT2、AT11 |
 
 > 分类**开放不封闭**：现实里能被攻击的地方都要能被建成一个注入面。新增注入面 = 加一个 scheme handler（内核）+ 场景在该面敞开（数据），仍不脚本化攻击。
+
+`plugin:`/`mcp:`、`supply:`/`aibom:`、`insider:` 是语义型注入面：它们不应被强行建成普通 `read_*`
+文本读取，而应分别改变工具面、制品/依赖事实、seat 行为或授权状态。否则会让"自由注入"只停留在落位层。
 
 ## 3. 注入 API（内核形态）
 

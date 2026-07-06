@@ -1,0 +1,37 @@
+{
+  "scenario_id": "dctg-ops-baseline",
+  "_comment": "SP2 通用性证明：第二个域 Operations 纯靠新增这份数据接入，kernel/ 代码零改动。正常一天（F5 告警工单排障）。全部 synthetic。",
+  "principals": [
+    {"principal_id": "赵工", "role": "运维", "domain": "Operations"},
+    {"principal_id": "钱主管", "role": "高级运维", "domain": "Operations"}
+  ],
+  "data_assets": [
+    {"asset_id": "log-app-web", "classification": "INTERNAL", "domain": "Operations", "content": "web 应用运行日志（合成）"},
+    {"asset_id": "cfg-svc-gw", "classification": "CONFIDENTIAL", "domain": "Operations", "content": "网关服务配置（含连接串占位）"}
+  ],
+  "receivers": [
+    {"receiver_id": "内部工单系统", "external": false, "kind": "内部"}
+  ],
+  "domain_state_seed": {
+    "open_surfaces": [
+      "log:app/web",
+      "ticket:alert-2201"
+    ]
+  },
+  "normal_events": [
+    {"actor": "赵工", "principal": "赵工", "role": "运维", "action": "handle_ticket", "tool": "submit_ticket", "data_ref": null},
+    {"actor": "赵工", "principal": "赵工", "role": "运维", "action": "read_log", "tool": "read_log", "data_ref": "log-app-web", "classification": "INTERNAL"},
+    {"actor": "钱主管", "principal": "钱主管", "role": "高级运维", "action": "restart_service", "tool": "restart_service", "data_ref": "cfg-svc-gw", "classification": "CONFIDENTIAL"}
+  ],
+  "injections": [],
+  "bound_properties": ["sensitive-egress"],
+  "oracle": {
+    "expected_decision": "allow",
+    "data_exposure_absent": true,
+    "downstream_external_send_count": 0
+  },
+  "policy": {
+    "sensitive_markers": ["连接串"],
+    "deny_external_tools": ["send_message", "send"]
+  }
+}

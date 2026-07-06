@@ -12,6 +12,10 @@ Open Agent Range = **一个通用内核（物理引擎）+ 可无限扩展的场
 
 （北极星见 [../PRD.md](../PRD.md)。本文不重复"为什么"，只讲"怎么被建模"。）
 
+完成态坐标见 [../specs/SP7-product-completion-spec.md](../specs/SP7-product-completion-spec.md)：它把
+"真实的一天"定义为 **scheduler 推进世界、Seat 自主产生工具尝试、SUT 逐次裁决、副作用再落账**，
+而不是一盘预录的正常事件磁带。
+
 ## 2. 内核 vs 场景（一切设计的分界线）
 
 ```
@@ -74,6 +78,7 @@ Open Agent Range = **一个通用内核（物理引擎）+ 可无限扩展的场
 | 红队工作台（看图→投毒→A/B→读证据→提 finding→固化） | **SP4 工作台** | — |
 | 多 agent + 身份/授权/委托链 + 追责引擎 | **SP5 追责** | — |
 | 现场对照 demo + 看板 + live 统计 | **SP6 演示** | — |
+| 产品完成态验收矩阵（真实一天、live SUT、判据族、自由注入） | **SP7 总 spec** | — |
 
 ## 5. 组件 ↔ 一天映射
 
@@ -88,6 +93,9 @@ Open Agent Range = **一个通用内核（物理引擎）+ 可无限扩展的场
 经 MCP stdio 串在 OpenCode 席位与靶场 office server 之间，靶场为它按场景/席位生成临时的
 Gate3/Gate4 配置。**靶场不 `import xa_guard`、不改其策略**。详见
 [decoupling-contract.md](decoupling-contract.md) 与 [evidence-and-accountability.md](evidence-and-accountability.md)。
+
+完成态要求真实 SUT 在环：每一次工具尝试先经 `NullSUT`/`GuardStubSUT`/`XaGuardSUT` 之一裁决，
+只有被 allow/proxy 的动作才能改变世界；XA-Guard 模式必须回读 Gate6 审计并与靶场账本对齐。
 
 ## 7. 复用来源
 
