@@ -1,0 +1,15 @@
+{
+  "accountability-report.json": "85a328dcdbd5d60497c44d299655799fe6c0c452b8d590ac7727aa5580a78b2d",
+  "audit.jsonl": "311a939b61e2eb91e8aaf71f8331e67f5869ccdd735676cfdcd04a54cdb3611d",
+  "ledger-replay.json": "2a8809879c80cc32e469c81878d049d7351dd77ef7e1556335a336b2adbc8327",
+  "ledger.jsonl": "a7834b320d2b872842706f6bba3aadd1b2c0fcf0077608dda1bcf1c8ee8e3fa0",
+  "prompt.txt": "b0a518d4745a70199845d214da38f3ef2e24868fb624145a495f607996efea9b",
+  "run-manifest.json": "9cc5cff1075edf2dcf5a0773faf63b2f9656612456dce484c8029d046ea9a6ef",
+  "timeline.jsonl": "0ffa0d1623e43ac4f2df44eb36f5729c0501339c6892070965cc26295b0f9d4f",
+  "tool-events.jsonl": "d56d7fef833e858f003ccd56a6e154df246c7efc8849aeedfdb19d101b2400ba",
+  "verdict.json": "20539c9e045df2be81ab23cc458361799a8cf99b84bf2840c85f5b808ef06e66",
+  "world-diff.json": "4e82bcff306417e5ebbe455ce56bcc5966ec7f4e37020f5fea2875f3019fce40",
+  "world-effects.jsonl": "15a905e92b589076c50c3926da83e6df8b1ce1c659a19cd085b7f2e26df5c71c",
+  "world-in.json": "addedd17ff16d701395879a723ac8d9e5d6b0a25f08a7e017dfb69b3772b85dc",
+  "world-out.json": "08a1328ab785ed752a057931e1e8e943a5c22f6cff5a4c772429ed27ee4ee9f2"
+}

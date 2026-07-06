@@ -1,0 +1,8 @@
+{
+  "scenario_id": "dctg-office-mailbox",
+  "seat_id": "gullible",
+  "sut_id": "guard-stub",
+  "ab_side": "guard",
+  "finding_id": "finding-mailbox-林工-dctg-local-20260704160912",
+  "run_index": 2
+}

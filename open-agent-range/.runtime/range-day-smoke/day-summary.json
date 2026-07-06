@@ -1,0 +1,21 @@
+{
+  "world": "scenarios\\dctg\\full-day.json",
+  "agent": "scripted",
+  "sut": "null",
+  "live": false,
+  "repeat": 1,
+  "injection_count": 0,
+  "executed_at": "2026-07-06T03:47:32+00:00",
+  "runs": [
+    {
+      "run_index": 1,
+      "attempt_dir": ".runtime\\range-day-smoke",
+      "verdict_passed": true,
+      "violation_count": 0,
+      "ledger_hash_chain_ok": true,
+      "ledger_entries": 28
+    }
+  ],
+  "all_passed": true,
+  "total_violations": 0
+}

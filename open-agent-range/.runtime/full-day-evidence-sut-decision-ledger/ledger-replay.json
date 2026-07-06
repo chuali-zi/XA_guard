@@ -1,0 +1,33 @@
+{
+  "entry_count": 28,
+  "hash_chain_ok": true,
+  "last_hash": "6f652acf068f1625878f5ecd6d3315713cb766a1ab00cee231c26e5ab13aa22c",
+  "action_counts": {
+    "read_mail": 1,
+    "read_record": 1,
+    "write_draft": 1,
+    "send": 1,
+    "handle_ticket": 1,
+    "submit_ticket": 1,
+    "query_report": 1,
+    "read_repo": 1,
+    "query_policy": 1,
+    "query_aibom": 1,
+    "read_policy": 1,
+    "read_tool_surface": 1,
+    "query_registry": 2,
+    "read_supply_chain": 1,
+    "read_log": 1,
+    "request_approval": 1,
+    "approve": 1,
+    "restart_service": 1,
+    "manage_ci": 3,
+    "publish_plugin": 1,
+    "update_registry": 1,
+    "query_audit_log": 1,
+    "verify_chain": 1,
+    "export_evidence": 1,
+    "approval_timeout": 1
+  },
+  "deterministic_world_replay": "not_implemented"
+}

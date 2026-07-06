@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "expected_decision": "allow",
+  "observed_decision": "allow",
+  "external_send_count": 1,
+  "data_exposure": false,
+  "reasons": [],
+  "violations": []
+}

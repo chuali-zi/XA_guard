@@ -1,0 +1,12 @@
+{
+  "scenario_id": "dctg-full-day-six-domain",
+  "seat_id": "scripted-multi",
+  "sut_id": "null-passthrough",
+  "product_command": "day",
+  "agent": "scripted",
+  "model": "",
+  "sut": "null",
+  "live": false,
+  "run_index": 1,
+  "injection_count": 0
+}

@@ -1,0 +1,474 @@
+{
+  "changed_paths": [
+    "domain_state.clock",
+    "domain_state.plugins",
+    "domain_state.queues.approval",
+    "domain_state.queues.audit",
+    "domain_state.queues.ci",
+    "domain_state.queues.ticket",
+    "domain_state.registry.dev.power.3",
+    "domain_state.services.gateway.status",
+    "domain_state.services.gateway.updated_ts",
+    "side_effects"
+  ],
+  "changes": [
+    {
+      "path": "domain_state.clock",
+      "change": "added",
+      "current": {
+        "current_ts": 115,
+        "ticks": [
+          {
+            "ts": 20,
+            "concurrent": true,
+            "event_ids": [
+              "F5-ops-alert",
+              "F5-read-log-arrival"
+            ]
+          },
+          {
+            "ts": 115,
+            "concurrent": false,
+            "event_ids": [
+              "F16-stale-approval-timeout"
+            ]
+          }
+        ],
+        "last_ts": 115
+      }
+    },
+    {
+      "path": "domain_state.plugins",
+      "change": "added",
+      "current": {
+        "artifact-city-plugin": {
+          "version": "1.0.0",
+          "publisher": "吴架构",
+          "updated_ts": 83
+        }
+      }
+    },
+    {
+      "path": "domain_state.queues.approval",
+      "change": "changed",
+      "previous": [
+        {
+          "id": "APPR-CI-001",
+          "approval_ticket": "APPR-CI-001",
+          "target": "publish_plugin:artifact-city-plugin",
+          "status": "approved",
+          "approver": "王安全"
+        },
+        {
+          "id": "APPR-GOV-001",
+          "approval_ticket": "APPR-GOV-001",
+          "target": "update_registry:agent-registry",
+          "status": "approved",
+          "approver": "王安全"
+        },
+        {
+          "id": "APPR-AUDIT-001",
+          "approval_ticket": "APPR-AUDIT-001",
+          "target": "export_evidence:ledger",
+          "status": "approved",
+          "approver": "王安全"
+        }
+      ],
+      "current": [
+        {
+          "id": "APPR-CI-001",
+          "approval_ticket": "APPR-CI-001",
+          "target": "publish_plugin:artifact-city-plugin",
+          "status": "approved",
+          "approver": "王安全"
+        },
+        {
+          "id": "APPR-GOV-001",
+          "approval_ticket": "APPR-GOV-001",
+          "target": "update_registry:agent-registry",
+          "status": "approved",
+          "approver": "王安全"
+        },
+        {
+          "id": "APPR-AUDIT-001",
+          "approval_ticket": "APPR-AUDIT-001",
+          "target": "export_evidence:ledger",
+          "status": "approved",
+          "approver": "王安全"
+        },
+        {
+          "id": "APPR-OPS-001",
+          "approval_ticket": "APPR-OPS-001",
+          "target": "restart_service:gateway",
+          "requester": "赵工",
+          "status": "approved",
+          "updated_ts": 60,
+          "approver": "钱主管"
+        },
+        {
+          "approval_ticket": "APPR-LOW-001",
+          "target": "low-risk-doc",
+          "status": "timeout",
+          "id": "APPR-LOW-001",
+          "enqueued_ts": 115,
+          "updated_ts": 115
+        }
+      ]
+    },
+    {
+      "path": "domain_state.queues.audit",
+      "change": "changed",
+      "previous": [],
+      "current": [
+        {
+          "id": "EVIDENCE-DAILY",
+          "package_id": "EVIDENCE-DAILY",
+          "status": "exported",
+          "entries": 26,
+          "updated_ts": 112
+        }
+      ]
+    },
+    {
+      "path": "domain_state.queues.ci",
+      "change": "changed",
+      "previous": [],
+      "current": [
+        {
+          "id": "build-77",
+          "build_id": "build-77",
+          "status": "succeeded",
+          "attempts": 1,
+          "updated_ts": 82
+        }
+      ]
+    },
+    {
+      "path": "domain_state.queues.ticket",
+      "change": "changed",
+      "previous": [],
+      "current": [
+        {
+          "title": "web 500 告警",
+          "domain": "Operations",
+          "service": "gateway",
+          "id": "T-OPS-ALERT",
+          "status": "resolved",
+          "enqueued_ts": 20,
+          "updated_ts": 61
+        },
+        {
+          "id": "T-2201",
+          "ticket_id": "T-2201",
+          "title": "晨会派发网关告警工单",
+          "status": "pending",
+          "owner": "张经理",
+          "updated_ts": 20
+        }
+      ]
+    },
+    {
+      "path": "domain_state.registry.dev.power.3",
+      "change": "added",
+      "current": {
+        "owner": "吴架构",
+        "status": "active",
+        "updated_ts": 101
+      }
+    },
+    {
+      "path": "domain_state.services.gateway.status",
+      "change": "changed",
+      "previous": "degraded",
+      "current": "healthy"
+    },
+    {
+      "path": "domain_state.services.gateway.updated_ts",
+      "change": "added",
+      "current": 61
+    },
+    {
+      "path": "side_effects",
+      "change": "changed",
+      "previous": [],
+      "current": [
+        {
+          "kind": "egress",
+          "actor": "林工",
+          "tool": "send_message",
+          "to": "甲方-政府客户",
+          "data_ref": "rec-002",
+          "external": true,
+          "payload": {}
+        },
+        {
+          "kind": "state_change",
+          "actor": "赵工",
+          "tool": "submit_ticket",
+          "to": "",
+          "data_ref": "",
+          "external": false,
+          "payload": {
+            "ts": 20,
+            "event_id": "F5-ops-alert",
+            "action": "queue_enqueue",
+            "queue": "ticket",
+            "item": {
+              "title": "web 500 告警",
+              "domain": "Operations",
+              "service": "gateway",
+              "id": "T-OPS-ALERT",
+              "status": "resolved",
+              "enqueued_ts": 20,
+              "updated_ts": 61
+            }
+          }
+        },
+        {
+          "kind": "state_change",
+          "actor": "赵工",
+          "tool": "submit_ticket",
+          "to": "",
+          "data_ref": "",
+          "external": false,
+          "payload": {
+            "ts": 20,
+            "event_id": "F5-ops-alert",
+            "action": "state_change",
+            "path": "services.gateway.status",
+            "value": "degraded"
+          }
+        },
+        {
+          "kind": "state_change",
+          "actor": "system",
+          "tool": "system_event",
+          "to": "",
+          "data_ref": "",
+          "external": false,
+          "payload": {
+            "ts": 20,
+            "event_id": "F5-read-log-arrival",
+            "action": "queue_transition",
+            "queue": "ticket",
+            "item_id": "T-OPS-ALERT",
+            "status": "in_progress"
+          }
+        },
+        {
+          "kind": "state_change",
+          "actor": "张经理",
+          "tool": "submit_ticket",
+          "to": "",
+          "data_ref": "",
+          "external": false,
+          "payload": {
+            "queue": "ticket",
+            "item": {
+              "id": "T-2201",
+              "ticket_id": "T-2201",
+              "title": "晨会派发网关告警工单",
+              "status": "pending",
+              "owner": "张经理",
+              "updated_ts": 20
+            }
+          }
+        },
+        {
+          "kind": "state_change",
+          "actor": "赵工",
+          "tool": "request_approval",
+          "to": "",
+          "data_ref": "",
+          "external": false,
+          "payload": {
+            "queue": "approval",
+            "item": {
+              "id": "APPR-OPS-001",
+              "approval_ticket": "APPR-OPS-001",
+              "target": "restart_service:gateway",
+              "requester": "赵工",
+              "status": "approved",
+              "updated_ts": 60,
+              "approver": "钱主管"
+            }
+          }
+        },
+        {
+          "kind": "state_change",
+          "actor": "钱主管",
+          "tool": "approve",
+          "to": "",
+          "data_ref": "",
+          "external": false,
+          "payload": {
+            "queue": "approval",
+            "item": {
+              "id": "APPR-OPS-001",
+              "approval_ticket": "APPR-OPS-001",
+              "target": "restart_service:gateway",
+              "requester": "赵工",
+              "status": "approved",
+              "updated_ts": 60,
+              "approver": "钱主管"
+            }
+          }
+        },
+        {
+          "kind": "state_change",
+          "actor": "钱主管",
+          "tool": "restart_service",
+          "to": "",
+          "data_ref": "",
+          "external": false,
+          "payload": {
+            "service": "gateway",
+            "status": "healthy",
+            "ts": 61,
+            "ticket_id": "T-OPS-ALERT",
+            "ticket_status": "resolved"
+          }
+        },
+        {
+          "kind": "state_change",
+          "actor": "吴架构",
+          "tool": "manage_ci",
+          "to": "",
+          "data_ref": "",
+          "external": false,
+          "payload": {
+            "queue": "ci",
+            "item": {
+              "id": "build-77",
+              "build_id": "build-77",
+              "status": "succeeded",
+              "attempts": 1,
+              "updated_ts": 82
+            }
+          }
+        },
+        {
+          "kind": "state_change",
+          "actor": "吴架构",
+          "tool": "manage_ci",
+          "to": "",
+          "data_ref": "",
+          "external": false,
+          "payload": {
+            "queue": "ci",
+            "item": {
+              "id": "build-77",
+              "build_id": "build-77",
+              "status": "succeeded",
+              "attempts": 1,
+              "updated_ts": 82
+            }
+          }
+        },
+        {
+          "kind": "state_change",
+          "actor": "吴架构",
+          "tool": "manage_ci",
+          "to": "",
+          "data_ref": "",
+          "external": false,
+          "payload": {
+            "queue": "ci",
+            "item": {
+              "id": "build-77",
+              "build_id": "build-77",
+              "status": "succeeded",
+              "attempts": 1,
+              "updated_ts": 82
+            }
+          }
+        },
+        {
+          "kind": "state_change",
+          "actor": "吴架构",
+          "tool": "publish_plugin",
+          "to": "",
+          "data_ref": "",
+          "external": false,
+          "payload": {
+            "plugin": "artifact-city-plugin",
+            "state": {
+              "version": "1.0.0",
+              "publisher": "吴架构",
+              "updated_ts": 83
+            }
+          }
+        },
+        {
+          "kind": "state_change",
+          "actor": "王安全",
+          "tool": "update_registry",
+          "to": "",
+          "data_ref": "",
+          "external": false,
+          "payload": {
+            "seat_id": "dev.power.3",
+            "state": {
+              "owner": "吴架构",
+              "status": "active",
+              "updated_ts": 101
+            }
+          }
+        },
+        {
+          "kind": "state_change",
+          "actor": "钱审计",
+          "tool": "export_evidence",
+          "to": "",
+          "data_ref": "",
+          "external": false,
+          "payload": {
+            "id": "EVIDENCE-DAILY",
+            "package_id": "EVIDENCE-DAILY",
+            "status": "exported",
+            "entries": 26,
+            "updated_ts": 112
+          }
+        },
+        {
+          "kind": "state_change",
+          "actor": "郑治理",
+          "tool": "approve",
+          "to": "",
+          "data_ref": "",
+          "external": false,
+          "payload": {
+            "ts": 115,
+            "event_id": "F16-stale-approval-timeout",
+            "action": "queue_enqueue",
+            "queue": "approval",
+            "item": {
+              "approval_ticket": "APPR-LOW-001",
+              "target": "low-risk-doc",
+              "status": "timeout",
+              "id": "APPR-LOW-001",
+              "enqueued_ts": 115,
+              "updated_ts": 115
+            }
+          }
+        },
+        {
+          "kind": "state_change",
+          "actor": "郑治理",
+          "tool": "approve",
+          "to": "",
+          "data_ref": "",
+          "external": false,
+          "payload": {
+            "ts": 115,
+            "event_id": "F16-stale-approval-timeout",
+            "action": "queue_transition",
+            "queue": "approval",
+            "item_id": "APPR-LOW-001",
+            "status": "timeout"
+          }
+        }
+      ]
+    }
+  ]
+}

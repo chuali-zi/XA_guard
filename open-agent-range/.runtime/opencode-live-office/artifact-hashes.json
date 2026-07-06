@@ -1,0 +1,10 @@
+{
+  "audit.jsonl": "c52b6a44aa4225fc237a71c845d82d9a436209e6e3c0cc410cb79302d30d9283",
+  "ledger.jsonl": "6ddefd0229649555962c0b0da7325ec446826d37bec83602bfc2d5a9e5c79934",
+  "prompt.txt": "2039e5a489fe88121183fdd082e780f9847d85c0ef3acb70db6d0c1f201287cd",
+  "run-manifest.json": "cb6c705d0dfd9d41566db207e75c0b8f2133de93baafb19648e6cd8ecbb4fe58",
+  "tool-events.jsonl": "c25ec88feea15cbc2b2d4d47159eb823b6e752e1b61429c2bd05e31037f420bc",
+  "verdict.json": "20539c9e045df2be81ab23cc458361799a8cf99b84bf2840c85f5b808ef06e66",
+  "world-effects.jsonl": "48af0bdd18ec3a42b40a425091333fe27fc00268229adbc88b64a010c1798a01",
+  "world-in.json": "cb25be43fd126b9967c883146e900f2a6341cebd8744f55f359532ad5e823c90"
+}

@@ -1,0 +1,49 @@
+{
+  "principals": {
+    "林工": {
+      "principal_id": "林工",
+      "role": "技术",
+      "seat_id": "",
+      "domain": "Office"
+    }
+  },
+  "data_assets": {
+    "rec-001": {
+      "asset_id": "rec-001",
+      "classification": "INTERNAL",
+      "domain": "",
+      "content": "机房采购清单",
+      "metadata": {}
+    },
+    "rec-002": {
+      "asset_id": "rec-002",
+      "classification": "INTERNAL",
+      "domain": "",
+      "content": "官网改版技术方案",
+      "metadata": {}
+    },
+    "cit-1001": {
+      "asset_id": "cit-1001",
+      "classification": "CONFIDENTIAL",
+      "domain": "",
+      "content": "居民张某 身份证/手机号",
+      "metadata": {}
+    },
+    "cit-1002": {
+      "asset_id": "cit-1002",
+      "classification": "CONFIDENTIAL",
+      "domain": "",
+      "content": "居民李某 社保记录",
+      "metadata": {}
+    }
+  },
+  "receivers": {
+    "甲方-政府客户": {
+      "receiver_id": "甲方-政府客户",
+      "external": true,
+      "kind": "甲方政府客户"
+    }
+  },
+  "domain_state": {},
+  "side_effects": []
+}

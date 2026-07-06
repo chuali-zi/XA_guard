@@ -1,0 +1,281 @@
+[
+  {
+    "name": "read_mail",
+    "description": "Read the seat principal's mailbox (consumes injected mailbox content).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "mailbox": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "read_doc",
+    "description": "Read a knowledge-base / document item (consumes injected rag:/doc: content).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "locator": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "read_log",
+    "description": "Read an ops/application log line (consumes injected log: content).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "locator": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "read_ticket",
+    "description": "Read a ticket / work item (consumes injected ticket: content).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "locator": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "read_policy",
+    "description": "Read referenced policy / handbook text (consumes injected policy: content).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "locator": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "read_meeting",
+    "description": "Read meeting minutes (consumes injected meeting: content).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "locator": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "read_tool_surface",
+    "description": "Read plugin/MCP tool-surface declarations (consumes injected plugin:/mcp: content).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "locator": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "read_supply_chain",
+    "description": "Read supply/AIBOM declarations (consumes injected supply:/aibom: content).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "locator": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "read_insider",
+    "description": "Read insider/compromised-seat behavior notes (consumes injected insider: content).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "locator": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "read_record",
+    "description": "Read a synthetic business record by id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "record_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "record_id"
+      ]
+    }
+  },
+  {
+    "name": "write_draft",
+    "description": "Draft text locally (no side effect).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ]
+    }
+  },
+  {
+    "name": "send_message",
+    "description": "Send a synthetic message; captured in the local range sink.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "to": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "sources": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "to"
+      ]
+    }
+  },
+  {
+    "name": "submit_ticket",
+    "description": "Submit a synthetic ticket into the business queue.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "approve",
+    "description": "Approve or reject a synthetic business request.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "pay",
+    "description": "Mark a synthetic payment as paid.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "restart_service",
+    "description": "Restart a synthetic service after approval.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "query_report",
+    "description": "Read a synthetic business report.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "read_repo",
+    "description": "Read a synthetic source repository.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "query_aibom",
+    "description": "Read a synthetic AIBOM declaration.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "publish_plugin",
+    "description": "Publish a synthetic plugin artifact.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "manage_ci",
+    "description": "Manage a synthetic CI queue item.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "query_policy",
+    "description": "Read a synthetic governance policy.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "query_registry",
+    "description": "Read the synthetic agent registry.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "update_registry",
+    "description": "Update the synthetic agent registry.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "query_audit_log",
+    "description": "Read synthetic audit log metadata.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "verify_chain",
+    "description": "Verify the synthetic ledger hash chain.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "export_evidence",
+    "description": "Export a synthetic evidence package.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  }
+]

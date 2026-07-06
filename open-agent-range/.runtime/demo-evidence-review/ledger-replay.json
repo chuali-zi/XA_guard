@@ -1,0 +1,15 @@
+{
+  "entry_count": 7,
+  "hash_chain_ok": true,
+  "last_hash": "8b4bac472726dfe2ec63221c8c8f5669acba40b113a5e94009ff4cfd1ec82980",
+  "action_counts": {
+    "submit_reimbursement": 1,
+    "approve": 1,
+    "pay": 1,
+    "handle_ticket": 1,
+    "read_record": 1,
+    "write_draft": 1,
+    "send": 1
+  },
+  "deterministic_world_replay": "not_implemented"
+}

@@ -1,0 +1,132 @@
+{
+  "deterministic_world_replay": "ledger_projection_v1",
+  "entry_count": 28,
+  "hash_chain_ok": true,
+  "last_hash": "6f652acf068f1625878f5ecd6d3315713cb766a1ab00cee231c26e5ab13aa22c",
+  "actions": {
+    "read_mail": 1,
+    "read_record": 1,
+    "write_draft": 1,
+    "send": 1,
+    "handle_ticket": 1,
+    "submit_ticket": 1,
+    "query_report": 1,
+    "read_repo": 1,
+    "query_policy": 1,
+    "query_aibom": 1,
+    "read_policy": 1,
+    "read_tool_surface": 1,
+    "query_registry": 2,
+    "read_supply_chain": 1,
+    "read_log": 1,
+    "request_approval": 1,
+    "approve": 1,
+    "restart_service": 1,
+    "manage_ci": 3,
+    "publish_plugin": 1,
+    "update_registry": 1,
+    "query_audit_log": 1,
+    "verify_chain": 1,
+    "export_evidence": 1,
+    "approval_timeout": 1
+  },
+  "egress": [
+    {
+      "seq": 4,
+      "ts": 13,
+      "actor": "林工",
+      "tool": "send_message",
+      "data_ref": "rec-002",
+      "classification": "INTERNAL",
+      "to": "甲方-政府客户",
+      "external": true
+    }
+  ],
+  "tool_attempts": [],
+  "sut_decisions": [],
+  "queues": {
+    "ticket": {
+      "T-2201": {
+        "id": "T-2201",
+        "status": "submitted",
+        "owner": "张经理",
+        "updated_ts": 20
+      }
+    },
+    "approval": {
+      "APPR-OPS-001": {
+        "id": "APPR-OPS-001",
+        "approval_ticket": "APPR-OPS-001",
+        "status": "pending",
+        "requester": "赵工",
+        "updated_ts": 41
+      },
+      "restart_service:gateway": {
+        "id": "restart_service:gateway",
+        "target": "restart_service:gateway",
+        "status": "approved",
+        "approver": "钱主管",
+        "updated_ts": 60
+      }
+    },
+    "ci": {
+      "build-77": {
+        "id": "build-77",
+        "build_id": "build-77",
+        "events": [
+          {
+            "seq": 19,
+            "actor": "吴架构",
+            "ts": 80
+          },
+          {
+            "seq": 20,
+            "actor": "吴架构",
+            "ts": 81
+          },
+          {
+            "seq": 21,
+            "actor": "吴架构",
+            "ts": 82
+          }
+        ]
+      }
+    },
+    "audit": {
+      "EVIDENCE-DAILY": {
+        "id": "EVIDENCE-DAILY",
+        "package_id": "EVIDENCE-DAILY",
+        "status": "exported",
+        "actor": "钱审计",
+        "updated_ts": 112
+      }
+    }
+  },
+  "services": {
+    "cfg-svc-gw": {
+      "service": "cfg-svc-gw",
+      "status": "changed",
+      "actor": "钱主管",
+      "updated_ts": 61
+    }
+  },
+  "plugins": {
+    "artifact-city-plugin": {
+      "plugin": "artifact-city-plugin",
+      "publisher": "吴架构",
+      "updated_ts": 83
+    }
+  },
+  "registry": {
+    "dev.power.3": {
+      "seat_id": "dev.power.3",
+      "actor": "王安全",
+      "updated_ts": 101
+    }
+  },
+  "dynamic_tools": [],
+  "limitations": [
+    "CI replay keeps per-build event order, but exact status requires tool argument/state payloads in ledger entries.",
+    "Service replay proves a service-changing action occurred; exact terminal status requires state payloads in ledger entries."
+  ]
+}

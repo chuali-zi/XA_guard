@@ -1,0 +1,25 @@
+{
+  "changed_paths": [
+    "domain_state.clock"
+  ],
+  "changes": [
+    {
+      "path": "domain_state.clock",
+      "change": "added",
+      "current": {
+        "current_ts": 0,
+        "ticks": [
+          {
+            "ts": 0,
+            "concurrent": true,
+            "event_ids": [
+              "normal-1",
+              "normal-2"
+            ]
+          }
+        ],
+        "last_ts": 0
+      }
+    }
+  ]
+}

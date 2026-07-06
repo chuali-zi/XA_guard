@@ -1,0 +1,7 @@
+{
+  "scenario_id": "dctg-office-baseline",
+  "seat_id": "opencode",
+  "sut_id": "null-passthrough",
+  "agent": "opencode",
+  "model": "deepseek/deepseek-v4-flash"
+}

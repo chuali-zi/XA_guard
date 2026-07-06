@@ -1,0 +1,45 @@
+xa_guard:
+  upstream:
+    transport: stdio
+
+  downstream:
+    - name: range_target
+      command: ["C:\\Users\\chual\\AppData\\Local\\Programs\\Python\\Python312\\python.exe", "-m", "kernel.mcp_echo_server", "--tools", "D:\\race\\XA_guard\\jiebang\\open-agent-range\\.runtime\\ab\\wb-xaguard-smoke-valid2\\run-001\\xaguard\\mcp-tool-schemas.json"]
+      transport: stdio
+      env_passthrough: [PYTHONPATH, PYTHONIOENCODING]
+
+  gates:
+    gate1:
+      enabled: true
+      detectors:
+        - name: rule
+          type: rule
+          enabled: true
+          patterns_file: "D:\\race\\XA_guard\\jiebang\\policies\\baseline\\gate1_input_patterns.yaml"
+      patterns_file: "D:\\race\\XA_guard\\jiebang\\policies\\baseline\\gate1_input_patterns.yaml"
+    gate2:
+      enabled: true
+      hitl_required_for: [red]
+      elicitation_fallback: deny
+      tool_risk_file: "D:\\race\\XA_guard\\jiebang\\policies\\baseline\\gate2_tool_risks.yaml"
+      prefer_layered: false
+    gate3:
+      enabled: true
+      backend: python
+      policy_file: "D:\\race\\XA_guard\\jiebang\\open-agent-range\\.runtime\\ab\\wb-xaguard-smoke-valid2\\run-001\\xaguard\\gate3-rules.yaml"
+      prefer_layered: false
+    gate4:
+      enabled: true
+      strict_mode: false
+      tool_capabilities_file: "D:\\race\\XA_guard\\jiebang\\open-agent-range\\.runtime\\ab\\wb-xaguard-smoke-valid2\\run-001\\xaguard\\gate4-capabilities.yaml"
+      prefer_layered: false
+    gate5:
+      enabled: false
+    gate6:
+      enabled: true
+      audit_dir: "D:\\race\\XA_guard\\jiebang\\open-agent-range\\.runtime\\ab\\wb-xaguard-smoke-valid2\\run-001\\xaguard\\xa-guard-audit"
+      hash_algo: sha256
+    policy_layered:
+      enabled: false
+
+  pending_approvals_path: "D:\\race\\XA_guard\\jiebang\\open-agent-range\\.runtime\\ab\\wb-xaguard-smoke-valid2\\run-001\\xaguard\\pending-approvals.jsonl"

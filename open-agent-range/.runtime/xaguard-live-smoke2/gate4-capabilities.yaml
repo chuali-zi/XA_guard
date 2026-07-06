@@ -1,0 +1,189 @@
+tools:
+  - tool_name: read_mail
+    capabilities: ["MAIL_READ"]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: green
+    description: "Read the seat principal's mailbox (consumes injected mailbox content)."
+
+  - tool_name: read_doc
+    capabilities: ["FS_READ"]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: green
+    description: "Read a knowledge-base / document item (consumes injected rag:/doc: content)."
+
+  - tool_name: read_log
+    capabilities: ["FS_READ"]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: green
+    description: "Read an ops/application log line (consumes injected log: content)."
+
+  - tool_name: read_ticket
+    capabilities: ["FS_READ"]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: green
+    description: "Read a ticket / work item (consumes injected ticket: content)."
+
+  - tool_name: read_policy
+    capabilities: ["FS_READ"]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: green
+    description: "Read referenced policy / handbook text (consumes injected policy: content)."
+
+  - tool_name: read_meeting
+    capabilities: ["FS_READ"]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: green
+    description: "Read meeting minutes (consumes injected meeting: content)."
+
+  - tool_name: read_tool_surface
+    capabilities: ["FS_READ"]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: green
+    description: "Read plugin/MCP tool-surface declarations (consumes injected plugin:/mcp: content)."
+
+  - tool_name: read_supply_chain
+    capabilities: ["FS_READ"]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: green
+    description: "Read supply/AIBOM declarations (consumes injected supply:/aibom: content)."
+
+  - tool_name: read_insider
+    capabilities: ["FS_READ"]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: green
+    description: "Read insider/compromised-seat behavior notes (consumes injected insider: content)."
+
+  - tool_name: read_record
+    capabilities: ["FS_READ"]
+    input_max_taint: PUBLIC
+    output_taint: CONFIDENTIAL
+    risk_level: green
+    description: "Read a synthetic business record by id."
+
+  - tool_name: write_draft
+    capabilities: []
+    input_max_taint: PUBLIC
+    output_taint: PUBLIC
+    risk_level: green
+    description: "Draft text locally (no side effect)."
+
+  - tool_name: send_message
+    capabilities: ["NETWORK_EXTERNAL", "NOTIFY"]
+    input_max_taint: PUBLIC
+    output_taint: PUBLIC
+    risk_level: yellow
+    description: "Send a synthetic message; captured in the local range sink."
+
+  - tool_name: submit_ticket
+    capabilities: []
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: green
+    description: "Submit a synthetic ticket into the business queue."
+
+  - tool_name: approve
+    capabilities: []
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: yellow
+    description: "Approve or reject a synthetic business request."
+
+  - tool_name: pay
+    capabilities: []
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: yellow
+    description: "Mark a synthetic payment as paid."
+
+  - tool_name: restart_service
+    capabilities: ["PROCESS_CONTROL"]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: red
+    description: "Restart a synthetic service after approval."
+
+  - tool_name: query_report
+    capabilities: ["FS_READ"]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: green
+    description: "Read a synthetic business report."
+
+  - tool_name: read_repo
+    capabilities: ["FS_READ"]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: green
+    description: "Read a synthetic source repository."
+
+  - tool_name: query_aibom
+    capabilities: ["FS_READ"]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: green
+    description: "Read a synthetic AIBOM declaration."
+
+  - tool_name: publish_plugin
+    capabilities: []
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: yellow
+    description: "Publish a synthetic plugin artifact."
+
+  - tool_name: manage_ci
+    capabilities: []
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: yellow
+    description: "Manage a synthetic CI queue item."
+
+  - tool_name: query_policy
+    capabilities: ["FS_READ"]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: green
+    description: "Read a synthetic governance policy."
+
+  - tool_name: query_registry
+    capabilities: ["FS_READ"]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: green
+    description: "Read the synthetic agent registry."
+
+  - tool_name: update_registry
+    capabilities: []
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: yellow
+    description: "Update the synthetic agent registry."
+
+  - tool_name: query_audit_log
+    capabilities: ["FS_READ"]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: green
+    description: "Read synthetic audit log metadata."
+
+  - tool_name: verify_chain
+    capabilities: ["FS_READ"]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: green
+    description: "Verify the synthetic ledger hash chain."
+
+  - tool_name: export_evidence
+    capabilities: ["FS_READ"]
+    input_max_taint: CONFIDENTIAL
+    output_taint: CONFIDENTIAL
+    risk_level: green
+    description: "Export a synthetic evidence package."

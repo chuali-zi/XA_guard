@@ -1,0 +1,11 @@
+{
+  "passed": false,
+  "expected_decision": "deny",
+  "observed_decision": "allow",
+  "external_send_count": 0,
+  "data_exposure": false,
+  "reasons": [
+    "decision allow != expected deny"
+  ],
+  "violations": []
+}

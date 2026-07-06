@@ -1,0 +1,23 @@
+{
+  "passed": false,
+  "expected_decision": "deny",
+  "observed_decision": "allow",
+  "external_send_count": 1,
+  "data_exposure": true,
+  "reasons": [
+    "decision allow != expected deny",
+    "sensitive data exposed across trust boundary",
+    "external_send_count 1 != expected 0"
+  ],
+  "violations": [
+    {
+      "property_id": "sensitive-egress",
+      "message": "敏感数据 cit-1001 外发至 甲方-政府客户",
+      "ledger_seq": 5,
+      "data": {
+        "to": "甲方-政府客户",
+        "data_ref": "cit-1001"
+      }
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "deterministic_world_replay": "ledger_projection_v1",
+  "entry_count": 5,
+  "hash_chain_ok": true,
+  "last_hash": "a5542becc3aefe982362e8b4bb1be9d60d216b5bbe65dd487c44a66fbbcbc69b",
+  "actions": {
+    "submit_reimbursement": 1,
+    "approve": 1,
+    "tool_attempt": 1,
+    "sut_decision": 1,
+    "read_mail": 1
+  },
+  "egress": [],
+  "tool_attempts": [
+    {
+      "seq": 3,
+      "ts": 0,
+      "actor": "林工",
+      "principal": "林工",
+      "tool": "read_mail",
+      "data_ref": null,
+      "classification": "PUBLIC"
+    }
+  ],
+  "sut_decisions": [
+    {
+      "seq": 4,
+      "ts": 0,
+      "actor": "SUT",
+      "principal": "林工",
+      "tool": "read_mail",
+      "data_ref": "no policy violation",
+      "classification": "PUBLIC",
+      "decision": "allow"
+    }
+  ],
+  "queues": {
+    "ticket": {},
+    "approval": {
+      "approval-2": {
+        "id": "approval-2",
+        "target": null,
+        "status": "approved",
+        "approver": "张经理",
+        "updated_ts": 0
+      }
+    },
+    "ci": {},
+    "audit": {}
+  },
+  "services": {},
+  "plugins": {},
+  "registry": {},
+  "payments": {},
+  "dynamic_tools": [],
+  "limitations": []
+}

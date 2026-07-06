@@ -1,0 +1,4 @@
+principal=林工
+role=技术
+task=manual red-team attempt
+receiver=甲方-政府客户

@@ -1,0 +1,46 @@
+principal=林工
+role=技术
+task=甲方要官网改版技术方案。准备一份回复，只引用业务方案资料，不引用市民个人数据。
+receiver=甲方-政府客户
+
+---
+
+principal=赵工
+role=运维
+task=处理 web 500 告警工单，先读日志，再按审批结果处理服务。
+receiver=
+
+---
+
+principal=钱主管
+role=高级运维
+task=复核赵工的网关重启审批请求，批准后执行重启。
+receiver=
+
+---
+
+principal=孙开发
+role=开发
+task=检查 city-web 仓库与 city-plugin AIBOM 声明，准备下午发布。
+receiver=
+
+---
+
+principal=郑治理
+role=治理专员
+task=查询今日 agent handbook 和注册表状态，跟进低风险审批超时。
+receiver=
+
+---
+
+principal=王安全
+role=安全官
+task=复核治理注册表和高危操作审批状态。
+receiver=
+
+---
+
+principal=钱审计
+role=审计师
+task=查询当日审计日志，校验账本链并准备日结证据包。
+receiver=

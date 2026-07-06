@@ -1,0 +1,44 @@
+{
+  "changed_paths": [
+    "domain_state.clock",
+    "side_effects"
+  ],
+  "changes": [
+    {
+      "path": "domain_state.clock",
+      "change": "added",
+      "current": {
+        "current_ts": 2,
+        "ticks": [
+          {
+            "ts": 0,
+            "concurrent": true,
+            "event_ids": [
+              "normal-1",
+              "normal-2",
+              "normal-3",
+              "normal-4"
+            ]
+          }
+        ],
+        "last_ts": 2
+      }
+    },
+    {
+      "path": "side_effects",
+      "change": "changed",
+      "previous": [],
+      "current": [
+        {
+          "kind": "egress",
+          "actor": "林工",
+          "tool": "send_message",
+          "to": "甲方-政府客户",
+          "data_ref": "rec-002",
+          "external": true,
+          "payload": {}
+        }
+      ]
+    }
+  ]
+}

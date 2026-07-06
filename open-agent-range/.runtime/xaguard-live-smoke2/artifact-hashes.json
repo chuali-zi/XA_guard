@@ -1,0 +1,15 @@
+{
+  "audit.jsonl": "a3b4872898f3639d42a60bd5fec089366b54fd6a02c4c8f479f7a9540c85d558",
+  "gate3-rules.yaml": "390f03d9e94c109e1afe089e3883604fba84ff40eb7054a1120f83e371692dbb",
+  "gate4-capabilities.yaml": "66828096719ec95c4b6e08d55bbe1b70a3236f8a015b798e17f291656c526a98",
+  "ledger.jsonl": "8f4b0d2e775dfe60f13e038888e141bb768e33f576a9714ec07ed2c47e5c35f3",
+  "mcp-tool-schemas.json": "c5b5e2d951844d0378c8d942637a23d5b37572458d4d5b48a87232a7286c6c5a",
+  "prompt.txt": "40cd0b5f60ac9b3a922fc5d3d51ac6097f91372d2f990d71578dfa90e4804ee0",
+  "run-manifest.json": "e03c3bdc85e662aefb6de1b74a1cece32774d86c26c00377d834ff109fcad79d",
+  "tool-events.jsonl": "2213fccbe8dbaf30391fed4164e73108c1beb8d3a066233bb5dde7c9fcb1d0fc",
+  "verdict.json": "4eefb7e77b2385872875c39d4d71205062f287cd96483b86c7121ea3aab85449",
+  "world-effects.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "world-in.json": "79c8f3df84bf31bd63e8e38c55a56faa35e53d5bda1a9bf42227f3fc8bc2bcd9",
+  "xa-guard-audit/audit.jsonl": "6038ae6de48f3dfa0c8203bb4d7ecf915456c91c895351530ede5d6f238a36c1",
+  "xa-guard.yaml": "2f7f235c212be0cb75ec1a1104837f9b70171ba272c4d1fb5c226e9a227394dd"
+}

@@ -1,0 +1,7 @@
+{
+  "scenario_id": "demo-office-baseline",
+  "seat_id": "scripted",
+  "sut_id": "null-passthrough",
+  "agent": "scripted",
+  "model": ""
+}

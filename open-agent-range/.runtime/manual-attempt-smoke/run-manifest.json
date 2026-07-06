@@ -1,0 +1,10 @@
+{
+  "scenario_id": "dctg-office-mailbox",
+  "seat_id": "manual",
+  "sut_id": "guard-stub",
+  "agent": "manual",
+  "principal": "林工",
+  "manual_tool": "send_message",
+  "live": false,
+  "injection_count": 0
+}
