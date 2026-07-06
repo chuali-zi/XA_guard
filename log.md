@@ -1,3 +1,20 @@
+# 2026-07-05 23:16 -07:00 L3 R4 性能完整复跑验收
+
+- 按 `docs/acceptance/L3-test-and-acceptance.md` 的 R4 口径复跑性能验收，证据目录 `docs/evidence/l3-r4-20260705-current/`，新增 `README.md` 和 `artifact-hashes.json`。
+- 首次 `pytest` 因未设置 `PYTHONPATH=src` 导致 `xa_guard` 不可见；补环境变量后 `tests/unit/test_l3_performance_benchmark.py` 为 7 passed。未修改测试代码。
+- 进程内 500 请求/并发 10 使用 `--require-targets` 通过：P50 4.362ms、P95 36.042ms、262.301 QPS、RSS 峰值 62.172MB，530 条审计记录链验证通过。
+- Streamable HTTP 10 sessions/500 请求使用 `--require-targets` 通过：P95 185.518ms、69.876 QPS、RSS 峰值 102.867MB，500/500 measured markers 匹配，审计链验证通过，关闭后 active sessions=0。
+- Streamable HTTP 20 sessions/500 请求作为容量边界运行：无错误、无串话、500/500 markers、审计链通过、active sessions=0，但 P95 483.732ms 超过 300ms，记录为 LIMIT，不声明 20 会话支持。
+- 本轮只完成 R4 复跑和证据收束；不改变 R1/R2/R3/R5/R6/R8/R9 仍有 BLOCKED 项、L3 最终仍 BLOCKED 的结论。
+
+# 2026-07-05 R8 外部 AIBOM/CycloneDX 验收准备
+
+- 本轮只做 R8 文档和交接准备，不执行正式验收，不宣称 PASS。
+- 新增 `docs/acceptance/r8-aibom-external/`：将 `@cyclonedx/cdxgen` 作为合法外部生成器优先候选，记录来源、Apache-2.0 许可、CycloneDX 1.6/AI-BOM 相关能力、待核验风险和采用门槛。
+- 新增最小样本目录 `docs/acceptance/r8-aibom-external/samples/python-ai-plugin/`，包含 Python 包元数据、MCP manifest、prompt 文件和最小模块，供后续外部工具扫描。
+- 补充候选生成命令、SHA-256 固定命令、`xa_guard.aibom.external_generator.load_external_cyclonedx` 导入校验命令和证据清单；同步更新 `docs/acceptance/L3-aibom-external-generator.md`、`docs/README.md`、`docs/.log/worklog.md`。
+- 未完成：未安装或运行 cdxgen/aibom，未生成真实 CycloneDX 产物，未归档证据，未验证 marketplace/IDE 安装链；R8 仍保持 BLOCKED。
+
 # 2026-07-05 22:58 -07:00 L3 R7 OPA 完整功能验收
 
 - 按 `docs/acceptance/L3-test-and-acceptance.md` 的 R7 口径复核并执行 OPA 验收；证据目录 `/mnt/d/evidence/l3-r7-20260706T055152Z/`，最终摘要 `r7-final-summary.json`，artifact manifest `artifact-hashes.json`。
@@ -2679,4 +2696,3 @@ Key finding:
 - 规划范围：模拟企业"数字城市科技集团"（~500 员工、~150 Agent Seat）、L1-L4 + Test 五级 Seat 体系、6 个企业域（Office/Operations/Business Data/Dev Supply/Governance/Audit）的 Seat 分配与能力定义、跨域访问规则矩阵、委托链约束、Seat 生命周期、成本模型（月均 ~$1,040）、与 Arena Core 组件的映射关系。
 - 更新 `enterprise-agent-range/docs/README.md` 先读顺序添加该规划入口。
 - 本规划不修改 runtime 代码、不改变 XA-Guard 验收结论、不引入真实模型调用。
-

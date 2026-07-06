@@ -1,5 +1,17 @@
 # docs 模块工作日志
 
+## 2026-07-05 R8 外部 AIBOM 生成器准备
+
+任务：为后续 R8 验收准备合法外部 AIBOM/CycloneDX 生成器候选、样本目录和命令，不宣称通过。
+
+新增 `docs/acceptance/r8-aibom-external/`：选择 `@cyclonedx/cdxgen` 作为优先候选，补候选来源/许可证/风险、最小 Python AI 插件样本、生成/哈希/XA-Guard 导入校验命令和证据清单。
+
+同步更新 `docs/acceptance/L3-aibom-external-generator.md` 与 `docs/README.md` 指向新入口。本轮未实跑外部工具、未生成真实 BOM、未改变 R8 BLOCKED 状态。
+
+## 2026-07-05 R4 证据收束
+
+为 L3 R4 复跑新增 `docs/evidence/l3-r4-20260705-current/README.md` 与 `artifact-hashes.json`，同步 `status.md` 和根 `log.md`。结果：进程内 500 与 HTTP 10x500 PASS；HTTP 20x500 为容量 LIMIT。
+
 ## 2026-06-30 19:28 PDT
 
 任务：基于赛题 PDF、现有 docs、`status.md` 和根 README，整理当前状态和下一步 TODO。

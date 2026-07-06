@@ -1,0 +1,13 @@
+{
+  "name": "r8-sample-ai-plugin",
+  "version": "0.1.0",
+  "description": "Minimal MCP manifest for external AIBOM generator preparation.",
+  "transport": "stdio",
+  "entrypoint": "python -m r8_sample_plugin",
+  "tools": [
+    {
+      "name": "summarize_public_note",
+      "description": "Summarize non-sensitive public sample text."
+    }
+  ]
+}

@@ -279,7 +279,11 @@ def test_execution_locks_are_rechecked_for_budget_runs(tmp_path: Path, monkeypat
             return "changed" if name == "repository" else f"{name}-commit"
         return " M changed.py" if name == "agentdojo" else ""
 
+    def fake_git_dirty(path: Path) -> bool:
+        return path.name == "agentdojo"
+
     monkeypatch.setattr("scripts.run_r2_r3_acceptance._git", fake_git)
+    monkeypatch.setattr("scripts.run_r2_r3_acceptance._git_dirty", fake_git_dirty)
     assert _execution_lock_errors(plan) == [
         "execution_commit_changed:repository",
         "execution_repository_dirty:agentdojo",

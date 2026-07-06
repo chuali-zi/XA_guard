@@ -1,0 +1,128 @@
+{
+  "schema_version": "xa-streamable-http-multisession-benchmark/v0.1",
+  "generated_at": "2026-07-06T06:15:08.312289+00:00",
+  "claim_scope": "single_process_uvicorn_stateful_mcp_multisession",
+  "benchmark": {
+    "path": "D:\\race\\XA_guard\\jiebang\\scripts\\benchmark_streamable_http.py",
+    "sha256": "e8af560390a010a66ffd39d5463e2a9ae848924d0254458f8975a8345a5e2a19"
+  },
+  "config": {
+    "path": "configs\\xa-guard.opencode-smoke.yaml",
+    "sha256": "22647ea74450e5be50b1024dafd5562e881e6be85097e77b2af56a08a9764f16"
+  },
+  "environment": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.12.10",
+    "cpu_count": 22
+  },
+  "server": {
+    "url": "http://127.0.0.1:48883/mcp",
+    "worker_count": 1,
+    "startup_ms": 149.048,
+    "session_mode": "stateful",
+    "session_idle_timeout_seconds": 60
+  },
+  "workload": {
+    "sessions": 10,
+    "requests": 500,
+    "warmup": 30,
+    "tool": "get_cpu",
+    "case_distribution": {
+      "allow": 1.0
+    }
+  },
+  "warmup": {
+    "sessions": 10,
+    "requests": 30,
+    "session_ids_total": 10,
+    "session_ids_unique": 10,
+    "empty_session_ids": 0,
+    "initialization_latency_ms": {
+      "p50": 1000.331,
+      "p95": 1943.093,
+      "max": 2142.427
+    },
+    "call_latency_ms": {
+      "p50": 119.252,
+      "p95": 226.67,
+      "p99": 231.267,
+      "max": 234.608
+    },
+    "elapsed_seconds": 0.485271,
+    "throughput_qps": 61.821,
+    "errors": [],
+    "response_mismatches": 0
+  },
+  "measured": {
+    "sessions": 10,
+    "requests": 500,
+    "session_ids_total": 10,
+    "session_ids_unique": 10,
+    "empty_session_ids": 0,
+    "initialization_latency_ms": {
+      "p50": 860.473,
+      "p95": 1801.84,
+      "max": 1972.099
+    },
+    "call_latency_ms": {
+      "p50": 139.618,
+      "p95": 185.518,
+      "p99": 238.894,
+      "max": 261.259
+    },
+    "elapsed_seconds": 7.155569,
+    "throughput_qps": 69.876,
+    "errors": [],
+    "response_mismatches": 0
+  },
+  "audit": {
+    "path": "docs\\evidence\\l3-r4-20260705-current\\.perf-http-10x500-audit\\audit.jsonl",
+    "records_total": 530,
+    "measured_records": 500,
+    "measured_trace_ids_unique": 500,
+    "measured_completeness_min": 1.0,
+    "request_markers_expected": 500,
+    "request_markers_audited": 500,
+    "request_markers_missing": [],
+    "request_markers_unexpected": [],
+    "chain_verified": true,
+    "bad_line": null,
+    "sha256": "5e9917712c1e03831e2f767e3983bd12c4200d88caf8c4784ff907cad778bdc1"
+  },
+  "memory": {
+    "peak_rss_mb": 102.867,
+    "samples": 453
+  },
+  "health_after": {
+    "status": "ok",
+    "transport": "streamable-http",
+    "session_mode": "stateful",
+    "active_sessions": 0,
+    "session_idle_timeout_seconds": 60
+  },
+  "targets": {
+    "initialization_success_rate": true,
+    "session_id_unique_rate": true,
+    "call_success_rate": true,
+    "response_isolation": true,
+    "audit_completeness": true,
+    "audit_request_mapping": true,
+    "audit_chain": true,
+    "session_reclamation": true,
+    "p95_le_300ms": true,
+    "throughput_ge_50qps": true,
+    "peak_rss_le_1024mb": true
+  },
+  "overall_pass": true,
+  "artifacts": {
+    "raw_samples_path": "docs\\evidence\\l3-r4-20260705-current\\perf-http-10x500.samples.jsonl",
+    "raw_samples_sha256": "51ea7aa9bd8bcf2f480e65fe25050f6583d32bcc4eb8fe4b600de232a82df40e"
+  },
+  "limitations": [
+    "single uvicorn worker",
+    "single shared stdio downstream session",
+    "allow-only workload",
+    "no TLS or external reverse proxy",
+    "not a multi-process pending-ledger claim"
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "schema_version": "xa-l3-performance-benchmark/v0.1",
+  "generated_at": "2026-07-06T06:14:44.307624+00:00",
+  "claim_scope": "local_in_process_six_gate_pipeline",
+  "benchmark": {
+    "path": "D:\\race\\XA_guard\\jiebang\\scripts\\benchmark_l3_performance.py",
+    "sha256": "8eea6a243183ce64d6ee4033e45239155995a72ffbbe3d44f04cdef0089f1b6e"
+  },
+  "config": {
+    "path": "D:\\race\\XA_guard\\jiebang\\configs\\xa-guard.opencode-smoke.yaml",
+    "sha256": "22647ea74450e5be50b1024dafd5562e881e6be85097e77b2af56a08a9764f16"
+  },
+  "environment": {
+    "python": "3.12.10",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "processor": "Intel64 Family 6 Model 170 Stepping 4, GenuineIntel",
+    "cpu_count": 22
+  },
+  "workload": {
+    "requests": 500,
+    "warmup": 30,
+    "concurrency": 10,
+    "cases": [
+      "allow",
+      "deny",
+      "approval"
+    ],
+    "includes_gate6_audit_write": true
+  },
+  "summary": {
+    "elapsed_seconds": 1.906204,
+    "throughput_qps": 262.301,
+    "latency": {
+      "min_ms": 0.975,
+      "mean_ms": 12.514,
+      "p50_ms": 4.362,
+      "p95_ms": 36.042,
+      "p99_ms": 56.146,
+      "max_ms": 85.122
+    },
+    "memory": {
+      "provider": "windows_working_set",
+      "rss_start_mb": 61.102,
+      "rss_end_mb": 62.172,
+      "rss_delta_mb": 1.07,
+      "rss_peak_mb": 62.172
+    },
+    "decisions": {
+      "allow": 167,
+      "case:allow": 167,
+      "case:approval": 166,
+      "case:deny": 167,
+      "deny": 333
+    },
+    "audit": {
+      "path": "D:\\race\\XA_guard\\jiebang\\docs\\evidence\\l3-r4-20260705-current\\perf-impl-audit\\run-20260706T061442.189126Z-12016\\audit.jsonl",
+      "records": 530,
+      "chain_verified": true,
+      "bad_line": null
+    },
+    "targets": {
+      "profile": "PRD medium",
+      "p50_ms_lte": 100.0,
+      "p95_ms_lte": 300.0,
+      "qps_gte": 50.0,
+      "rss_mb_lte": 1024.0,
+      "results": {
+        "p50": true,
+        "p95": true,
+        "qps": true,
+        "memory": true
+      }
+    },
+    "targets_met": true
+  },
+  "limitations": [
+    "Does not include MCP stdio/HTTP transport overhead.",
+    "Does not include remote or local model inference.",
+    "Uses a no-op downstream executor; tool runtime is excluded.",
+    "Single-process local evidence is not a multi-host soak test."
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "schema_version": "xa-guard-artifact-hashes/v1",
+  "generated_at": "2026-07-06T06:16:00Z",
+  "scope": "L3 R4 performance acceptance rerun",
+  "artifacts": [
+    {
+      "path": "docs/evidence/l3-r4-20260705-current/perf-implementation-500.json",
+      "sha256": "3CB694C5A225333F39B7B2DA9CEB46101301195E2D696EC77A30A0915D8562D2"
+    },
+    {
+      "path": "docs/evidence/l3-r4-20260705-current/perf-impl-audit/run-20260706T061442.189126Z-12016/audit.jsonl",
+      "sha256": "71317BCE194618826E9ADD4EDF793AE53C41253E5FE58A69FD0D35AB60BABD98"
+    },
+    {
+      "path": "docs/evidence/l3-r4-20260705-current/perf-http-10x500.json",
+      "sha256": "C81A3938C37790096CBD954AA5CB550D38BB4EB150B65A4B2687E9ECAF1D5713"
+    },
+    {
+      "path": "docs/evidence/l3-r4-20260705-current/perf-http-10x500.samples.jsonl",
+      "sha256": "51EA7AA9BD8BCF2F480E65FE25050F6583D32BCC4EB8FE4B600DE232A82DF40E"
+    },
+    {
+      "path": "docs/evidence/l3-r4-20260705-current/.perf-http-10x500-audit/audit.jsonl",
+      "sha256": "5E9917712C1E03831E2F767E3983BD12C4200D88CAF8C4784FF907CAD778BDC1"
+    },
+    {
+      "path": "docs/evidence/l3-r4-20260705-current/perf-http-20x500-limit.json",
+      "sha256": "1CB9B2E4580EDFDFA4745C518BD1668245529908C7D484D6552CE5BE1DF73610"
+    },
+    {
+      "path": "docs/evidence/l3-r4-20260705-current/perf-http-20x500-limit.samples.jsonl",
+      "sha256": "716EA2A039A8CA6DA9FBA961DFF4111D1360BE9A7F68813025ED845DDC3C5F2C"
+    },
+    {
+      "path": "docs/evidence/l3-r4-20260705-current/.perf-http-20x500-limit-audit/audit.jsonl",
+      "sha256": "46FB64F6302900BA4C2FF0E4FD45EF88024D1323F3A3A7912DA80B0B99037568"
+    }
+  ]
+}

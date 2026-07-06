@@ -1,0 +1,18 @@
+[project]
+name = "r8-sample-ai-plugin"
+version = "0.1.0"
+description = "Minimal AI plugin sample for R8 external AIBOM/CycloneDX generation."
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "mcp>=1.0.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.0",
+]
+
+[tool.r8_sample]
+prompt_path = "prompts/system.prompt.md"
+mcp_manifest = "mcp-server.json"

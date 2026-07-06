@@ -4,7 +4,9 @@
 
 `xa_guard.aibom.external_generator` 接收已经生成的 CycloneDX JSON，不发现、下载或执行任何外部生成器。该边界用于离线 fixture、受控流水线产物和人工提供的产物交换；它不是外部工具运行器。
 
-本仓库没有验证某个第三方项目存在稳定的官方 CLI，因此不内置任何第三方命令，也不声称示例命令属于官方接口。调用方必须记录自己实际使用并已核验的命令参数。
+R8 后续接手入口见 [`r8-aibom-external/README.md`](./r8-aibom-external/README.md)。该目录已准备 `@cyclonedx/cdxgen` 作为合法外部 AIBOM/CycloneDX 生成器候选、最小样本目录和候选命令；当前仍是 `TODO/BLOCKED`，尚未实跑，不构成 R8 PASS。
+
+本仓库不内置任何第三方命令，也不由 XA-Guard 自动执行外部生成器。调用方必须记录自己实际使用并已核验的命令参数、版本、许可证和产物哈希。
 
 ## 必填来源记录
 
@@ -25,3 +27,10 @@
 ## 静态 fixture
 
 测试中的 `fixture-generator`、`example.invalid` 来源及其参数仅为不可访问的 fixture 数据，不代表真实产品或官方 CLI。单元测试只构造本地字节和临时文件，不访问网络，也不启动外部进程。
+
+## R8 候选准备状态
+
+- 候选工具：`@cyclonedx/cdxgen` / `cdxgen` / `aibom`。
+- 样本目录：`docs/acceptance/r8-aibom-external/samples/python-ai-plugin/`。
+- 命令与证据清单：[`r8-aibom-external/README.md`](./r8-aibom-external/README.md)。
+- 仍缺：固定版本实跑、真实 CycloneDX 1.6 产物、XA-Guard 导入校验输出、artifact hash manifest、真实安装链证据。

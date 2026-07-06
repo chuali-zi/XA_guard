@@ -55,6 +55,20 @@ def _path_tree_sha256(path: Path | None) -> str | None:
         return _sha256_file(path)
     if not path.is_dir():
         return None
+    opencode_config = path / "opencode"
+    if opencode_config.is_dir():
+        digest = hashlib.sha256()
+        matched = False
+        for name in ("opencode.json", "opencode.jsonc"):
+            item = opencode_config / name
+            if item.is_file():
+                matched = True
+                digest.update(str(item.relative_to(path)).replace("\\", "/").encode("utf-8"))
+                digest.update(b"\0")
+                digest.update(item.read_bytes())
+                digest.update(b"\0")
+        if matched:
+            return digest.hexdigest()
     digest = hashlib.sha256()
     for item in sorted(candidate for candidate in path.rglob("*") if candidate.is_file()):
         digest.update(str(item.relative_to(path)).replace("\\", "/").encode("utf-8"))
@@ -111,6 +125,27 @@ def _git(upstream: Path, *args: str) -> str:
     ).stdout.strip()
 
 
+def _git_dirty(upstream: Path) -> bool:
+    process = subprocess.Popen(
+        ["git", "-c", f"safe.directory={upstream.as_posix()}", "ls-files", "-m", "-o", "--exclude-standard"],
+        cwd=upstream,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    try:
+        return bool(process.stdout and process.stdout.readline())
+    finally:
+        process.terminate()
+        try:
+            process.communicate(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.communicate()
+
+
 def _resolved(config_path: Path, value: str) -> Path:
     path = Path(value).expanduser()
     if not path.is_absolute():
@@ -136,7 +171,7 @@ def _upstream_lock(path: Path, license_names: tuple[str, ...]) -> dict[str, Any]
     return {
         "path": str(path),
         "commit": _git(path, "rev-parse", "HEAD"),
-        "dirty": bool(_git(path, "status", "--porcelain")),
+        "dirty": _git_dirty(path),
         "license_path": str(license_path),
         "license_sha256": _sha256_file(license_path),
     }
@@ -221,7 +256,7 @@ def build_plan(config_path: Path, config: dict[str, Any]) -> dict[str, Any]:
         "repository": {
             "path": str(ROOT),
             "commit": _git(ROOT, "rev-parse", "HEAD"),
-            "dirty": bool(_git(ROOT, "status", "--porcelain")),
+            "dirty": _git_dirty(ROOT),
         },
         "agentdojo": _upstream_lock(ad_upstream, ("LICENSE", "LICENCE")),
         "injecagent": _upstream_lock(ia_upstream, ("LICENCE", "LICENSE")),
@@ -607,7 +642,7 @@ def _execution_lock_errors(plan: dict[str, Any]) -> list[str]:
         path = Path(lock["path"])
         try:
             current_commit = _git(path, "rev-parse", "HEAD")
-            dirty = bool(_git(path, "status", "--porcelain"))
+            dirty = _git_dirty(path)
         except (OSError, subprocess.SubprocessError):
             errors.append(f"unreadable_execution_lock:{name}")
             continue

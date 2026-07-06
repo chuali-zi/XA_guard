@@ -78,8 +78,8 @@ def test_invoke_opencode_json_uses_temporary_file_fallback(tmp_path, monkeypatch
     invocation_log = tmp_path / "invocations.jsonl"
 
     def fake_run(command, **kwargs):
-        del kwargs
-        prompt_path = Path(command[-1])
+        del command
+        prompt_path = next(Path(kwargs["cwd"]).glob(".xa-agentdojo-turn-*/turn.txt"))
         (prompt_path.parent / filename).write_text(
             json.dumps({"content": "done", "tool_calls": []}),
             encoding="utf-8",
@@ -116,8 +116,9 @@ def test_invoke_opencode_json_uses_mutated_prompt_file_fallback(tmp_path, monkey
     invocation_log = tmp_path / "invocations.jsonl"
 
     def fake_run(command, **kwargs):
-        del kwargs
-        Path(command[-1]).write_text(
+        del command
+        prompt_path = next(Path(kwargs["cwd"]).glob(".xa-agentdojo-turn-*/turn.txt"))
+        prompt_path.write_text(
             json.dumps(
                 {
                     "content": None,

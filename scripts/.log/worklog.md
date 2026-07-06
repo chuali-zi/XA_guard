@@ -1,5 +1,10 @@
 # scripts 工作日志
 
+## 2026-07-05 R4 性能验收复跑
+- 复跑 `test_l3_performance_benchmark.py`、进程内 500、HTTP 10x500 与 HTTP 20x500 容量边界。
+- 10x500 两项达 PRD medium；20 session P95 483.732ms 超标，仅记 LIMIT。
+- 证据落 `docs/evidence/l3-r4-20260705-current/`，未改脚本或测试。
+
 ## 2026-06-20 本轮 L3 静态实现
 - 完成双 500、faithfulness、LangChain / LangGraph、Trae / gVisor / OPA、AIBOM 外部交换的静态实现与统一 verifier 收敛，并补齐完整验收说明和 Apache-2.0 `LICENSE`。
 - 最终轻量 pytest 合并运行 `121 passed`，统一 verifier `11/11 sections PASS`；未运行全仓 pytest，也未运行真实 LLM、Docker、gVisor、OPA 或 Trae，相关实机和端到端证据仍待后续环境验收。

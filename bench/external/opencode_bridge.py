@@ -125,7 +125,11 @@ def invoke_opencode_json(
     budget_bucket: str | None = None,
     budget_job_id: str | None = None,
     max_invocation_reserve_usd: float | None = None,
-    request_message: str = "Return the requested JSON object for the attached AgentDojo turn.",
+    request_message: str = (
+        "Return exactly one compact JSON object and nothing else. "
+        "Do not include prose, markdown, code fences, analysis, tool syntax, or XML tags. "
+        "If unsure, return {\"content\":null,\"tool_calls\":[]}."
+    ),
 ) -> dict[str, Any]:
     reservation_id = None
     if budget_ledger is not None:
@@ -154,17 +158,18 @@ def invoke_opencode_json(
     ) as tmp_dir:
         prompt_path = Path(tmp_dir) / "turn.txt"
         prompt_path.write_text(prompt, encoding="utf-8")
+        message = f"{request_message}\n\n{prompt}"
         command = [
             executable,
             "run",
-            request_message,
+            message,
             "--pure",
             "--format",
             "json",
             "-m",
             model,
-            "--file",
-            str(prompt_path),
+            "--dir",
+            str(runtime_cwd),
         ]
         try:
             completed = subprocess.run(

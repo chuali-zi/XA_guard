@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,6 +38,29 @@ def _repo_git(*args: str) -> str:
     ).stdout.strip()
 
 
+def _git_dirty(path: Path) -> bool:
+    process = subprocess.Popen(
+        ["git", "-c", f"safe.directory={path.as_posix()}", "ls-files", "-m", "-o", "--exclude-standard"],
+        cwd=path,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        return bool(process.stdout and process.stdout.readline())
+    finally:
+        process.terminate()
+        try:
+            process.communicate(timeout=2)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.communicate()
+
+
+def _repo_dirty() -> bool:
+    return bool(_repo_git("ls-files", "-m", "-o", "--exclude-standard"))
+
+
 def _config_hash(path: str | None) -> str | None:
     if path is None:
         return None
@@ -45,6 +69,20 @@ def _config_hash(path: str | None) -> str | None:
         return _sha256(root)
     if not root.is_dir():
         return None
+    opencode_config = root / "opencode"
+    if opencode_config.is_dir():
+        digest = hashlib.sha256()
+        matched = False
+        for name in ("opencode.json", "opencode.jsonc"):
+            item = opencode_config / name
+            if item.is_file():
+                matched = True
+                digest.update(str(item.relative_to(root)).replace("\\", "/").encode("utf-8"))
+                digest.update(b"\0")
+                digest.update(item.read_bytes())
+                digest.update(b"\0")
+        if matched:
+            return digest.hexdigest()
     digest = hashlib.sha256()
     for item in sorted(p for p in root.rglob("*") if p.is_file()):
         digest.update(str(item.relative_to(root)).replace("\\", "/").encode("utf-8"))
@@ -242,7 +280,7 @@ def main() -> None:
         _tool_dict(upstream / "data" / "tools.json"),
         tool_response,
     )
-    runtime = Path(__file__).resolve().parents[1] / "pytest_tmp_opencode_injecagent_runtime"
+    runtime = Path(tempfile.gettempdir()) / "xa-guard-opencode-injecagent-runtime"
     model = OpenCodeReActModel(
         executable=args.opencode_executable,
         model=args.opencode_model,
@@ -344,7 +382,7 @@ def main() -> None:
         "upstream": {
             "repository": "https://github.com/uiuc-kang-lab/InjecAgent",
             "commit": _git(upstream, "rev-parse", "HEAD"),
-            "dirty": bool(_git(upstream, "status", "--porcelain")),
+            "dirty": _git_dirty(upstream),
             "license": "MIT",
             "license_sha256": _sha256(upstream / "LICENCE"),
             "dataset_total": 1054,
@@ -355,7 +393,7 @@ def main() -> None:
         "run": {
             "model_adapter": "opencode-run-json",
             "runner_commit": _repo_git("rev-parse", "HEAD"),
-            "runner_dirty": bool(_repo_git("status", "--porcelain")),
+            "runner_dirty": _repo_dirty(),
             "adapter_commit": _repo_git("rev-parse", "HEAD"),
             "acceptance_config_sha256": args.acceptance_config_sha256,
             "opencode_permission_config_sha256": _config_hash(args.opencode_config_home),
