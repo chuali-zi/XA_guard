@@ -105,7 +105,7 @@ PowerShell：
 $Bom = "$Evidence/aibom.cdxgen.json"
 $Sha = (Get-FileHash $Bom -Algorithm SHA256).Hash.ToLowerInvariant()
 $env:PYTHONPATH = "src"
-python -c "from pathlib import Path; from xa_guard.aibom.external_generator import ExternalGeneratorSpec, load_external_cyclonedx; bom=Path(r'$Bom'); gen=ExternalGeneratorSpec(name='@cyclonedx/cdxgen', source='https://github.com/CycloneDX/cdxgen', version='12.3.1', license_expression='Apache-2.0', commands=(('npx','--yes','@cyclonedx/cdxgen@12.3.1','-r','--include-formulation','--bom-audit','--bom-audit-categories','ai-bom','--spec-version','1.6','-o',str(bom),r'docs/acceptance/r8-aibom-external/samples/python-ai-plugin'),)); ex=load_external_cyclonedx(bom, expected_sha256='$Sha', generator=gen); print({'sha256': ex.sha256, 'specVersion': ex.bom.get('specVersion'), 'components': len(ex.bom.get('components', [])), 'generator': ex.generator.as_dict()})" | Out-File "$Evidence/xa-guard-import-result.txt" -Encoding utf8
+python -c "from pathlib import Path; from xa_guard.aibom.external_generator import ExternalGeneratorSpec, load_external_cyclonedx; bom=Path(r'$Bom'); gen=ExternalGeneratorSpec(name='@cyclonedx/cdxgen', source='https://github.com/cdxgen/cdxgen', version='12.3.1', license_expression='Apache-2.0', commands=(('npx','--yes','@cyclonedx/cdxgen@12.3.1','-r','--include-formulation','--bom-audit','--bom-audit-categories','ai-bom','--spec-version','1.6','-o',str(bom),r'docs/acceptance/r8-aibom-external/samples/python-ai-plugin'),)); ex=load_external_cyclonedx(bom, expected_sha256='$Sha', generator=gen); print({'sha256': ex.sha256, 'specVersion': ex.bom.get('specVersion'), 'components': len(ex.bom.get('components', [])), 'generator': ex.generator.as_dict()})" | Out-File "$Evidence/xa-guard-import-result.txt" -Encoding utf8
 ```
 
 Bash：
@@ -120,7 +120,7 @@ from xa_guard.aibom.external_generator import ExternalGeneratorSpec, load_extern
 bom = Path("$bom")
 gen = ExternalGeneratorSpec(
     name="@cyclonedx/cdxgen",
-    source="https://github.com/CycloneDX/cdxgen",
+    source="https://github.com/cdxgen/cdxgen",
     version="12.3.1",
     license_expression="Apache-2.0",
     commands=((

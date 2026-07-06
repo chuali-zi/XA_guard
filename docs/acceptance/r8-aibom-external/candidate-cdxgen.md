@@ -7,7 +7,7 @@
 | 项 | 内容 |
 |---|---|
 | 项目 | `cdxgen/cdxgen`，npm 包 `@cyclonedx/cdxgen` |
-| 来源 | <https://github.com/CycloneDX/cdxgen> |
+| 来源 | <https://github.com/cdxgen/cdxgen> |
 | 文档 | <https://cdxgen.github.io/cdxgen> |
 | 许可证 | Apache-2.0 |
 | 主要输出 | CycloneDX JSON；README 说明支持 CycloneDX 1.5-1.7，并支持 SPDX 3.0.1 JSON-LD 导出 |
