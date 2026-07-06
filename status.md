@@ -17,12 +17,13 @@
 > 2026-07-01 新增项目级 `.opencode/opencode.json`，将本仓默认 OpenCode 模型与内置 build/plan/general/explore agent 配置为 `openai/gpt-5.5`，并设置 `options.reasoningEffort: xhigh`；该配置仅影响重启后的 OpenCode 会话，不改变 XA-Guard 产品能力或验收结论。
 > 2026-07-01 新增 `enterprise-agent-range/` 独立企业级智能体安全靶场设计区，包含自有 `docs/`、`status.md` 和 `.log/worklog.md`；设计覆盖重型企业场景、解耦契约、架构、数据模型、数据流、攻击分类、场景矩阵、评测指标和证据规范。该目录明确只把 XA-Guard 作为外部 `SUT`，不导入 `src/xa_guard`、不复用既有 `docs/`，当前仅为文档设计，不改变 XA-Guard 运行时能力或 L3 验收状态。
 > 2026-07-05 `open-agent-range/` 当前是独立开放红队靶场新目录：`PRD.md` 已冻结；已从 SP0 walking skeleton 推进到 SP2+ 六域活世界最小竖切（`full-day.json`、业务时钟、队列/审批状态、同 tick 并发批次、多 seat 轮转交错）+ full-day 关键业务副作用大幅迁出 scheduled tape（scheduler 主要保留外部/背景事实，关键动作由 seat ToolSurface 调用落账）+ F3 报销审批支付 seat/SUT/ToolSurface 链路（小王提交、张经理审批、陈会计按审批链支付）+ Guard/XA-Guard 类 SUT 裁决事实进入 hash ledger + `Ledger.replay()` projection v1/关键终态复原 + `range day/replay/report/sut check/workbench serve` 产品命令薄入口 + SP3 多角度注入可消费 + plugin/mcp `tool-surface-drift` + supply/aibom `supply-chain-drift` + policy `policy-exception-abuse` + plugin/mcp `sandbox-escape-attempt` + attempt 级动态 ToolSurface + SP4.1 finding 队列/A-B/审核（含 Null vs XA-Guard 离线/live 入口、live `INFRA_ERROR` 不计分）+ promote 证据门禁 + ManualSeat CLI 单步手动 ToolCall 入口 + SP5 最小追责 + 最小真实 XA-Guard live SUT + SP7 最小证据包（world-in/out/diff、timeline、ledger replay projection、accountability report）。它仍不是完整持久在线自由沙盒：正常 seat 行为仍偏 demo scripted，F10/F11/F15 等业务流仍未完整落成，动态/真实下游工具 replay payload、Gate6/range ledger 深度对齐、交互式 Web UI、交互式多步 ManualSeat、任意长度真实 agent loop、insider/真实供应链/真实 MCP consequence、真实策略/沙箱执行器和真实 live N>=3 证据矩阵仍未完成。
+> 2026-07-05 本机完成 L3 R7 OPA 验收扩展，证据目录 `/mnt/d/evidence/l3-r7-20260706T055152Z/`：新增 R7 验收脚本，修复 WSL 下 `tools/opa/opa.exe` 自动发现、Rego truthiness 与 OPA timeout，增加 strict bundle SHA 漂移 fail-closed。64 个 Gate3 baseline 正/负 fixtures 在 Python backend 与 strict OPA backend 100% 一致；缺 OPA executable、OPA timeout、非法响应和 bundle drift 四项均 fail-closed 且无下游执行；OPA Compose profile 构建并健康启动，容器内 `/usr/local/bin/opa version` 为 1.4.2；默认 `openpolicyagent/opa:1.4.2-static` digest `sha256:3c995dc8a59f6ddfd92eb7404d2f7ff9fe71cd025d9251199957a8a6afbfd76e` 已用 Trivy 扫描。扫描发现 2 Critical、26 High、36 Medium、3 Low、1 Unknown，因此 R7 功能验收可记 PASS，但生产镜像仍需换 approved digest 或正式风险接受，不能写“镜像安全无发现”。
 
 ## 总体结论
 
 仓库已达到 **L3 静态实现验收通过 + L3 核心工程原型可运行 + 部分真实环境验收通过**：
 - 静态 S1–S7 全部 PASS（双 500 implementation、Gate1 holdout 协议、AgentDojo/InjecAgent runner、性能入口、Trae/gVisor/OPA 静态、AIBOM/国密/审计/faithfulness 单测；S7 含 BUG-R9 回归测试 123 passed）。
-- 真实验收已通过：R4 性能（进程内 500 + HTTP 10 会话/500，四项 PRD 中等档全达标）、R6 Docker build/up + healthz（6/6 steps PASS，容器 live healthy）、R7 OPA parity（真实 OPA 1.17.0 与 Python fallback 7/7 一致 + strict_opa fail-closed 确认）、R2 install_plugin + AgentDojo baseline + InjecAgent base/defended 真实 opencode smoke（官方上游 pinned，official_claim=False）、R9 本地 SM2-with-SM3 签验 + 篡改检出 + faithfulness 独立重算 + 本地 TSA anchor（含 SM2-TSA-token 路径，BUG-R9 修复后 PASS）。
+- 真实验收已通过：R4 性能（进程内 500 + HTTP 10 会话/500，四项 PRD 中等档全达标）、R6 Docker build/up + healthz（6/6 steps PASS，容器 live healthy）、R7 OPA 功能验收（64 个 Gate3 baseline 正/负 fixtures Python/strict OPA 100% 一致，缺 binary/timeout/非法响应/bundle drift 均 fail-closed；OPA Compose profile healthy；默认 OPA 镜像扫描有漏洞发现，生产前需换 approved digest 或风险接受）、R2 install_plugin + AgentDojo baseline + InjecAgent base/defended 真实 opencode smoke（官方上游 pinned，official_claim=False）、R9 本地 SM2-with-SM3 签验 + 篡改检出 + faithfulness 独立重算 + 本地 TSA anchor（含 SM2-TSA-token 路径，BUG-R9 修复后 PASS）。
 - 20 会话容量如实记录为 LIMIT（P95 366.979ms > 300ms），未声明支持。
 - BUG-R9（SM2-TSA-token anchor 验证 mismatch）已修复：`tsa.py` `_payload_for_hash` 排除 `sm2_tsa_*` 字段，新增回归测试，S7 全套 123 passed 无回归。
 - BUG-R9 修复及回归测试已进入 commit `6cf1ce9`，本快照随之同步。2026-06-21 全量测试默认 Windows 编码下还有 1 个可复现兼容性失败。
@@ -51,7 +52,7 @@
 | LangChain / LangGraph | wrapper、callback/observer、HITL resume、node/tool 等适配已实现 | 固定真实版本及真实 agent/transport 端到端验收未完成 |
 | Trae (R5) | 配置模板、接入文档和 allow/deny/taint/pending 四案例静态资产 S5 PASS | 真实 Trae GUI 工具发现/调用/HITL/日志/截图 BLOCKED（按用户指示跳过 GUI） |
 | gVisor (R6) | 静态 runsc/禁网/只读根/非 root/cap_drop/no-new-priv/资源限制 S6 验过；**Docker build/up + healthz 真实 PASS（6/6 steps，容器 live healthy，镜像 xa-guard:latest+sandbox:latest 构建成功）** | 真实 Linux/runsc 隔离 BLOCKED：Windows Docker Desktop 无 runsc runtime（runtimes=[runc,containerd,nvidia]），需 Linux 主机 |
-| OPA (R7) | 本轮真实 OPA 1.17.0 与 Python fallback 7/7 parity；strict_opa fail-closed 在 gate3_policy.py:59-60 确认 | 真实 OPA 固定镜像 provenance/license、漂移负测与完整 fixture 矩阵未跑 |
+| OPA (R7) | 2026-07-05 本机完整功能验收 PASS：本地 OPA 1.17.0 与 Python backend 对 32 条 Gate3 baseline 规则的 64 个正/负 fixtures 100% 一致；strict OPA 对缺 executable、timeout、非法响应和 bundle SHA drift 均 fail-closed 且无下游执行；OPA Compose profile 使用 `openpolicyagent/opa:1.4.2-static` 构建并健康启动，容器内 OPA 1.4.2 可执行；证据 `/mnt/d/evidence/l3-r7-20260706T055152Z/` | 默认 OPA 镜像 digest 已固定并用 Trivy 扫描，但发现 2 Critical / 26 High / 36 Medium / 3 Low / 1 Unknown；生产交付前需换 approved digest 或给出正式风险接受，不能宣称镜像扫描“无发现” |
 | AIBOM (R2/R8) | 内部扫描/评级/签名/漂移/离线 preflight S7 测过；真实 opencode install_plugin smoke PASS（AIBOM F deny） | 合法外部生成器真实产物/marketplace/IDE 安装链 BLOCKED |
 | 审计与国密 (R9) | 本轮真实 SM2-with-SM3 签验 25 条 0 错误 + 篡改检出；本地 TSA anchor（**含 SM2-TSA-token 路径，BUG-R9 修复后 PASS**）验过；faithfulness 重算 PASS | 第三方 TSA/HSM BLOCKED（本地 file TSA + 软件 SM2 key 仅为 demo/CI） |
 | 外部 benchmark (R2/R3) | 完整矩阵 CLI 保持兼容；`subscription_budget60_v1` 已实现确定性 manifest、四桶 ledger、调用前熔断、全局未完成题续考、完成题跳过、AgentDojo 内部 task cache 复用、R2/R3 turn retry 的 retry 分桶、provider 配额暂停、跨 resume 失败上限、运行前 commit/clean/权限 hash 复核及 sampled Wilson 聚合；profile/claim scope 也与冻结配置一致。默认每批 8 jobs、单题最多 2 次基础设施尝试。目标回归 32 项与 ruff 已通过。2026-06-22 历史 `$10` 运行仍只有 7/32 calibration jobs complete，不进入新正式指标 | 新 `$60` 正式校准和 sampled 结果仍 NOT RUN。AgentDojo suite/arm 批量运行和官方 utility trace 批量复用仍未实现；OpenCode 内部工具禁用仍依赖 `--pure`、隔离目录及已冻结权限配置，尚无经真实 CLI 验证的更细粒度硬开关；`$0.20` 是调用前保守预留，不是 provider 单次响应的可证明上限。旧结果不得写入正式分母 |
@@ -74,12 +75,11 @@
 1. R1 双 500 formal 独立复核 + Gate1 独立 holdout 数据/阈值锁定/Recall/FPR 正式结论 — 需独立评测方。
 2. R5 真实 Trae 四案例 + 截图/录像 — 需真实 Trae GUI（按用户指示本轮跳过）。
 3. R6 真实 Linux/gVisor runsc 隔离/故障/性能 — Docker build/up + healthz 已 PASS，但 runsc 需 Linux 主机安装（Windows Docker Desktop 无 runsc runtime）。
-4. R7 真实 OPA 固定镜像 provenance/license、漂移负测与完整 fixture 矩阵 — parity 与 fail-closed 已 PASS，镜像层未跑。
-5. R2/R3 `subscription_budget60_v1` — 离线工具已完成续考与预算安全纠偏；旧首批真实 calibration 因 `$2/$1` 分桶耗尽停在 `$2.94602940`，7/32 complete，冻结失败且不得混入新正式分母。新预算分桶 `$6/$32/$16/$6`，默认 8 jobs/批、失败题 2 次封顶；新的付费校准、AgentDojo suite/arm 批量降本和 sampled 结果未完成。2,986-job `research_full_matrix` 为 `DEFERRED_OPTIONAL`。
-6. R8 合法外部 AIBOM 生成器 + 真实 CycloneDX 1.6 产物 + 真实安装链 — 需用户安装/批准外部生成器。
-7. R9 第三方 TSA + 真实 HSM/合法 SDK + 故障负测 + faithfulness 大规模独立重放 — 需生产 key/HSM provider（本地 file TSA + 软件 SM2 key 仅为 demo/CI；BUG-R9 已修复，SM2-TSA-token anchor round-trip PASS）。
-8. 最终 PDF、视频、表单、截图、原始证据、artifact hash manifest 与外部存证/签名的收束和验收。
+4. R2/R3 `subscription_budget60_v1` — 离线工具已完成续考与预算安全纠偏；旧首批真实 calibration 因 `$2/$1` 分桶耗尽停在 `$2.94602940`，7/32 complete，冻结失败且不得混入新正式分母。新预算分桶 `$6/$32/$16/$6`，默认 8 jobs/批、失败题 2 次封顶；新的付费校准、AgentDojo suite/arm 批量降本和 sampled 结果未完成。2,986-job `research_full_matrix` 为 `DEFERRED_OPTIONAL`。
+5. R8 合法外部 AIBOM 生成器 + 真实 CycloneDX 1.6 产物 + 真实安装链 — 需用户安装/批准外部生成器。
+6. R9 第三方 TSA + 真实 HSM/合法 SDK + 故障负测 + faithfulness 大规模独立重放 — 需生产 key/HSM provider（本地 file TSA + 软件 SM2 key 仅为 demo/CI；BUG-R9 已修复，SM2-TSA-token anchor round-trip PASS）。
+7. 最终 PDF、视频、表单、截图、原始证据、artifact hash manifest 与外部存证/签名的收束和验收。
 
 ## 距离赛题目标
 
-核心安全链路、L3 静态资产和验证入口已具备。R2/R3 的 `subscription_budget60_v1` 离线工程能力现已完成，但新的正式校准和 sampled 结果尚未产生，因此比赛证据仍待完成；2,986-job 全矩阵继续为可选研究扩展。当前仍 BLOCKED：R1 独立双 500/holdout、R2/R3 真实预算型评测、R5 真实 Trae、R6 Linux/runsc、R8 外部 AIBOM、R9 第三方 TSA/HSM，以及最终交付物。仓库状态保持：**L3 静态实现验收通过 + 部分真实验收通过；L3 最终验收 BLOCKED**。
+核心安全链路、L3 静态资产和验证入口已具备。R2/R3 的 `subscription_budget60_v1` 离线工程能力现已完成，但新的正式校准和 sampled 结果尚未产生，因此比赛证据仍待完成；2,986-job 全矩阵继续为可选研究扩展。当前仍 BLOCKED：R1 独立双 500/holdout、R2/R3 真实预算型评测、R5 真实 Trae、R6 Linux/runsc、R8 外部 AIBOM、R9 第三方 TSA/HSM，以及最终交付物。R7 OPA 功能验收已完成，但默认 OPA 镜像扫描存在漏洞发现，生产交付前还需 approved digest 或风险接受。仓库状态保持：**L3 静态实现验收通过 + 部分真实验收通过；L3 最终验收 BLOCKED**。

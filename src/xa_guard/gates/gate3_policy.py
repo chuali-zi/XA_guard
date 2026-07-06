@@ -55,7 +55,11 @@ class Gate3Policy(Gate):
         if self.backend == "python":
             self.compiled = {r.id: compile_predicate(r.predicate) for r in self.rules}
         elif self.backend == "rego":
-            self.rego = RegoPolicyEngine(self.rules, opa_path=self.opt("opa_path"))
+            self.rego = RegoPolicyEngine(
+                self.rules,
+                opa_path=self.opt("opa_path"),
+                timeout_seconds=float(self.opt("opa_timeout_seconds", 5.0)),
+            )
             if bool(self.opt("strict_opa", False)) and not self.rego.opa_available:
                 raise RuntimeError("gate3 rego backend requires an OPA binary when strict_opa=true")
         else:
@@ -84,6 +88,9 @@ class Gate3Policy(Gate):
             if layered is not None:
                 rules = layered.get_policy_rules()
                 if rules:
+                    expected = str(self.opt("expected_policy_bundle_sha", "") or "")
+                    if expected and layered.bundle_sha != expected:
+                        raise RuntimeError("gate3 policy bundle drift detected")
                     return rules, layered.get_compiled_predicates(), layered.bundle_sha
         return self.rules, self.compiled, ""
 
@@ -93,7 +100,11 @@ class Gate3Policy(Gate):
         if self._layered_rego is not None and self._layered_rego_bundle_sha == bundle_sha:
             return self._layered_rego
         try:
-            self._layered_rego = RegoPolicyEngine(rules, opa_path=self.opt("opa_path"))
+            self._layered_rego = RegoPolicyEngine(
+                rules,
+                opa_path=self.opt("opa_path"),
+                timeout_seconds=float(self.opt("opa_timeout_seconds", 5.0)),
+            )
         except RegoCompileError:
             self._layered_rego = None
             self._layered_rego_bundle_sha = ""

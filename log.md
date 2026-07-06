@@ -1,3 +1,13 @@
+# 2026-07-05 22:58 -07:00 L3 R7 OPA 完整功能验收
+
+- 按 `docs/acceptance/L3-test-and-acceptance.md` 的 R7 口径复核并执行 OPA 验收；证据目录 `/mnt/d/evidence/l3-r7-20260706T055152Z/`，最终摘要 `r7-final-summary.json`，artifact manifest `artifact-hashes.json`。
+- 修复产品代码中的 R7 问题：`src/xa_guard/policy/rego.py` 现在在 WSL/Linux 下也能自动发现 `tools/opa/opa.exe`，Rego 转译显式加入 Python truthiness 语义，OPA CLI 调用加入 `opa_timeout_seconds`；`src/xa_guard/gates/gate3_policy.py` 支持 strict OPA timeout 和 `expected_policy_bundle_sha` 漂移 fail-closed。
+- 新增 `scripts/run_l3_r7_opa_acceptance.py`，不修改测试断言；它对 32 条 Gate3 baseline 规则的 64 个正/负 fixtures 同时跑 Python backend 与 strict OPA backend，并比较 decision 与 rule-hit set。
+- 验收结果：64/64 parity PASS；缺 OPA executable、OPA timeout、非法响应、policy bundle SHA drift 四个 fail-closed 探针均 PASS 且无下游执行；`python -m pytest -q -p no:cacheprovider tests/unit/test_gate3.py tests/unit/test_opa_export.py tests/test_gate3_rule_fixtures_assets.py` 为 53 passed；`scripts/validate_gate3_rule_fixtures.py --strict --json` 为 32 rules / 32 fixtures / 0 errors。
+- 用 sudo Docker 完成 OPA profile 镜像与运行证据：`openpolicyagent/opa:1.4.2-static` 拉取 digest `sha256:3c995dc8a59f6ddfd92eb7404d2f7ff9fe71cd025d9251199957a8a6afbfd76e`；`docker compose -f docker-compose.yml -f deploy/opa/docker-compose.opa.yml build/up` 成功；`/healthz` 返回 ok；容器内 `/usr/local/bin/opa version` 为 1.4.2；已 `docker compose down` 清理运行容器。
+- 用容器化 Trivy 扫描默认 OPA 镜像，结果已归档：2 Critical、26 High、36 Medium、3 Low、1 Unknown。R7 功能验收可记 PASS，但默认镜像不能宣称“扫描无发现”；生产交付前需换 approved digest 或正式风险接受。
+- 本轮没有修改测试代码，没有调用付费模型，没有改变 R1/R2/R3/R5/R6/R8/R9 的 BLOCKED 状态；L3 最终仍 BLOCKED。
+
 # 2026-07-05 21:15 -07:00 Open Agent Range F3 报销审批支付链路
 
 - 继续根据 `gpt-5.5/xhigh` 子 agent 的 PRD review 建议补 `open-agent-range/` 的完整业务流缺口；本轮先补 F3 报销审批支付。

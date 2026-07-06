@@ -30,9 +30,13 @@ def _json(value: object) -> str:
 
 
 def _local_opa_path() -> str | None:
-    suffix = "opa.exe" if os.name == "nt" else "opa"
-    candidate = Path(__file__).resolve().parents[3] / "tools" / "opa" / suffix
-    return str(candidate) if candidate.exists() else None
+    tools_dir = Path(__file__).resolve().parents[3] / "tools" / "opa"
+    names = ["opa.exe"] if os.name == "nt" else ["opa", "opa.exe"]
+    for name in names:
+        candidate = tools_dir / name
+        if candidate.exists():
+            return str(candidate)
+    return None
 
 
 def _rego_value(node: ast.AST) -> str:
@@ -77,8 +81,26 @@ def _rego_call(node: ast.Call) -> str:
     raise RegoCompileError(f"unsupported call: {ast.dump(node, include_attributes=False)}")
 
 
+def _is_args_get(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "args"
+        and node.func.attr == "get"
+    )
+
+
+def _truthy_expr(node: ast.AST) -> str:
+    if isinstance(node, ast.Call):
+        return f"truthy({_rego_call(node)})"
+    return f"truthy({_rego_value(node)})"
+
+
 def _rego_expr(node: ast.AST) -> str:
     if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
+        if isinstance(node.operand, (ast.Call, ast.Name, ast.Subscript)):
+            return f"not {_truthy_expr(node.operand)}"
         return f"not ({_rego_expr(node.operand)})"
     if isinstance(node, ast.Compare):
         left = _rego_value(node.left)
@@ -106,8 +128,10 @@ def _rego_expr(node: ast.AST) -> str:
             left = right
         return "(" + " and ".join(parts) + ")"
     if isinstance(node, ast.Call):
+        if _is_args_get(node):
+            return _truthy_expr(node)
         return _rego_call(node)
-    return _rego_value(node)
+    return _truthy_expr(node)
 
 
 def _rego_bodies(node: ast.AST) -> list[list[str]]:
@@ -150,6 +174,13 @@ def build_rego_module(rules: list[PolicyRule], package: str = "xa_guard.gate3") 
         "",
         "# Generated from XA-Guard PolicyRule DSL. Do not edit by hand.",
         "",
+        "truthy(x) if {",
+        "  x != false",
+        "  x != null",
+        "  x != \"\"",
+        "  x != 0",
+        "}",
+        "",
     ]
     for rule in rules:
         bodies = _rego_bodies(ast.parse(rule.predicate, mode="eval").body)
@@ -186,6 +217,7 @@ class RegoPolicyEngine:
     rules: list[PolicyRule]
     opa_path: str | None = None
     package: str = "xa_guard.gate3"
+    timeout_seconds: float = 5.0
 
     def __post_init__(self) -> None:
         if self.opa_path:
@@ -244,6 +276,7 @@ class RegoPolicyEngine:
                 text=True,
                 encoding="utf-8",
                 cwd=str(tmpdir),
+                timeout=self.timeout_seconds,
             )
         payload = json.loads(proc.stdout or "{}")
         result = payload.get("result") or []
