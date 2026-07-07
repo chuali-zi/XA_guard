@@ -1,3 +1,13 @@
+# 2026-07-07 R8 外部 AIBOM/CycloneDX 实跑落地（BLOCKED → PASS）
+
+- 落实 R8 证据：本机安装并运行合法开源外部工具 `@cyclonedx/cdxgen@12.7.0`（Apache-2.0），扫描 `docs/acceptance/r8-aibom-external/samples/python-ai-plugin/`，真实生成 CycloneDX `specVersion: "1.6"` 产物（32 组件，SHA-256 `6a43e3a3…1db100`）。npm/npx 经 Clash mixed 代理 `http://127.0.0.1:7897` 访问 registry（fake-ip 环境，直连失败）。
+- `load_external_cyclonedx` 导入 `import: PASS`：SHA-256 绑定校验通过、CycloneDX schema 校验通过（jsonschema 路径）。产物含真实 AI-BOM 语义：MCP SDK 组件带 `cdx:mcp:*` 属性和 `mcp-sdk`/`official-mcp-sdk` 标签，非纯 SBOM。
+- 实跑发现并修复 XA-Guard 缺陷：cdxgen 12.7.0 按 CycloneDX 1.5+ 把 `metadata.tools` 写成对象形式 `{components,services}`，而内置子集 schema 只允许旧版数组形式，导致合法 1.6 产物首次导入被拒。已将 schema 的 `metadata.tools` 放宽为 `anyOf:[array, object]`，并补回归测试 `TestMetadataToolsForms`（数组/对象两形式）。
+- flag 漂移修正：候选命令的 `--bom-audit`/`--bom-audit-categories ai-bom` 在 12.7.0 不存在，改用 `--profile research`；`--include-formulation` 会触发 whole-repo 扫描（首跑 986KB 并泄露 `docs/references/...`），刻意不用，最终产物 22.7KB 作用域限定样本。
+- 证据：`D:/evidence/l3-r8-aibom-20260707T105519Z/`，仓内副本 `docs/acceptance/r8-aibom-external/evidence/l3-r8-aibom-20260707T105519Z/`（version/sha/import-result/commands/environment/artifact-hashes）。结果记 `docs/acceptance/r8-aibom-external/RESULTS.md`；README 与 L3 状态同步更新。
+- 验证：`python -m pytest tests/unit/test_aibom_schema_validator.py tests/unit/test_aibom_external_generator.py -q` 全绿。
+- 仍不宣称：marketplace/IDE 安装链、完整 AI-BOM 全字段覆盖仍缺；`npx --yes`+代理不作为生产供应链策略。
+
 # 2026-07-07 01:11 -07:00 Open Agent Range Workbench finding 持久编辑
 
 - 继续推进 `open-agent-range/` 的 Workbench 产品形态。本轮把浏览器内 finding 从“命令文本生成”推进到本地 API 持久创建/编辑。

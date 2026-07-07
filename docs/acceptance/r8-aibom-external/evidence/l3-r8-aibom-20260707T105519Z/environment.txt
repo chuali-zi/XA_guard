@@ -1,0 +1,14 @@
+# R8 evidence environment — captured 2026-07-07T11:06:45Z
+
+OS            : MINGW64_NT-10.0-26200 3.6.6-1cdd4371.x86_64 x86_64 / Windows 11 Home China 10.0.26200
+Node.js       : v25.6.1
+npm           : 11.9.0
+npx           : 11.9.0
+cdxgen        : 12.7.0 (npm @cyclonedx/cdxgen, Apache-2.0)
+Python        : Python 3.12.10
+jsonschema    : 4.26.0
+XA-Guard HEAD : 1ed87183778a19a77a732754eeb5c8c28e3c79af
+XA-Guard branch: main
+git worktree  : 4 changed path(s) at capture time
+npm proxy     : HTTPS_PROXY=http://127.0.0.1:7897 (Clash mixed port)
+sample dir    : docs/acceptance/r8-aibom-external/samples/python-ai-plugin

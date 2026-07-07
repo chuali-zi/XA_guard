@@ -103,6 +103,44 @@ class TestRealExporterBOM:
 
 
 # ---------------------------------------------------------------------------
+# (a2) metadata.tools accepts both CycloneDX forms
+# ---------------------------------------------------------------------------
+
+class TestMetadataToolsForms:
+    """CycloneDX 1.5+ allows metadata.tools as the legacy array OR an object.
+
+    Real external generators (e.g. @cyclonedx/cdxgen 12.x) emit the object form
+    ``{"components": [...], "services": [...]}``; the legacy array form must keep
+    working for older producers.
+    """
+
+    def test_metadata_tools_legacy_array_accepted(self) -> None:
+        bom = _bom()
+        bom["metadata"]["tools"] = [
+            {"vendor": "XA-Guard", "name": "scanner", "version": "1.0"}
+        ]
+        result = validate_cyclonedx(bom)
+        assert result.valid, result.errors
+
+    def test_metadata_tools_object_form_accepted(self) -> None:
+        bom = _bom()
+        bom["metadata"]["tools"] = {
+            "components": [
+                {
+                    "type": "application",
+                    "name": "cdxgen",
+                    "group": "@cyclonedx",
+                    "version": "12.7.0",
+                    "purl": "pkg:npm/%40cyclonedx/cdxgen@12.7.0",
+                    "bom-ref": "pkg:npm/@cyclonedx/cdxgen@12.7.0",
+                }
+            ]
+        }
+        result = validate_cyclonedx(bom)
+        assert result.valid, result.errors
+
+
+# ---------------------------------------------------------------------------
 # (b) specVersion 1.6 accepted
 # ---------------------------------------------------------------------------
 

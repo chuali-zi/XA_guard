@@ -1,0 +1,22 @@
+# R8 external AIBOM/CycloneDX generation — actual commands executed on 2026-07-07 (UTC)
+# Network: npm/npx routed through Clash mixed proxy at http://127.0.0.1:7897
+#          (registry DNS is fake-ip; direct connect fails without the proxy)
+
+export HTTPS_PROXY=http://127.0.0.1:7897 HTTP_PROXY=http://127.0.0.1:7897 FETCH_LICENSE=false
+
+# Generate CycloneDX 1.6 from the minimal sample (scoped; NO --include-formulation
+# because that flag makes cdxgen walk the whole git repo and leak repo-wide file lists)
+npx --yes @cyclonedx/cdxgen@12.7.0   -r -t python --profile research --spec-version 1.6   -o "D:/evidence/l3-r8-aibom-20260707T105519Z/aibom.cdxgen.json"   docs/acceptance/r8-aibom-external/samples/python-ai-plugin
+
+# Version + hash
+npx --yes @cyclonedx/cdxgen@12.7.0 --version > cdxgen-version.txt
+sha256sum "D:/evidence/l3-r8-aibom-20260707T105519Z/aibom.cdxgen.json" > aibom.sha256
+
+# XA-Guard read-only import + CycloneDX schema validation
+PYTHONPATH=src python -c "... load_external_cyclonedx(bom, expected_sha256=SHA, generator=ExternalGeneratorSpec(...)) ..."
+# (full script output archived in xa-guard-import-result.txt)
+
+# NOTE on flag drift vs docs/acceptance/r8-aibom-external/README.md candidate command:
+#   --bom-audit and --bom-audit-categories ai-bom DO NOT EXIST in cdxgen 12.7.0.
+#   AI/ML semantics are driven by --profile (research/ml) instead. The MCP SDK
+#   AI-BOM detection (cdx:mcp:* properties + mcp-sdk tags) is produced without them.

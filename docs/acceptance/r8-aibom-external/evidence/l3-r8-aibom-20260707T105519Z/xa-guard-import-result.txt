@@ -1,0 +1,50 @@
+{
+  "import": "PASS",
+  "sha256": "6a43e3a3b8637f7cc05c328a9261311825e4ba08ec119faf1ec0699dea1db100",
+  "specVersion": "1.6",
+  "bomFormat": "CycloneDX",
+  "components": 32,
+  "dependencies": 32,
+  "schema_valid": true,
+  "schema_validator": "jsonschema",
+  "schema_errors": [],
+  "ai_bom_evidence": {
+    "mcp_sdk_detected": true,
+    "mcp_tags": [
+      "mcp",
+      "mcp-sdk",
+      "official-mcp-sdk",
+      "trusted-source"
+    ],
+    "mcp_properties": [
+      "cdx:mcp:package",
+      "cdx:mcp:official",
+      "cdx:mcp:role",
+      "cdx:mcp:catalogSource",
+      "cdx:mcp:packageName"
+    ]
+  },
+  "generator": {
+    "name": "@cyclonedx/cdxgen",
+    "source": "https://github.com/cdxgen/cdxgen",
+    "version": "12.7.0",
+    "license": "Apache-2.0",
+    "commands": [
+      [
+        "npx",
+        "--yes",
+        "@cyclonedx/cdxgen@12.7.0",
+        "-r",
+        "-t",
+        "python",
+        "--profile",
+        "research",
+        "--spec-version",
+        "1.6",
+        "-o",
+        "D:\\evidence\\l3-r8-aibom-20260707T105519Z\\aibom.cdxgen.json",
+        "docs/acceptance/r8-aibom-external/samples/python-ai-plugin"
+      ]
+    ]
+  }
+}

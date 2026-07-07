@@ -1,0 +1,31 @@
+{
+  "generated_utc": "2026-07-07T11:06:59Z",
+  "algorithm": "SHA-256",
+  "evidence_dir": "D:/evidence/l3-r8-aibom-20260707T105519Z",
+  "files": {
+    "aibom.cdxgen.json": {
+      "sha256": "6a43e3a3b8637f7cc05c328a9261311825e4ba08ec119faf1ec0699dea1db100",
+      "bytes": 22694
+    },
+    "aibom.sha256": {
+      "sha256": "a6b6a64261744030f7be8592486cae431fdd237daa7dec20d5e4413c648183b2",
+      "bytes": 125
+    },
+    "cdxgen-version.txt": {
+      "sha256": "27409acbd3c19f04fdab1ce2cac372532b8a2ba0b77f758487150a97360006c3",
+      "bytes": 69
+    },
+    "commands.txt": {
+      "sha256": "09e5688f55b6c016089c5da2a569981c886eeff12a1a81856210a56f5f13bbbc",
+      "bytes": 1473
+    },
+    "environment.txt": {
+      "sha256": "c4ea6c4ed218cfcd02e235456a983ca535f5eb79b61823e335f8862117640e3e",
+      "bytes": 619
+    },
+    "xa-guard-import-result.txt": {
+      "sha256": "c00ac80a7979890ca84413759ddc4350030a15b59e07a4c8aa2339ee8d9ed441",
+      "bytes": 1205
+    }
+  }
+}

@@ -2,6 +2,13 @@
 
 ---
 
+## 2026-07-07 — R8 外部 CycloneDX 1.6 实跑 + schema 修复
+- 用 `@cyclonedx/cdxgen@12.7.0` 真实生成样本的 CycloneDX 1.6 产物（32 组件），`external_generator.load_external_cyclonedx` 导入 `import: PASS`（SHA-256 绑定 + jsonschema 校验），含 MCP SDK 的 `cdx:mcp:*` AI-BOM 语义。
+- 修复缺陷：`schema/cyclonedx-1.6.subset.schema.json` 的 `metadata.tools` 只允许旧版数组，拒绝 cdxgen 的 1.5+ 对象形式 `{components,services}`。放宽为 `anyOf:[array, object]`，补 `TestMetadataToolsForms` 两形式回归。
+- 证据 `D:/evidence/l3-r8-aibom-20260707T105519Z/` + 仓内副本；详见 `docs/acceptance/r8-aibom-external/RESULTS.md`。npm 经 Clash 代理 7897 访问 registry。
+
+---
+
 ## 2026-06-18 — MCP install_plugin 离线准入（Codex 主 agent）
 - `gateway.admit_install_request()` 新增本地目录/归档参数别名与 `expected_sha256`，本地 artifact 走真实解包/静态扫描；远程引用只在服务端离线缓存命中时扫描。
 - `proxy.upstream` 在真实 MCP `tools/call install_plugin` 进入 6 关卡前注入 `aibom_gateway` 结果；D/F 或未镜像远程引用直接拒绝，A/B/C 继续服从既有策略/HITL，Gate6 记录 `AIBOM-GATEWAY`。

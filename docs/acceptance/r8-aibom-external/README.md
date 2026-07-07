@@ -1,6 +1,8 @@
 # R8 外部 AIBOM/CycloneDX 生成器交接
 
-状态：`TODO/BLOCKED`，仅完成候选调研、样本目录和命令准备；未实跑、未归档证据、不能宣称 R8 PASS。
+状态：`DONE`（2026-07-07 实跑通过）。已用 `@cyclonedx/cdxgen@12.7.0` 真实生成 CycloneDX 1.6 产物并经 XA-Guard 导入 + schema 校验通过；实跑结果、证据目录与实测命令见 [`RESULTS.md`](./RESULTS.md)。
+
+> 实测提示：候选命令中的 `--bom-audit` / `--bom-audit-categories ai-bom` 在 cdxgen 12.7.0 中不存在，已在 `RESULTS.md` 用 `--profile research` 替代并记录；`--include-formulation` 会触发 whole-repo 扫描，已刻意不用。下文候选调研内容保留作历史参考。
 
 ## 目标
 

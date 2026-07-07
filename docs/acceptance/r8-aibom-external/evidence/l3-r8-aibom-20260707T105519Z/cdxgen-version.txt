@@ -1,0 +1,2 @@
+[1mCycloneDX Generator 12.7.0[0m
+Runtime: Node.js, Version: 25.6.1

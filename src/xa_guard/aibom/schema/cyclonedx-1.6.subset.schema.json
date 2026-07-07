@@ -30,7 +30,20 @@
       "type": "object",
       "properties": {
         "timestamp": {"type": "string"},
-        "tools": {"type": "array"},
+        "tools": {
+          "$comment": "CycloneDX 1.5+ permits either the legacy tool array or an object with 'components'/'services'. cdxgen 12.x emits the object form.",
+          "anyOf": [
+            {"type": "array"},
+            {
+              "type": "object",
+              "properties": {
+                "components": {"type": "array", "items": {"$ref": "#/$defs/component"}},
+                "services": {"type": "array"}
+              },
+              "additionalProperties": true
+            }
+          ]
+        },
         "authors": {"type": "array"},
         "component": {"$ref": "#/$defs/component"},
         "manufacture": {"type": "object"},
