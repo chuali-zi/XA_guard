@@ -1,5 +1,13 @@
 # 工作日志
 
+## 2026-07-07 07:27 Workbench Evidence Review 明细展开
+
+- **背景/目标**：继续推进 `Confucius` review 指出的 Workbench 缺口：上一轮已有 Null vs Protected 摘要并排审阅，但仍不是 timeline / tool-events / audit / ledger / violations 明细浏览器。
+- **本轮做了什么**：`/api/compare-evidence` 的 null/protected side summary 现在带 `details`，包含 timeline、tool_events、audit、ledger、violations、raw_xaguard_audit 以及各自 count，默认截取前 30 行用于浏览。Workbench `Evidence Review` 双栏面板新增可展开 `<details>`，可在浏览器里展开 Timeline、Tool events、Audit、Ledger、Violations、Raw XA-Guard audit。
+- **测试/验证**：`python -m pytest kernel/tests/test_range_cli.py -q` 通过（15 个用例）；完整 `python -m pytest kernel/tests -q` 通过（118 个用例）。手工 smoke：`python -m kernel.range_cli workbench serve --world scenarios\dctg\full-day.json --out-dir .runtime\workbench-detail-smoke --no-server --json` 通过；抽取页面 `<script>` 后 `node --check` 通过；临时 runtime 产物已清理。
+- **外部复核结论**：按要求启动 `gpt-5.5/xhigh` 只读子 agent `Dalton`，但该 agent 因 usage limit 报错退出，未产出有效 review 结论；因此本轮不能声明已通过用户指定验收。
+- **仍未完成**：这只是把 Evidence Review 从摘要卡推进到明细可展开，不是完整产品完成态。仍缺 run selector、跨 run 统计、地图画布、多注入编排、真实 live N>=3、full-day observe-plan-act、XA-Guard live 长生命周期和更深 insider/policy/sandbox consequence。
+
 ## 2026-07-07 06:16 Workbench Evidence Review 摘要并排审阅
 
 - **背景/目标**：继续推进 `Erdos` / `Confucius` 指出的 Workbench 产品形态缺口。上一轮已经有 A/B 执行、summary 读取、review/promote 和 audit alignment，但浏览器里仍缺 Null vs Protected 的证据对照面，红队需要自己读 JSON 判断复现与防护效果。

@@ -1,5 +1,13 @@
 # open-agent-range 工作日志
 
+## 2026-07-07 07:27 Workbench Evidence Review detail expansion
+- Continued the PRD product-shape work after the `Confucius` review. The concrete gap addressed here: the prior Evidence Review compared Null vs Protected summaries, but it still did not expose timeline / tool-events / audit / ledger / violation details in the browser.
+- Extended `/api/compare-evidence` so each null/protected side includes `details`: timeline, tool_events, audit, ledger, violations, raw_xaguard_audit, and their counts. The API returns the first 30 rows of each artifact by default for browser review.
+- Updated the generated Workbench HTML so each side of the Evidence Review panel has expandable `<details>` sections for Timeline, Tool events, Audit, Ledger, Violations, and Raw XA-Guard audit.
+- Verification: `python -m pytest kernel/tests/test_range_cli.py -q` passed with 15 tests; full `python -m pytest kernel/tests -q` passed with 118 tests. Smoke `python -m kernel.range_cli workbench serve --world scenarios\dctg\full-day.json --out-dir .runtime\workbench-detail-smoke --no-server --json` passed, and the extracted page script passed `node --check`. Temporary runtime output was removed.
+- Requested review: the `gpt-5.5` / `xhigh` read-only subagent `Dalton` was started but failed with a usage-limit error, so this round has no valid xhigh review conclusion.
+- Still incomplete: this improves browser evidence review, but it is still not the full product. Missing pieces remain run selection, cross-run statistics, map canvas, multi-injection orchestration, true live N>=3, full-day observe-plan-act seats, long-lived XA-Guard live, and deeper insider/policy/sandbox consequences.
+
 ## 2026-07-07 06:16 Workbench Evidence Review summary comparison
 - Continued the PRD product-shape work after the `Erdos` review. The concrete gap addressed here: browser Workbench could run A/B and read summary JSON, but it did not yet provide a side-by-side red-team review surface for Null vs Protected evidence.
 - Added `/api/compare-evidence` to `range_cli workbench serve`. It can read an A/B summary path or explicit null/protected evidence paths and returns null baseline, protected side, violation/external-send deltas, blocked refs, still leaked refs, new protected leaks, and `protection_observed`.

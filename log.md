@@ -1,3 +1,11 @@
+# 2026-07-07 07:27 -07:00 Open Agent Range Evidence Review detail browser
+
+- 继续推进 `open-agent-range/` 的 Workbench 产品形态，把 Evidence Review 从摘要级 Null vs Protected 对照推进到浏览器内可展开证据明细。
+- `/api/compare-evidence` 的两侧 summary 现在包含 `details`：timeline、tool_events、audit、ledger、violations、raw_xaguard_audit 以及各自 count，默认截取前 30 行用于浏览器审阅。
+- 页面 Evidence Review 双栏新增可展开 `<details>`：Timeline、Tool events、Audit、Ledger、Violations、Raw XA-Guard audit。红队可在浏览器里直接对照 selected A/B run 的核心证据明细。
+- 验证：`python -m pytest kernel/tests/test_range_cli.py -q` 15 passed；`python -m pytest kernel/tests -q` 118 passed。`workbench serve --no-server` smoke 通过，抽取页面脚本后 `node --check` 通过；临时 runtime 产物已清理。
+- 按要求启动 `gpt-5.5/xhigh` 只读子 agent `Dalton` 复核，但该 agent 因 usage limit 报错退出，没有有效 review 结论；本轮仍不能声明符合 PRD/SP7。
+
 # 2026-07-07 06:20 -07:00 R8 xa-aibom validate/admit 实跑收敛
 
 - 按用户要求补跑 L3 内部 R8 的 `xa-aibom validate/admit`：外部 cdxgen CycloneDX 1.6 BOM 用 `validate --expected-sha256` 正向通过；schema-valid 篡改 BOM、错误 expected hash、缺 `bomFormat` 均 exit 2 fail-closed。
