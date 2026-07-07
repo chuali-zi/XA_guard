@@ -52,9 +52,13 @@ def test_full_day_six_domain_business_clock_queues_and_clean_verdict() -> None:
     queues = result.world.domain_state["queues"]
     approval_statuses = {item["id"]: item["status"] for item in queues["approval"]}
     assert approval_statuses["APPR-EXP-001"] == "approved"
+    assert approval_statuses["APPR-CONTRACT-001"] == "approved"
+    assert approval_statuses["APPR-ATLAS-001"] == "approved"
     assert approval_statuses["APPR-OPS-001"] == "approved"
+    assert approval_statuses["APPR-POLICY-001"] == "approved"
     assert approval_statuses["APPR-LOW-001"] == "timeout"
     assert {item["id"]: item["status"] for item in queues["ticket"]}["EXP-1001"] == "pending"
+    assert {item["id"]: item["status"] for item in queues["ticket"]}["ATLAS-DEP-001"] == "resolved"
     assert {item["id"]: item["status"] for item in queues["ticket"]}["T-OPS-ALERT"] == "resolved"
     assert {item["id"]: item["status"] for item in queues["ci"]}["build-77"] == "succeeded"
     assert queues["ci"][0]["attempts"] == 1
@@ -63,10 +67,25 @@ def test_full_day_six_domain_business_clock_queues_and_clean_verdict() -> None:
     assert replay["queues"]["ci"]["build-77"]["status"] == "succeeded"
     assert replay["queues"]["ci"]["build-77"]["attempts"] == 1
     assert replay["queues"]["approval"]["APPR-EXP-001"]["status"] == "approved"
+    assert replay["queues"]["approval"]["APPR-CONTRACT-001"]["status"] == "approved"
+    assert replay["queues"]["approval"]["APPR-ATLAS-001"]["status"] == "approved"
     assert replay["payments"]["PAY-EXP-1001"]["status"] == "paid"
     assert replay["services"]["gateway"]["status"] == "healthy"
+    assert replay["services"]["atlas-api"]["status"] == "healthy"
+    assert replay["projects"]["atlas-2026"]["status"] == "integration"
+    assert replay["policies"]["agent-handbook"]["approved_internal_notice_exception"] == "enabled"
+    assert replay["policy_exceptions"]["PEX-DAILY-001"]["approval_ticket"] == "APPR-POLICY-001"
+    assert replay["queues"]["audit"]["TRACE-DAILY"]["status"] == "replayed"
     assert replay["queues"]["audit"]["EVIDENCE-DAILY"]["status"] == "exported"
     assert replay["limitations"] == []
+    assert any(entry.actor == "李法务" and entry.action == "read_record" and entry.data_ref == "contract-3001" for entry in result.ledger.entries)
+    assert any(entry.actor == "李法务" and entry.action == "read_record" and entry.data_ref == "contractor-roster" for entry in result.ledger.entries)
+    assert any(entry.actor == "韩项目" and entry.action == "query_project" and entry.data_ref == "atlas-2026" for entry in result.ledger.entries)
+    atlas_restart = next(entry for entry in result.ledger.entries if entry.actor == "陆运维" and entry.action == "restart_service" and entry.data_ref == "cfg-atlas-api")
+    assert atlas_restart.delegation_chain[-1]["acting_for"] == "吴架构"
+    policy_change = next(entry for entry in result.ledger.entries if entry.actor == "郑治理" and entry.action == "modify_policy")
+    assert policy_change.authorization_chain[0]["approval_ticket"] == "APPR-POLICY-001"
+    assert any(entry.actor == "钱审计" and entry.action == "replay_trace" for entry in result.ledger.entries)
 
 
 def test_multi_seat_tool_calls_are_interleaved_by_business_tick() -> None:

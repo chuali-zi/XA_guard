@@ -1,7 +1,50 @@
 # 工作日志
 
+## 2026-07-07 00:46 Workbench 本地 API 执行与路径修正
+
+- **背景/目标**：继续推进“真实政企一天 + 完全自由红队靶场”的产品形态。上一轮 `workbench serve` 已能在页面内构造多步 ManualSession，但仍主要是命令构造器；本轮把 HTTP serve 模式推进到能直接触发本地 `manual-session` 执行。
+- **本轮做了什么**：`workbench serve` 在 HTTP 模式下新增 `/api/manual-session` 本地 JSON API；页面新增 `Run local API` 和 `API Result`，可把浏览器中构造的多步 ToolCall 作为指定 principal 发送给 `manual-session`，经 SUT 裁决并写标准 evidence。`run_workbench_api_action()` 负责输入校验、attempt 目录生成、调用 `kernel.workbench manual-session` 并返回 summary/stderr。随后修正 `build_workbench_state()`，将 `world_path`、`findings_dir`、`dashboard_dir` 解析为绝对路径，避免 HTTP server 切换工作目录后 API 找不到场景文件。
+- **外部复核结论**：按用户要求启动的 `gpt-5.5/xhigh` 只读子 agent `Nash` 已完成 review，结论仍是 **不完全符合 PRD**。它认可当前已有 16 个 seat、12 类开放入口、9 个属性族以及 CLI/workbench/evidence/replay 基础能力，但指出 P0 缺口仍包括 deterministic baseline、OpenCode/live agent 长程不足、XA-Guard live smoke 级、Workbench 不是完整自由红队产品、语义型注入仍偏模拟事实。
+- **测试/验证**：`python -m pytest kernel/tests/test_range_cli.py -q` 通过（11 个用例）；`python -m pytest kernel/tests/test_workbench.py -q` 通过（19 个用例）；完整 `python -m pytest kernel/tests -q` 通过（113 个用例）。手工 smoke：`python -m kernel.range_cli workbench serve --world scenarios\dctg\full-day.json --out-dir .runtime\workbench-api-smoke --no-server --json` 通过；抽取页面 `<script>` 后 `node --check` 通过；临时 `.runtime\workbench-api-smoke` 已清理。
+- **仍未完成**：这只是 Web 工作台从“构造命令”推进到“可执行多步 manual-session”的一个局部后台能力；仍缺地图点击注入、多 finding 持久编辑、浏览器内 A/B 执行、证据并排审阅、完整 replay/report dashboard、长程 observe-plan-act 和真实 live N>=3/Gate6-range ledger 对齐。
+
+## 2026-07-06 20:37 交互式静态 Workbench 控制台
+
+- **背景/目标**：继续推进 `gpt-5.5/xhigh` review 指出的 P0 产品形态缺口：`workbench serve` 之前只是只读表格和命令列表，不能像红队靶场控制台那样在页面内选择 seat/tool、构造多步 ManualSeat 或生成 A/B/finding 命令。
+- **本轮做了什么**：`build_workbench_state()` 为每个 tool 输出 `input_schema`；`render_workbench_html()` 重做为本地交互式静态控制台，页面内嵌 `RANGE_STATE`，支持 seat 列表选择、tool 下拉联动、基于 ToolSurface schema 的 args 模板、多步 ToolCall 序列构造、`manual-session` 命令输出/复制、finding 初始化命令和 Null vs XA-Guard A/B 命令生成；同时保留世界指标、open surfaces、bound properties、finding queue 和参考命令视图。
+- **测试/验证**：`python -m pytest kernel/tests/test_range_cli.py -q` 通过（10 个用例）；`python -m pytest kernel/tests/test_range_cli.py kernel/tests/test_workbench.py -q` 通过（29 个用例）；完整 `python -m pytest kernel/tests -q` 通过（112 个用例）。手工 smoke：`python -m kernel.range_cli workbench serve --world scenarios\dctg\full-day.json --out-dir .runtime\workbench-interactive --no-server --json` 通过；抽取生成的 `<script>` 后 `node --check` 通过。
+- **仍未完成**：这仍是静态 HTML/JS 命令构造器，不是能直接执行命令、保存多 finding、做地图点击注入、展示 evidence 并排 diff 的完整 Web 工作台；PRD 目标仍未完成。
+
+## 2026-07-06 20:27 manual-session、OpenCode 多轮产品证明与 F13/F14 治理审计链
+
+- **背景/目标**：继续按用户目标和 `gpt-5.5/xhigh` review 推进“真实政企一天 + 完全自由红队靶场”。本轮先收尾 Hume review 后的 P0/P1 缺口中可落地的三块：多步 ManualSeat、OpenCode 多轮产品证明、F13/F14 下午治理审计链。
+- **外部复核结论**：子 agent `Hume` 完成只读 review，结论仍是“不完全符合 PRD”。它确认 F3/F10/F11 有价值，但指出 full-day 仍偏 deterministic scripted baseline、live XA-Guard 仍是 smoke、workbench 非完整交互产品、F15/策略/审计/动态 consequence 仍偏薄、属性与 replay/report 仍需深化。
+- **本轮做了什么**：新增 `manual-session` 多步手工 ToolCall 入口，支持 `--calls-json` 与 `--calls-file`，并兼容 PowerShell 写出的 UTF-8 BOM；`range_cli` 顶层别名和静态工作台命令同步。`range day` summary/run manifest 新增 `opencode_multiround` 与 `tool_attempt_count`，补了 `day --agent opencode --opencode-multiround --repeat 3` 的产品级 mock 回归；同一 evidence 目录复跑前会清理本产品生成的旧 artifact，避免 stale `day-summary.json` 污染 hash manifest。
+- **业务链路增强**：`reference_surface()` 新增 `modify_policy` 与 `replay_trace`；`full-day.json` 新增 `APPR-POLICY-001`、`policy_exception_approvers`、`modify_policy` 特权动作，并让 `王安全 approve -> 郑治理 modify_policy/send_message(内部通知) -> 钱审计 replay_trace/verify_chain/export_evidence` 形成 F13/F14 下午治理审计链。`Ledger.replay()` 新增 `policies` 与 `policy_exceptions` 投影。
+- **测试/验证**：`python -m pytest kernel/tests/test_range_cli.py -q` 通过（10 个用例）；`python -m pytest kernel/tests/test_range_cli.py kernel/tests/test_workbench.py -q` 通过（28 个用例）；`python -m pytest kernel/tests/test_range_cli.py kernel/tests/test_workbench.py kernel/tests/test_opencode_seat.py -q` 通过（39 个用例）；`python -m pytest kernel/tests/test_business_scheduler.py kernel/tests/test_policy_sandbox_properties.py kernel/tests/test_range_cli.py -q` 通过（16 个用例）；完整 `python -m pytest kernel/tests -q` 通过（112 个用例）。`range day` full-day smoke 通过，账本 46 条、工具尝试 44 次、零违规；随后 `range replay --verify-hashes --verify-ledger --verify-sut-audit` 通过。`manual-session --calls-file` smoke 通过并验证 BOM calls 文件可读。
+- **仍未完成**：仍不能宣称 PRD 完成。full-day 正常行为仍是 deterministic scripted baseline；ManualSeat 虽支持 CLI 多步，但不是交互式 Web 操作台；live XA-Guard 仍不是 attempt 级长生命周期 session，也没有真实 live N>=3/Gate6-range ledger 深度对齐；F15 仍是最小安全外发/内部通知落点，真实策略/沙箱/供应链/MCP downstream 仍需深化。
 
 
+
+
+
+
+## 2026-07-06 20:10 F11 Atlas 跨部门项目依赖链路落账
+
+- **背景/目标**：继续补 `gpt5.5/xhigh` review 指出的 full-day 业务流缺口。本轮实现 F11 Atlas 跨部门项目依赖，让 Office 项目经理、Dev 架构和 Ops 运维形成真实 delegation/approval/service change 链路。
+- **本轮做了什么**：`scenarios/dctg/full-day.json` 新增 `韩项目`、`陆运维`、`atlas-2026`、`cfg-atlas-api`、`projects.atlas-2026` 和 F11 seat context；`reference_surface()` 新增 `query_project`；`scripted_plans_for_scenario()` 新增韩项目查询 Atlas、提交 `ATLAS-DEP-001`、申请 `APPR-ATLAS-001`，吴架构按委托读 repo，陆运维审批并切换 `atlas-api`。
+- **证据/回放**：`Ledger.replay()` 新增 `projects` 投影；F11 的 `atlas-2026` 项目、`ATLAS-DEP-001` 工单、`APPR-ATLAS-001` 审批和 `atlas-api` 服务状态可在 replay 中复原。
+- **测试/验证**：`python -m pytest kernel/tests/test_business_scheduler.py -q` 通过（2 个用例）；`python -m pytest kernel/tests -q` 通过（108 个用例）；`python -m pytest kernel/tests/test_range_cli.py kernel/tests/test_workbench.py -q` 通过（25 个用例）；`python -m kernel.demo --scenario scenarios\dctg\full-day.json` 通过，账本 42 条、零违规、`verdict.passed=True`。
+- **外部复核**：已再次启动 `gpt-5.5/xhigh` 只读子 agent `Hume` 按用户指定 prompt 审查当前仓库，等待结果。
+- **仍未完成**：F15 客户方案回复外发仍未按 full-day 下午链路单独落成；任意长度 observe-plan-act、live XA-Guard N>=3/Gate6-range ledger 对齐、交互式 Web/ManualSeat 和更真实 semantic consequence 仍未完成。
+
+## 2026-07-06 20:02 F10 合同处理链路落账
+
+- **背景/目标**：继续根据 `gpt5.5/xhigh` 子 agent review 的 P0 缺口补完整业务流。本轮补 F10 合同处理，让合同附件/合同/承包商名册通过 seat/SUT/ToolSurface 被正常消费并落账。
+- **本轮做了什么**：`scenarios/dctg/full-day.json` 新增 `李法务`、`刘主管`、`contract-3001`、`contractor-roster` 和 F10 seat context；`scripted_plans_for_scenario()` 新增李法务读取 `doc:合同附件`、读取合同与承包商名册、起草处理意见，以及刘主管审批 `APPR-CONTRACT-001`。
+- **测试/验证**：`kernel/tests/test_business_scheduler.py` 断言 F10 合同/承包商读取与合同审批 replay；`python -m pytest kernel/tests/test_business_scheduler.py -q` 通过（2 个用例）；`python -m pytest kernel/tests -q` 通过（108 个用例）；`python -m kernel.demo --scenario scenarios\dctg\full-day.json` 通过，账本 36 条、零违规、`verdict.passed=True`。
+- **外部复核**：尝试按用户新验收方式再次启动 `gpt-5.5/xhigh` 子 agent review，但子 agent 因 usage limit 报错退出，不能作为有效外部 review 结论。
+- **仍未完成**：这只补了 F10；F11/F15、任意长度 observe-plan-act、live XA-Guard N>=3/Gate6-range ledger 对齐、交互式 Web/ManualSeat 和更真实 semantic consequence 仍未完成。
 
 ## 2026-07-05 21:15 F3 报销审批支付链路落账
 

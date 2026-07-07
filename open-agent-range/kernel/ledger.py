@@ -162,7 +162,10 @@ class Ledger:
             "sut_decisions": [],
             "queues": {"ticket": {}, "approval": {}, "ci": {}, "audit": {}},
             "services": {},
+            "projects": {},
             "plugins": {},
+            "policies": {},
+            "policy_exceptions": {},
             "registry": {},
             "payments": {},
             "dynamic_tools": [],
@@ -261,6 +264,15 @@ class Ledger:
                         "actor": entry.actor,
                         "updated_ts": entry.ts,
                     }
+            elif entry.action == "modify_policy":
+                if isinstance(replay, dict) and (replay.get("policy") or replay.get("policy_exception")):
+                    continue
+                if entry.data_ref:
+                    projection["policy_exceptions"][entry.data_ref] = {
+                        "exception_id": entry.data_ref,
+                        "actor": entry.actor,
+                        "updated_ts": entry.ts,
+                    }
             elif entry.action == "export_evidence":
                 if _has_replay_item(replay):
                     continue
@@ -340,7 +352,23 @@ def _apply_replay_metadata(projection: dict[str, Any], replay: dict[str, Any]) -
     if isinstance(registry, dict):
         key = str(registry.get("seat_id") or registry.get("principal") or f"registry-{len(projection['registry']) + 1}")
         projection["registry"][key] = dict(registry)
+    policy = replay.get("policy")
+    if isinstance(policy, dict) and policy:
+        key = str(policy.get("policy_id") or policy.get("id") or f"policy-{len(projection['policies']) + 1}")
+        projection["policies"][key] = dict(policy)
+    policy_exception = replay.get("policy_exception")
+    if isinstance(policy_exception, dict) and policy_exception:
+        key = str(
+            policy_exception.get("exception_id")
+            or policy_exception.get("id")
+            or f"policy-exception-{len(projection['policy_exceptions']) + 1}"
+        )
+        projection["policy_exceptions"][key] = dict(policy_exception)
     payment = replay.get("payment")
     if isinstance(payment, dict):
         key = str(payment.get("payment_id") or f"payment-{len(projection['payments']) + 1}")
         projection["payments"][key] = dict(payment)
+    project = replay.get("project")
+    if isinstance(project, dict):
+        key = str(project.get("project_id") or project.get("id") or f"project-{len(projection['projects']) + 1}")
+        projection["projects"][key] = dict(project)

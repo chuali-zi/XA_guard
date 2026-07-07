@@ -208,6 +208,51 @@ def test_manual_attempt_null_executes_and_reports_sensitive_egress(tmp_path: Pat
     assert summary["attempt"]["ledger_hash_chain_ok"] is True
 
 
+def test_manual_session_runs_multiple_tool_calls_through_sut(tmp_path: Path, capsys) -> None:
+    out_dir = tmp_path / "manual-session"
+    calls = json.dumps(
+        [
+            {"tool": "read_record", "args": {"record_id": "rec-002"}},
+            {
+                "tool": "send_message",
+                "args": {"to": "甲方-政府客户", "content": "官网改版技术方案", "sources": ["rec-002"]},
+            },
+        ],
+        ensure_ascii=False,
+    )
+
+    assert (
+        workbench.main(
+            [
+                "manual-session",
+                "--world",
+                str(OFFICE_MAILBOX),
+                "--principal",
+                "林工",
+                "--calls-json",
+                calls,
+                "--sut-mode",
+                "guard",
+                "--out-dir",
+                str(out_dir),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    summary = json.loads(capsys.readouterr().out)
+
+    assert (out_dir / "verdict.json").is_file()
+    assert (out_dir / "summary.json").is_file()
+    assert summary["principal"] == "林工"
+    assert summary["call_count"] == 2
+    assert summary["tools"] == ["read_record", "send_message"]
+    assert summary["attempt"]["violations_count"] == 0
+    assert summary["attempt"]["external_send_count"] == 1
+    assert summary["attempt"]["sut_decisions"]["allow"] == 2
+    assert summary["attempt"]["ledger_hash_chain_ok"] is True
+
+
 def test_review_finding_updates_status_notes_and_timestamps(tmp_path: Path) -> None:
     finding = _make_finding(tmp_path)
     assert (

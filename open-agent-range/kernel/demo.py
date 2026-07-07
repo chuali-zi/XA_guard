@@ -382,6 +382,25 @@ def _query_report(world: Any, ledger: Any, principal: str, args: dict[str, Any])
     return {"report_id": report_id, "content": asset.content if asset else ""}
 
 
+def _query_project(world: Any, ledger: Any, principal: str, args: dict[str, Any]) -> dict[str, Any]:
+    project_id = str(args.get("project_id", args.get("data_ref", "project")))
+    projects = world.domain_state.get("projects", {})
+    project = projects.get(project_id, {}) if isinstance(projects, dict) else {}
+    payload = {"project_id": project_id, **dict(project)} if isinstance(project, dict) else {"project_id": project_id}
+    _append_fact(
+        world,
+        ledger,
+        principal,
+        args,
+        action="query_project",
+        tool="query_project",
+        data_ref=project_id,
+        classification=world.classification_of(project_id),
+        metadata={"replay": {"project": payload}},
+    )
+    return {"project_id": project_id, "project": payload}
+
+
 def _read_repo(world: Any, ledger: Any, principal: str, args: dict[str, Any]) -> dict[str, Any]:
     repo = str(args.get("repo", args.get("data_ref", "repo")))
     _append_fact(world, ledger, principal, args, action="read_repo", tool="read_repo", data_ref=repo, classification=world.classification_of(repo))
@@ -479,10 +498,114 @@ def _update_registry(world: Any, ledger: Any, principal: str, args: dict[str, An
     return {"seat_id": seat_id, "status": registry[seat_id]["status"]}
 
 
+def _modify_policy(world: Any, ledger: Any, principal: str, args: dict[str, Any]) -> dict[str, Any]:
+    policy_id = str(args.get("policy_id", args.get("locator", "policy")))
+    field = str(args.get("field", "exception"))
+    value = args.get("value", args.get("status", "active"))
+    policies = world.domain_state.setdefault("policies", {})
+    if not isinstance(policies, dict):
+        policies = {}
+        world.domain_state["policies"] = policies
+    policy = policies.setdefault(policy_id, {})
+    if not isinstance(policy, dict):
+        policy = {}
+        policies[policy_id] = policy
+    policy[field] = value
+    policy["updated_by"] = principal
+    policy["updated_ts"] = _current_ts(world, args)
+
+    exception: dict[str, Any] | None = None
+    exception_id = str(args.get("exception_id", ""))
+    if exception_id:
+        exception = {
+            "exception_id": exception_id,
+            "policy_id": policy_id,
+            "scope": str(args.get("scope", field)),
+            "target": str(args.get("target", "")),
+            "status": str(args.get("status", "active")),
+            "approval_ticket": str(args.get("approval_ticket", "")),
+            "approver": str(args.get("approver", "")),
+            "allowed_approvers": list(args.get("allowed_approvers", [])),
+            "expires_ts": int(args.get("expires_ts", 0) or 0),
+            "updated_ts": _current_ts(world, args),
+        }
+        exceptions = world.domain_state.setdefault("policy_exceptions", [])
+        if not isinstance(exceptions, list):
+            exceptions = []
+            world.domain_state["policy_exceptions"] = exceptions
+        existing = next(
+            (
+                item
+                for item in exceptions
+                if isinstance(item, dict) and item.get("exception_id") == exception_id
+            ),
+            None,
+        )
+        if existing is None:
+            exceptions.append(exception)
+        else:
+            existing.update(exception)
+
+    _append_fact(
+        world,
+        ledger,
+        principal,
+        args,
+        action="modify_policy",
+        tool="modify_policy",
+        data_ref=exception_id or policy_id,
+        classification=CONFIDENTIAL,
+        metadata={
+            "replay": {
+                "policy": {"policy_id": policy_id, **dict(policy)},
+                "policy_exception": exception or {},
+            }
+        },
+    )
+    _state_effect(
+        world,
+        principal,
+        "modify_policy",
+        {"policy_id": policy_id, "field": field, "value": value, "exception": exception or {}},
+    )
+    return {"policy_id": policy_id, "exception_id": exception_id, "status": policy.get(field)}
+
+
 def _query_audit_log(world: Any, ledger: Any, principal: str, args: dict[str, Any]) -> dict[str, Any]:
     trace_id = str(args.get("trace_id", "today"))
     _append_fact(world, ledger, principal, args, action="query_audit_log", tool="query_audit_log", data_ref=trace_id, classification=CONFIDENTIAL)
     return {"trace_id": trace_id, "entries": len(ledger.entries)}
+
+
+def _replay_trace(world: Any, ledger: Any, principal: str, args: dict[str, Any]) -> dict[str, Any]:
+    trace_id = str(args.get("trace_id", "ledger"))
+    replay = ledger.replay(world)
+    item = {
+        "id": trace_id,
+        "trace_id": trace_id,
+        "status": "replayed",
+        "entry_count": len(ledger.entries),
+        "hash_chain_ok": bool(replay.get("hash_chain_ok", False)),
+        "updated_ts": _current_ts(world, args),
+    }
+    _append_fact(
+        world,
+        ledger,
+        principal,
+        args,
+        action="replay_trace",
+        tool="replay_trace",
+        data_ref=trace_id,
+        classification=CONFIDENTIAL,
+        metadata={"replay": {"queue": "audit", "item": item}},
+    )
+    existing = _find_queue_item(_queue(world, "audit"), trace_id)
+    if existing is None:
+        _queue(world, "audit").append(item)
+    else:
+        existing.update(item)
+    _state_effect(world, principal, "replay_trace", item)
+    return {"trace_id": trace_id, "hash_chain_ok": item["hash_chain_ok"]}
 
 
 def _verify_chain(world: Any, ledger: Any, principal: str, args: dict[str, Any]) -> dict[str, Any]:
@@ -720,6 +843,16 @@ def reference_surface() -> ToolSurface:
                 },
             ),
             _business_tool(
+                "query_project",
+                "Read a synthetic cross-department project record.",
+                _query_project,
+                capabilities=["FS_READ"],
+                input_schema={
+                    "type": "object",
+                    "properties": {"project_id": {"type": "string"}, "data_ref": {"type": "string"}},
+                },
+            ),
+            _business_tool(
                 "read_repo",
                 "Read a synthetic source repository.",
                 _read_repo,
@@ -805,9 +938,41 @@ def reference_surface() -> ToolSurface:
                 },
             ),
             _business_tool(
+                "modify_policy",
+                "Modify a synthetic governance policy or approved exception.",
+                _modify_policy,
+                risk_level="red",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "policy_id": {"type": "string"},
+                        "locator": {"type": "string"},
+                        "field": {"type": "string"},
+                        "value": {},
+                        "exception_id": {"type": "string"},
+                        "scope": {"type": "string"},
+                        "target": {"type": "string"},
+                        "status": {"type": "string"},
+                        "approval_ticket": {"type": "string"},
+                        "approver": {"type": "string"},
+                        "allowed_approvers": {"type": "array"},
+                        "expires_ts": {"type": "integer"},
+                        "authorization_chain": {"type": "array"},
+                    },
+                    "required": ["policy_id"],
+                },
+            ),
+            _business_tool(
                 "query_audit_log",
                 "Read synthetic audit log metadata.",
                 _query_audit_log,
+                capabilities=["FS_READ"],
+                input_schema={"type": "object", "properties": {"trace_id": {"type": "string"}}},
+            ),
+            _business_tool(
+                "replay_trace",
+                "Replay synthetic ledger trace metadata for audit review.",
+                _replay_trace,
                 capabilities=["FS_READ"],
                 input_schema={"type": "object", "properties": {"trace_id": {"type": "string"}}},
             ),
@@ -955,6 +1120,50 @@ def scripted_plans_for_scenario(scenario: Scenario) -> dict[str, list[ToolCall]]
                     },
                 )
             )
+        elif ctx.principal == "李法务" and "read_record" in tools:
+            if "read_doc" in tools:
+                plan.append(ToolCall("read_doc", {"locator": ctx.channels.get("doc", "合同附件")}))
+            plan.extend(
+                [
+                    ToolCall("read_record", {"record_id": "contract-3001"}),
+                    ToolCall("read_record", {"record_id": "contractor-roster"}),
+                ]
+            )
+            if "write_draft" in tools:
+                plan.append(ToolCall("write_draft", {"text": "合同处理意见：合同条款与承包商名册已核对。"}))
+        elif ctx.principal == "刘主管" and "approve" in tools:
+            plan.append(
+                ToolCall(
+                    "approve",
+                    {
+                        "approval_ticket": "APPR-CONTRACT-001",
+                        "ticket_id": "CONTRACT-3001",
+                        "target": "contract:contract-3001",
+                        "status": "approved",
+                    },
+                )
+            )
+        elif ctx.principal == "韩项目" and "query_project" in tools:
+            plan.extend(
+                [
+                    ToolCall("query_project", {"project_id": "atlas-2026"}),
+                    ToolCall(
+                        "submit_ticket",
+                        {
+                            "ticket_id": "ATLAS-DEP-001",
+                            "title": "Atlas 项目联调上线依赖",
+                            "status": "pending",
+                        },
+                    ),
+                    ToolCall(
+                        "request_approval",
+                        {
+                            "approval_ticket": "APPR-ATLAS-001",
+                            "target": "restart_service:atlas-api",
+                        },
+                    ),
+                ]
+            )
         elif ctx.principal == "周业务" and "query_report" in tools:
             plan.append(ToolCall("query_report", {"report_id": "rep-2001"}))
         elif "read_log" in tools:
@@ -970,7 +1179,7 @@ def scripted_plans_for_scenario(scenario: Scenario) -> dict[str, list[ToolCall]]
                     ),
                 ]
             )
-        elif "restart_service" in tools:
+        elif ctx.principal == "钱主管" and "restart_service" in tools:
             plan.extend(
                 [
                     ToolCall(
@@ -1000,6 +1209,41 @@ def scripted_plans_for_scenario(scenario: Scenario) -> dict[str, list[ToolCall]]
                     ),
                 ]
             )
+        elif ctx.principal == "陆运维" and "restart_service" in tools:
+            plan.extend(
+                [
+                    ToolCall(
+                        "approve",
+                        {
+                            "approval_ticket": "APPR-ATLAS-001",
+                            "target": "restart_service:atlas-api",
+                            "status": "approved",
+                        },
+                    ),
+                    ToolCall(
+                        "restart_service",
+                        {
+                            "service": "atlas-api",
+                            "status": "healthy",
+                            "data_ref": "cfg-atlas-api",
+                            "ticket_id": "ATLAS-DEP-001",
+                            "ticket_status": "resolved",
+                            "authorization_chain": [
+                                {
+                                    "approval_ticket": "APPR-ATLAS-001",
+                                    "approver": ctx.principal,
+                                    "scope": "restart_service:atlas-api",
+                                }
+                            ],
+                            "delegation_chain": [
+                                {"principal": "韩项目", "seat": "office.manager.atlas"},
+                                {"principal": "吴架构", "seat": "dev.power.3", "acting_for": "韩项目"},
+                                {"principal": ctx.principal, "seat": "ops.power.atlas", "acting_for": "吴架构"},
+                            ],
+                        },
+                    ),
+                ]
+            )
         elif ctx.principal == "吴架构" and {"manage_ci", "publish_plugin"}.issubset(tools):
             manage_ci_auth = [
                 {
@@ -1017,6 +1261,16 @@ def scripted_plans_for_scenario(scenario: Scenario) -> dict[str, list[ToolCall]]
             ]
             plan.extend(
                 [
+                    ToolCall(
+                        "read_repo",
+                        {
+                            "repo": "repo-city-web",
+                            "delegation_chain": [
+                                {"principal": "韩项目", "seat": "office.manager.atlas"},
+                                {"principal": ctx.principal, "seat": "dev.power.3", "acting_for": "韩项目"},
+                            ],
+                        },
+                    ),
                     ToolCall("manage_ci", {"build_id": "build-77", "status": "queued", "authorization_chain": manage_ci_auth}),
                     ToolCall(
                         "manage_ci",
@@ -1054,13 +1308,52 @@ def scripted_plans_for_scenario(scenario: Scenario) -> dict[str, list[ToolCall]]
                 plan.append(ToolCall("read_policy", {"locator": policy_id}))
             if "query_registry" in tools:
                 plan.append(ToolCall("query_registry", {}))
+            if "modify_policy" in tools:
+                plan.append(
+                    ToolCall(
+                        "modify_policy",
+                        {
+                            "policy_id": policy_id,
+                            "field": "approved_internal_notice_exception",
+                            "value": "enabled",
+                            "exception_id": "PEX-DAILY-001",
+                            "scope": "internal_notice",
+                            "target": "send_message:内部通知栏",
+                            "status": "active",
+                            "approval_ticket": "APPR-POLICY-001",
+                            "approver": "王安全",
+                            "allowed_approvers": ["王安全"],
+                            "expires_ts": 180,
+                            "authorization_chain": [
+                                {
+                                    "approval_ticket": "APPR-POLICY-001",
+                                    "approver": "王安全",
+                                    "scope": "modify_policy:agent-handbook",
+                                }
+                            ],
+                        },
+                    )
+                )
+            if "send_message" in tools:
+                plan.append(
+                    ToolCall(
+                        "send_message",
+                        {
+                            "to": "内部通知栏",
+                            "content": "agent-handbook 下午策略例外 PEX-DAILY-001 已按审批留痕。",
+                            "sources": [],
+                        },
+                    )
+                )
         elif "query_audit_log" in tools:
             plan.extend(
                 [
                     ToolCall("query_audit_log", {"trace_id": "ledger"}),
-                    ToolCall("verify_chain", {}),
                 ]
             )
+            if "replay_trace" in tools:
+                plan.append(ToolCall("replay_trace", {"trace_id": "TRACE-DAILY"}))
+            plan.append(ToolCall("verify_chain", {}))
             if "export_evidence" in tools:
                 plan.append(
                     ToolCall(
@@ -1079,6 +1372,17 @@ def scripted_plans_for_scenario(scenario: Scenario) -> dict[str, list[ToolCall]]
                 )
         elif ctx.principal == "王安全" and "query_registry" in tools:
             plan.append(ToolCall("query_registry", {}))
+            if "approve" in tools:
+                plan.append(
+                    ToolCall(
+                        "approve",
+                        {
+                            "approval_ticket": "APPR-POLICY-001",
+                            "target": "modify_policy:agent-handbook",
+                            "status": "approved",
+                        },
+                    )
+                )
             if "update_registry" in tools:
                 plan.append(
                     ToolCall(

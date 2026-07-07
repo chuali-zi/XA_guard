@@ -77,6 +77,20 @@ def main(argv: list[str] | None = None) -> int:
     manual.add_argument("--task", default="manual red-team attempt")
     manual.add_argument("--json", action="store_true", help="emit JSON summary")
 
+    manual_session = sub.add_parser("manual-session", help="run multiple manual ToolCalls through a selected SUT")
+    manual_session.add_argument("--world", required=True)
+    manual_session.add_argument("--principal", required=True)
+    calls_source = manual_session.add_mutually_exclusive_group(required=True)
+    calls_source.add_argument("--calls-json", help="JSON list of {'tool': name, 'args': object} calls")
+    calls_source.add_argument("--calls-file", help="path to a JSON file containing the call list")
+    manual_session.add_argument("--inject", action="append", default=[], help="optional injection fixture JSON; may repeat")
+    manual_session.add_argument("--out-dir", "--evidence-dir", dest="out_dir")
+    manual_session.add_argument("--sut-mode", default="guard", choices=["null", "guard", "guardstub", "xaguard", "xa-guard"])
+    manual_session.add_argument("--live", action="store_true", help="use live XA-Guard when --sut-mode xaguard")
+    manual_session.add_argument("--xa-guard-root", help="path to the external XA-Guard repository for live mode")
+    manual_session.add_argument("--task", default="manual multi-step red-team session")
+    manual_session.add_argument("--json", action="store_true", help="emit JSON summary")
+
     review = sub.add_parser("review-finding", help="write human review status and notes")
     review.add_argument("--finding", required=True)
     review.add_argument("--status", required=True, choices=sorted(REVIEW_STATUSES))
@@ -120,6 +134,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_validate_finding(args)
     if args.command == "manual-attempt":
         return _cmd_manual_attempt(args)
+    if args.command == "manual-session":
+        return _cmd_manual_session(args)
     if args.command == "review-finding":
         return _cmd_review_finding(args)
     if args.command == "run-ab":
@@ -267,6 +283,79 @@ def _cmd_manual_attempt(args: argparse.Namespace) -> int:
         "world": args.world,
         "principal": args.principal,
         "tool": args.tool,
+        "sut_mode": args.sut_mode,
+        "live": args.live,
+        "injection_count": len(injections),
+        "executed_at": _now_iso(),
+        "attempt": _result_summary(out_dir, sut.sut_id, result),
+    }
+    _write_json(out_dir / "summary.json", summary)
+    if args.json:
+        _print_json(summary)
+    else:
+        _print_human_summary(summary["attempt"])
+        print(f"evidence_dir\t{out_dir}")
+    return 0
+
+
+def _cmd_manual_session(args: argparse.Namespace) -> int:
+    try:
+        calls_label = "--calls-file" if args.calls_file else "--calls-json"
+        calls_text = Path(args.calls_file).read_text(encoding="utf-8-sig") if args.calls_file else args.calls_json
+        calls = _parse_tool_calls(str(calls_text), calls_label)
+    except (OSError, ValueError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    if args.live and _normalized_manual_sut_mode(args.sut_mode) != "xaguard":
+        print("--live is only valid with --sut-mode xaguard", file=sys.stderr)
+        return 2
+
+    scenario = load_scenario(args.world)
+    injections = []
+    for path in args.inject:
+        injections.extend(load_injections(path))
+    if injections:
+        scenario = with_injections(scenario, injections)
+
+    surface = reference_surface()
+    unknown = [call.tool for call in calls if call.tool not in surface.tool_names()]
+    if unknown:
+        print(f"unknown tool for reference surface: {', '.join(unknown)}", file=sys.stderr)
+        return 2
+
+    context = _manual_context(scenario, principal=args.principal, task=args.task, surface=surface)
+    manual_scenario = replace(scenario, seat_context=context, seat_contexts=[context])
+    sut = _manual_sut(
+        manual_scenario,
+        args.sut_mode,
+        live=args.live,
+        xa_guard_root=Path(args.xa_guard_root) if args.xa_guard_root else None,
+    )
+    out_dir = Path(args.out_dir) if args.out_dir else Path(".runtime") / "manual-sessions" / _manual_attempt_id(
+        args.principal,
+        calls[0].tool,
+    )
+    result = _run_side(
+        manual_scenario,
+        surface,
+        sut,
+        out_dir,
+        seat=ManualSeat(calls),
+        infra_errors_as_summary=args.live,
+        evidence_meta={
+            "agent": "manual-session",
+            "principal": args.principal,
+            "manual_call_count": len(calls),
+            "manual_tools": [call.tool for call in calls],
+            "live": args.live,
+            "injection_count": len(injections),
+        },
+    )
+    summary = {
+        "world": args.world,
+        "principal": args.principal,
+        "tools": [call.tool for call in calls],
+        "call_count": len(calls),
         "sut_mode": args.sut_mode,
         "live": args.live,
         "injection_count": len(injections),
@@ -610,6 +699,27 @@ def _parse_json_object(text: str, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{label} must be a JSON object")
     return value
+
+
+def _parse_tool_calls(text: str, label: str = "--calls-json") -> list[ToolCall]:
+    try:
+        value = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{label} must be a JSON list: {exc}") from exc
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"{label} must be a non-empty JSON list")
+    calls: list[ToolCall] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise ValueError(f"{label} item {index} must be an object")
+        tool = str(item.get("tool", "")).strip()
+        if not tool:
+            raise ValueError(f"{label} item {index} missing tool")
+        args = item.get("args", {})
+        if not isinstance(args, dict):
+            raise ValueError(f"{label} item {index} args must be an object")
+        calls.append(ToolCall(tool, dict(args)))
+    return calls
 
 
 def _manual_context(scenario: Scenario, *, principal: str, task: str, surface: Any) -> SeatContext:

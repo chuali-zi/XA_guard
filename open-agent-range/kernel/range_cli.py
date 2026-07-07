@@ -12,6 +12,8 @@ It intentionally reuses the kernel runner instead of inventing a parallel path.
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import http.server
 import json
 import os
@@ -24,7 +26,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from kernel.demo import build_seat, reference_surface
-from kernel.evidence import HASH_MANIFEST, EvidenceStore
+from kernel.evidence import ARTIFACT_NAMES, HASH_MANIFEST, EvidenceStore
 from kernel.ledger import Ledger
 from kernel.policy_overlay import overlay_from_scenario
 from kernel.run import run_attempt
@@ -39,6 +41,7 @@ WORKBENCH_ALIASES = {
     "list-findings",
     "validate-finding",
     "manual-attempt",
+    "manual-session",
     "review-finding",
     "run-ab",
     "show",
@@ -137,6 +140,7 @@ def _cmd_day(args: argparse.Namespace) -> int:
 
     for run_index in range(1, args.repeat + 1):
         attempt_dir = out_root if args.repeat == 1 else out_root / f"run-{run_index:03d}"
+        _prepare_product_attempt_dir(attempt_dir)
         sut = _sut_for(args.sut, scenario, live=args.live, xa_guard_root=args.xa_guard_root)
         seat_args = SimpleNamespace(
             agent=args.agent,
@@ -155,6 +159,7 @@ def _cmd_day(args: argparse.Namespace) -> int:
                 "product_command": "day",
                 "agent": args.agent,
                 "model": args.model if args.agent == "opencode" else "",
+                "opencode_multiround": bool(args.opencode_multiround) if args.agent == "opencode" else False,
                 "sut": _normalize_sut(args.sut),
                 "live": args.live,
                 "run_index": run_index,
@@ -169,6 +174,7 @@ def _cmd_day(args: argparse.Namespace) -> int:
                 "violation_count": len(result.violations),
                 "ledger_hash_chain_ok": result.ledger.verify_hash_chain(),
                 "ledger_entries": len(result.ledger.entries),
+                "tool_attempt_count": len(result.attempts),
             }
         )
 
@@ -177,6 +183,7 @@ def _cmd_day(args: argparse.Namespace) -> int:
         "agent": args.agent,
         "sut": _normalize_sut(args.sut),
         "live": args.live,
+        "opencode_multiround": bool(args.opencode_multiround) if args.agent == "opencode" else False,
         "repeat": args.repeat,
         "injection_count": len(injections),
         "executed_at": _now_iso(),
@@ -187,6 +194,14 @@ def _cmd_day(args: argparse.Namespace) -> int:
     _write_json(out_root / "day-summary.json", summary)
     _print_json(summary)
     return 0 if summary["total_violations"] == 0 else 1
+
+
+def _prepare_product_attempt_dir(attempt_dir: Path) -> None:
+    generated = set(ARTIFACT_NAMES) | {HASH_MANIFEST, "day-summary.json", "opencode-events.jsonl"}
+    for name in generated:
+        path = attempt_dir / name
+        if path.is_file():
+            path.unlink()
 
 
 def _cmd_replay(args: argparse.Namespace) -> int:
@@ -300,7 +315,7 @@ def _cmd_workbench_serve(args: argparse.Namespace) -> int:
         _print_json(result)
     else:
         print(f"Serving Open Agent Range workbench at {url}")
-    handler = http.server.SimpleHTTPRequestHandler
+    handler = _make_workbench_handler(out_dir, state)
     with _pushd(out_dir):
         with socketserver.TCPServer((args.host, args.port), handler) as httpd:
             try:
@@ -308,6 +323,93 @@ def _cmd_workbench_serve(args: argparse.Namespace) -> int:
             except KeyboardInterrupt:
                 return 0
     return 0
+
+
+def _make_workbench_handler(out_dir: Path, state: dict[str, Any]) -> type[http.server.SimpleHTTPRequestHandler]:
+    class WorkbenchHandler(http.server.SimpleHTTPRequestHandler):
+        def do_POST(self) -> None:  # noqa: N802 - stdlib handler method name
+            if self.path != "/api/manual-session":
+                self.send_error(404, "unknown workbench API endpoint")
+                return
+            length = int(self.headers.get("Content-Length", "0") or "0")
+            try:
+                payload = json.loads(self.rfile.read(length).decode("utf-8-sig") or "{}")
+                result = run_workbench_api_action(
+                    state,
+                    "manual-session",
+                    payload,
+                    api_root=out_dir / "api-runs",
+                )
+            except Exception as exc:  # local operator API; report structured failure to the page
+                result = {"ok": False, "error": str(exc), "error_type": type(exc).__name__}
+            body = json.dumps(result, ensure_ascii=False, indent=2).encode("utf-8")
+            self.send_response(200 if result.get("ok") else 400)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    return WorkbenchHandler
+
+
+def run_workbench_api_action(
+    state: dict[str, Any],
+    action: str,
+    payload: dict[str, Any],
+    *,
+    api_root: Path,
+) -> dict[str, Any]:
+    if action != "manual-session":
+        raise ValueError(f"unknown workbench API action: {action}")
+    principal = str(payload.get("principal", "")).strip()
+    if not principal:
+        raise ValueError("principal is required")
+    calls = payload.get("calls")
+    if not isinstance(calls, list) or not calls:
+        raise ValueError("calls must be a non-empty list")
+    sut_mode = str(payload.get("sut_mode", "guard") or "guard")
+    if sut_mode not in {"null", "guard", "guardstub", "xaguard", "xa-guard"}:
+        raise ValueError("sut_mode must be null, guard, guardstub, xaguard, or xa-guard")
+    attempt_dir = api_root / "manual-session" / _api_attempt_id(principal)
+    from kernel import workbench
+
+    argv = [
+        "manual-session",
+        "--world",
+        str(state.get("world_path", "")),
+        "--principal",
+        principal,
+        "--calls-json",
+        json.dumps(calls, ensure_ascii=False, separators=(",", ":")),
+        "--sut-mode",
+        sut_mode,
+        "--out-dir",
+        str(attempt_dir),
+        "--json",
+    ]
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        code = workbench.main(argv)
+    raw = stdout.getvalue().strip()
+    try:
+        summary = json.loads(raw) if raw else {}
+    except json.JSONDecodeError:
+        summary = {"raw_stdout": raw}
+    return {
+        "ok": code == 0,
+        "code": code,
+        "action": action,
+        "attempt_dir": str(attempt_dir),
+        "summary": summary,
+        "stderr": stderr.getvalue().strip(),
+    }
+
+
+def _api_attempt_id(principal: str) -> str:
+    safe = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in principal).strip("-") or "seat"
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return f"{stamp}-{safe}"
 
 
 @dataclass
@@ -388,6 +490,9 @@ def build_report(run_dir: Path) -> dict[str, Any]:
 
 
 def build_workbench_state(world_path: Path, findings_dir: Path, out_dir: Path) -> dict[str, Any]:
+    world_path = Path(world_path).resolve()
+    findings_dir = Path(findings_dir).resolve()
+    out_dir = Path(out_dir).resolve()
     scenario = load_scenario(world_path)
     surface = reference_surface()
     findings = _load_finding_items(findings_dir)
@@ -425,6 +530,7 @@ def build_workbench_state(world_path: Path, findings_dir: Path, out_dir: Path) -
                 "input_max_taint": tool.input_max_taint,
                 "output_taint": tool.output_taint,
                 "description": tool.description,
+                "input_schema": tool.input_schema,
             }
             for tool in surface.tools
         ],
@@ -434,6 +540,7 @@ def build_workbench_state(world_path: Path, findings_dir: Path, out_dir: Path) -
             "day_null": f"python -m kernel.range_cli day --world {world_path} --sut null --evidence-dir .runtime/day-null",
             "day_xaguard": f"python -m kernel.range_cli day --world {world_path} --sut xaguard --evidence-dir .runtime/day-xaguard",
             "manual_attempt": f"python -m kernel.range_cli manual-attempt --world {world_path} --principal <seat> --tool <tool> --args-json '{{}}'",
+            "manual_session": f"python -m kernel.range_cli manual-session --world {world_path} --principal <seat> --calls-json '[{{\"tool\":\"read_record\",\"args\":{{\"record_id\":\"rec-002\"}}}}]'",
             "run_ab": "python -m kernel.range_cli run-ab --finding <finding.json> --sut-mode null,xaguard --repeat 3 --live --execute",
             "report": "python -m kernel.range_cli report --run <attempt-dir> --format html --out report.html",
             "replay": "python -m kernel.range_cli replay --attempt <attempt-dir> --verify-hashes --verify-ledger --verify-sut-audit",
@@ -505,16 +612,16 @@ def render_workbench_html(state: dict[str, Any]) -> str:
         for label, value in metric_rows
     )
     seats = "".join(
-        "<tr>"
-        f"<td>{_html(str(item.get('principal', '')))}</td>"
-        f"<td>{_html(str(item.get('role', '')))}</td>"
-        f"<td>{_html(', '.join(item.get('tool_names', [])))}</td>"
-        f"<td>{_html(', '.join(item.get('channels', [])))}</td>"
-        "</tr>"
+        "<button class=\"seat-row\" type=\"button\" data-seat=\""
+        f"{_html(str(item.get('principal', '')))}\">"
+        f"<strong>{_html(str(item.get('principal', '')))}</strong>"
+        f"<span>{_html(str(item.get('role', '')))}</span>"
+        f"<small>{_html(', '.join(item.get('tool_names', [])))}</small>"
+        "</button>"
         for item in state.get("seat_contexts", [])
     )
-    surfaces = "".join(f"<li>{_html(str(item))}</li>" for item in state.get("open_surfaces", []))
-    properties = "".join(f"<li>{_html(str(item))}</li>" for item in state.get("bound_properties", []))
+    surfaces = "".join(f"<button class=\"chip\" type=\"button\">{_html(str(item))}</button>" for item in state.get("open_surfaces", []))
+    properties = "".join(f"<span class=\"property\">{_html(str(item))}</span>" for item in state.get("bound_properties", []))
     findings = "".join(
         "<tr>"
         f"<td>{_html(str(item.get('status', '')))}</td>"
@@ -528,34 +635,79 @@ def render_workbench_html(state: dict[str, Any]) -> str:
         f"<tr><th>{_html(str(name))}</th><td><code>{_html(str(command))}</code></td></tr>"
         for name, command in state.get("commands", {}).items()
     )
+    state_json = _json_script(state)
     return (
         "<!doctype html>\n"
         "<html><head><meta charset=\"utf-8\"><title>Open Agent Range Workbench</title>"
         "<style>"
-        ":root{color-scheme:light;background:#f7f7f4;color:#171716}"
-        "body{font-family:Inter,Segoe UI,system-ui,sans-serif;margin:0;line-height:1.45}"
-        "header{background:#17201b;color:#fff;padding:28px 36px}"
-        "main{padding:28px 36px;max-width:1180px;margin:auto}"
-        "h1{font-size:30px;margin:0 0 8px}h2{font-size:18px;margin:28px 0 12px}"
-        ".sub{color:#cbd8d0;margin:0}.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:18px 0}"
-        ".metric{background:#fff;border:1px solid #d8d8d2;padding:12px}.metric span{display:block;color:#686861;font-size:12px}.metric strong{font-size:20px}"
-        "table{border-collapse:collapse;width:100%;background:#fff}th,td{border:1px solid #d8d8d2;padding:8px 10px;text-align:left;vertical-align:top}"
-        "th{background:#ecece6}ul{columns:2;background:#fff;border:1px solid #d8d8d2;padding:14px 28px}code{white-space:pre-wrap}"
+        ":root{color-scheme:dark;--ink:#eef0e8;--muted:#9aa597;--line:#2b332b;--panel:#111711;--field:#0b100c;--accent:#d6ff57;--warn:#f4b860;--danger:#ff6b5f}"
+        "*{box-sizing:border-box}body{margin:0;background:#080b08;color:var(--ink);font-family:Bahnschrift,'Aptos',Segoe UI,sans-serif;line-height:1.45}"
+        "body:before{content:'';position:fixed;inset:0;pointer-events:none;background:linear-gradient(90deg,rgba(214,255,87,.05) 1px,transparent 1px),linear-gradient(rgba(214,255,87,.035) 1px,transparent 1px);background-size:48px 48px;mask-image:linear-gradient(#000,transparent 78%)}"
+        "header{padding:22px 28px;border-bottom:1px solid var(--line);background:#0d140f;position:sticky;top:0;z-index:2}"
+        "h1{font-size:24px;margin:0;letter-spacing:0}h2{font-size:14px;margin:0 0 12px;color:var(--accent);text-transform:uppercase}h3{font-size:13px;margin:18px 0 8px;color:var(--muted)}"
+        ".sub{color:var(--muted);margin:4px 0 0;font-family:Consolas,monospace;font-size:12px}.shell{display:grid;grid-template-columns:280px minmax(420px,1fr) 360px;gap:16px;padding:16px;position:relative}"
+        ".panel{background:rgba(17,23,17,.92);border:1px solid var(--line);padding:14px;min-width:0}.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0 0 14px}"
+        ".metric{border:1px solid var(--line);padding:10px;background:#0b100c}.metric span{display:block;color:var(--muted);font-size:11px}.metric strong{font-size:20px}"
+        ".seat-list{display:grid;gap:7px;max-height:530px;overflow:auto}.seat-row{width:100%;text-align:left;border:1px solid var(--line);background:#0b100c;color:var(--ink);padding:9px;cursor:pointer;transition:.16s border-color,.16s background}"
+        ".seat-row:hover,.seat-row.active{border-color:var(--accent);background:#17200f}.seat-row strong,.seat-row span,.seat-row small{display:block}.seat-row span,.seat-row small{color:var(--muted);font-size:11px}.seat-row small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"
+        ".surface-grid,.property-grid{display:flex;flex-wrap:wrap;gap:7px}.chip,.property{border:1px solid var(--line);background:#0b100c;color:var(--ink);padding:7px 8px;font-size:12px}.property{color:var(--accent)}"
+        "label{display:block;color:var(--muted);font-size:11px;margin:10px 0 5px}select,textarea,input{width:100%;background:var(--field);border:1px solid var(--line);color:var(--ink);padding:9px;font:12px Consolas,monospace}"
+        "textarea{min-height:120px;resize:vertical}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.btn{border:1px solid var(--accent);background:transparent;color:var(--accent);padding:8px 10px;cursor:pointer;font-weight:700}.btn.secondary{border-color:var(--line);color:var(--ink)}"
+        ".btn:hover{background:rgba(214,255,87,.12)}.calls{display:grid;gap:7px;margin-top:10px}.call{display:grid;grid-template-columns:24px 1fr auto;gap:8px;align-items:start;border:1px solid var(--line);background:#0b100c;padding:8px;font-family:Consolas,monospace;font-size:12px}"
+        ".call b{color:var(--accent)}.call button{background:transparent;color:var(--danger);border:0;cursor:pointer}pre,code{white-space:pre-wrap;word-break:break-word}pre{background:#050805;border:1px solid var(--line);padding:10px;min-height:54px;color:#dce7d8}"
+        "table{border-collapse:collapse;width:100%;background:#0b100c;font-size:12px}th,td{border:1px solid var(--line);padding:7px;text-align:left;vertical-align:top}th{color:var(--muted);font-weight:600}"
+        ".notice{border-left:3px solid var(--warn);padding:8px 10px;background:#171208;color:#ebdcc5;font-size:12px}.split{display:grid;grid-template-columns:1fr 1fr;gap:10px}.kbd{font-family:Consolas,monospace;color:var(--accent)}"
+        "@media (max-width:1100px){.shell{grid-template-columns:1fr}.panel{min-height:auto}.seat-list{max-height:260px}}"
         "</style></head><body>"
         "<header><h1>Open Agent Range Workbench</h1>"
-        f"<p class=\"sub\">{_html(str(state.get('world_path', '')))}</p></header><main>"
-        f"<section class=\"metrics\">{metrics}</section>"
-        "<h2>Seats</h2><table><tr><th>Principal</th><th>Role</th><th>Tools</th><th>Channels</th></tr>"
-        f"{seats}</table>"
-        "<h2>Open Injection Surfaces</h2><ul>"
-        f"{surfaces}</ul>"
-        "<h2>Bound Properties</h2><ul>"
-        f"{properties}</ul>"
-        "<h2>Finding Queue</h2><table><tr><th>Status</th><th>ID</th><th>Target</th><th>Path</th></tr>"
+        f"<p class=\"sub\">{_html(str(state.get('world_path', '')))}</p></header>"
+        "<main class=\"shell\" data-app=\"range-workbench\">"
+        "<section class=\"panel\"><h2>World Map</h2>"
+        f"<div class=\"metrics\">{metrics}</div>"
+        "<h3>Seats</h3><div class=\"seat-list\" id=\"seatList\">"
+        f"{seats}</div></section>"
+        "<section class=\"panel\"><h2>Manual Session Builder</h2>"
+        "<div class=\"notice\">Build a multi-step ToolCall session, then run the generated command from the repository root.</div>"
+        "<div class=\"split\"><div><label for=\"seatSelect\">Seat</label><select id=\"seatSelect\"></select></div><div><label for=\"toolSelect\">Tool</label><select id=\"toolSelect\"></select></div></div>"
+        "<label for=\"argsEditor\">Tool args JSON</label><textarea id=\"argsEditor\" spellcheck=\"false\"></textarea>"
+        "<div class=\"toolbar\"><button class=\"btn\" id=\"addCall\" type=\"button\">Add ToolCall</button><button class=\"btn secondary\" id=\"resetCalls\" type=\"button\">Reset</button><button class=\"btn secondary\" id=\"copyCommand\" type=\"button\">Copy command</button><button class=\"btn\" id=\"runSession\" type=\"button\">Run local API</button></div>"
+        "<div class=\"calls\" id=\"callList\"></div>"
+        "<h3>Command</h3><pre id=\"commandOutput\"></pre>"
+        "<h3>API Result</h3><pre id=\"apiResult\"></pre>"
+        "<h3>Tool Contract</h3><pre id=\"toolContract\"></pre>"
+        "<h3>Open Injection Surfaces</h3><div class=\"surface-grid\">"
+        f"{surfaces}</div><h3>Bound Properties</h3><div class=\"property-grid\">{properties}</div>"
+        "</section>"
+        "<aside class=\"panel\"><h2>Finding / A-B</h2>"
+        "<label for=\"targetInput\">Finding target</label><input id=\"targetInput\" value=\"mailbox:林工@dctg.local\">"
+        "<label for=\"payloadInput\">Payload note</label><textarea id=\"payloadInput\">synthetic red-team payload</textarea>"
+        "<div class=\"toolbar\"><button class=\"btn secondary\" id=\"makeFinding\" type=\"button\">Finding command</button><button class=\"btn secondary\" id=\"makeAb\" type=\"button\">A/B command</button></div>"
+        "<pre id=\"findingCommand\"></pre>"
+        "<h3>Finding Queue</h3><table><tr><th>Status</th><th>ID</th><th>Target</th><th>Path</th></tr>"
         f"{findings}</table>"
-        "<h2>Executable Commands</h2><table>"
-        f"{commands}</table>"
-        "</main></body></html>\n"
+        "<h3>Reference Commands</h3><table>"
+        f"{commands}</table></aside></main>"
+        f"<script>const RANGE_STATE={state_json};\n"
+        "const seats=RANGE_STATE.seat_contexts||[];const tools=RANGE_STATE.tools||[];const calls=[];"
+        "const byId=(id)=>document.getElementById(id);"
+        "const shellQuote=(s)=>String(s).includes(' ')?'\"'+String(s).replaceAll('\"','\\\\\"')+'\"':String(s);"
+        "const toolByName=(name)=>tools.find((tool)=>tool.name===name)||{};"
+        "function sampleValue(prop){if(!prop||typeof prop!=='object')return '...';if(prop.type==='array')return [];if(prop.type==='integer'||prop.type==='number')return 1;if(prop.type==='boolean')return true;if(prop.type==='object')return {};return '...';}"
+        "function sampleArgs(tool){const schema=(tool&&tool.input_schema)||{};const props=schema.properties||{};const out={};Object.keys(props).forEach((key)=>out[key]=sampleValue(props[key]));return out;}"
+        "function selectedSeat(){return seats.find((seat)=>seat.principal===byId('seatSelect').value)||seats[0]||{};}"
+        "function refreshSeatSelect(){byId('seatSelect').innerHTML=seats.map((seat)=>`<option>${seat.principal}</option>`).join('');}"
+        "function refreshTools(){const seat=selectedSeat();const allowed=seat.tool_names||[];byId('toolSelect').innerHTML=allowed.map((name)=>`<option>${name}</option>`).join('');refreshArgs();document.querySelectorAll('.seat-row').forEach((row)=>row.classList.toggle('active',row.dataset.seat===seat.principal));}"
+        "function refreshArgs(){const tool=toolByName(byId('toolSelect').value);byId('argsEditor').value=JSON.stringify(sampleArgs(tool),null,2);byId('toolContract').textContent=JSON.stringify(tool,null,2);}"
+        "function renderCalls(){byId('callList').innerHTML=calls.map((call,index)=>`<div class=\"call\"><b>${index+1}</b><span>${call.tool}<br>${JSON.stringify(call.args)}</span><button type=\"button\" data-remove=\"${index}\">x</button></div>`).join('');const command=`python -m kernel.range_cli manual-session --world ${shellQuote(RANGE_STATE.world_path)} --principal ${shellQuote(byId('seatSelect').value)} --calls-json '${JSON.stringify(calls)}' --sut-mode guard --out-dir .runtime/manual-session --json`;byId('commandOutput').textContent=command;}"
+        "function addCall(){let args;try{args=JSON.parse(byId('argsEditor').value||'{}')}catch(err){byId('commandOutput').textContent='Invalid JSON: '+err.message;return;}calls.push({tool:byId('toolSelect').value,args});renderCalls();}"
+        "function makeFinding(){const target=byId('targetInput').value;const payload=byId('payloadInput').value;byId('findingCommand').textContent=`python -m kernel.range_cli init-finding --world ${shellQuote(RANGE_STATE.world_path)} --target ${shellQuote(target)} --payload ${shellQuote(payload)} --task-prompt ${shellQuote('red-team manual session')}`;}"
+        "function makeAb(){byId('findingCommand').textContent='python -m kernel.range_cli run-ab --finding <finding.json> --sut-mode null,xaguard --repeat 3 --live --execute --out-dir .runtime/ab';}"
+        "async function runSession(){if(location.protocol==='file:'){byId('apiResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}if(!calls.length){byId('apiResult').textContent='Add at least one ToolCall first.';return;}byId('apiResult').textContent='Running...';try{const response=await fetch('/api/manual-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({principal:byId('seatSelect').value,calls,sut_mode:'guard'})});const data=await response.json();byId('apiResult').textContent=JSON.stringify(data,null,2);}catch(err){byId('apiResult').textContent='API error: '+err.message;}}"
+        "document.addEventListener('click',(event)=>{const idx=event.target.dataset&&event.target.dataset.remove;if(idx!==undefined){calls.splice(Number(idx),1);renderCalls();}});"
+        "byId('seatSelect').addEventListener('change',refreshTools);byId('toolSelect').addEventListener('change',refreshArgs);byId('addCall').addEventListener('click',addCall);byId('resetCalls').addEventListener('click',()=>{calls.length=0;renderCalls();});byId('makeFinding').addEventListener('click',makeFinding);byId('makeAb').addEventListener('click',makeAb);byId('runSession').addEventListener('click',runSession);byId('copyCommand').addEventListener('click',()=>navigator.clipboard&&navigator.clipboard.writeText(byId('commandOutput').textContent));"
+        "document.querySelectorAll('.seat-row').forEach((row)=>row.addEventListener('click',()=>{byId('seatSelect').value=row.dataset.seat;refreshTools();}));"
+        "refreshSeatSelect();refreshTools();renderCalls();makeFinding();</script>"
+        "</body></html>\n"
     )
 
 
@@ -712,6 +864,10 @@ def _html(value: str) -> str:
         .replace(">", "&gt;")
         .replace('"', "&quot;")
     )
+
+
+def _json_script(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
 
 
 if __name__ == "__main__":
