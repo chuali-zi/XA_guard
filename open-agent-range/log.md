@@ -1,5 +1,13 @@
 # 工作日志
 
+## 2026-07-07 05:44 Workbench review/promote 本地 API 闭环
+
+- **背景/目标**：继续推进 `Rawls` review 指出的 Workbench P0 产品形态缺口。上一轮已经能在浏览器内保存 finding、跑 A/B 和读 summary，但 review/promote 仍需要回到 CLI，红队 finding 生命周期还不完整。
+- **本轮做了什么**：`range_cli workbench serve` 新增 `/api/review-finding` 与 `/api/promote-finding`。这两个 API 直接包装现有 `kernel.workbench review-finding` 和 `promote`，因此复用已有 review 字段、promotion evidence gate、challenge JSON 结构和 finding 状态更新。页面新增 review notes、Review reproduced、Review rejected、Promote、challenge path、force promote 控件。
+- **外部复核结论**：`gpt-5.5/xhigh` 只读子 agent `Sagan` 完成 review，结论仍是 **不完全符合 PRD**。它确认 review/promote API 是真实进展，但 P0 仍是 full-day scripted baseline、XA-Guard live 非 attempt 级长生命周期、缺 N>=3 live null vs xaguard 证据矩阵、Gate6 audit 与 range ledger 未逐工具尝试/裁决/副作用深度对齐，以及 Workbench 仍非完整 Web 沙盘。
+- **测试/验证**：`python -m pytest kernel/tests/test_range_cli.py -q` 通过（14 个用例）；`python -m pytest kernel/tests/test_workbench.py -q` 通过（19 个用例）；完整 `python -m pytest kernel/tests -q` 通过（116 个用例）。手工 smoke：`python -m kernel.range_cli workbench serve --world scenarios\dctg\full-day.json --out-dir .runtime\workbench-promote-api-smoke --no-server --json` 通过；抽取页面 `<script>` 后 `node --check` 通过；临时 runtime 产物已清理。
+- **仍未完成**：浏览器内 finding 生命周期已能走 save/list/A-B/show/review/promote，但仍缺真正地图画布、多注入编排、证据并排审核、完整 replay/report dashboard、真实 live N>=3、长程 observe-plan-act 和 XA-Guard 长生命周期在环。
+
 ## 2026-07-07 01:11 Workbench finding 持久编辑与注入面选择
 
 - **背景/目标**：继续推进 `Hubble` review 指出的 Workbench P0 产品形态缺口。上一轮浏览器已能执行 manual-session、A/B 和读取 evidence summary，但 finding 仍主要靠命令文本创建，开放注入面按钮也没有真正驱动 target 编辑。

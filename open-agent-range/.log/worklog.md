@@ -1,5 +1,13 @@
 # open-agent-range 工作日志
 
+## 2026-07-07 05:44 Workbench review/promote local API loop
+- Continued the PRD product-shape work after the `Rawls` review. The concrete gap addressed here: browser Workbench could save findings, run A/B, and read summaries, but review/promote still required returning to the CLI.
+- Added `/api/review-finding` and `/api/promote-finding` to `range_cli workbench serve`. These APIs invoke existing `kernel.workbench review-finding` and `promote`, so they reuse review fields, the promotion evidence gate, challenge JSON structure, and finding status updates.
+- Updated the generated Workbench HTML with review notes, `Review reproduced`, `Review rejected`, `Promote`, challenge path, and force-promote controls.
+- Requested review: the `gpt-5.5` / `xhigh` read-only subagent `Sagan` completed and still judged the range not fully PRD-compliant. It acknowledged the review/promote APIs as real progress, but kept P0 gaps around scripted full-day baseline behavior, non-long-lived XA-Guard live, missing N>=3 live null-vs-xaguard evidence, missing Gate6/range-ledger per-tool deep alignment, and an incomplete Web range.
+- Verification: `python -m pytest kernel/tests/test_range_cli.py -q` passed with 14 tests; `python -m pytest kernel/tests/test_workbench.py -q` passed with 19 tests; full `python -m pytest kernel/tests -q` passed with 116 tests. Smoke `python -m kernel.range_cli workbench serve --world scenarios\dctg\full-day.json --out-dir .runtime\workbench-promote-api-smoke --no-server --json` passed, and the extracted page script passed `node --check`. Temporary runtime output was removed.
+- Still incomplete: browser finding lifecycle now covers save/list/A-B/show/review/promote, but this is still not a true map canvas, multi-injection orchestration, side-by-side evidence review, full replay/report dashboard, live N>=3 matrix, long-running observe-plan-act seat runtime, or long-lived XA-Guard session.
+
 ## 2026-07-07 01:11 Workbench finding persistence and surface selection
 - Continued the PRD product-shape work after the `Hubble` review. The concrete gap addressed here: browser Workbench could run manual-session/A-B/show evidence, but finding creation/editing was still mostly command text and the open injection-surface map buttons did not drive the finding target.
 - Added `/api/save-finding` and `/api/list-findings` to `range_cli workbench serve`. `save-finding` creates or updates a finding JSON under `findings_dir` using the existing finding schema while preserving `last_ab_summary`, challenge metadata, and creation time. `list-findings` returns editable fields such as payload, task_prompt, notes, and last_ab_summary.

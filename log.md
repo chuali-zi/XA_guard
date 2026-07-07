@@ -1,3 +1,10 @@
+# 2026-07-07 05:51 -07:00 Open Agent Range xhigh review after review/promote API
+
+- 按用户要求启动 `gpt-5.5/xhigh` 只读子 agent `Sagan` 复核 `open-agent-range/` 当前靶场形态，重点审视新增 Workbench `/api/review-finding` 与 `/api/promote-finding` 后是否已达到“真实政企一天 + 完全自由红队靶场”。
+- 结论仍是 **不完全符合 PRD/SP7**。Sagan 确认 review/promote API 已实装并复用 promotion evidence gate，但认为当前仍只是“可运行、可演示、可固化 finding 的开放靶场竖切”。
+- 主要 P0 差距：full-day 仍偏 scripted baseline；XA-Guard live 不是 attempt 级长生命周期 session；缺 N>=3 live null vs xaguard 证据矩阵；Gate6 audit 与 range ledger 未逐工具尝试/裁决/副作用深度 hash/seq 对齐；Workbench 仍缺地图、多注入编排、证据并排审阅和 replay/report dashboard。
+- 下一步建议被记录为硬验收闭环：`range run-ab --finding <reviewed> --sut-mode null,xaguard --repeat 3 --live` 稳定产出双侧 evidence，并让 promote gate 默认要求 reviewed + N>=3 + live xaguard + Gate6/range ledger 对齐通过，然后再替换 full-day scripted plans 为可插拔 observe-plan-act seat loop。
+
 # 2026-07-07 R8 外部 AIBOM/CycloneDX 实跑落地（BLOCKED → PASS）
 
 - 落实 R8 证据：本机安装并运行合法开源外部工具 `@cyclonedx/cdxgen@12.7.0`（Apache-2.0），扫描 `docs/acceptance/r8-aibom-external/samples/python-ai-plugin/`，真实生成 CycloneDX `specVersion: "1.6"` 产物（32 组件，SHA-256 `6a43e3a3…1db100`）。npm/npx 经 Clash mixed 代理 `http://127.0.0.1:7897` 访问 registry（fake-ip 环境，直连失败）。
@@ -7,6 +14,13 @@
 - 证据：`D:/evidence/l3-r8-aibom-20260707T105519Z/`，仓内副本 `docs/acceptance/r8-aibom-external/evidence/l3-r8-aibom-20260707T105519Z/`（version/sha/import-result/commands/environment/artifact-hashes）。结果记 `docs/acceptance/r8-aibom-external/RESULTS.md`；README 与 L3 状态同步更新。
 - 验证：`python -m pytest tests/unit/test_aibom_schema_validator.py tests/unit/test_aibom_external_generator.py -q` 全绿。
 - 仍不宣称：marketplace/IDE 安装链、完整 AI-BOM 全字段覆盖仍缺；`npx --yes`+代理不作为生产供应链策略。
+
+# 2026-07-07 05:44 -07:00 Open Agent Range Workbench review/promote API
+
+- 继续推进 `open-agent-range/` 的 Workbench 产品闭环。本轮把浏览器内 finding 生命周期从 save/list/A-B/show evidence 延伸到 review/promote。
+- 新增 `/api/review-finding` 与 `/api/promote-finding`，直接包装现有 `kernel.workbench review-finding` 和 `promote`，复用 review 字段、promotion evidence gate、challenge JSON 结构和 finding 状态更新。页面新增 review notes、`Review reproduced`、`Review rejected`、`Promote`、challenge path、force promote 控件。
+- 验证：`python -m pytest kernel/tests/test_range_cli.py -q` 14 passed；`python -m pytest kernel/tests/test_workbench.py -q` 19 passed；`python -m pytest kernel/tests -q` 116 passed。`workbench serve --no-server` smoke 通过，抽取页面脚本后 `node --check` 通过；临时 runtime 产物已清理。
+- 未完成：浏览器内 finding 生命周期已覆盖 save/list/A-B/show/review/promote，但仍不是完整自由红队靶场；还缺真正地图画布、多注入编排、证据并排审核、完整 replay/report dashboard、真实 live N>=3、长程 observe-plan-act 和 XA-Guard 长生命周期在环。
 
 # 2026-07-07 01:11 -07:00 Open Agent Range Workbench finding 持久编辑
 
