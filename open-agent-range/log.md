@@ -1,5 +1,14 @@
 # 工作日志
 
+## 2026-07-07 07:58 ReactiveSeat observe-plan-act 与 agent transcript
+
+- **背景/目标**：继续推进 `Singer` / 前序 review 指出的 P0：full-day 正常日仍偏 `scripted_plans_for_scenario()` 一次性固定计划，不是全席位 observe-plan-act。
+- **本轮做了什么**：新增 `ReactiveSeat` 并接入 `range day --agent reactive` / `kernel.demo --agent reactive`。该 seat 不一次性返回整天计划，而是先观察通道/业务对象，再通过 `on_tool_result()` 基于工具结果回调逐步生成下一步 ToolCall；full-day reactive 路径覆盖林工、报销审批支付、运维审批重启、Atlas、合同、CI/插件、治理策略例外、审计导出等关键链路。
+- **证据标准修正**：根据 `Singer` 指出的 SP7 证据命名缺口，所有带 seat events 的 attempt 现在写 `agent-transcript.jsonl` 和 `seat-events.jsonl`；OpenCode seat 仍额外保留 `opencode-events.jsonl`。Reactive 证据不再写误导性的 `opencode-events.jsonl`。
+- **外部复核结论**：按要求启动 `gpt-5.5/xhigh` 只读子 agent `Singer`。它仍判定不完全符合 PRD：ReactiveSeat 是真实进步，但仍是 deterministic 状态机，不是 live agent / ManualSeat 任意长度自主行为；完成态仍缺 opencode/xaguard/live N>=3 证据矩阵、长生命周期 XA-Guard、地图/多注入编排和完整 dashboard。
+- **测试/验证**：`python -m pytest kernel/tests -q` 通过（120 个用例）；`python -m kernel.range_cli day --world scenarios\dctg\full-day.json --agent reactive --sut null --evidence-dir .runtime\reactive-day-smoke` 通过，账本 43 条、工具尝试 41 次、零违规；随后 `replay --verify-hashes --verify-ledger --verify-sut-audit --json` 通过，artifact hash 15 项，含 `agent-transcript.jsonl`。
+- **仍未完成**：这只是把正常日从“一次性脚本计划”推进到“本地分步状态机”；下一步仍应推进真实 OpenCode/full-day agent loop、XA-Guard 长生命周期 live、`null,xaguard --live --repeat >=3` 矩阵和完整红队 Web 沙盘。
+
 ## 2026-07-07 07:45 Workbench Run Catalog 与 run selector
 
 - **背景/目标**：继续推进 `Avicenna`/前序 review 指出的 Workbench 产品形态缺口。上一轮已有 Evidence Review 明细展开，但红队仍缺浏览器内 run selector 和跨 run 统计入口，需要能从已有 A/B evidence 中选择任意 run 审阅。

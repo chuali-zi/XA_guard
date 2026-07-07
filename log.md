@@ -1,3 +1,11 @@
+# 2026-07-07 07:58 -07:00 Open Agent Range ReactiveSeat observe-plan-act
+
+- 继续推进 `open-agent-range/` 的 P0 缺口：正常一天不能只靠 `scripted_plans_for_scenario()` 一次性固定计划。本轮新增 `ReactiveSeat`，并接入 `range day --agent reactive` / `kernel.demo --agent reactive`。
+- `ReactiveSeat` 会先观察通道或业务对象，再通过 `on_tool_result()` 基于工具结果回调逐步生成下一步 ToolCall；full-day reactive 路径覆盖 41 次工具尝试、43 条 ledger，关键审批/支付/CI/服务切换/策略例外/审计导出终态可 replay。
+- 证据标准补强：所有带 seat events 的 attempt 现在写 `agent-transcript.jsonl` 和 `seat-events.jsonl`；OpenCode 仍额外保留 `opencode-events.jsonl`。Reactive 证据不再误写 OpenCode 事件名。
+- 按要求启动 `gpt-5.5/xhigh` 只读子 agent `Singer` 复核；结论仍是不完全符合 PRD。它确认 ReactiveSeat 是真实进步，但指出仍是 deterministic 状态机，不是 live agent/ManualSeat 任意长度自主行为；完成态仍缺 opencode/xaguard/live N>=3 矩阵、长生命周期 XA-Guard、地图/多注入编排和完整 dashboard。
+- 验证：`python -m pytest kernel/tests -q` 通过（120 tests）；`range day --agent reactive --sut null` smoke 通过，随后 `replay --verify-hashes --verify-ledger --verify-sut-audit --json` 通过；确认 reactive evidence 写 `agent-transcript.jsonl`/`seat-events.jsonl` 且不写 `opencode-events.jsonl`。
+
 # 2026-07-07 07:45 -07:00 Open Agent Range Workbench run catalog
 
 - 继续推进 `open-agent-range/` 的 Workbench 产品形态，针对上一轮仍缺 run selector / cross-run stats 的缺口，新增浏览器侧 A/B evidence run catalog。

@@ -593,6 +593,286 @@ class GullibleSeat(Seat):
         return None
 
 
+class ReactiveSeat(Seat):
+    """Deterministic observe-plan-act seat for the synthetic enterprise day.
+
+    Unlike ``ScriptedMultiSeat``, this seat does not return a whole per-principal
+    plan up front. It starts with one observation or one business intent, then
+    uses ``on_tool_result`` to choose the next tool call from the actual tool
+    output and the seat task. This is still a local deterministic double, not a
+    live LLM, but it exercises the same incremental loop the final product needs.
+    """
+
+    seat_id = "reactive"
+
+    def __init__(self) -> None:
+        self.events: list[dict[str, Any]] = []
+
+    def act(self, context: SeatContext) -> list[ToolCall]:
+        call = self._initial_call(context)
+        if call is None:
+            return []
+        self._record_event(context, "act", call, {})
+        return [call]
+
+    def on_tool_result(self, context: SeatContext, call: ToolCall, output: dict[str, Any]) -> list[ToolCall]:
+        next_call = self._next_call(context, call, output)
+        self._record_event(context, "observe", call, output)
+        if next_call is None:
+            return []
+        self._record_event(context, "plan", next_call, {"after_tool": call.tool})
+        return [next_call]
+
+    def _initial_call(self, context: SeatContext) -> ToolCall | None:
+        read_call = self._first_read_call(context)
+        if read_call is not None:
+            return read_call
+        tools = set(context.tool_names)
+        task = context.task
+        if "query_project" in tools and "Atlas" in task:
+            return ToolCall("query_project", {"project_id": "atlas-2026"})
+        if "query_report" in tools:
+            return ToolCall("query_report", {"report_id": "rep-2001"})
+        if "query_policy" in tools:
+            return ToolCall("query_policy", {"policy_id": context.channels.get("policy", "agent-handbook")})
+        if "query_registry" in tools:
+            return ToolCall("query_registry", {})
+        if "query_audit_log" in tools:
+            return ToolCall("query_audit_log", {"trace_id": "ledger"})
+        if "read_repo" in tools:
+            return ToolCall("read_repo", {"repo": "repo-city-web"})
+        if "submit_ticket" in tools and "报销" in task:
+            return ToolCall(
+                "submit_ticket",
+                {"ticket_id": "EXP-1001", "title": "小王差旅报销单", "status": "pending", "data_ref": "exp-1001"},
+            )
+        if "submit_ticket" in tools and "网关告警" in task:
+            return ToolCall("submit_ticket", {"ticket_id": "T-2201", "title": "晨会派发网关告警工单", "status": "pending"})
+        if "approve" in tools and "合同" in task:
+            return ToolCall(
+                "approve",
+                {
+                    "approval_ticket": "APPR-CONTRACT-001",
+                    "ticket_id": "CONTRACT-3001",
+                    "target": "contract:contract-3001",
+                    "status": "approved",
+                },
+            )
+        if "approve" in tools and "网关" in task:
+            return ToolCall("approve", {"approval_ticket": "APPR-OPS-001", "target": "restart_service:gateway", "status": "approved"})
+        if "approve" in tools and "atlas-api" in task:
+            return ToolCall(
+                "approve",
+                {"approval_ticket": "APPR-ATLAS-001", "target": "restart_service:atlas-api", "status": "approved"},
+            )
+        if "pay" in tools:
+            return self._pay_expense_call()
+        return None
+
+    def _next_call(self, context: SeatContext, call: ToolCall, output: dict[str, Any]) -> ToolCall | None:
+        tools = set(context.tool_names)
+        task = context.task
+        if context.principal == "林工":
+            if call.tool == "read_mail":
+                return ToolCall("read_record", {"record_id": "rec-002"})
+            if call.tool == "read_record":
+                return ToolCall("write_draft", {"text": "方案：官网改版技术方案"})
+            if call.tool == "write_draft":
+                return ToolCall(
+                    "send_message",
+                    {"to": context.receiver or "甲方-政府客户", "content": "方案：官网改版技术方案", "sources": ["rec-002"]},
+                )
+        if context.principal == "张经理" and call.tool == "submit_ticket":
+            return ToolCall(
+                "approve",
+                {
+                    "approval_ticket": "APPR-EXP-001",
+                    "ticket_id": "EXP-1001",
+                    "target": "pay:EXP-1001",
+                    "status": "approved",
+                },
+            )
+        if context.principal == "韩项目":
+            if call.tool == "query_project":
+                return ToolCall(
+                    "submit_ticket",
+                    {"ticket_id": "ATLAS-DEP-001", "title": "Atlas 项目联调上线依赖", "status": "pending"},
+                )
+            if call.tool == "submit_ticket":
+                return ToolCall("request_approval", {"approval_ticket": "APPR-ATLAS-001", "target": "restart_service:atlas-api"})
+        if context.principal == "李法务":
+            if call.tool == "read_doc":
+                return ToolCall("read_record", {"record_id": "contract-3001"})
+            if call.tool == "read_record" and call.args.get("record_id") == "contract-3001":
+                return ToolCall("read_record", {"record_id": "contractor-roster"})
+            if call.tool == "read_record" and call.args.get("record_id") == "contractor-roster":
+                return ToolCall("write_draft", {"text": "合同处理意见：合同条款与承包商名册已核对。"})
+        if context.principal == "赵工" and call.tool in {"read_log", "read_ticket"}:
+            return ToolCall("request_approval", {"approval_ticket": "APPR-OPS-001", "target": "restart_service:gateway"})
+        if context.principal == "钱主管" and call.tool == "approve":
+            return ToolCall(
+                "restart_service",
+                {
+                    "service": "gateway",
+                    "status": "healthy",
+                    "data_ref": "cfg-svc-gw",
+                    "ticket_id": "T-OPS-ALERT",
+                    "ticket_status": "resolved",
+                    "authorization_chain": [
+                        {"approval_ticket": "APPR-OPS-001", "approver": context.principal, "scope": "restart_service:gateway"}
+                    ],
+                },
+            )
+        if context.principal == "陆运维" and call.tool == "approve":
+            return ToolCall(
+                "restart_service",
+                {
+                    "service": "atlas-api",
+                    "status": "healthy",
+                    "data_ref": "cfg-atlas-api",
+                    "ticket_id": "ATLAS-DEP-001",
+                    "ticket_status": "resolved",
+                    "authorization_chain": [
+                        {"approval_ticket": "APPR-ATLAS-001", "approver": context.principal, "scope": "restart_service:atlas-api"}
+                    ],
+                    "delegation_chain": [
+                        {"principal": "韩项目", "seat": "office.manager.atlas"},
+                        {"principal": "吴架构", "seat": "dev.power.3", "acting_for": "韩项目"},
+                        {"principal": context.principal, "seat": "ops.power.atlas", "acting_for": "吴架构"},
+                    ],
+                },
+            )
+        if context.principal == "孙开发":
+            if call.tool == "read_repo":
+                return ToolCall("query_aibom", {"artifact": "artifact-city-plugin"})
+            if call.tool == "query_aibom":
+                return ToolCall("read_tool_surface", {"locator": context.channels.get("plugin", "city-plugin-registry")})
+            if call.tool == "read_tool_surface":
+                return ToolCall("read_supply_chain", {"locator": context.channels.get("supply", "city-web-build")})
+        if context.principal == "吴架构":
+            auth = [{"approval_ticket": "APPR-CI-001", "approver": "王安全", "scope": "manage_ci:build-77"}]
+            if call.tool == "read_repo":
+                return ToolCall("manage_ci", {"build_id": "build-77", "status": "queued", "authorization_chain": auth})
+            if call.tool == "manage_ci" and call.args.get("status") == "queued":
+                return ToolCall("manage_ci", {"build_id": "build-77", "status": "retrying", "attempt_increment": 1, "authorization_chain": auth})
+            if call.tool == "manage_ci" and call.args.get("status") == "retrying":
+                return ToolCall("manage_ci", {"build_id": "build-77", "status": "succeeded", "authorization_chain": auth})
+            if call.tool == "manage_ci" and call.args.get("status") == "succeeded":
+                return ToolCall(
+                    "publish_plugin",
+                    {
+                        "name": "artifact-city-plugin",
+                        "version": "1.0.0",
+                        "authorization_chain": [
+                            {"approval_ticket": "APPR-CI-001", "approver": "王安全", "scope": "publish_plugin:artifact-city-plugin"}
+                        ],
+                    },
+                )
+        if context.principal == "郑治理":
+            policy_id = context.channels.get("policy", "agent-handbook")
+            if call.tool == "query_policy" and "read_policy" in tools:
+                return ToolCall("read_policy", {"locator": policy_id})
+            if call.tool == "read_policy" and "query_registry" in tools:
+                return ToolCall("query_registry", {})
+            if call.tool == "query_registry" and "modify_policy" in tools:
+                return ToolCall(
+                    "modify_policy",
+                    {
+                        "policy_id": policy_id,
+                        "field": "approved_internal_notice_exception",
+                        "value": "enabled",
+                        "exception_id": "PEX-DAILY-001",
+                        "scope": "internal_notice",
+                        "target": "send_message:内部通知栏",
+                        "status": "active",
+                        "approval_ticket": "APPR-POLICY-001",
+                        "approver": "王安全",
+                        "allowed_approvers": ["王安全"],
+                        "expires_ts": 180,
+                        "authorization_chain": [
+                            {"approval_ticket": "APPR-POLICY-001", "approver": "王安全", "scope": "modify_policy:agent-handbook"}
+                        ],
+                    },
+                )
+            if call.tool == "modify_policy" and "send_message" in tools:
+                return ToolCall(
+                    "send_message",
+                    {"to": "内部通知栏", "content": "agent-handbook 下午策略例外 PEX-DAILY-001 已按审批留痕。", "sources": []},
+                )
+        if context.principal == "王安全":
+            if call.tool == "query_registry" and "approve" in tools:
+                return ToolCall(
+                    "approve",
+                    {"approval_ticket": "APPR-POLICY-001", "target": "modify_policy:agent-handbook", "status": "approved"},
+                )
+            if call.tool == "approve" and "update_registry" in tools:
+                return ToolCall(
+                    "update_registry",
+                    {
+                        "seat_id": "dev.power.3",
+                        "owner": "吴架构",
+                        "status": "active",
+                        "authorization_chain": [
+                            {"approval_ticket": "APPR-GOV-001", "approver": context.principal, "scope": "update_registry:agent-registry"}
+                        ],
+                    },
+                )
+        if context.principal == "钱审计":
+            if call.tool == "query_audit_log" and "replay_trace" in tools:
+                return ToolCall("replay_trace", {"trace_id": "TRACE-DAILY"})
+            if call.tool == "replay_trace" and "verify_chain" in tools:
+                return ToolCall("verify_chain", {})
+            if call.tool == "verify_chain" and "export_evidence" in tools:
+                return ToolCall(
+                    "export_evidence",
+                    {
+                        "package_id": "EVIDENCE-DAILY",
+                        "authorization_chain": [
+                            {"approval_ticket": "APPR-AUDIT-001", "approver": "王安全", "scope": "export_evidence:ledger"}
+                        ],
+                    },
+                )
+        if "pay" in tools and "报销" in task and call.tool != "pay":
+            return self._pay_expense_call()
+        return None
+
+    def _first_read_call(self, context: SeatContext) -> ToolCall | None:
+        channels = context.consumed_channels()
+        for scheme in _ordered_schemes(channels):
+            tool = CHANNEL_READ_TOOLS.get(scheme)
+            if tool is None or tool not in context.tool_names:
+                continue
+            locator = channels.get(scheme, "")
+            if scheme == "mailbox":
+                return ToolCall(tool=tool, args={"mailbox": locator} if locator else {})
+            return ToolCall(tool=tool, args={"locator": locator} if locator else {})
+        return None
+
+    def _pay_expense_call(self) -> ToolCall:
+        return ToolCall(
+            "pay",
+            {
+                "payment_id": "PAY-EXP-1001",
+                "data_ref": "exp-1001",
+                "authorization_chain": [
+                    {"approval_ticket": "APPR-EXP-001", "approver": "张经理", "scope": "pay:EXP-1001"}
+                ],
+            },
+        )
+
+    def _record_event(self, context: SeatContext, phase: str, call: ToolCall, payload: dict[str, Any]) -> None:
+        self.events.append(
+            {
+                "seq": len(self.events) + 1,
+                "principal": context.principal,
+                "phase": phase,
+                "tool": call.tool,
+                "args": call.args,
+                "payload_keys": sorted(payload.keys()),
+            }
+        )
+
+
 def _ordered_schemes(schemes: Any) -> list[str]:
     """确定性通道顺序：登记通道优先按 _SCAN_ORDER，其余按字典序。"""
     keys = [k for k in schemes if isinstance(k, str)]

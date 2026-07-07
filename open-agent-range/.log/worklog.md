@@ -1,5 +1,13 @@
 # open-agent-range 工作日志
 
+## 2026-07-07 07:58 ReactiveSeat observe-plan-act and agent transcript
+- Continued the P0 product-shape work around the scripted full-day baseline. Added `ReactiveSeat` and exposed it through `range day --agent reactive` / `kernel.demo --agent reactive`.
+- `ReactiveSeat` starts with an observation or a first business intent, then uses `on_tool_result()` to enqueue the next ToolCall after the runner returns each real tool output. The full-day reactive path now covers key Office, Ops, Atlas, contract, CI/plugin, governance, and audit flows.
+- Fixed evidence semantics called out by the `Singer` review: attempts with seat events now write `agent-transcript.jsonl` and `seat-events.jsonl`; OpenCode still writes compatibility `opencode-events.jsonl`. Reactive evidence no longer uses the OpenCode-specific event filename.
+- Requested review: the `gpt-5.5` / `xhigh` read-only subagent `Singer` still found the range incomplete against the PRD. It confirmed ReactiveSeat is real progress, but still a deterministic state machine rather than a live long-running autonomous agent; P0 gaps remain opencode/xaguard/live N>=3 evidence, long-lived XA-Guard sessions, and a complete red-team Web sandbox.
+- Verification: full `python -m pytest kernel/tests -q` passed with 120 tests. `range day --agent reactive --sut null` smoke passed with 41 tool attempts, 43 ledger rows, zero violations, and replay/hash/ledger/audit verification passed. The evidence package included `agent-transcript.jsonl`.
+- Still incomplete: this moves normal-day execution from one-shot scripted plans to a local observe-plan-act loop, but it does not satisfy the final PRD completion gates.
+
 ## 2026-07-07 07:45 Workbench run catalog and run selector
 - Continued the PRD product-shape work by addressing a Workbench gap left after the Evidence Review detail expansion: the browser could compare an evidence path, but it did not yet discover existing A/B runs or provide a run selector / cross-run summary.
 - Added `evidence_roots`, `evidence_runs`, and `evidence_run_stats` to `build_workbench_state()`. Added `/api/list-runs`, which scans real A/B `summary.json` files and returns a run catalog, run options, null/protected leak counts, protection delta, and protected infra-error counts.

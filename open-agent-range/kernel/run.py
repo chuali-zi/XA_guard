@@ -256,7 +256,11 @@ def _write_evidence(
     store.write_jsonl("timeline.jsonl", _timeline_rows(schedule_ticks, ledger, sut, attempts))
     seat_events = getattr(seat, "events", None)
     if seat_events:
-        store.write_jsonl("opencode-events.jsonl", list(seat_events))
+        rows = list(seat_events)
+        store.write_jsonl("agent-transcript.jsonl", rows)
+        store.write_jsonl("seat-events.jsonl", rows)
+        if seat.seat_id == "opencode":
+            store.write_jsonl("opencode-events.jsonl", rows)
     store.write_jsonl(
         "audit.jsonl",
         [{"tool": a.tool, "decision": a.decision, "reason": a.reason} for a in sut.audit],

@@ -8,7 +8,7 @@ from kernel.demo import reference_surface, scripted_plans_for_scenario
 from kernel.oracle import OracleSpec
 from kernel.run import run_attempt
 from kernel.scenario import Scenario, load_scenario
-from kernel.seat import ScriptedMultiSeat, ScriptedSeat, SeatContext
+from kernel.seat import ReactiveSeat, ScriptedMultiSeat, ScriptedSeat, SeatContext
 from kernel.sut import NullSUT, ToolCall
 
 SCENARIOS = Path(__file__).resolve().parents[2] / "scenarios"
@@ -115,3 +115,36 @@ def test_multi_seat_tool_calls_are_interleaved_by_business_tick() -> None:
         ("Alice", 6),
     ]
     assert result.ledger.verify_hash_chain()
+
+
+def test_full_day_reactive_seat_observes_then_plans_key_business_flows() -> None:
+    scenario = load_scenario(FULL_DAY)
+    seat = ReactiveSeat()
+
+    result = run_attempt(
+        scenario,
+        reference_surface(),
+        seat,
+        NullSUT(),
+    )
+
+    assert result.ledger.verify_hash_chain()
+    assert result.violations == []
+    assert result.verdict.passed
+    assert len(result.attempts) > 20
+    assert any(event["phase"] == "observe" for event in seat.events)
+    assert any(event["phase"] == "plan" for event in seat.events)
+    assert any(event["principal"] == "林工" and event["phase"] == "plan" and event["tool"] == "send_message" for event in seat.events)
+
+    queues = result.world.domain_state["queues"]
+    approval_statuses = {item["id"]: item["status"] for item in queues["approval"]}
+    assert approval_statuses["APPR-EXP-001"] == "approved"
+    assert approval_statuses["APPR-POLICY-001"] == "approved"
+    assert {item["id"]: item["status"] for item in queues["ticket"]}["ATLAS-DEP-001"] == "resolved"
+    assert {item["id"]: item["status"] for item in queues["ci"]}["build-77"] == "succeeded"
+    assert result.world.domain_state["services"]["gateway"]["status"] == "healthy"
+    assert result.world.domain_state["services"]["atlas-api"]["status"] == "healthy"
+    replay = result.ledger.replay(result.world)
+    assert replay["payments"]["PAY-EXP-1001"]["status"] == "paid"
+    assert replay["policy_exceptions"]["PEX-DAILY-001"]["approval_ticket"] == "APPR-POLICY-001"
+    assert replay["queues"]["audit"]["EVIDENCE-DAILY"]["status"] == "exported"

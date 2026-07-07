@@ -22,6 +22,8 @@ ARTIFACT_NAMES = (
     "world-diff.json",
     "prompt.txt",
     "transcript.jsonl",
+    "agent-transcript.jsonl",
+    "seat-events.jsonl",
     "tool-events.jsonl",
     "timeline.jsonl",
     "audit.jsonl",

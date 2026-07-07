@@ -71,6 +71,43 @@ def test_day_repeat_writes_numbered_attempts(tmp_path: Path, capsys) -> None:
     assert summary["runs"][1]["attempt_dir"].endswith("run-002")
 
 
+def test_day_reactive_agent_writes_observe_plan_act_evidence(tmp_path: Path, capsys) -> None:
+    out = tmp_path / "reactive-day"
+
+    assert (
+        range_cli.main(
+            [
+                "day",
+                "--world",
+                str(FULL_DAY),
+                "--agent",
+                "reactive",
+                "--sut",
+                "null",
+                "--evidence-dir",
+                str(out),
+            ]
+        )
+        == 0
+    )
+    summary = json.loads(capsys.readouterr().out)
+    events = [json.loads(line) for line in (out / "seat-events.jsonl").read_text(encoding="utf-8").splitlines()]
+    transcript = [
+        json.loads(line) for line in (out / "agent-transcript.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    replay = json.loads((out / "ledger-replay.json").read_text(encoding="utf-8"))
+
+    assert summary["agent"] == "reactive"
+    assert summary["all_passed"] is True
+    assert summary["runs"][0]["tool_attempt_count"] > 20
+    assert transcript == events
+    assert any(event["phase"] == "observe" for event in events)
+    assert any(event["phase"] == "plan" and event["tool"] == "send_message" for event in events)
+    assert not (out / "opencode-events.jsonl").exists()
+    assert replay["payments"]["PAY-EXP-1001"]["status"] == "paid"
+    assert replay["queues"]["audit"]["EVIDENCE-DAILY"]["status"] == "exported"
+
+
 def test_day_opencode_multiround_repeat_writes_product_evidence(tmp_path: Path, capsys) -> None:
     out = tmp_path / "opencode-day"
     payload = {
@@ -121,6 +158,8 @@ def test_day_opencode_multiround_repeat_writes_product_evidence(tmp_path: Path, 
         assert manifest["seat_id"] == "opencode"
         assert manifest["opencode_multiround"] is True
         assert tools == ["read_mail", "read_record", "write_draft"]
+        assert (run_dir / "agent-transcript.jsonl").is_file()
+        assert (run_dir / "seat-events.jsonl").is_file()
         assert (run_dir / "opencode-events.jsonl").is_file()
 
 

@@ -26,7 +26,7 @@ from kernel.property_engine import build_engine
 from kernel.run import run_attempt
 from kernel.scheduler import current_tick
 from kernel.scenario import Scenario, load_injections, load_scenario, with_injections
-from kernel.seat import GullibleSeat, OpenCodeSeat, ScriptedMultiSeat, ScriptedSeat, Seat, SeatContext
+from kernel.seat import GullibleSeat, OpenCodeSeat, ReactiveSeat, ScriptedMultiSeat, ScriptedSeat, Seat, SeatContext
 from kernel.surface import ToolDefinition, ToolSurface
 from kernel.sut import NullSUT, ToolCall
 from kernel.world import CONFIDENTIAL, INTERNAL, DataAsset, Principal, Receiver, SideEffect
@@ -1414,6 +1414,8 @@ def build_seat(args: argparse.Namespace, scenario: Scenario | None = None) -> Se
         return ScriptedSeat(scripted_plan())
     if args.agent == "gullible":
         return GullibleSeat()
+    if args.agent == "reactive":
+        return ReactiveSeat()
     if args.agent == "opencode":
         return OpenCodeSeat(
             model=args.model,
@@ -1450,7 +1452,7 @@ def main(argv: list[str]) -> int:
         sys.stdout.reconfigure(encoding="utf-8")
 
     parser = argparse.ArgumentParser(description="Open Agent Range kernel demo")
-    parser.add_argument("--agent", choices=["scripted", "gullible", "opencode"], default="scripted")
+    parser.add_argument("--agent", choices=["scripted", "gullible", "reactive", "opencode"], default="scripted")
     parser.add_argument("--model", default="deepseek/deepseek-v4-flash")
     parser.add_argument("--opencode-agent", default="build")
     parser.add_argument(

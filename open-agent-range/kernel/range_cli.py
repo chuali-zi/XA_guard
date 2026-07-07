@@ -63,7 +63,7 @@ def main(argv: list[str] | None = None) -> int:
 
     day = sub.add_parser("day", help="run a scenario day and write evidence")
     day.add_argument("--world", required=True)
-    day.add_argument("--agent", choices=["scripted", "gullible", "opencode"], default="scripted")
+    day.add_argument("--agent", choices=["scripted", "gullible", "reactive", "opencode"], default="scripted")
     day.add_argument("--sut", choices=["null", "guard", "guardstub", "xaguard", "xa-guard"], default="null")
     day.add_argument("--model", default="deepseek/deepseek-v4-flash")
     day.add_argument("--opencode-agent", default="build")
