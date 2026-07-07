@@ -525,6 +525,46 @@ def test_promote_requires_reproduced_and_updates_finding(tmp_path: Path) -> None
     ]
 
 
+def test_promote_rejects_tampered_protected_audit_alignment(tmp_path: Path, capsys) -> None:
+    finding = _make_finding(tmp_path)
+    challenge = tmp_path / "challenge.json"
+    assert (
+        workbench.main(
+            ["review-finding", "--finding", str(finding), "--status", "reproduced", "--notes", "reviewed"]
+        )
+        == 0
+    )
+    assert (
+        workbench.main(
+            [
+                "run-ab",
+                "--finding",
+                str(finding),
+                "--out-dir",
+                str(tmp_path / "ab"),
+                "--execute",
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    audit_path = tmp_path / "ab" / "guard" / "audit.jsonl"
+    audit_rows = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
+    audit_rows[0]["tool"] = "tampered_tool"
+    audit_path.write_text(
+        "\n".join(json.dumps(row, ensure_ascii=False, sort_keys=True) for row in audit_rows) + "\n",
+        encoding="utf-8",
+    )
+
+    assert workbench.main(["promote", "--finding", str(finding), "--out", str(challenge)]) == 1
+    captured = capsys.readouterr()
+
+    assert not challenge.exists()
+    assert "promotion gate failed" in captured.err
+    assert "audit alignment failed" in captured.err
+    assert "range_audit.tool" in captured.err
+
+
 def test_promote_default_out_refuses_overwrite_without_force(tmp_path: Path, monkeypatch, capsys) -> None:
     monkeypatch.chdir(tmp_path)
     finding = _make_finding(tmp_path)

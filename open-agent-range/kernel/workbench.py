@@ -983,7 +983,79 @@ def _promotion_gate_errors(finding: dict[str, Any]) -> list[str]:
                 errors.append(f"run {run.get('run_index', '?')} {side} evidence missing: {', '.join(missing)}")
             if side_summary.get("ledger_hash_chain_ok") is not True:
                 errors.append(f"run {run.get('run_index', '?')} {side} ledger hash chain is not verified")
+            alignment_errors = _attempt_alignment_errors(attempt_path, require_ledger=(side == protected_label))
+            for error in alignment_errors:
+                errors.append(f"run {run.get('run_index', '?')} {side} evidence audit alignment failed: {error}")
     return errors
+
+
+def _attempt_alignment_errors(attempt_path: Path, *, require_ledger: bool) -> list[str]:
+    errors: list[str] = []
+    tool_events = _read_jsonl(attempt_path / "tool-events.jsonl")
+    audit = _read_jsonl(attempt_path / "audit.jsonl")
+    ledger_rows = _read_jsonl(attempt_path / "ledger.jsonl")
+    attempts = [row for row in ledger_rows if row.get("action") == "tool_attempt"]
+    decisions = [row for row in ledger_rows if row.get("action") == "sut_decision"]
+    if len(audit) != len(tool_events):
+        errors.append(f"range_audit count expected {len(tool_events)} actual {len(audit)}")
+    if require_ledger:
+        if len(attempts) != len(tool_events):
+            errors.append(f"ledger_tool_attempt count expected {len(tool_events)} actual {len(attempts)}")
+        if len(decisions) != len(tool_events):
+            errors.append(f"ledger_sut_decision count expected {len(tool_events)} actual {len(decisions)}")
+    for index, event in enumerate(tool_events):
+        expected_tool = event.get("tool")
+        audit_row = audit[index] if index < len(audit) else {}
+        if audit_row.get("tool") != expected_tool:
+            errors.append(
+                f"seq {index + 1} range_audit.tool expected {expected_tool} actual {audit_row.get('tool')}"
+            )
+        if require_ledger:
+            attempt_row = attempts[index] if index < len(attempts) else {}
+            decision_row = decisions[index] if index < len(decisions) else {}
+            if attempt_row.get("tool") != expected_tool:
+                errors.append(
+                    f"seq {index + 1} ledger_tool_attempt.tool expected {expected_tool} actual {attempt_row.get('tool')}"
+                )
+            if decision_row.get("tool") != expected_tool:
+                errors.append(
+                    f"seq {index + 1} ledger_sut_decision.tool expected {expected_tool} actual {decision_row.get('tool')}"
+                )
+            expected_decision = _canonical_decision(decision_row.get("decision"))
+            actual_decision = _canonical_decision(audit_row.get("decision"))
+            if actual_decision != expected_decision:
+                errors.append(
+                    f"seq {index + 1} range_audit.decision expected {expected_decision} actual {actual_decision}"
+                )
+    raw_xaguard = _read_jsonl(attempt_path / "xa-guard-audit" / "audit.jsonl")
+    if raw_xaguard:
+        if len(raw_xaguard) < len(audit):
+            errors.append(f"raw_xaguard_audit count expected at least {len(audit)} actual {len(raw_xaguard)}")
+        for index, audit_row in enumerate(audit):
+            raw_row = raw_xaguard[index] if index < len(raw_xaguard) else {}
+            raw_tool = raw_row.get("gen_ai.tool.name") or raw_row.get("tool")
+            if raw_tool != audit_row.get("tool"):
+                errors.append(
+                    f"seq {index + 1} raw_xaguard_audit.tool expected {audit_row.get('tool')} actual {raw_tool}"
+                )
+            raw_decision = _canonical_decision(raw_row.get("gen_ai.decision.final") or raw_row.get("decision"))
+            audit_decision = _canonical_decision(audit_row.get("decision"))
+            if raw_decision != audit_decision:
+                errors.append(
+                    f"seq {index + 1} raw_xaguard_audit.decision expected {audit_decision} actual {raw_decision}"
+                )
+    return errors
+
+
+def _canonical_decision(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    if text in {"deny", "require_approval"}:
+        return "deny"
+    if text in {"allow", "warn"}:
+        return "allow"
+    return text
 
 
 def _finding_list_item(path: Path, finding: dict[str, Any]) -> dict[str, Any]:

@@ -126,7 +126,7 @@ def test_day_opencode_multiround_repeat_writes_product_evidence(tmp_path: Path, 
 
 def test_replay_verifies_hashes_ledger_and_sut_audit(tmp_path: Path, capsys) -> None:
     out = tmp_path / "day"
-    assert range_cli.main(["day", "--world", str(FULL_DAY), "--evidence-dir", str(out)]) == 0
+    assert range_cli.main(["day", "--world", str(FULL_DAY), "--sut", "guard", "--evidence-dir", str(out)]) == 0
     capsys.readouterr()
 
     assert (
@@ -150,6 +150,45 @@ def test_replay_verifies_hashes_ledger_and_sut_audit(tmp_path: Path, capsys) -> 
     assert result["checks"]["ledger"]["hash_chain_ok"] is True
     assert result["checks"]["ledger"]["projection_matches_artifact"] is True
     assert result["checks"]["sut_audit"]["ok"] is True
+    assert result["checks"]["sut_audit"]["sequence_alignment_ok"] is True
+    assert result["checks"]["sut_audit"]["count_mismatches"] == []
+    assert result["checks"]["sut_audit"]["sequence_mismatches"] == []
+    assert result["checks"]["sut_audit"]["ledger_alignment_available"] is True
+    assert result["checks"]["sut_audit"]["ledger_tool_attempt_count"] == result["checks"]["sut_audit"]["tool_event_count"]
+    assert result["checks"]["sut_audit"]["ledger_sut_decision_count"] == result["checks"]["sut_audit"]["tool_event_count"]
+
+
+def test_replay_sut_audit_detects_sequence_mismatch(tmp_path: Path, capsys) -> None:
+    out = tmp_path / "day"
+    assert range_cli.main(["day", "--world", str(FULL_DAY), "--evidence-dir", str(out)]) == 0
+    capsys.readouterr()
+    audit_path = out / "audit.jsonl"
+    audit_rows = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines()]
+    audit_rows[0]["tool"] = "tampered_tool"
+    audit_path.write_text(
+        "\n".join(json.dumps(row, ensure_ascii=False, sort_keys=True) for row in audit_rows) + "\n",
+        encoding="utf-8",
+    )
+
+    assert (
+        range_cli.main(
+            [
+                "replay",
+                "--attempt",
+                str(out),
+                "--verify-sut-audit",
+                "--json",
+            ]
+        )
+        == 1
+    )
+    result = json.loads(capsys.readouterr().out)
+
+    assert result["ok"] is False
+    assert result["checks"]["sut_audit"]["ok"] is False
+    assert result["checks"]["sut_audit"]["sequence_alignment_ok"] is False
+    assert result["checks"]["sut_audit"]["count_mismatches"] == []
+    assert result["checks"]["sut_audit"]["sequence_mismatches"][0]["field"] == "range_audit.tool"
 
 
 def test_day_rerun_same_dir_keeps_artifact_hashes_replayable(tmp_path: Path, capsys) -> None:

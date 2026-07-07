@@ -1,5 +1,13 @@
 # open-agent-range 工作日志
 
+## 2026-07-07 06:04 SUT audit alignment and promote gate hardening
+- Continued the PRD completion work after the `Sagan` review. The concrete gap addressed here: `replay --verify-sut-audit` was mostly count-level, and promotion did not prove protected evidence alignment between tool events, audit rows, and ledger decisions.
+- Upgraded `range replay --verify-sut-audit` to emit sequence-level alignment across `tool-events.jsonl`, range `audit.jsonl`, ledger `tool_attempt`, ledger `sut_decision`, and optional raw `xa-guard-audit/audit.jsonl` tool/decision rows.
+- Hardened `workbench promote`: promotion now checks audit alignment for every A/B evidence attempt. The null side must at least align range audit with tool events, and the protected side must include aligned ledger tool attempts and SUT decisions before challenge promotion is allowed.
+- Requested review: the `gpt-5.5` / `xhigh` read-only subagent `Erdos` completed and still judged the range not fully PRD-compliant. It acknowledged the audit alignment and promote gate as real progress, but kept P0 gaps around scripted full-day baseline behavior, non-long-lived XA-Guard live, missing true `null,xaguard --live --repeat 3` evidence, incomplete Web range, and shallow insider consequences.
+- Verification: `python -m pytest kernel/tests/test_range_cli.py -q` passed with 15 tests; `python -m pytest kernel/tests/test_workbench.py -q` passed with 20 tests; full `python -m pytest kernel/tests -q` passed with 118 tests. New tests cover successful replay alignment, replay rejection after audit tampering, and promote rejection after protected A/B audit tampering.
+- Still incomplete: this improves evidence/replay/promotion integrity, but it is not yet a full live red-team range. Missing pieces remain long-running observe-plan-act seats, attempt-level long-lived XA-Guard live sessions, true live N>=3 A/B matrices, Web map/multi-injection/side-by-side evidence dashboards, and deeper insider/policy/sandbox consequences.
+
 ## 2026-07-07 05:44 Workbench review/promote local API loop
 - Continued the PRD product-shape work after the `Rawls` review. The concrete gap addressed here: browser Workbench could save findings, run A/B, and read summaries, but review/promote still required returning to the CLI.
 - Added `/api/review-finding` and `/api/promote-finding` to `range_cli workbench serve`. These APIs invoke existing `kernel.workbench review-finding` and `promote`, so they reuse review fields, the promotion evidence gate, challenge JSON structure, and finding status updates.

@@ -1018,18 +1018,148 @@ def _verify_artifact_hashes(attempt: Path) -> dict[str, Any]:
 def _verify_sut_audit(attempt: Path) -> dict[str, Any]:
     tool_events = _read_jsonl(attempt / "tool-events.jsonl")
     audit = _read_jsonl(attempt / "audit.jsonl")
-    decisions = [row for row in _read_jsonl(attempt / "ledger.jsonl") if row.get("action") == "sut_decision"]
+    ledger_rows = _read_jsonl(attempt / "ledger.jsonl")
+    attempts = [row for row in ledger_rows if row.get("action") == "tool_attempt"]
+    decisions = [row for row in ledger_rows if row.get("action") == "sut_decision"]
+    raw_xaguard_audit = _read_jsonl(attempt / "xa-guard-audit" / "audit.jsonl")
     audit_tools = [row.get("tool") for row in audit]
     event_tools = [row.get("tool") for row in tool_events]
-    ok = len(audit) == len(tool_events) and (not decisions or len(decisions) == len(tool_events))
+    count_mismatches: list[dict[str, Any]] = []
+    expected_count = len(tool_events)
+    counts = {
+        "tool_events": len(tool_events),
+        "range_audit": len(audit),
+    }
+    if attempts:
+        counts["ledger_tool_attempts"] = len(attempts)
+    if decisions:
+        counts["ledger_sut_decisions"] = len(decisions)
+    for name, actual in counts.items():
+        if actual != expected_count:
+            count_mismatches.append({"name": name, "expected": expected_count, "actual": actual})
+    sequence_mismatches = _sut_audit_sequence_mismatches(tool_events, attempts, decisions, audit)
+    raw_xaguard_mismatches: list[dict[str, Any]] = []
+    if raw_xaguard_audit:
+        if len(raw_xaguard_audit) < len(audit):
+            raw_xaguard_mismatches.append(
+                {"name": "raw_xaguard_audit", "expected_at_least": len(audit), "actual": len(raw_xaguard_audit)}
+            )
+        raw_xaguard_mismatches.extend(_raw_xaguard_audit_mismatches(audit, raw_xaguard_audit))
+    ok = not count_mismatches and not sequence_mismatches and not raw_xaguard_mismatches
     return {
         "ok": ok,
         "tool_event_count": len(tool_events),
         "audit_count": len(audit),
+        "ledger_tool_attempt_count": len(attempts),
         "ledger_sut_decision_count": len(decisions),
+        "ledger_alignment_available": bool(attempts or decisions),
         "audit_tools": audit_tools,
         "tool_event_tools": event_tools,
+        "sequence_alignment_ok": not sequence_mismatches,
+        "count_mismatches": count_mismatches,
+        "sequence_mismatches": sequence_mismatches,
+        "raw_xaguard_audit_count": len(raw_xaguard_audit),
+        "raw_xaguard_alignment_ok": not raw_xaguard_mismatches,
+        "raw_xaguard_mismatches": raw_xaguard_mismatches,
     }
+
+
+def _sut_audit_sequence_mismatches(
+    tool_events: list[dict[str, Any]],
+    attempts: list[dict[str, Any]],
+    decisions: list[dict[str, Any]],
+    audit: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    mismatches: list[dict[str, Any]] = []
+    row_count = max(len(tool_events), len(attempts), len(decisions), len(audit))
+    for index in range(row_count):
+        event = _row_at(tool_events, index)
+        attempt = _row_at(attempts, index)
+        decision = _row_at(decisions, index)
+        audit_row = _row_at(audit, index)
+        expected_tool = event.get("tool") if event else None
+        for name, row in (
+            ("ledger_tool_attempt", attempt),
+            ("ledger_sut_decision", decision),
+            ("range_audit", audit_row),
+        ):
+            if name == "ledger_tool_attempt" and not attempts:
+                continue
+            if name == "ledger_sut_decision" and not decisions:
+                continue
+            actual_tool = row.get("tool") if row else None
+            if actual_tool != expected_tool:
+                mismatches.append(
+                    {
+                        "seq": index + 1,
+                        "field": f"{name}.tool",
+                        "expected": expected_tool,
+                        "actual": actual_tool,
+                    }
+                )
+        if decisions:
+            expected_decision = _canonical_decision(decision.get("decision") if decision else None)
+            actual_decision = _canonical_decision(audit_row.get("decision") if audit_row else None)
+        else:
+            expected_decision = actual_decision = None
+        if decisions and actual_decision != expected_decision:
+            mismatches.append(
+                {
+                    "seq": index + 1,
+                    "field": "range_audit.decision",
+                    "expected": expected_decision,
+                    "actual": actual_decision,
+                }
+            )
+    return mismatches
+
+
+def _raw_xaguard_audit_mismatches(
+    audit: list[dict[str, Any]],
+    raw_xaguard_audit: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    mismatches: list[dict[str, Any]] = []
+    for index, audit_row in enumerate(audit):
+        raw = _row_at(raw_xaguard_audit, index)
+        if raw is None:
+            continue
+        raw_tool = raw.get("gen_ai.tool.name") or raw.get("tool")
+        if raw_tool != audit_row.get("tool"):
+            mismatches.append(
+                {
+                    "seq": index + 1,
+                    "field": "raw_xaguard_audit.tool",
+                    "expected": audit_row.get("tool"),
+                    "actual": raw_tool,
+                }
+            )
+        raw_decision = _canonical_decision(raw.get("gen_ai.decision.final") or raw.get("decision"))
+        audit_decision = _canonical_decision(audit_row.get("decision"))
+        if raw_decision != audit_decision:
+            mismatches.append(
+                {
+                    "seq": index + 1,
+                    "field": "raw_xaguard_audit.decision",
+                    "expected": audit_decision,
+                    "actual": raw_decision,
+                }
+            )
+    return mismatches
+
+
+def _row_at(rows: list[dict[str, Any]], index: int) -> dict[str, Any] | None:
+    return rows[index] if index < len(rows) else None
+
+
+def _canonical_decision(value: Any) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip().lower()
+    if text in {"deny", "require_approval"}:
+        return "deny"
+    if text in {"allow", "warn"}:
+        return "allow"
+    return text
 
 
 def _render_replay_text(result: ReplayCheckResult) -> str:

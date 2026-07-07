@@ -1,3 +1,11 @@
+# 2026-07-07 06:04 -07:00 Open Agent Range SUT audit alignment gate
+
+- 继续推进 `open-agent-range/` 的 PRD 完成态，针对上一轮 xhigh review 指出的 “Gate6 audit 与 range ledger 未逐工具尝试/裁决深度对齐” 做证据门禁加固。
+- `range replay --verify-sut-audit` 从数量级校验升级为逐序对齐：检查 `tool-events.jsonl`、range `audit.jsonl`、ledger `tool_attempt`、ledger `sut_decision`，并在存在 `xa-guard-audit/audit.jsonl` 时对 raw XA-Guard/Gate6 audit 的 tool/decision 做对齐。
+- `workbench promote` 的 promotion gate 新增 audit alignment：null side 至少要求 audit/tool-events 对齐；protected side 必须有 ledger tool_attempt/sut_decision 且与 audit/tool-events 逐序一致。篡改 protected A/B audit 时 promote 会拒绝固化 challenge。
+- 验证：`python -m pytest kernel/tests/test_range_cli.py -q` 15 passed；`python -m pytest kernel/tests/test_workbench.py -q` 20 passed；`python -m pytest kernel/tests -q` 118 passed。新增测试覆盖 replay alignment 正向、篡改 audit 后 replay 拒绝、篡改 protected audit 后 promote 拒绝。
+- `gpt-5.5/xhigh` 只读子 agent `Erdos` 复核后仍判定 **不完全符合 PRD/SP7**：本轮是实质进展，但仍缺 full-day 任意长度 observe-plan-act、XA-Guard live attempt 级长生命周期、真实 `null,xaguard --live --repeat 3` 证据矩阵、完整 Web 沙盘和更真实的 insider consequence。
+
 # 2026-07-07 05:51 -07:00 Open Agent Range xhigh review after review/promote API
 
 - 按用户要求启动 `gpt-5.5/xhigh` 只读子 agent `Sagan` 复核 `open-agent-range/` 当前靶场形态，重点审视新增 Workbench `/api/review-finding` 与 `/api/promote-finding` 后是否已达到“真实政企一天 + 完全自由红队靶场”。

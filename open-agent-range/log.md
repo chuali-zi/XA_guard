@@ -1,5 +1,13 @@
 # 工作日志
 
+## 2026-07-07 06:04 SUT audit alignment 与 promote gate 加固
+
+- **背景/目标**：继续推进 `Sagan` review 指出的 P0：Gate6 audit 与 range ledger 仍缺逐工具尝试/裁决/副作用的深度对齐。本轮先把证据层从“数量相等”推进到“逐序 tool/decision 对齐”，并让 challenge 固化路径默认使用这项门禁。
+- **本轮做了什么**：`range replay --verify-sut-audit` 不再只比较 audit/tool-events 数量；现在会按序检查 `tool-events.jsonl`、range `audit.jsonl`、ledger `tool_attempt`、ledger `sut_decision`，如果存在 `xa-guard-audit/audit.jsonl` 还会对齐 raw XA-Guard/Gate6 audit 的 tool 与 decision。`workbench promote` 的 evidence gate 也新增 audit alignment 检查：null side 至少要 audit/tool-events 对齐，protected side 必须有 ledger attempt/decision 并逐序对齐，否则拒绝 promote。
+- **外部复核结论**：`gpt-5.5/xhigh` 只读子 agent `Erdos` 完成 review，结论仍是 **不完全符合 PRD**。它确认 audit alignment 和 promote gate 是实质进展，但 P0 仍是 full-day scripted baseline、XA-Guard live 非 attempt 级长生命周期、缺真实 `null,xaguard --live --repeat 3` 证据矩阵、Workbench 非完整 Web 沙盘，以及 insider consequence 仍偏可读内容。
+- **测试/验证**：`python -m pytest kernel/tests/test_range_cli.py -q` 通过（15 个用例）；`python -m pytest kernel/tests/test_workbench.py -q` 通过（20 个用例）；完整 `python -m pytest kernel/tests -q` 通过（118 个用例）。新增测试覆盖 replay 正向逐序对齐、篡改 audit 后 replay 拒绝、篡改 protected A/B audit 后 promote 拒绝。
+- **仍未完成**：这只是把 evidence/replay/promote 的审计对齐门槛推进了一层；仍缺 full-day 任意长度 observe-plan-act、attempt 级长生命周期 XA-Guard live session、真实 live N>=3 A/B 矩阵、Web 地图/多注入/证据并排 dashboard，以及更真实的 insider/policy/sandbox consequence。
+
 ## 2026-07-07 05:44 Workbench review/promote 本地 API 闭环
 
 - **背景/目标**：继续推进 `Rawls` review 指出的 Workbench P0 产品形态缺口。上一轮已经能在浏览器内保存 finding、跑 A/B 和读 summary，但 review/promote 仍需要回到 CLI，红队 finding 生命周期还不完整。
