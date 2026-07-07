@@ -297,6 +297,10 @@ def test_workbench_serve_writes_static_dashboard(tmp_path: Path, capsys) -> None
     assert "Timeline" in html
     assert "Tool events" in html
     assert "Raw XA-Guard audit" in html
+    assert "Run catalog" in html
+    assert "runRows" in html
+    assert "selectedRunIndex" in html
+    assert "/api/list-runs" in html
 
 
 def test_sut_check_reports_offline_configuration(capsys) -> None:
@@ -455,13 +459,13 @@ def test_workbench_api_run_ab_executes_and_show_evidence_reads_summary(tmp_path:
     result = range_cli.run_workbench_api_action(
         state,
         "run-ab",
-        {"finding_path": str(finding), "sut_mode": "null,guard", "runs": 1, "execute": True},
+        {"finding_path": str(finding), "sut_mode": "null,guard", "runs": 2, "execute": True},
         api_root=tmp_path / "api-runs",
     )
 
     out_dir = Path(result["out_dir"])
     assert result["ok"] is True
-    assert result["summary"]["aggregate"]["null_leak_count"] == 1
+    assert result["summary"]["aggregate"]["null_leak_count"] == 2
     assert result["summary"]["aggregate"]["guard_leak_count"] == 0
     assert (out_dir / "summary.json").is_file()
 
@@ -473,17 +477,35 @@ def test_workbench_api_run_ab_executes_and_show_evidence_reads_summary(tmp_path:
     )
 
     assert shown["ok"] is True
-    assert shown["summary"]["run_count"] == 1
+    assert shown["summary"]["run_count"] == 2
     assert shown["summary"]["aggregate"]["protection_delta"] == 1.0
+
+    catalog = range_cli.run_workbench_api_action(
+        state,
+        "list-runs",
+        {},
+        api_root=tmp_path / "api-runs",
+    )
+
+    assert catalog["ok"] is True
+    assert catalog["run_count"] == 1
+    assert catalog["stats"]["ab_run_count"] == 2
+    assert catalog["stats"]["null_leak_count"] == 2.0
+    assert catalog["stats"]["protected_leak_count"] == 0.0
+    assert catalog["runs"][0]["path"] == str(out_dir)
+    assert catalog["runs"][0]["run_options"][0]["run_index"] == 1
+    assert catalog["runs"][0]["run_options"][1]["run_index"] == 2
+    assert catalog["runs"][0]["run_options"][0]["null_path"].endswith("null")
 
     compared = range_cli.run_workbench_api_action(
         state,
         "compare-evidence",
-        {"path": str(out_dir)},
+        {"path": str(out_dir), "run_index": 2},
         api_root=tmp_path / "api-runs",
     )
 
     assert compared["ok"] is True
+    assert compared["comparison"]["run_index"] == 2
     assert compared["comparison"]["protected_label"] == "guard"
     assert compared["comparison"]["null"]["violations_count"] == 1
     assert compared["comparison"]["protected"]["violations_count"] == 0

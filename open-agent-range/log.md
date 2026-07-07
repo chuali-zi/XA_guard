@@ -1,5 +1,13 @@
 # 工作日志
 
+## 2026-07-07 07:45 Workbench Run Catalog 与 run selector
+
+- **背景/目标**：继续推进 `Avicenna`/前序 review 指出的 Workbench 产品形态缺口。上一轮已有 Evidence Review 明细展开，但红队仍缺浏览器内 run selector 和跨 run 统计入口，需要能从已有 A/B evidence 中选择任意 run 审阅。
+- **本轮做了什么**：`build_workbench_state()` 新增 `evidence_roots`、`evidence_runs`、`evidence_run_stats`；HTTP API 新增 `/api/list-runs`，扫描真实 A/B `summary.json` 并返回 run catalog、run_options、Null/Protected 泄漏数、protection delta、infra error 聚合。Workbench 页面新增 Run catalog、Refresh runs、Compare selected run、selected run index；`/api/compare-evidence` 支持 `run_index`，可选择已有 A/B summary 的指定第 N 次 run 进入 Evidence Review 明细。
+- **review 反馈与修正**：按要求启动 `gpt-5.5/xhigh` 只读子 agent `Avicenna`。它仍判定不完全符合 PRD，P0 仍是 deterministic scripted baseline、XA-Guard live 非长生命周期/缺 N>=3 live 矩阵、Workbench 仍缺地图/注入编排/完整 dashboard；同时指出本轮 `run_index` 参数被 `_compare_evidence_paths()` 内部局部变量重置为 1。已修复该 bug，并把回归测试改为真实 `runs=2`，断言 `compare-evidence` 选择 `run_index=2`。
+- **测试/验证**：`python -m pytest kernel/tests/test_range_cli.py::test_workbench_api_run_ab_executes_and_show_evidence_reads_summary -q` 通过；完整 `python -m pytest kernel/tests -q` 通过（118 个用例）。手工 smoke：`python -m kernel.range_cli workbench serve --world scenarios\dctg\full-day.json --out-dir .runtime\workbench-run-catalog-smoke --no-server --json` 通过；抽取页面 `<script>` 后 `node --check` 通过；临时 runtime 产物已清理。
+- **仍未完成**：本轮把 Workbench 从“看刚跑完一次 evidence”推进到“可索引/选择已有 A/B run”，但仍不是完整自由靶场。下一步优先级仍是 full-day observe-plan-act seat、长生命周期 XA-Guard live、真实 `null,xaguard --live --repeat >=3` 证据矩阵、地图/多注入编排/完整 replay dashboard。
+
 ## 2026-07-07 07:27 Workbench Evidence Review 明细展开
 
 - **背景/目标**：继续推进 `Confucius` review 指出的 Workbench 缺口：上一轮已有 Null vs Protected 摘要并排审阅，但仍不是 timeline / tool-events / audit / ledger / violations 明细浏览器。

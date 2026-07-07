@@ -1,5 +1,13 @@
 # open-agent-range 工作日志
 
+## 2026-07-07 07:45 Workbench run catalog and run selector
+- Continued the PRD product-shape work by addressing a Workbench gap left after the Evidence Review detail expansion: the browser could compare an evidence path, but it did not yet discover existing A/B runs or provide a run selector / cross-run summary.
+- Added `evidence_roots`, `evidence_runs`, and `evidence_run_stats` to `build_workbench_state()`. Added `/api/list-runs`, which scans real A/B `summary.json` files and returns a run catalog, run options, null/protected leak counts, protection delta, and protected infra-error counts.
+- Updated the generated Workbench UI with Run catalog, Refresh runs, Compare selected run, and selected run index controls. `/api/compare-evidence` now accepts `run_index` so a red teamer can choose a specific run from an existing A/B summary before opening Evidence Review details.
+- Requested review: the `gpt-5.5` / `xhigh` read-only subagent `Avicenna` reviewed the current range and still found it incomplete against the PRD. It confirmed the run catalog is real product progress but identified a `run_index` bug where `_compare_evidence_paths()` reset the selected index to 1. That bug was fixed, and the regression now runs A/B with `runs=2` and asserts that `run_index=2` is selected.
+- Verification: targeted `test_workbench_api_run_ab_executes_and_show_evidence_reads_summary` passed; full `python -m pytest kernel/tests -q` passed with 118 tests; `workbench serve --no-server` smoke passed and the extracted page script passed `node --check`. Temporary runtime output was removed.
+- Still incomplete: this adds evidence indexing and run selection, but the PRD completion gaps remain full-day observe-plan-act seats, long-lived XA-Guard live sessions, real `null,xaguard --live --repeat >=3` evidence, map/multi-injection orchestration, and a full replay/report dashboard.
+
 ## 2026-07-07 07:27 Workbench Evidence Review detail expansion
 - Continued the PRD product-shape work after the `Confucius` review. The concrete gap addressed here: the prior Evidence Review compared Null vs Protected summaries, but it still did not expose timeline / tool-events / audit / ledger / violation details in the browser.
 - Extended `/api/compare-evidence` so each null/protected side includes `details`: timeline, tool_events, audit, ledger, violations, raw_xaguard_audit, and their counts. The API returns the first 30 rows of each artifact by default for browser review.

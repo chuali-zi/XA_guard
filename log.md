@@ -1,3 +1,11 @@
+# 2026-07-07 07:45 -07:00 Open Agent Range Workbench run catalog
+
+- 继续推进 `open-agent-range/` 的 Workbench 产品形态，针对上一轮仍缺 run selector / cross-run stats 的缺口，新增浏览器侧 A/B evidence run catalog。
+- `workbench serve` 现在会在 state 中写入 `evidence_roots`、`evidence_runs`、`evidence_run_stats`；HTTP 本地 API 新增 `/api/list-runs`，可扫描真实 `summary.json`，列出 A/B run、run options、Null/Protected 泄漏数、protection delta 与 infra error 统计。
+- 页面新增 Run catalog、Refresh runs、Compare selected run、selected run index；`/api/compare-evidence` 支持 `run_index`，红队可从已有 A/B run 中选择某一次 run 进入 Evidence Review 明细。
+- 按要求启动 `gpt-5.5/xhigh` 只读子 agent `Avicenna` 复核；结论仍是不完全符合 PRD，但确认本轮 run catalog 是真实产品进展，并指出 `run_index` 被局部变量重置的 bug。本轮已修复该 bug，并把测试改为真实 `runs=2` 回归，确认可选择第 2 次 run。
+- 验证：`python -m pytest kernel/tests/test_range_cli.py::test_workbench_api_run_ab_executes_and_show_evidence_reads_summary -q` 通过；`python -m pytest kernel/tests -q` 通过（118 tests）；`workbench serve --no-server` smoke 与抽取页面脚本 `node --check` 通过。仍不能声明符合“真实政企一天 + 完全自由红队靶场”完成态。
+
 # 2026-07-07 07:27 -07:00 Open Agent Range Evidence Review detail browser
 
 - 继续推进 `open-agent-range/` 的 Workbench 产品形态，把 Evidence Review 从摘要级 Null vs Protected 对照推进到浏览器内可展开证据明细。

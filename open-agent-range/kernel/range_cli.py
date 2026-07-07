@@ -334,6 +334,7 @@ def _make_workbench_handler(out_dir: Path, state: dict[str, Any]) -> type[http.s
                 "/api/show-evidence": "show-evidence",
                 "/api/save-finding": "save-finding",
                 "/api/list-findings": "list-findings",
+                "/api/list-runs": "list-runs",
                 "/api/review-finding": "review-finding",
                 "/api/promote-finding": "promote-finding",
                 "/api/compare-evidence": "compare-evidence",
@@ -380,6 +381,8 @@ def run_workbench_api_action(
         return _run_workbench_api_save_finding(state, payload)
     if action == "list-findings":
         return _run_workbench_api_list_findings(state)
+    if action == "list-runs":
+        return _run_workbench_api_list_runs(state, payload, api_root=api_root)
     if action == "review-finding":
         return _run_workbench_api_review_finding(state, payload)
     if action == "promote-finding":
@@ -489,12 +492,14 @@ def _run_workbench_api_compare_evidence(payload: dict[str, Any]) -> dict[str, An
     path_text = str(payload.get("path") or payload.get("ab_path") or "").strip()
     null_path = str(payload.get("null_path") or "").strip()
     protected_path = str(payload.get("protected_path") or "").strip()
+    run_index = int(payload.get("run_index") or payload.get("selected_run_index") or 0)
     if not path_text and not (null_path and protected_path):
         raise ValueError("path or null_path/protected_path is required")
     comparison = _compare_evidence_paths(
         Path(path_text) if path_text else None,
         null_path=Path(null_path) if null_path else None,
         protected_path=Path(protected_path) if protected_path else None,
+        run_index=run_index if run_index > 0 else None,
     )
     return {
         "ok": True,
@@ -564,6 +569,25 @@ def _run_workbench_api_list_findings(state: dict[str, Any]) -> dict[str, Any]:
         "action": "list-findings",
         "findings_dir": str(findings_dir),
         "findings": _load_finding_items(findings_dir),
+    }
+
+
+def _run_workbench_api_list_runs(
+    state: dict[str, Any],
+    payload: dict[str, Any],
+    *,
+    api_root: Path,
+) -> dict[str, Any]:
+    roots = _evidence_roots_from_payload(state, payload, api_root=api_root)
+    runs = _load_evidence_run_items(*roots)
+    return {
+        "ok": True,
+        "code": 0,
+        "action": "list-runs",
+        "roots": [str(root) for root in roots],
+        "run_count": len(runs),
+        "stats": _aggregate_evidence_run_items(runs),
+        "runs": runs,
     }
 
 
@@ -651,11 +675,12 @@ def _compare_evidence_paths(
     *,
     null_path: Path | None,
     protected_path: Path | None,
+    run_index: int | None = None,
 ) -> dict[str, Any]:
     ab_summary: dict[str, Any] = {}
     run: dict[str, Any] = {}
     protected_label = "protected"
-    run_index = 1
+    selected_run_index = 1
     if path is not None:
         summary_path = path / "summary.json" if path.is_dir() else path
         if not summary_path.is_file():
@@ -665,9 +690,9 @@ def _compare_evidence_paths(
         runs = ab_summary.get("runs", [])
         if not isinstance(runs, list) or not runs:
             raise ValueError("A/B summary has no runs to compare")
-        requested_index = int(ab_summary.get("selected_run_index") or 1)
-        run_index = int(requested_index if requested_index >= 1 else 1)
-        run = next((item for item in runs if int(item.get("run_index", 0) or 0) == run_index), runs[0])
+        requested_index = int(run_index or ab_summary.get("selected_run_index") or 1)
+        selected_run_index = int(requested_index if requested_index >= 1 else 1)
+        run = next((item for item in runs if int(item.get("run_index", 0) or 0) == selected_run_index), runs[0])
         null_path = Path(str(run.get("null", {}).get("path", "")))
         protected_path = Path(str(run.get(protected_label, {}).get("path", "")))
     if null_path is None or protected_path is None:
@@ -684,7 +709,7 @@ def _compare_evidence_paths(
     protection_delta = null_violations - protected_violations
     return {
         "path": str(path) if path is not None else "",
-        "run_index": int(run.get("run_index", run_index) or run_index),
+        "run_index": int(run.get("run_index", selected_run_index) or selected_run_index),
         "protected_label": protected_label,
         "aggregate": ab_summary.get("aggregate", {}) if ab_summary else {},
         "null": null_summary,
@@ -739,6 +764,149 @@ def _load_attempt_details_for_compare(path: Path, *, limit: int = 30) -> dict[st
         "violations": violations[:limit],
         "raw_xaguard_audit": raw_xaguard_audit[:limit],
     }
+
+
+def _evidence_roots_from_payload(
+    state: dict[str, Any],
+    payload: dict[str, Any],
+    *,
+    api_root: Path,
+) -> list[Path]:
+    candidates: list[Any] = []
+    payload_roots = payload.get("roots")
+    if isinstance(payload_roots, list):
+        candidates.extend(payload_roots)
+    for key in ("root", "evidence_root", "evidence_dir"):
+        if payload.get(key):
+            candidates.append(payload[key])
+    state_roots = state.get("evidence_roots", [])
+    if isinstance(state_roots, list):
+        candidates.extend(state_roots)
+    candidates.append(api_root)
+
+    roots: list[Path] = []
+    seen: set[str] = set()
+    for item in candidates:
+        if not item:
+            continue
+        path = Path(str(item)).expanduser()
+        try:
+            key = str(path.resolve())
+        except OSError:
+            key = str(path)
+        if key not in seen:
+            roots.append(path)
+            seen.add(key)
+    return roots
+
+
+def _load_evidence_run_items(*roots: Path, limit: int = 100) -> list[dict[str, Any]]:
+    summary_paths: list[Path] = []
+    seen: set[str] = set()
+    for root in roots:
+        candidates: list[Path] = []
+        if root.is_file() and root.name == "summary.json":
+            candidates = [root]
+        elif (root / "summary.json").is_file():
+            candidates = [root / "summary.json"]
+        elif root.is_dir():
+            candidates = list(root.rglob("summary.json"))
+        for path in candidates:
+            try:
+                key = str(path.resolve())
+            except OSError:
+                key = str(path)
+            if key not in seen:
+                summary_paths.append(path)
+                seen.add(key)
+
+    items: list[dict[str, Any]] = []
+    for path in summary_paths:
+        item = _evidence_run_item_from_summary(path)
+        if item:
+            items.append(item)
+    items.sort(key=lambda item: str(item.get("modified_at", "")), reverse=True)
+    return items[:limit]
+
+
+def _evidence_run_item_from_summary(summary_path: Path) -> dict[str, Any] | None:
+    try:
+        summary = _read_json(summary_path)
+    except (OSError, json.JSONDecodeError):
+        return None
+    runs = summary.get("runs")
+    aggregate = summary.get("aggregate")
+    protected_label = str(summary.get("protected_side") or "")
+    if not isinstance(runs, list) or not isinstance(aggregate, dict) or not protected_label:
+        return None
+
+    run_options: list[dict[str, Any]] = []
+    for run in runs:
+        if not isinstance(run, dict):
+            continue
+        null_side = run.get("null", {}) if isinstance(run.get("null", {}), dict) else {}
+        protected_side = run.get(protected_label, {}) if isinstance(run.get(protected_label, {}), dict) else {}
+        if not protected_side and isinstance(run.get("guarded", {}), dict):
+            protected_side = run.get("guarded", {})
+        run_options.append(
+            {
+                "run_index": int(run.get("run_index", len(run_options) + 1) or len(run_options) + 1),
+                "null_path": str(null_side.get("path", "")),
+                "protected_path": str(protected_side.get("path", "")),
+                "null_status": str(null_side.get("status", "ok")),
+                "protected_status": str(protected_side.get("status", "ok")),
+                "null_violations": _as_number(null_side.get("violation_count", 0)),
+                "protected_violations": _as_number(protected_side.get("violation_count", 0)),
+                "protection_delta": _as_number(run.get("protection_delta", 0)),
+            }
+        )
+
+    modified_at = ""
+    with contextlib.suppress(OSError):
+        modified_at = datetime.fromtimestamp(summary_path.stat().st_mtime, timezone.utc).replace(microsecond=0).isoformat()
+    return {
+        "path": str(summary_path.parent),
+        "summary_path": str(summary_path),
+        "finding_id": str(summary.get("finding_id", "")),
+        "target": str(summary.get("target", "")),
+        "world": str(summary.get("world", "")),
+        "protected_side": protected_label,
+        "live": bool(summary.get("live", False)),
+        "executed_at": str(summary.get("executed_at", "")),
+        "modified_at": modified_at,
+        "run_count": int(summary.get("run_count", len(run_options)) or len(run_options)),
+        "aggregate": {
+            "asr_null": _as_number(aggregate.get("asr_null", 0)),
+            "asr_protected": _as_number(aggregate.get("asr_protected", 0)),
+            "protection_delta": _as_number(aggregate.get("protection_delta", 0)),
+            "null_leak_count": _as_number(aggregate.get("null_leak_count", 0)),
+            "protected_leak_count": _as_number(aggregate.get("protected_leak_count", 0)),
+            "protected_infra_error_count": _as_number(aggregate.get("protected_infra_error_count", 0)),
+        },
+        "run_options": run_options,
+    }
+
+
+def _aggregate_evidence_run_items(items: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "catalog_count": len(items),
+        "ab_run_count": sum(int(item.get("run_count", 0) or 0) for item in items),
+        "null_leak_count": sum(_as_number(item.get("aggregate", {}).get("null_leak_count", 0)) for item in items),
+        "protected_leak_count": sum(
+            _as_number(item.get("aggregate", {}).get("protected_leak_count", 0)) for item in items
+        ),
+        "protection_delta": sum(_as_number(item.get("aggregate", {}).get("protection_delta", 0)) for item in items),
+        "protected_infra_error_count": sum(
+            _as_number(item.get("aggregate", {}).get("protected_infra_error_count", 0)) for item in items
+        ),
+    }
+
+
+def _as_number(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _api_attempt_id(principal: str) -> str:
@@ -839,12 +1007,17 @@ def build_workbench_state(world_path: Path, findings_dir: Path, out_dir: Path) -
     scenario = load_scenario(world_path)
     surface = reference_surface()
     findings = _load_finding_items(findings_dir)
+    evidence_roots = [out_dir, out_dir / "api-runs"]
+    evidence_runs = _load_evidence_run_items(*evidence_roots)
     contexts = scenario.seat_contexts or ([scenario.seat_context] if scenario.seat_context else [])
     return {
         "generated_at": _now_iso(),
         "world_path": str(world_path),
         "scenario_id": scenario.scenario_id,
         "dashboard_dir": str(out_dir),
+        "evidence_roots": [str(root) for root in evidence_roots],
+        "evidence_runs": evidence_runs,
+        "evidence_run_stats": _aggregate_evidence_run_items(evidence_runs),
         "principals": [
             {"principal_id": item.principal_id, "role": item.role, "domain": item.domain}
             for item in scenario.principals
@@ -949,6 +1122,7 @@ def render_workbench_html(state: dict[str, Any]) -> str:
         ("Properties", len(state.get("bound_properties", []))),
         ("Tools", len(state.get("tools", []))),
         ("Findings", len(state.get("findings", []))),
+        ("Evidence runs", state.get("evidence_run_stats", {}).get("ab_run_count", 0)),
     ]
     metrics = "".join(
         f"<div class=\"metric\"><span>{_html(str(label))}</span><strong>{_html(str(value))}</strong></div>"
@@ -976,6 +1150,16 @@ def render_workbench_html(state: dict[str, Any]) -> str:
         f"<td>{_html(str(item.get('path', '')))}</td>"
         "</tr>"
         for item in state.get("findings", [])
+    )
+    run_rows = "".join(
+        f"<tr data-run-path=\"{_html(str(item.get('path', '')))}\">"
+        f"<td>{_html(str(item.get('protected_side', '')))}</td>"
+        f"<td>{_html(str(item.get('run_count', '')))}</td>"
+        f"<td>{_html(str(item.get('aggregate', {}).get('null_leak_count', 0)))}/"
+        f"{_html(str(item.get('aggregate', {}).get('protected_leak_count', 0)))}</td>"
+        f"<td>{_html(str(item.get('aggregate', {}).get('protection_delta', 0)))}</td>"
+        "</tr>"
+        for item in state.get("evidence_runs", [])
     )
     commands = "".join(
         f"<tr><th>{_html(str(name))}</th><td><code>{_html(str(command))}</code></td></tr>"
@@ -1034,6 +1218,10 @@ def render_workbench_html(state: dict[str, Any]) -> str:
         "<label for=\"findingPathInput\">Finding JSON</label><input id=\"findingPathInput\">"
         "<label for=\"challengePathInput\">Challenge path</label><input id=\"challengePathInput\">"
         "<label for=\"evidencePathInput\">Evidence path</label><input id=\"evidencePathInput\">"
+        "<div class=\"split\"><div><label for=\"selectedRunIndex\">Selected run index</label><input id=\"selectedRunIndex\" type=\"number\" min=\"1\" value=\"1\"></div><div><label>Run catalog</label><div class=\"toolbar\"><button class=\"btn secondary\" id=\"refreshRuns\" type=\"button\">Refresh runs</button><button class=\"btn secondary\" id=\"compareSelectedRun\" type=\"button\">Compare selected run</button></div></div></div>"
+        "<table><thead><tr><th>SUT</th><th>Runs</th><th>Leaks N/P</th><th>Delta</th></tr></thead>"
+        f"<tbody id=\"runRows\">{run_rows}</tbody></table>"
+        "<pre id=\"runStats\"></pre>"
         "<div class=\"split\"><div><label for=\"abSutMode\">SUT</label><select id=\"abSutMode\"><option value=\"null,guard\">Null / Guard</option><option value=\"null,xaguard\">Null / XA-Guard</option></select></div><div><label for=\"abRuns\">Runs</label><input id=\"abRuns\" type=\"number\" min=\"1\" value=\"1\"></div></div>"
         "<label><input id=\"abLive\" type=\"checkbox\"> Live</label>"
         "<label><input id=\"promoteForce\" type=\"checkbox\"> Force promote</label>"
@@ -1047,7 +1235,7 @@ def render_workbench_html(state: dict[str, Any]) -> str:
         f"{commands}</table></aside></main>"
         f"<script>const RANGE_STATE={state_json};\n"
         "const seats=RANGE_STATE.seat_contexts||[];const tools=RANGE_STATE.tools||[];const calls=[];"
-        "let findings=RANGE_STATE.findings||[];let lastEvidencePath='';"
+        "let findings=RANGE_STATE.findings||[];let evidenceRuns=RANGE_STATE.evidence_runs||[];let lastEvidencePath='';"
         "const byId=(id)=>document.getElementById(id);"
         "const esc=(value)=>String(value??'').replace(/[&<>\"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[ch]));"
         "const shellQuote=(s)=>String(s).includes(' ')?'\"'+String(s).replaceAll('\"','\\\\\"')+'\"':String(s);"
@@ -1061,27 +1249,30 @@ def render_workbench_html(state: dict[str, Any]) -> str:
         "function renderCalls(){byId('callList').innerHTML=calls.map((call,index)=>`<div class=\"call\"><b>${index+1}</b><span>${call.tool}<br>${JSON.stringify(call.args)}</span><button type=\"button\" data-remove=\"${index}\">x</button></div>`).join('');const command=`python -m kernel.range_cli manual-session --world ${shellQuote(RANGE_STATE.world_path)} --principal ${shellQuote(byId('seatSelect').value)} --calls-json '${JSON.stringify(calls)}' --sut-mode guard --out-dir .runtime/manual-session --json`;byId('commandOutput').textContent=command;}"
         "function addCall(){let args;try{args=JSON.parse(byId('argsEditor').value||'{}')}catch(err){byId('commandOutput').textContent='Invalid JSON: '+err.message;return;}calls.push({tool:byId('toolSelect').value,args});renderCalls();}"
         "function renderFindingRows(){byId('findingRows').innerHTML=findings.map((item)=>`<tr data-finding-path=\"${esc(item.path)}\"><td>${esc(item.status)}</td><td>${esc(item.finding_id)}</td><td>${esc(item.target)}</td><td>${esc(item.path)}</td></tr>`).join('');}"
+        "function renderRunRows(){byId('runRows').innerHTML=evidenceRuns.map((item)=>`<tr data-run-path=\"${esc(item.path)}\"><td>${esc(item.protected_side)}</td><td>${esc(item.run_count)}</td><td>${esc((item.aggregate||{}).null_leak_count||0)}/${esc((item.aggregate||{}).protected_leak_count||0)}</td><td>${esc((item.aggregate||{}).protection_delta||0)}</td></tr>`).join('');}"
         "function selectFinding(item){if(!item)return;byId('findingPathInput').value=item.path||'';byId('targetInput').value=item.target||'';byId('payloadInput').value=item.payload||'';byId('taskPromptInput').value=item.task_prompt||'red-team manual session';byId('riskInput').value=item.expected_risk||'sensitive-egress';byId('statusSelect').value=item.status||'draft';byId('notesInput').value=item.notes||'';byId('challengePathInput').value=item.challenge_path||'';const last=item.last_ab_summary||{};if(last.path){byId('evidencePathInput').value=last.path;lastEvidencePath=last.path;}makeFinding();makeAb();}"
+        "function selectRun(item){if(!item)return;byId('evidencePathInput').value=item.path||'';byId('selectedRunIndex').value=((item.run_options||[])[0]||{}).run_index||1;lastEvidencePath=item.path||'';byId('runStats').textContent=JSON.stringify({path:item.path,summary_path:item.summary_path,aggregate:item.aggregate,run_options:item.run_options},null,2);}"
         "function makeFinding(){const target=byId('targetInput').value;const payload=byId('payloadInput').value;const task=byId('taskPromptInput').value||'red-team manual session';byId('findingCommand').textContent=`python -m kernel.range_cli init-finding --world ${shellQuote(RANGE_STATE.world_path)} --target ${shellQuote(target)} --payload ${shellQuote(payload)} --task-prompt ${shellQuote(task)}`;}"
         "function currentFindingPath(){return byId('findingPathInput').value||((findings[0]&&findings[0].path)||'');}"
         "function makeAb(){const finding=currentFindingPath()||'<finding.json>';const live=byId('abLive').checked?' --live':'';byId('findingCommand').textContent=`python -m kernel.range_cli run-ab --finding ${shellQuote(finding)} --sut-mode ${shellQuote(byId('abSutMode').value)} --repeat ${shellQuote(byId('abRuns').value||'1')}${live} --execute --out-dir .runtime/ab`;}"
         "async function saveFinding(){if(location.protocol==='file:'){byId('abResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}byId('abResult').textContent='Saving finding...';try{const response=await fetch('/api/save-finding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:byId('findingPathInput').value,target:byId('targetInput').value,payload:byId('payloadInput').value,task_prompt:byId('taskPromptInput').value,expected_risk:byId('riskInput').value,status:byId('statusSelect').value,notes:byId('notesInput').value})});const data=await response.json();if(data.findings){findings=data.findings;renderFindingRows();}if(data.path){byId('findingPathInput').value=data.path;}byId('abResult').textContent=JSON.stringify(data,null,2);makeAb();}catch(err){byId('abResult').textContent='API error: '+err.message;}}"
         "async function refreshFindings(){if(location.protocol==='file:'){byId('abResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}try{const response=await fetch('/api/list-findings',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const data=await response.json();if(data.findings){findings=data.findings;renderFindingRows();}byId('abResult').textContent=JSON.stringify(data,null,2);}catch(err){byId('abResult').textContent='API error: '+err.message;}}"
+        "async function refreshRuns(){if(location.protocol==='file:'){byId('runStats').textContent=JSON.stringify({stats:RANGE_STATE.evidence_run_stats||{},runs:evidenceRuns},null,2);return;}try{const response=await fetch('/api/list-runs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({roots:RANGE_STATE.evidence_roots||[]})});const data=await response.json();if(data.runs){evidenceRuns=data.runs;renderRunRows();if(evidenceRuns[0])selectRun(evidenceRuns[0]);}byId('runStats').textContent=JSON.stringify({stats:data.stats,runs:data.runs},null,2);}catch(err){byId('runStats').textContent='API error: '+err.message;}}"
         "async function reviewFinding(status){if(location.protocol==='file:'){byId('abResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}const finding=currentFindingPath();if(!finding){byId('abResult').textContent='Select or save a finding first.';return;}try{const response=await fetch('/api/review-finding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({finding_path:finding,status,notes:byId('reviewNotesInput').value})});const data=await response.json();if(data.findings){findings=data.findings;renderFindingRows();}if(data.finding){selectFinding({...data.finding,path:finding});}byId('abResult').textContent=JSON.stringify(data,null,2);}catch(err){byId('abResult').textContent='API error: '+err.message;}}"
         "async function promoteFinding(){if(location.protocol==='file:'){byId('abResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}const finding=currentFindingPath();if(!finding){byId('abResult').textContent='Select or save a finding first.';return;}try{const response=await fetch('/api/promote-finding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({finding_path:finding,out:byId('challengePathInput').value,force:byId('promoteForce').checked})});const data=await response.json();if(data.findings){findings=data.findings;renderFindingRows();}if(data.challenge_path){byId('challengePathInput').value=data.challenge_path;}if(data.finding){selectFinding({...data.finding,path:finding});}byId('abResult').textContent=JSON.stringify(data,null,2);}catch(err){byId('abResult').textContent='API error: '+err.message;}}"
         "async function runSession(){if(location.protocol==='file:'){byId('apiResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}if(!calls.length){byId('apiResult').textContent='Add at least one ToolCall first.';return;}byId('apiResult').textContent='Running...';try{const response=await fetch('/api/manual-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({principal:byId('seatSelect').value,calls,sut_mode:'guard'})});const data=await response.json();byId('apiResult').textContent=JSON.stringify(data,null,2);}catch(err){byId('apiResult').textContent='API error: '+err.message;}}"
-        "async function runAb(){if(location.protocol==='file:'){byId('abResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}const finding=currentFindingPath();if(!finding){byId('abResult').textContent='Select or create a finding JSON first.';return;}byId('abResult').textContent='Running A/B...';try{const response=await fetch('/api/run-ab',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({finding_path:finding,sut_mode:byId('abSutMode').value,runs:Number(byId('abRuns').value||1),live:byId('abLive').checked,execute:true})});const data=await response.json();if(data.out_dir){lastEvidencePath=data.out_dir;byId('evidencePathInput').value=data.out_dir;}else if(data.summary_path){lastEvidencePath=data.summary_path;byId('evidencePathInput').value=data.summary_path;}byId('abResult').textContent=JSON.stringify(data,null,2);}catch(err){byId('abResult').textContent='API error: '+err.message;}}"
+        "async function runAb(){if(location.protocol==='file:'){byId('abResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}const finding=currentFindingPath();if(!finding){byId('abResult').textContent='Select or create a finding JSON first.';return;}byId('abResult').textContent='Running A/B...';try{const response=await fetch('/api/run-ab',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({finding_path:finding,sut_mode:byId('abSutMode').value,runs:Number(byId('abRuns').value||1),live:byId('abLive').checked,execute:true})});const data=await response.json();if(data.out_dir){lastEvidencePath=data.out_dir;byId('evidencePathInput').value=data.out_dir;}else if(data.summary_path){lastEvidencePath=data.summary_path;byId('evidencePathInput').value=data.summary_path;}byId('abResult').textContent=JSON.stringify(data,null,2);await refreshRuns();}catch(err){byId('abResult').textContent='API error: '+err.message;}}"
         "async function showEvidence(){if(location.protocol==='file:'){byId('abResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}const path=byId('evidencePathInput').value||lastEvidencePath;if(!path){byId('abResult').textContent='No evidence path available.';return;}try{const response=await fetch('/api/show-evidence',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path})});const data=await response.json();byId('abResult').textContent=JSON.stringify(data,null,2);}catch(err){byId('abResult').textContent='API error: '+err.message;}}"
         "function metricRows(summary){const decisions=summary.sut_decisions||{};return `<dl><dt>Path</dt><dd>${esc(summary.path||'')}</dd><dt>Passed</dt><dd>${esc(summary.verdict_passed)}</dd><dt>Violations</dt><dd>${esc(summary.violations_count)}</dd><dt>External sends</dt><dd>${esc(summary.external_send_count)}</dd><dt>Leaked refs</dt><dd>${esc((summary.leaked_data_refs||[]).join(', ')||'-')}</dd><dt>Decisions</dt><dd>A:${esc(decisions.allow||0)} D:${esc(decisions.deny||0)}</dd><dt>Tool events</dt><dd>${esc(summary.tool_event_count)}</dd><dt>Ledger hash</dt><dd>${esc(summary.ledger_hash_chain_ok)}</dd></dl>`;}"
         "function detailBlock(title,rows,count){return `<details><summary>${esc(title)} (${esc(count??(rows||[]).length)})</summary><pre>${esc(JSON.stringify(rows||[],null,2))}</pre></details>`;}"
         "function detailRows(summary){const details=summary.details||{};return detailBlock('Timeline',details.timeline,details.timeline_count)+detailBlock('Tool events',details.tool_events,details.tool_event_count)+detailBlock('Audit',details.audit,details.audit_count)+detailBlock('Ledger',details.ledger,details.ledger_count)+detailBlock('Violations',details.violations,details.violation_count)+detailBlock('Raw XA-Guard audit',details.raw_xaguard_audit,details.raw_xaguard_audit_count);}"
         "function reviewCard(title,summary){return `<div class=\"review-card\"><h4>${esc(title)}</h4>${metricRows(summary||{})}${detailRows(summary||{})}</div>`;}"
         "function renderComparison(data){const c=data.comparison||{};const d=c.delta||{};byId('evidenceReview').className='';byId('evidenceReview').innerHTML=`<div class=\"review-grid\">${reviewCard('Null baseline',c.null||{})}${reviewCard(c.protected_label||'Protected',c.protected||{})}</div><div class=\"delta\"><b>Delta</b><br>Violation delta: ${esc(d.violation_delta)} | External-send delta: ${esc(d.external_send_delta)} | Protection observed: ${esc(d.protection_observed)}<br>Blocked refs: ${esc((d.blocked_data_refs||[]).join(', ')||'-')}<br>Still leaked: ${esc((d.still_leaked_data_refs||[]).join(', ')||'-')}</div>`;}"
-        "async function compareEvidence(){if(location.protocol==='file:'){byId('abResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}const path=byId('evidencePathInput').value||lastEvidencePath;if(!path){byId('abResult').textContent='No A/B evidence path available.';return;}try{const response=await fetch('/api/compare-evidence',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path})});const data=await response.json();renderComparison(data);byId('abResult').textContent=JSON.stringify(data,null,2);}catch(err){byId('abResult').textContent='API error: '+err.message;}}"
-        "document.addEventListener('click',(event)=>{const idx=event.target.dataset&&event.target.dataset.remove;if(idx!==undefined){calls.splice(Number(idx),1);renderCalls();}const surface=event.target.dataset&&event.target.dataset.surface;if(surface){byId('targetInput').value=surface;makeFinding();makeAb();}const row=event.target.closest&&event.target.closest('tr[data-finding-path]');if(row){selectFinding(findings.find((item)=>item.path===row.dataset.findingPath));}});"
-        "byId('seatSelect').addEventListener('change',refreshTools);byId('toolSelect').addEventListener('change',refreshArgs);byId('addCall').addEventListener('click',addCall);byId('resetCalls').addEventListener('click',()=>{calls.length=0;renderCalls();});byId('saveFinding').addEventListener('click',saveFinding);byId('refreshFindings').addEventListener('click',refreshFindings);byId('reviewReproduced').addEventListener('click',()=>reviewFinding('reproduced'));byId('reviewRejected').addEventListener('click',()=>reviewFinding('rejected'));byId('promoteFinding').addEventListener('click',promoteFinding);byId('makeFinding').addEventListener('click',makeFinding);byId('makeAb').addEventListener('click',makeAb);byId('runSession').addEventListener('click',runSession);byId('runAb').addEventListener('click',runAb);byId('showEvidence').addEventListener('click',showEvidence);byId('compareEvidence').addEventListener('click',compareEvidence);byId('abSutMode').addEventListener('change',makeAb);byId('abRuns').addEventListener('input',makeAb);byId('abLive').addEventListener('change',makeAb);byId('findingPathInput').addEventListener('input',makeAb);['targetInput','payloadInput','taskPromptInput'].forEach((id)=>byId(id).addEventListener('input',makeFinding));byId('copyCommand').addEventListener('click',()=>navigator.clipboard&&navigator.clipboard.writeText(byId('commandOutput').textContent));"
+        "async function compareEvidence(){if(location.protocol==='file:'){byId('abResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}const path=byId('evidencePathInput').value||lastEvidencePath;if(!path){byId('abResult').textContent='No A/B evidence path available.';return;}try{const response=await fetch('/api/compare-evidence',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path,run_index:Number(byId('selectedRunIndex').value||1)})});const data=await response.json();renderComparison(data);byId('abResult').textContent=JSON.stringify(data,null,2);}catch(err){byId('abResult').textContent='API error: '+err.message;}}"
+        "document.addEventListener('click',(event)=>{const idx=event.target.dataset&&event.target.dataset.remove;if(idx!==undefined){calls.splice(Number(idx),1);renderCalls();}const surface=event.target.dataset&&event.target.dataset.surface;if(surface){byId('targetInput').value=surface;makeFinding();makeAb();}const row=event.target.closest&&event.target.closest('tr[data-finding-path]');if(row){selectFinding(findings.find((item)=>item.path===row.dataset.findingPath));}const runRow=event.target.closest&&event.target.closest('tr[data-run-path]');if(runRow){selectRun(evidenceRuns.find((item)=>item.path===runRow.dataset.runPath));}});"
+        "byId('seatSelect').addEventListener('change',refreshTools);byId('toolSelect').addEventListener('change',refreshArgs);byId('addCall').addEventListener('click',addCall);byId('resetCalls').addEventListener('click',()=>{calls.length=0;renderCalls();});byId('saveFinding').addEventListener('click',saveFinding);byId('refreshFindings').addEventListener('click',refreshFindings);byId('refreshRuns').addEventListener('click',refreshRuns);byId('compareSelectedRun').addEventListener('click',compareEvidence);byId('reviewReproduced').addEventListener('click',()=>reviewFinding('reproduced'));byId('reviewRejected').addEventListener('click',()=>reviewFinding('rejected'));byId('promoteFinding').addEventListener('click',promoteFinding);byId('makeFinding').addEventListener('click',makeFinding);byId('makeAb').addEventListener('click',makeAb);byId('runSession').addEventListener('click',runSession);byId('runAb').addEventListener('click',runAb);byId('showEvidence').addEventListener('click',showEvidence);byId('compareEvidence').addEventListener('click',compareEvidence);byId('abSutMode').addEventListener('change',makeAb);byId('abRuns').addEventListener('input',makeAb);byId('abLive').addEventListener('change',makeAb);byId('findingPathInput').addEventListener('input',makeAb);['targetInput','payloadInput','taskPromptInput'].forEach((id)=>byId(id).addEventListener('input',makeFinding));byId('copyCommand').addEventListener('click',()=>navigator.clipboard&&navigator.clipboard.writeText(byId('commandOutput').textContent));"
         "document.querySelectorAll('.seat-row').forEach((row)=>row.addEventListener('click',()=>{byId('seatSelect').value=row.dataset.seat;refreshTools();}));"
-        "renderFindingRows();if(findings[0]){selectFinding(findings[0]);}else{byId('findingPathInput').value='';}refreshSeatSelect();refreshTools();renderCalls();makeFinding();</script>"
+        "renderFindingRows();renderRunRows();if(findings[0]){selectFinding(findings[0]);}else{byId('findingPathInput').value='';}if(evidenceRuns[0]){selectRun(evidenceRuns[0]);}refreshSeatSelect();refreshTools();renderCalls();makeFinding();</script>"
         "</body></html>\n"
     )
 
