@@ -1,3 +1,11 @@
+# 2026-07-07 01:11 -07:00 Open Agent Range Workbench finding 持久编辑
+
+- 继续推进 `open-agent-range/` 的 Workbench 产品形态。本轮把浏览器内 finding 从“命令文本生成”推进到本地 API 持久创建/编辑。
+- 新增 `/api/save-finding` 与 `/api/list-findings`：前者按现有 finding schema 在 `findings_dir` 创建或更新 JSON，保留 `last_ab_summary`、challenge 元数据和 created_at；后者读回 payload、task_prompt、notes、last_ab_summary 等可编辑字段。页面新增 task prompt、expected risk、status、notes、`Save finding`、`Refresh` 控件；点击开放注入面会填充 target，点击 finding 队列表格会回填编辑表单。
+- `gpt-5.5/xhigh` 只读子 agent `Rawls` 完成复核，结论仍是 **不完全符合 PRD**：新增 finding save/list 与既有 manual-session/run-ab/show-evidence 是真实进展，但 deterministic baseline、薄 Web 包装、live A/B 完成态、XA-Guard 长生命周期和真实 semantic consequence 仍是 P0 缺口。
+- 验证：`python -m pytest kernel/tests/test_range_cli.py -q` 13 passed；`python -m pytest kernel/tests/test_workbench.py -q` 19 passed；`python -m pytest kernel/tests -q` 115 passed。`workbench serve --no-server` smoke 通过，抽取页面脚本后 `node --check` 通过；临时 runtime 产物已清理。
+- 未完成：这仍只是最小开放面选择与 finding 持久编辑，不是真正地图画布、多注入编排、证据并排审核或完整 replay/report dashboard；Open Agent Range 仍未达到完整 PRD。
+
 # 2026-07-07 00:57 -07:00 Open Agent Range Workbench A/B API
 
 - 继续推进 `open-agent-range/` 的红队产品形态。本轮把 `workbench serve` 的 HTTP 本地 API 从多步 `manual-session` 扩展到 finding A/B 执行和 evidence summary 读取。

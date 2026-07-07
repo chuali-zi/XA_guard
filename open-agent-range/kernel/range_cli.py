@@ -332,6 +332,8 @@ def _make_workbench_handler(out_dir: Path, state: dict[str, Any]) -> type[http.s
                 "/api/manual-session": "manual-session",
                 "/api/run-ab": "run-ab",
                 "/api/show-evidence": "show-evidence",
+                "/api/save-finding": "save-finding",
+                "/api/list-findings": "list-findings",
             }
             action = actions.get(self.path)
             if action is None:
@@ -371,6 +373,10 @@ def run_workbench_api_action(
         return _run_workbench_api_run_ab(payload, api_root=api_root)
     if action == "show-evidence":
         return _run_workbench_api_show_evidence(payload)
+    if action == "save-finding":
+        return _run_workbench_api_save_finding(state, payload)
+    if action == "list-findings":
+        return _run_workbench_api_list_findings(state)
     raise ValueError(f"unknown workbench API action: {action}")
 
 
@@ -470,6 +476,69 @@ def _run_workbench_api_show_evidence(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _run_workbench_api_save_finding(state: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+    target = str(payload.get("target", "")).strip()
+    if not target:
+        raise ValueError("target is required")
+    payload_text = str(payload.get("payload", "")).strip()
+    if not payload_text:
+        raise ValueError("payload is required")
+    task_prompt = str(payload.get("task_prompt", "red-team manual session") or "red-team manual session").strip()
+    expected_risk = str(payload.get("expected_risk", "sensitive-egress") or "sensitive-egress").strip()
+    notes = str(payload.get("notes", "") or "")
+    status = str(payload.get("status", "draft") or "draft").strip()
+    if status not in {"draft", "reproduced", "rejected", "promoted"}:
+        raise ValueError("status must be draft, reproduced, rejected, or promoted")
+
+    findings_dir = Path(str(state.get("findings_dir", ".runtime/findings"))).resolve()
+    path_text = str(payload.get("path", "") or "").strip()
+    new_finding_id = _api_finding_id(target)
+    finding_path = Path(path_text).expanduser() if path_text else findings_dir / f"{new_finding_id}.json"
+    if not finding_path.is_absolute():
+        finding_path = (findings_dir / finding_path).resolve()
+    existing: dict[str, Any] = {}
+    if finding_path.is_file():
+        existing = _read_json(finding_path)
+    now = _now_iso()
+    finding = {
+        "finding_id": existing.get("finding_id") or new_finding_id,
+        "world": str(payload.get("world") or existing.get("world") or state.get("world_path", "")),
+        "target": target,
+        "payload": payload_text,
+        "task_prompt": task_prompt,
+        "expected_risk": expected_risk,
+        "notes": notes,
+        "created_at": existing.get("created_at") or now,
+        "status": status,
+        "updated_at": now,
+        "review_notes": existing.get("review_notes", ""),
+        "reviewed_at": existing.get("reviewed_at", ""),
+        "last_ab_summary": existing.get("last_ab_summary", {}),
+        "challenge_path": existing.get("challenge_path", ""),
+        "promoted_at": existing.get("promoted_at", ""),
+    }
+    _write_json(finding_path, finding)
+    return {
+        "ok": True,
+        "code": 0,
+        "action": "save-finding",
+        "path": str(finding_path),
+        "finding": finding,
+        "findings": _load_finding_items(findings_dir),
+    }
+
+
+def _run_workbench_api_list_findings(state: dict[str, Any]) -> dict[str, Any]:
+    findings_dir = Path(str(state.get("findings_dir", ".runtime/findings"))).resolve()
+    return {
+        "ok": True,
+        "code": 0,
+        "action": "list-findings",
+        "findings_dir": str(findings_dir),
+        "findings": _load_finding_items(findings_dir),
+    }
+
+
 def _invoke_workbench_json(argv: list[str]) -> tuple[int, dict[str, Any], str]:
     from kernel import workbench
 
@@ -489,6 +558,14 @@ def _api_attempt_id(principal: str) -> str:
     safe = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in principal).strip("-") or "seat"
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     return f"{stamp}-{safe}"
+
+
+def _api_finding_id(target: str) -> str:
+    stem = "".join(ch.lower() if ch.isalnum() else "-" for ch in target).strip("-")
+    while "--" in stem:
+        stem = stem.replace("--", "-")
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    return f"finding-{stem or 'target'}-{stamp}"
 
 
 @dataclass
@@ -699,10 +776,13 @@ def render_workbench_html(state: dict[str, Any]) -> str:
         "</button>"
         for item in state.get("seat_contexts", [])
     )
-    surfaces = "".join(f"<button class=\"chip\" type=\"button\">{_html(str(item))}</button>" for item in state.get("open_surfaces", []))
+    surfaces = "".join(
+        f"<button class=\"chip\" type=\"button\" data-surface=\"{_html(str(item))}\">{_html(str(item))}</button>"
+        for item in state.get("open_surfaces", [])
+    )
     properties = "".join(f"<span class=\"property\">{_html(str(item))}</span>" for item in state.get("bound_properties", []))
     findings = "".join(
-        "<tr>"
+        f"<tr data-finding-path=\"{_html(str(item.get('path', '')))}\">"
         f"<td>{_html(str(item.get('status', '')))}</td>"
         f"<td>{_html(str(item.get('finding_id', '')))}</td>"
         f"<td>{_html(str(item.get('target', '')))}</td>"
@@ -760,21 +840,25 @@ def render_workbench_html(state: dict[str, Any]) -> str:
         "<aside class=\"panel\"><h2>Finding / A-B</h2>"
         "<label for=\"targetInput\">Finding target</label><input id=\"targetInput\" value=\"mailbox:林工@dctg.local\">"
         "<label for=\"payloadInput\">Payload note</label><textarea id=\"payloadInput\">synthetic red-team payload</textarea>"
+        "<label for=\"taskPromptInput\">Task prompt</label><textarea id=\"taskPromptInput\">red-team manual session</textarea>"
+        "<div class=\"split\"><div><label for=\"riskInput\">Expected risk</label><input id=\"riskInput\" value=\"sensitive-egress\"></div><div><label for=\"statusSelect\">Status</label><select id=\"statusSelect\"><option>draft</option><option>reproduced</option><option>rejected</option><option>promoted</option></select></div></div>"
+        "<label for=\"notesInput\">Notes</label><textarea id=\"notesInput\"></textarea>"
         "<label for=\"findingPathInput\">Finding JSON</label><input id=\"findingPathInput\">"
         "<label for=\"evidencePathInput\">Evidence path</label><input id=\"evidencePathInput\">"
         "<div class=\"split\"><div><label for=\"abSutMode\">SUT</label><select id=\"abSutMode\"><option value=\"null,guard\">Null / Guard</option><option value=\"null,xaguard\">Null / XA-Guard</option></select></div><div><label for=\"abRuns\">Runs</label><input id=\"abRuns\" type=\"number\" min=\"1\" value=\"1\"></div></div>"
         "<label><input id=\"abLive\" type=\"checkbox\"> Live</label>"
-        "<div class=\"toolbar\"><button class=\"btn secondary\" id=\"makeFinding\" type=\"button\">Finding command</button><button class=\"btn secondary\" id=\"makeAb\" type=\"button\">A/B command</button><button class=\"btn\" id=\"runAb\" type=\"button\">Run A/B API</button><button class=\"btn secondary\" id=\"showEvidence\" type=\"button\">Show evidence</button></div>"
+        "<div class=\"toolbar\"><button class=\"btn\" id=\"saveFinding\" type=\"button\">Save finding</button><button class=\"btn secondary\" id=\"refreshFindings\" type=\"button\">Refresh</button><button class=\"btn secondary\" id=\"makeFinding\" type=\"button\">Finding command</button><button class=\"btn secondary\" id=\"makeAb\" type=\"button\">A/B command</button><button class=\"btn\" id=\"runAb\" type=\"button\">Run A/B API</button><button class=\"btn secondary\" id=\"showEvidence\" type=\"button\">Show evidence</button></div>"
         "<pre id=\"findingCommand\"></pre>"
         "<h3>A/B Result</h3><pre id=\"abResult\"></pre>"
-        "<h3>Finding Queue</h3><table><tr><th>Status</th><th>ID</th><th>Target</th><th>Path</th></tr>"
-        f"{findings}</table>"
+        "<h3>Finding Queue</h3><table><thead><tr><th>Status</th><th>ID</th><th>Target</th><th>Path</th></tr></thead>"
+        f"<tbody id=\"findingRows\">{findings}</tbody></table>"
         "<h3>Reference Commands</h3><table>"
         f"{commands}</table></aside></main>"
         f"<script>const RANGE_STATE={state_json};\n"
         "const seats=RANGE_STATE.seat_contexts||[];const tools=RANGE_STATE.tools||[];const calls=[];"
-        "const findings=RANGE_STATE.findings||[];let lastEvidencePath='';"
+        "let findings=RANGE_STATE.findings||[];let lastEvidencePath='';"
         "const byId=(id)=>document.getElementById(id);"
+        "const esc=(value)=>String(value??'').replace(/[&<>\"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[ch]));"
         "const shellQuote=(s)=>String(s).includes(' ')?'\"'+String(s).replaceAll('\"','\\\\\"')+'\"':String(s);"
         "const toolByName=(name)=>tools.find((tool)=>tool.name===name)||{};"
         "function sampleValue(prop){if(!prop||typeof prop!=='object')return '...';if(prop.type==='array')return [];if(prop.type==='integer'||prop.type==='number')return 1;if(prop.type==='boolean')return true;if(prop.type==='object')return {};return '...';}"
@@ -785,16 +869,20 @@ def render_workbench_html(state: dict[str, Any]) -> str:
         "function refreshArgs(){const tool=toolByName(byId('toolSelect').value);byId('argsEditor').value=JSON.stringify(sampleArgs(tool),null,2);byId('toolContract').textContent=JSON.stringify(tool,null,2);}"
         "function renderCalls(){byId('callList').innerHTML=calls.map((call,index)=>`<div class=\"call\"><b>${index+1}</b><span>${call.tool}<br>${JSON.stringify(call.args)}</span><button type=\"button\" data-remove=\"${index}\">x</button></div>`).join('');const command=`python -m kernel.range_cli manual-session --world ${shellQuote(RANGE_STATE.world_path)} --principal ${shellQuote(byId('seatSelect').value)} --calls-json '${JSON.stringify(calls)}' --sut-mode guard --out-dir .runtime/manual-session --json`;byId('commandOutput').textContent=command;}"
         "function addCall(){let args;try{args=JSON.parse(byId('argsEditor').value||'{}')}catch(err){byId('commandOutput').textContent='Invalid JSON: '+err.message;return;}calls.push({tool:byId('toolSelect').value,args});renderCalls();}"
-        "function makeFinding(){const target=byId('targetInput').value;const payload=byId('payloadInput').value;byId('findingCommand').textContent=`python -m kernel.range_cli init-finding --world ${shellQuote(RANGE_STATE.world_path)} --target ${shellQuote(target)} --payload ${shellQuote(payload)} --task-prompt ${shellQuote('red-team manual session')}`;}"
+        "function renderFindingRows(){byId('findingRows').innerHTML=findings.map((item)=>`<tr data-finding-path=\"${esc(item.path)}\"><td>${esc(item.status)}</td><td>${esc(item.finding_id)}</td><td>${esc(item.target)}</td><td>${esc(item.path)}</td></tr>`).join('');}"
+        "function selectFinding(item){if(!item)return;byId('findingPathInput').value=item.path||'';byId('targetInput').value=item.target||'';byId('payloadInput').value=item.payload||'';byId('taskPromptInput').value=item.task_prompt||'red-team manual session';byId('riskInput').value=item.expected_risk||'sensitive-egress';byId('statusSelect').value=item.status||'draft';byId('notesInput').value=item.notes||'';const last=item.last_ab_summary||{};if(last.path){byId('evidencePathInput').value=last.path;lastEvidencePath=last.path;}makeFinding();makeAb();}"
+        "function makeFinding(){const target=byId('targetInput').value;const payload=byId('payloadInput').value;const task=byId('taskPromptInput').value||'red-team manual session';byId('findingCommand').textContent=`python -m kernel.range_cli init-finding --world ${shellQuote(RANGE_STATE.world_path)} --target ${shellQuote(target)} --payload ${shellQuote(payload)} --task-prompt ${shellQuote(task)}`;}"
         "function currentFindingPath(){return byId('findingPathInput').value||((findings[0]&&findings[0].path)||'');}"
         "function makeAb(){const finding=currentFindingPath()||'<finding.json>';const live=byId('abLive').checked?' --live':'';byId('findingCommand').textContent=`python -m kernel.range_cli run-ab --finding ${shellQuote(finding)} --sut-mode ${shellQuote(byId('abSutMode').value)} --repeat ${shellQuote(byId('abRuns').value||'1')}${live} --execute --out-dir .runtime/ab`;}"
+        "async function saveFinding(){if(location.protocol==='file:'){byId('abResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}byId('abResult').textContent='Saving finding...';try{const response=await fetch('/api/save-finding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:byId('findingPathInput').value,target:byId('targetInput').value,payload:byId('payloadInput').value,task_prompt:byId('taskPromptInput').value,expected_risk:byId('riskInput').value,status:byId('statusSelect').value,notes:byId('notesInput').value})});const data=await response.json();if(data.findings){findings=data.findings;renderFindingRows();}if(data.path){byId('findingPathInput').value=data.path;}byId('abResult').textContent=JSON.stringify(data,null,2);makeAb();}catch(err){byId('abResult').textContent='API error: '+err.message;}}"
+        "async function refreshFindings(){if(location.protocol==='file:'){byId('abResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}try{const response=await fetch('/api/list-findings',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const data=await response.json();if(data.findings){findings=data.findings;renderFindingRows();}byId('abResult').textContent=JSON.stringify(data,null,2);}catch(err){byId('abResult').textContent='API error: '+err.message;}}"
         "async function runSession(){if(location.protocol==='file:'){byId('apiResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}if(!calls.length){byId('apiResult').textContent='Add at least one ToolCall first.';return;}byId('apiResult').textContent='Running...';try{const response=await fetch('/api/manual-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({principal:byId('seatSelect').value,calls,sut_mode:'guard'})});const data=await response.json();byId('apiResult').textContent=JSON.stringify(data,null,2);}catch(err){byId('apiResult').textContent='API error: '+err.message;}}"
         "async function runAb(){if(location.protocol==='file:'){byId('abResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}const finding=currentFindingPath();if(!finding){byId('abResult').textContent='Select or create a finding JSON first.';return;}byId('abResult').textContent='Running A/B...';try{const response=await fetch('/api/run-ab',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({finding_path:finding,sut_mode:byId('abSutMode').value,runs:Number(byId('abRuns').value||1),live:byId('abLive').checked,execute:true})});const data=await response.json();if(data.out_dir){lastEvidencePath=data.out_dir;byId('evidencePathInput').value=data.out_dir;}else if(data.summary_path){lastEvidencePath=data.summary_path;byId('evidencePathInput').value=data.summary_path;}byId('abResult').textContent=JSON.stringify(data,null,2);}catch(err){byId('abResult').textContent='API error: '+err.message;}}"
         "async function showEvidence(){if(location.protocol==='file:'){byId('abResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}const path=byId('evidencePathInput').value||lastEvidencePath;if(!path){byId('abResult').textContent='No evidence path available.';return;}try{const response=await fetch('/api/show-evidence',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path})});const data=await response.json();byId('abResult').textContent=JSON.stringify(data,null,2);}catch(err){byId('abResult').textContent='API error: '+err.message;}}"
-        "document.addEventListener('click',(event)=>{const idx=event.target.dataset&&event.target.dataset.remove;if(idx!==undefined){calls.splice(Number(idx),1);renderCalls();}});"
-        "byId('seatSelect').addEventListener('change',refreshTools);byId('toolSelect').addEventListener('change',refreshArgs);byId('addCall').addEventListener('click',addCall);byId('resetCalls').addEventListener('click',()=>{calls.length=0;renderCalls();});byId('makeFinding').addEventListener('click',makeFinding);byId('makeAb').addEventListener('click',makeAb);byId('runSession').addEventListener('click',runSession);byId('runAb').addEventListener('click',runAb);byId('showEvidence').addEventListener('click',showEvidence);byId('abSutMode').addEventListener('change',makeAb);byId('abRuns').addEventListener('input',makeAb);byId('abLive').addEventListener('change',makeAb);byId('findingPathInput').addEventListener('input',makeAb);byId('copyCommand').addEventListener('click',()=>navigator.clipboard&&navigator.clipboard.writeText(byId('commandOutput').textContent));"
+        "document.addEventListener('click',(event)=>{const idx=event.target.dataset&&event.target.dataset.remove;if(idx!==undefined){calls.splice(Number(idx),1);renderCalls();}const surface=event.target.dataset&&event.target.dataset.surface;if(surface){byId('targetInput').value=surface;makeFinding();makeAb();}const row=event.target.closest&&event.target.closest('tr[data-finding-path]');if(row){selectFinding(findings.find((item)=>item.path===row.dataset.findingPath));}});"
+        "byId('seatSelect').addEventListener('change',refreshTools);byId('toolSelect').addEventListener('change',refreshArgs);byId('addCall').addEventListener('click',addCall);byId('resetCalls').addEventListener('click',()=>{calls.length=0;renderCalls();});byId('saveFinding').addEventListener('click',saveFinding);byId('refreshFindings').addEventListener('click',refreshFindings);byId('makeFinding').addEventListener('click',makeFinding);byId('makeAb').addEventListener('click',makeAb);byId('runSession').addEventListener('click',runSession);byId('runAb').addEventListener('click',runAb);byId('showEvidence').addEventListener('click',showEvidence);byId('abSutMode').addEventListener('change',makeAb);byId('abRuns').addEventListener('input',makeAb);byId('abLive').addEventListener('change',makeAb);byId('findingPathInput').addEventListener('input',makeAb);['targetInput','payloadInput','taskPromptInput'].forEach((id)=>byId(id).addEventListener('input',makeFinding));byId('copyCommand').addEventListener('click',()=>navigator.clipboard&&navigator.clipboard.writeText(byId('commandOutput').textContent));"
         "document.querySelectorAll('.seat-row').forEach((row)=>row.addEventListener('click',()=>{byId('seatSelect').value=row.dataset.seat;refreshTools();}));"
-        "byId('findingPathInput').value=(findings[0]&&findings[0].path)||'';refreshSeatSelect();refreshTools();renderCalls();makeFinding();</script>"
+        "renderFindingRows();if(findings[0]){selectFinding(findings[0]);}else{byId('findingPathInput').value='';}refreshSeatSelect();refreshTools();renderCalls();makeFinding();</script>"
         "</body></html>\n"
     )
 
@@ -906,8 +994,12 @@ def _load_finding_items(findings_dir: Path) -> list[dict[str, Any]]:
                 "status": finding.get("status", "draft"),
                 "world": finding.get("world", ""),
                 "target": finding.get("target", ""),
+                "payload": finding.get("payload", ""),
+                "task_prompt": finding.get("task_prompt", ""),
                 "expected_risk": finding.get("expected_risk", ""),
+                "notes": finding.get("notes", ""),
                 "updated_at": finding.get("updated_at", ""),
+                "last_ab_summary": finding.get("last_ab_summary", {}),
             }
         )
     return items

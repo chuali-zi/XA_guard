@@ -1,5 +1,13 @@
 # 工作日志
 
+## 2026-07-07 01:11 Workbench finding 持久编辑与注入面选择
+
+- **背景/目标**：继续推进 `Hubble` review 指出的 Workbench P0 产品形态缺口。上一轮浏览器已能执行 manual-session、A/B 和读取 evidence summary，但 finding 仍主要靠命令文本创建，开放注入面按钮也没有真正驱动 target 编辑。
+- **本轮做了什么**：`range_cli workbench serve` 新增 `/api/save-finding` 与 `/api/list-findings`。`save-finding` 会按现有 finding schema 在 `findings_dir` 创建或更新 JSON，保留 `last_ab_summary`、challenge 信息和创建时间；`list-findings` 会读回 payload、task_prompt、notes、last_ab_summary 等可编辑状态。页面新增 task prompt、expected risk、status、notes、Save finding、Refresh 控件，finding 表格可点击回填编辑表单，开放注入面按钮可一键填充 target。
+- **外部复核结论**：`gpt-5.5/xhigh` 只读子 agent `Rawls` 完成 review，结论仍是 **不完全符合 PRD**。它确认 save/list finding、manual-session、run-ab、show-evidence 是真实进展，但仍不足以改判为完全自由靶场；P0 缺口仍是 deterministic baseline、Workbench 薄 Web 包装、A/B/live agent 未达完成态、XA-Guard live 非长生命周期、语义型注入 consequence 偏最小事实模拟。
+- **测试/验证**：`python -m pytest kernel/tests/test_range_cli.py -q` 通过（13 个用例）；`python -m pytest kernel/tests/test_workbench.py -q` 通过（19 个用例）；完整 `python -m pytest kernel/tests -q` 通过（115 个用例）。手工 smoke：`python -m kernel.range_cli workbench serve --world scenarios\dctg\full-day.json --out-dir .runtime\workbench-finding-api-smoke --no-server --json` 通过；抽取页面 `<script>` 后 `node --check` 通过；临时 runtime 产物已清理。
+- **仍未完成**：这只是最小的开放面选择和 finding 持久编辑，不是真正地图画布、多注入编排、证据并排审核或完整 replay/report dashboard；PRD 完成态仍未达到。
+
 ## 2026-07-07 00:57 Workbench A/B 执行 API 与 evidence summary 读取
 
 - **背景/目标**：继续推进 `Nash` review 指出的 P0 产品形态缺口：上一轮 Workbench HTTP 模式已能执行多步 `manual-session`，但浏览器内仍不能直接跑 finding A/B，也不能从页面读取 evidence summary。
