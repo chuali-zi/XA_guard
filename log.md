@@ -1,3 +1,10 @@
+# 2026-07-07 06:16 -07:00 Open Agent Range Workbench Evidence Review
+
+- 继续推进 `open-agent-range/` 的红队产品形态。本轮把 Workbench 从“跑 A/B 后吐 summary JSON”推进到浏览器内摘要级 Null vs Protected 证据并排审阅。
+- 新增 `/api/compare-evidence`：可读取 A/B summary 或显式 null/protected evidence path，返回 null baseline、protected side、violation/external-send delta、blocked refs、still leaked refs、new protected leaks 和 `protection_observed`。
+- 页面新增 `Compare evidence` 按钮与 `Evidence Review` 双栏面板，展示两侧 verdict、violations、external sends、leaked refs、SUT decisions、tool events、ledger hash 和 delta。
+- 验证：`python -m pytest kernel/tests/test_range_cli.py -q` 15 passed；`python -m pytest kernel/tests -q` 118 passed。`workbench serve --no-server` smoke 通过，抽取页面脚本后 `node --check` 通过；临时 runtime 产物已清理。
+- `gpt-5.5/xhigh` 只读子 agent `Confucius` 复核后仍判定 **不完全符合 PRD/SP7**：本轮是明显产品进展，但仍只是摘要级对照，不是完整 timeline / ledger / audit / violation detail evidence browser；P0 仍包括 full-day scripted baseline、XA-Guard live 非长生命周期、缺真实 live N>=3 A/B 矩阵、完整 Web 沙盘和更深 insider consequence。
 # 2026-07-07 06:04 -07:00 Open Agent Range SUT audit alignment gate
 
 - 继续推进 `open-agent-range/` 的 PRD 完成态，针对上一轮 xhigh review 指出的 “Gate6 audit 与 range ledger 未逐工具尝试/裁决深度对齐” 做证据门禁加固。

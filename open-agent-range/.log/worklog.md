@@ -1,5 +1,13 @@
 # open-agent-range 工作日志
 
+## 2026-07-07 06:16 Workbench Evidence Review summary comparison
+- Continued the PRD product-shape work after the `Erdos` review. The concrete gap addressed here: browser Workbench could run A/B and read summary JSON, but it did not yet provide a side-by-side red-team review surface for Null vs Protected evidence.
+- Added `/api/compare-evidence` to `range_cli workbench serve`. It can read an A/B summary path or explicit null/protected evidence paths and returns null baseline, protected side, violation/external-send deltas, blocked refs, still leaked refs, new protected leaks, and `protection_observed`.
+- Updated the generated Workbench HTML with a `Compare evidence` control and an `Evidence Review` two-column panel showing each side's verdict, violations, external sends, leaked refs, SUT decisions, tool events, ledger hash, and delta.
+- Requested review: the `gpt-5.5` / `xhigh` read-only subagent `Confucius` completed and still judged the range not fully PRD-compliant. It acknowledged compare-evidence as clear product progress, but noted the panel is still summary-level rather than a full timeline / ledger / audit / violation-detail evidence browser.
+- Verification: `python -m pytest kernel/tests/test_range_cli.py -q` passed with 15 tests; full `python -m pytest kernel/tests -q` passed with 118 tests. Smoke `python -m kernel.range_cli workbench serve --world scenarios\dctg\full-day.json --out-dir .runtime\workbench-compare-smoke --no-server --json` passed, and the extracted page script passed `node --check`. Temporary runtime output was removed.
+- Still incomplete: this is summary-level side-by-side review, not the full Web range. Missing pieces remain run selection, expandable timeline/tool-events/audit/ledger/violations/raw-XA-Guard rows, full replay/report dashboard, map canvas, multi-injection orchestration, live N>=3, and long-running observe-plan-act seats.
+
 ## 2026-07-07 06:04 SUT audit alignment and promote gate hardening
 - Continued the PRD completion work after the `Sagan` review. The concrete gap addressed here: `replay --verify-sut-audit` was mostly count-level, and promotion did not prove protected evidence alignment between tool events, audit rows, and ledger decisions.
 - Upgraded `range replay --verify-sut-audit` to emit sequence-level alignment across `tool-events.jsonl`, range `audit.jsonl`, ledger `tool_attempt`, ledger `sut_decision`, and optional raw `xa-guard-audit/audit.jsonl` tool/decision rows.

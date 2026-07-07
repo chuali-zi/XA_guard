@@ -291,6 +291,9 @@ def test_workbench_serve_writes_static_dashboard(tmp_path: Path, capsys) -> None
     assert "Promote" in html
     assert "/api/review-finding" in html
     assert "/api/promote-finding" in html
+    assert "Compare evidence" in html
+    assert "Evidence Review" in html
+    assert "/api/compare-evidence" in html
 
 
 def test_sut_check_reports_offline_configuration(capsys) -> None:
@@ -469,6 +472,21 @@ def test_workbench_api_run_ab_executes_and_show_evidence_reads_summary(tmp_path:
     assert shown["ok"] is True
     assert shown["summary"]["run_count"] == 1
     assert shown["summary"]["aggregate"]["protection_delta"] == 1.0
+
+    compared = range_cli.run_workbench_api_action(
+        state,
+        "compare-evidence",
+        {"path": str(out_dir)},
+        api_root=tmp_path / "api-runs",
+    )
+
+    assert compared["ok"] is True
+    assert compared["comparison"]["protected_label"] == "guard"
+    assert compared["comparison"]["null"]["violations_count"] == 1
+    assert compared["comparison"]["protected"]["violations_count"] == 0
+    assert compared["comparison"]["delta"]["violation_delta"] == 1
+    assert compared["comparison"]["delta"]["protection_observed"] is True
+    assert compared["comparison"]["delta"]["blocked_data_refs"] == ["cit-1001"]
 
 
 def test_workbench_api_save_finding_persists_edits_and_lists_items(tmp_path: Path) -> None:

@@ -1,5 +1,13 @@
 # 工作日志
 
+## 2026-07-07 06:16 Workbench Evidence Review 摘要并排审阅
+
+- **背景/目标**：继续推进 `Erdos` / `Confucius` 指出的 Workbench 产品形态缺口。上一轮已经有 A/B 执行、summary 读取、review/promote 和 audit alignment，但浏览器里仍缺 Null vs Protected 的证据对照面，红队需要自己读 JSON 判断复现与防护效果。
+- **本轮做了什么**：`range_cli workbench serve` 新增 `/api/compare-evidence`，可从 A/B summary 或显式 null/protected evidence path 读取两侧 attempt summary，并返回 null baseline、protected side、violation/external-send delta、blocked refs、still leaked refs、new protected leaks 和 `protection_observed`。页面新增 `Compare evidence` 按钮与 `Evidence Review` 双栏面板，展示两侧 verdict、violations、external sends、leaked refs、SUT decisions、tool events、ledger hash 和 delta。
+- **外部复核结论**：`gpt-5.5/xhigh` 只读子 agent `Confucius` 完成 review，结论仍是 **不完全符合 PRD**。它确认 compare-evidence 是明显产品进展，但指出当前仍是 `summarize_attempt()` 摘要级对照，不是完整 timeline / ledger / audit / violation detail evidence browser；P0 仍是 full-day scripted baseline、XA-Guard live 非 attempt 级长生命周期、缺真实 `null,xaguard --live --repeat >=3` 证据矩阵、Workbench 非完整红队沙盘，以及 insider consequence 仍偏结构化落位。
+- **测试/验证**：`python -m pytest kernel/tests/test_range_cli.py -q` 通过（15 个用例）；完整 `python -m pytest kernel/tests -q` 通过（118 个用例）。手工 smoke：`python -m kernel.range_cli workbench serve --world scenarios\dctg\full-day.json --out-dir .runtime\workbench-compare-smoke --no-server --json` 通过；抽取页面 `<script>` 后 `node --check` 通过；临时 runtime 产物已清理。
+- **仍未完成**：当前只是摘要级并排审阅，还缺 run selector、timeline/tool-events/audit/ledger/violations/raw-XA-Guard 逐项展开、完整 replay/report dashboard、地图画布、多注入编排、真实 live N>=3 和长程 observe-plan-act。
+
 ## 2026-07-07 06:04 SUT audit alignment 与 promote gate 加固
 
 - **背景/目标**：继续推进 `Sagan` review 指出的 P0：Gate6 audit 与 range ledger 仍缺逐工具尝试/裁决/副作用的深度对齐。本轮先把证据层从“数量相等”推进到“逐序 tool/decision 对齐”，并让 challenge 固化路径默认使用这项门禁。
