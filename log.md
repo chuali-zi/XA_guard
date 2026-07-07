@@ -1,3 +1,11 @@
+# 2026-07-07 00:57 -07:00 Open Agent Range Workbench A/B API
+
+- 继续推进 `open-agent-range/` 的红队产品形态。本轮把 `workbench serve` 的 HTTP 本地 API 从多步 `manual-session` 扩展到 finding A/B 执行和 evidence summary 读取。
+- 新增 `/api/run-ab` 与 `/api/show-evidence`：前者包装现有 `kernel.workbench run-ab`，接收 finding、SUT 模式、runs、live/execute 参数并写标准 A/B evidence；后者包装 `kernel.workbench show --json`，从 attempt 或 A/B 输出目录读回 summary。生成的 Workbench 页面新增 finding path、SUT、runs、live、`Run A/B API`、`Show evidence` 控件。
+- `gpt-5.5/xhigh` 只读子 agent `Hubble` 完成复核，结论仍是 **不完全符合 PRD**：新增 API 是实质进展，但仍主要是 CLI 的 HTTP 包装；deterministic baseline、XA-Guard live smoke、完整 Web Workbench 和真实 semantic consequence 仍是 P0 缺口。
+- 验证：`python -m pytest kernel/tests/test_range_cli.py -q` 12 passed；`python -m pytest kernel/tests/test_workbench.py -q` 19 passed；`python -m pytest kernel/tests -q` 114 passed。`workbench serve --no-server` smoke 通过，抽取页面脚本后 `node --check` 通过；临时 runtime 产物已清理。
+- 未完成：这仍不是完整自由红队靶场；还缺多 finding 持久编辑、地图点击注入、证据并排审阅、完整 replay/report dashboard、真实 live N>=3 矩阵、长程 observe-plan-act 和 Gate6/range ledger 深度对齐。
+
 # 2026-07-07 00:46 -07:00 Open Agent Range Workbench 本地 API 执行
 
 - 继续推进 `open-agent-range/` 的红队产品形态。本轮把 `workbench serve` 从“浏览器里构造 manual-session 命令”推进到 HTTP serve 模式下可通过 `/api/manual-session` 直接执行多步 ManualSeat 本地会话。

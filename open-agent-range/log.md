@@ -1,5 +1,13 @@
 # 工作日志
 
+## 2026-07-07 00:57 Workbench A/B 执行 API 与 evidence summary 读取
+
+- **背景/目标**：继续推进 `Nash` review 指出的 P0 产品形态缺口：上一轮 Workbench HTTP 模式已能执行多步 `manual-session`，但浏览器内仍不能直接跑 finding A/B，也不能从页面读取 evidence summary。
+- **本轮做了什么**：`range_cli workbench serve` 的本地 API 新增 `/api/run-ab` 和 `/api/show-evidence`。`/api/run-ab` 包装现有 `kernel.workbench run-ab`，接受 `finding_path`、`sut_mode`、`runs`、`live`、`execute`，执行后写标准 A/B evidence 与 `summary.json`；`/api/show-evidence` 包装 `kernel.workbench show --json`，可读取 attempt 或 A/B 输出目录的 summary。页面新增 finding path、SUT、runs、live 控件，以及 `Run A/B API` 和 `Show evidence`。
+- **外部复核结论**：`gpt-5.5/xhigh` 只读子 agent `Hubble` 完成 review，结论仍是 **不完全符合 PRD**。它确认 `/api/manual-session`、`/api/run-ab`、`/api/show-evidence` 是实质进展，但仍主要是 CLI 的 HTTP 包装；P0 缺口仍是 deterministic baseline、XA-Guard live smoke 级、Workbench 非完整自由红队产品、语义型注入 consequence 偏模拟事实。
+- **测试/验证**：`python -m pytest kernel/tests/test_range_cli.py -q` 通过（12 个用例）；`python -m pytest kernel/tests/test_workbench.py -q` 通过（19 个用例）；完整 `python -m pytest kernel/tests -q` 通过（114 个用例）。手工 smoke：`python -m kernel.range_cli workbench serve --world scenarios\dctg\full-day.json --out-dir .runtime\workbench-ab-api-smoke --no-server --json` 通过；抽取页面 `<script>` 后 `node --check` 通过；临时 runtime 产物已清理。
+- **仍未完成**：这只是把 A/B 执行和 evidence summary 读回接入浏览器本地 API；仍不是完整 Web 靶场。还缺多 finding 持久编辑、地图点击注入、证据并排审阅、完整 replay/report dashboard、真实 live N>=3 矩阵、长程 observe-plan-act seat 和 Gate6/range ledger 深度对齐。
+
 ## 2026-07-07 00:46 Workbench 本地 API 执行与路径修正
 
 - **背景/目标**：继续推进“真实政企一天 + 完全自由红队靶场”的产品形态。上一轮 `workbench serve` 已能在页面内构造多步 ManualSession，但仍主要是命令构造器；本轮把 HTTP serve 模式推进到能直接触发本地 `manual-session` 执行。

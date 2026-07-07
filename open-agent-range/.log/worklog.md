@@ -1,5 +1,13 @@
 # open-agent-range 工作日志
 
+## 2026-07-07 00:57 Workbench A/B execution API and evidence summary
+- Continued the PRD product-shape work after the `Nash` xhigh review. The concrete gap addressed here: the HTTP workbench could execute manual sessions, but could not yet run finding A/B or read evidence summaries from the browser.
+- Added `/api/run-ab` and `/api/show-evidence` to `range_cli workbench serve`. The new API actions intentionally invoke existing `kernel.workbench run-ab` and `kernel.workbench show --json` so browser execution uses the same evidence, summary, and finding-update path as the CLI.
+- Updated the generated workbench HTML with finding path, SUT mode, run count, live toggle, `Run A/B API`, and `Show evidence` controls. The page can now trigger a local Null-vs-Guard/XA-Guard A/B run and render the returned summary JSON.
+- Requested review: the `gpt-5.5` / `xhigh` read-only subagent `Hubble` completed and still judged the range not fully PRD-compliant. It called the new APIs real progress, but noted they are still mostly HTTP wrappers around the existing CLI; P0 gaps remain deterministic baseline behavior, smoke-level live XA-Guard, incomplete Web workbench, and mostly simulated semantic injection consequences.
+- Verification: `python -m pytest kernel/tests/test_range_cli.py -q` passed with 12 tests; `python -m pytest kernel/tests/test_workbench.py -q` passed with 19 tests; full `python -m pytest kernel/tests -q` passed with 114 tests. Smoke `python -m kernel.range_cli workbench serve --world scenarios\dctg\full-day.json --out-dir .runtime\workbench-ab-api-smoke --no-server --json` passed, and the extracted page script passed `node --check`. Temporary runtime output was removed.
+- Still incomplete: this is a local A/B execution/read API, not the final Web range. Missing pieces remain persistent multi-finding editing, map-click injection, side-by-side evidence review, complete replay/report dashboards, live N>=3 matrices, long-running observe-plan-act seats, and Gate6/range-ledger deep alignment.
+
 ## 2026-07-07 00:46 Workbench local API execution and path hardening
 - Continued the PRD product-shape work. The prior workbench could build a manual session command in the browser; this round adds an HTTP local execution path for the same multi-step ManualSeat workflow.
 - Added `/api/manual-session` to `range_cli workbench serve` in HTTP mode. The page now has `Run local API` and `API Result`; it posts the selected principal plus the constructed ToolCall list to the local API, which runs `kernel.workbench manual-session`, writes standard evidence, and returns a structured summary/stderr payload.

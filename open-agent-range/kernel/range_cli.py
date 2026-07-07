@@ -328,7 +328,13 @@ def _cmd_workbench_serve(args: argparse.Namespace) -> int:
 def _make_workbench_handler(out_dir: Path, state: dict[str, Any]) -> type[http.server.SimpleHTTPRequestHandler]:
     class WorkbenchHandler(http.server.SimpleHTTPRequestHandler):
         def do_POST(self) -> None:  # noqa: N802 - stdlib handler method name
-            if self.path != "/api/manual-session":
+            actions = {
+                "/api/manual-session": "manual-session",
+                "/api/run-ab": "run-ab",
+                "/api/show-evidence": "show-evidence",
+            }
+            action = actions.get(self.path)
+            if action is None:
                 self.send_error(404, "unknown workbench API endpoint")
                 return
             length = int(self.headers.get("Content-Length", "0") or "0")
@@ -336,7 +342,7 @@ def _make_workbench_handler(out_dir: Path, state: dict[str, Any]) -> type[http.s
                 payload = json.loads(self.rfile.read(length).decode("utf-8-sig") or "{}")
                 result = run_workbench_api_action(
                     state,
-                    "manual-session",
+                    action,
                     payload,
                     api_root=out_dir / "api-runs",
                 )
@@ -359,8 +365,21 @@ def run_workbench_api_action(
     *,
     api_root: Path,
 ) -> dict[str, Any]:
-    if action != "manual-session":
-        raise ValueError(f"unknown workbench API action: {action}")
+    if action == "manual-session":
+        return _run_workbench_api_manual_session(state, payload, api_root=api_root)
+    if action == "run-ab":
+        return _run_workbench_api_run_ab(payload, api_root=api_root)
+    if action == "show-evidence":
+        return _run_workbench_api_show_evidence(payload)
+    raise ValueError(f"unknown workbench API action: {action}")
+
+
+def _run_workbench_api_manual_session(
+    state: dict[str, Any],
+    payload: dict[str, Any],
+    *,
+    api_root: Path,
+) -> dict[str, Any]:
     principal = str(payload.get("principal", "")).strip()
     if not principal:
         raise ValueError("principal is required")
@@ -371,22 +390,89 @@ def run_workbench_api_action(
     if sut_mode not in {"null", "guard", "guardstub", "xaguard", "xa-guard"}:
         raise ValueError("sut_mode must be null, guard, guardstub, xaguard, or xa-guard")
     attempt_dir = api_root / "manual-session" / _api_attempt_id(principal)
-    from kernel import workbench
+    code, summary, stderr = _invoke_workbench_json(
+        [
+            "manual-session",
+            "--world",
+            str(state.get("world_path", "")),
+            "--principal",
+            principal,
+            "--calls-json",
+            json.dumps(calls, ensure_ascii=False, separators=(",", ":")),
+            "--sut-mode",
+            sut_mode,
+            "--out-dir",
+            str(attempt_dir),
+            "--json",
+        ]
+    )
+    return {
+        "ok": code == 0,
+        "code": code,
+        "action": "manual-session",
+        "attempt_dir": str(attempt_dir),
+        "summary": summary,
+        "stderr": stderr,
+    }
 
+
+def _run_workbench_api_run_ab(payload: dict[str, Any], *, api_root: Path) -> dict[str, Any]:
+    finding = str(payload.get("finding_path") or payload.get("finding") or "").strip()
+    if not finding:
+        raise ValueError("finding_path is required")
+    runs = int(payload.get("runs", payload.get("repeat", 1)) or 1)
+    if runs < 1:
+        raise ValueError("runs must be >= 1")
+    sut_mode = str(payload.get("sut_mode", "null,guard") or "null,guard")
+    live = bool(payload.get("live", False))
+    execute = bool(payload.get("execute", True))
+    out_dir = Path(str(payload.get("out_dir") or "")).expanduser() if payload.get("out_dir") else None
+    if out_dir is None:
+        out_dir = api_root / "ab" / _api_attempt_id("ab")
     argv = [
-        "manual-session",
-        "--world",
-        str(state.get("world_path", "")),
-        "--principal",
-        principal,
-        "--calls-json",
-        json.dumps(calls, ensure_ascii=False, separators=(",", ":")),
+        "run-ab",
+        "--finding",
+        finding,
+        "--out-dir",
+        str(out_dir),
+        "--runs",
+        str(runs),
         "--sut-mode",
         sut_mode,
-        "--out-dir",
-        str(attempt_dir),
-        "--json",
     ]
+    if live:
+        argv.append("--live")
+    argv.append("--execute" if execute else "--dry-run")
+    code, summary, stderr = _invoke_workbench_json(argv)
+    return {
+        "ok": code == 0,
+        "code": code,
+        "action": "run-ab",
+        "out_dir": str(out_dir),
+        "summary_path": str(out_dir / "summary.json"),
+        "summary": summary,
+        "stderr": stderr,
+    }
+
+
+def _run_workbench_api_show_evidence(payload: dict[str, Any]) -> dict[str, Any]:
+    path = str(payload.get("path") or "").strip()
+    if not path:
+        raise ValueError("path is required")
+    code, summary, stderr = _invoke_workbench_json(["show", path, "--json"])
+    return {
+        "ok": code == 0,
+        "code": code,
+        "action": "show-evidence",
+        "path": path,
+        "summary": summary,
+        "stderr": stderr,
+    }
+
+
+def _invoke_workbench_json(argv: list[str]) -> tuple[int, dict[str, Any], str]:
+    from kernel import workbench
+
     stdout = io.StringIO()
     stderr = io.StringIO()
     with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
@@ -396,14 +482,7 @@ def run_workbench_api_action(
         summary = json.loads(raw) if raw else {}
     except json.JSONDecodeError:
         summary = {"raw_stdout": raw}
-    return {
-        "ok": code == 0,
-        "code": code,
-        "action": action,
-        "attempt_dir": str(attempt_dir),
-        "summary": summary,
-        "stderr": stderr.getvalue().strip(),
-    }
+    return code, summary, stderr.getvalue().strip()
 
 
 def _api_attempt_id(principal: str) -> str:
@@ -651,7 +730,7 @@ def render_workbench_html(state: dict[str, Any]) -> str:
         ".seat-list{display:grid;gap:7px;max-height:530px;overflow:auto}.seat-row{width:100%;text-align:left;border:1px solid var(--line);background:#0b100c;color:var(--ink);padding:9px;cursor:pointer;transition:.16s border-color,.16s background}"
         ".seat-row:hover,.seat-row.active{border-color:var(--accent);background:#17200f}.seat-row strong,.seat-row span,.seat-row small{display:block}.seat-row span,.seat-row small{color:var(--muted);font-size:11px}.seat-row small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}"
         ".surface-grid,.property-grid{display:flex;flex-wrap:wrap;gap:7px}.chip,.property{border:1px solid var(--line);background:#0b100c;color:var(--ink);padding:7px 8px;font-size:12px}.property{color:var(--accent)}"
-        "label{display:block;color:var(--muted);font-size:11px;margin:10px 0 5px}select,textarea,input{width:100%;background:var(--field);border:1px solid var(--line);color:var(--ink);padding:9px;font:12px Consolas,monospace}"
+        "label{display:block;color:var(--muted);font-size:11px;margin:10px 0 5px}select,textarea,input{width:100%;background:var(--field);border:1px solid var(--line);color:var(--ink);padding:9px;font:12px Consolas,monospace}input[type=checkbox]{width:auto}"
         "textarea{min-height:120px;resize:vertical}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.btn{border:1px solid var(--accent);background:transparent;color:var(--accent);padding:8px 10px;cursor:pointer;font-weight:700}.btn.secondary{border-color:var(--line);color:var(--ink)}"
         ".btn:hover{background:rgba(214,255,87,.12)}.calls{display:grid;gap:7px;margin-top:10px}.call{display:grid;grid-template-columns:24px 1fr auto;gap:8px;align-items:start;border:1px solid var(--line);background:#0b100c;padding:8px;font-family:Consolas,monospace;font-size:12px}"
         ".call b{color:var(--accent)}.call button{background:transparent;color:var(--danger);border:0;cursor:pointer}pre,code{white-space:pre-wrap;word-break:break-word}pre{background:#050805;border:1px solid var(--line);padding:10px;min-height:54px;color:#dce7d8}"
@@ -681,14 +760,20 @@ def render_workbench_html(state: dict[str, Any]) -> str:
         "<aside class=\"panel\"><h2>Finding / A-B</h2>"
         "<label for=\"targetInput\">Finding target</label><input id=\"targetInput\" value=\"mailbox:林工@dctg.local\">"
         "<label for=\"payloadInput\">Payload note</label><textarea id=\"payloadInput\">synthetic red-team payload</textarea>"
-        "<div class=\"toolbar\"><button class=\"btn secondary\" id=\"makeFinding\" type=\"button\">Finding command</button><button class=\"btn secondary\" id=\"makeAb\" type=\"button\">A/B command</button></div>"
+        "<label for=\"findingPathInput\">Finding JSON</label><input id=\"findingPathInput\">"
+        "<label for=\"evidencePathInput\">Evidence path</label><input id=\"evidencePathInput\">"
+        "<div class=\"split\"><div><label for=\"abSutMode\">SUT</label><select id=\"abSutMode\"><option value=\"null,guard\">Null / Guard</option><option value=\"null,xaguard\">Null / XA-Guard</option></select></div><div><label for=\"abRuns\">Runs</label><input id=\"abRuns\" type=\"number\" min=\"1\" value=\"1\"></div></div>"
+        "<label><input id=\"abLive\" type=\"checkbox\"> Live</label>"
+        "<div class=\"toolbar\"><button class=\"btn secondary\" id=\"makeFinding\" type=\"button\">Finding command</button><button class=\"btn secondary\" id=\"makeAb\" type=\"button\">A/B command</button><button class=\"btn\" id=\"runAb\" type=\"button\">Run A/B API</button><button class=\"btn secondary\" id=\"showEvidence\" type=\"button\">Show evidence</button></div>"
         "<pre id=\"findingCommand\"></pre>"
+        "<h3>A/B Result</h3><pre id=\"abResult\"></pre>"
         "<h3>Finding Queue</h3><table><tr><th>Status</th><th>ID</th><th>Target</th><th>Path</th></tr>"
         f"{findings}</table>"
         "<h3>Reference Commands</h3><table>"
         f"{commands}</table></aside></main>"
         f"<script>const RANGE_STATE={state_json};\n"
         "const seats=RANGE_STATE.seat_contexts||[];const tools=RANGE_STATE.tools||[];const calls=[];"
+        "const findings=RANGE_STATE.findings||[];let lastEvidencePath='';"
         "const byId=(id)=>document.getElementById(id);"
         "const shellQuote=(s)=>String(s).includes(' ')?'\"'+String(s).replaceAll('\"','\\\\\"')+'\"':String(s);"
         "const toolByName=(name)=>tools.find((tool)=>tool.name===name)||{};"
@@ -701,12 +786,15 @@ def render_workbench_html(state: dict[str, Any]) -> str:
         "function renderCalls(){byId('callList').innerHTML=calls.map((call,index)=>`<div class=\"call\"><b>${index+1}</b><span>${call.tool}<br>${JSON.stringify(call.args)}</span><button type=\"button\" data-remove=\"${index}\">x</button></div>`).join('');const command=`python -m kernel.range_cli manual-session --world ${shellQuote(RANGE_STATE.world_path)} --principal ${shellQuote(byId('seatSelect').value)} --calls-json '${JSON.stringify(calls)}' --sut-mode guard --out-dir .runtime/manual-session --json`;byId('commandOutput').textContent=command;}"
         "function addCall(){let args;try{args=JSON.parse(byId('argsEditor').value||'{}')}catch(err){byId('commandOutput').textContent='Invalid JSON: '+err.message;return;}calls.push({tool:byId('toolSelect').value,args});renderCalls();}"
         "function makeFinding(){const target=byId('targetInput').value;const payload=byId('payloadInput').value;byId('findingCommand').textContent=`python -m kernel.range_cli init-finding --world ${shellQuote(RANGE_STATE.world_path)} --target ${shellQuote(target)} --payload ${shellQuote(payload)} --task-prompt ${shellQuote('red-team manual session')}`;}"
-        "function makeAb(){byId('findingCommand').textContent='python -m kernel.range_cli run-ab --finding <finding.json> --sut-mode null,xaguard --repeat 3 --live --execute --out-dir .runtime/ab';}"
+        "function currentFindingPath(){return byId('findingPathInput').value||((findings[0]&&findings[0].path)||'');}"
+        "function makeAb(){const finding=currentFindingPath()||'<finding.json>';const live=byId('abLive').checked?' --live':'';byId('findingCommand').textContent=`python -m kernel.range_cli run-ab --finding ${shellQuote(finding)} --sut-mode ${shellQuote(byId('abSutMode').value)} --repeat ${shellQuote(byId('abRuns').value||'1')}${live} --execute --out-dir .runtime/ab`;}"
         "async function runSession(){if(location.protocol==='file:'){byId('apiResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}if(!calls.length){byId('apiResult').textContent='Add at least one ToolCall first.';return;}byId('apiResult').textContent='Running...';try{const response=await fetch('/api/manual-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({principal:byId('seatSelect').value,calls,sut_mode:'guard'})});const data=await response.json();byId('apiResult').textContent=JSON.stringify(data,null,2);}catch(err){byId('apiResult').textContent='API error: '+err.message;}}"
+        "async function runAb(){if(location.protocol==='file:'){byId('abResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}const finding=currentFindingPath();if(!finding){byId('abResult').textContent='Select or create a finding JSON first.';return;}byId('abResult').textContent='Running A/B...';try{const response=await fetch('/api/run-ab',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({finding_path:finding,sut_mode:byId('abSutMode').value,runs:Number(byId('abRuns').value||1),live:byId('abLive').checked,execute:true})});const data=await response.json();if(data.out_dir){lastEvidencePath=data.out_dir;byId('evidencePathInput').value=data.out_dir;}else if(data.summary_path){lastEvidencePath=data.summary_path;byId('evidencePathInput').value=data.summary_path;}byId('abResult').textContent=JSON.stringify(data,null,2);}catch(err){byId('abResult').textContent='API error: '+err.message;}}"
+        "async function showEvidence(){if(location.protocol==='file:'){byId('abResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}const path=byId('evidencePathInput').value||lastEvidencePath;if(!path){byId('abResult').textContent='No evidence path available.';return;}try{const response=await fetch('/api/show-evidence',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path})});const data=await response.json();byId('abResult').textContent=JSON.stringify(data,null,2);}catch(err){byId('abResult').textContent='API error: '+err.message;}}"
         "document.addEventListener('click',(event)=>{const idx=event.target.dataset&&event.target.dataset.remove;if(idx!==undefined){calls.splice(Number(idx),1);renderCalls();}});"
-        "byId('seatSelect').addEventListener('change',refreshTools);byId('toolSelect').addEventListener('change',refreshArgs);byId('addCall').addEventListener('click',addCall);byId('resetCalls').addEventListener('click',()=>{calls.length=0;renderCalls();});byId('makeFinding').addEventListener('click',makeFinding);byId('makeAb').addEventListener('click',makeAb);byId('runSession').addEventListener('click',runSession);byId('copyCommand').addEventListener('click',()=>navigator.clipboard&&navigator.clipboard.writeText(byId('commandOutput').textContent));"
+        "byId('seatSelect').addEventListener('change',refreshTools);byId('toolSelect').addEventListener('change',refreshArgs);byId('addCall').addEventListener('click',addCall);byId('resetCalls').addEventListener('click',()=>{calls.length=0;renderCalls();});byId('makeFinding').addEventListener('click',makeFinding);byId('makeAb').addEventListener('click',makeAb);byId('runSession').addEventListener('click',runSession);byId('runAb').addEventListener('click',runAb);byId('showEvidence').addEventListener('click',showEvidence);byId('abSutMode').addEventListener('change',makeAb);byId('abRuns').addEventListener('input',makeAb);byId('abLive').addEventListener('change',makeAb);byId('findingPathInput').addEventListener('input',makeAb);byId('copyCommand').addEventListener('click',()=>navigator.clipboard&&navigator.clipboard.writeText(byId('commandOutput').textContent));"
         "document.querySelectorAll('.seat-row').forEach((row)=>row.addEventListener('click',()=>{byId('seatSelect').value=row.dataset.seat;refreshTools();}));"
-        "refreshSeatSelect();refreshTools();renderCalls();makeFinding();</script>"
+        "byId('findingPathInput').value=(findings[0]&&findings[0].path)||'';refreshSeatSelect();refreshTools();renderCalls();makeFinding();</script>"
         "</body></html>\n"
     )
 
