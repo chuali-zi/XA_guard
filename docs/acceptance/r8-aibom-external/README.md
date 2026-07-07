@@ -1,12 +1,12 @@
 # R8 外部 AIBOM/CycloneDX 生成器交接
 
-状态：`DONE`（2026-07-07 实跑通过）。已用 `@cyclonedx/cdxgen@12.7.0` 真实生成 CycloneDX 1.6 产物并经 XA-Guard 导入 + schema 校验通过；实跑结果、证据目录与实测命令见 [`RESULTS.md`](./RESULTS.md)。
+状态：`DONE`（2026-07-07 实跑通过）。已用 `@cyclonedx/cdxgen@12.7.0` 真实生成 CycloneDX 1.6 产物并经 XA-Guard 导入 + schema 校验通过；`xa-aibom validate/admit` 正向、篡改、hash mismatch、缺字段和高风险 deny 负测已实跑。结果、证据目录与实测命令见 [`RESULTS.md`](./RESULTS.md)。
 
 > 实测提示：候选命令中的 `--bom-audit` / `--bom-audit-categories ai-bom` 在 cdxgen 12.7.0 中不存在，已在 `RESULTS.md` 用 `--profile research` 替代并记录；`--include-formulation` 会触发 whole-repo 扫描，已刻意不用。下文候选调研内容保留作历史参考。
 
 ## 目标
 
-R8 需要证明 XA-Guard 能接收一个合法外部工具生成的真实 CycloneDX 1.6 AIBOM/SBOM，并通过 `xa_guard.aibom.external_generator` 做哈希、来源和 schema 校验。
+R8 需要证明 XA-Guard 能接收一个合法外部工具生成的真实 CycloneDX 1.6 AIBOM/SBOM，并通过 `xa_guard.aibom.external_generator` 与 `xa-aibom validate/admit` 做哈希、来源、schema 和 artifact 准入校验。
 
 本目录只解决后续 agent 接手前的准备问题：
 
@@ -149,13 +149,13 @@ PY
 - `aibom.cdxgen.json`：外部生成的 CycloneDX 1.6 JSON；
 - `aibom.sha256` 或 `aibom.sha256.json`：产物 SHA-256；
 - `xa-guard-import-result.txt`：XA-Guard 导入校验结果；
+- `xa-aibom-cli-results.md`：`xa-aibom validate/admit` 正负测矩阵；
 - `commands.txt`：实际执行命令，不要只复制本文候选命令；
 - `environment.txt`：OS、Node/npm/npx、Python、XA-Guard commit 或工作树摘要；
 - `artifact-hashes.json`：证据目录内文件哈希清单。
 
 ## 不宣称项
 
-- 不宣称 R8 PASS：本文未执行外部生成器，也未保存真实 CycloneDX 产物。
 - 不宣称 marketplace/IDE 安装链完成：样本只覆盖本地目录扫描。
 - 不宣称 cdxgen 输出完全等同最终 AIBOM 标准：需按实测 BOM 字段检查 prompt/MCP/model/formulation 覆盖。
 - 不把 `npx --yes` 当作生产供应链策略：正式证据应固定版本、保留 lock/下载来源、必要时用离线包或 release binary + hash。

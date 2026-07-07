@@ -37,7 +37,7 @@ docs/
 | 准备最终提交包 | [delivery/submission-checklist.md](./delivery/submission-checklist.md) | `TODO` |
 | 跑 L3/R1-R9 验收 | [acceptance/L3-test-and-acceptance.md](./acceptance/L3-test-and-acceptance.md) | `PARTIAL/BLOCKED` |
 | 跑 R2/R3 预算评测 | [acceptance/R2-R3矩阵自动验收使用说明.md](./acceptance/R2-R3矩阵自动验收使用说明.md) | `TODO/BLOCKED` |
-| 接手 R8 外部 AIBOM | [acceptance/r8-aibom-external/README.md](./acceptance/r8-aibom-external/README.md) | `TODO/BLOCKED` |
+| 接手 R8 外部 AIBOM | [acceptance/r8-aibom-external/README.md](./acceptance/r8-aibom-external/README.md) | `DONE/PARTIAL` |
 
 ## 状态标签
 

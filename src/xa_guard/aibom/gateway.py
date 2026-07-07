@@ -285,6 +285,8 @@ def _resolve_report(
         return report
     if _looks_remote(source):
         return scan_artifact(source, expected_sha256=expected_sha256)
+    if expected_sha256:
+        return scan_artifact(source, expected_sha256=expected_sha256)
     return scan(source)
 
 

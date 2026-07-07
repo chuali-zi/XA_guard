@@ -118,12 +118,13 @@ def scan_python_source(source: str, name: str = "<snippet>") -> ScanReport:
 def scan_artifact(source: str | Path, expected_sha256: str | None = None) -> ScanReport:
     """Scan a local artifact, file URL, or remote URL marker without network fetches."""
     source_text = str(source)
+    expected = expected_sha256.lower() if expected_sha256 else None
     parsed = urlparse(source_text)
     if parsed.scheme in {"http", "https"}:
         report = ScanReport(plugin_path=source_text)
         _risk(report, "artifact_remote_fetch_required", f"{source_text}: offline fetch required for remote artifact")
-        if expected_sha256:
-            report.provenance["expected_sha256"] = expected_sha256
+        if expected:
+            report.provenance["expected_sha256"] = expected
         return report
 
     path = _artifact_path(source_text, parsed)
@@ -154,9 +155,9 @@ def scan_artifact(source: str | Path, expected_sha256: str | None = None) -> Sca
     report.provenance["source"] = source_text
     if digest:
         report.provenance["sha256"] = digest
-    if expected_sha256:
-        report.provenance["expected_sha256"] = expected_sha256
-        verified = digest == expected_sha256
+    if expected:
+        report.provenance["expected_sha256"] = expected
+        verified = digest == expected
         report.provenance["sha256_verified"] = verified
         if not verified:
             _risk(report, "artifact_sha256_mismatch", f"{source_text}: sha256 mismatch")

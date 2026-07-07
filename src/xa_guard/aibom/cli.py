@@ -13,10 +13,16 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import hmac
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
+
+
+_SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 
 
 def _print_json(obj: Any) -> None:
@@ -92,17 +98,47 @@ def _cmd_bom(args: argparse.Namespace) -> int:
 def _cmd_validate(args: argparse.Namespace) -> int:
     from xa_guard.aibom.schema_validator import validate_cyclonedx
 
-    bom = json.loads(Path(args.bom).read_text(encoding="utf-8"))
+    raw = Path(args.bom).read_bytes()
+    actual_sha256 = hashlib.sha256(raw).hexdigest()
+    errors: list[str] = []
+    hash_valid: bool | None = None
+    expected_sha256 = str(args.expected_sha256 or "").lower()
+    if expected_sha256:
+        if not _SHA256_RE.fullmatch(expected_sha256):
+            hash_valid = False
+            errors.append("expected_sha256 must be exactly 64 hexadecimal characters")
+        else:
+            hash_valid = hmac.compare_digest(actual_sha256, expected_sha256)
+            if not hash_valid:
+                errors.append(f"SHA-256 mismatch: expected {expected_sha256}, got {actual_sha256}")
+
+    try:
+        bom = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        _print_json(
+            {
+                "valid": False,
+                "sha256": actual_sha256,
+                "hash_valid": hash_valid,
+                "spec_version": "",
+                "validator": "json",
+                "errors": errors + [f"invalid JSON: {exc}"],
+            }
+        )
+        return 2
     result = validate_cyclonedx(bom)
+    all_errors = errors + result.errors
     _print_json(
         {
-            "valid": result.valid,
+            "valid": result.valid and not all_errors,
+            "sha256": actual_sha256,
+            "hash_valid": hash_valid,
             "spec_version": result.spec_version,
             "validator": result.validator,
-            "errors": result.errors,
+            "errors": all_errors,
         }
     )
-    return 0 if result.valid else 2
+    return 0 if result.valid and not all_errors else 2
 
 
 def _cmd_drift(args: argparse.Namespace) -> int:
@@ -155,6 +191,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_val = sub.add_parser("validate", help="校验 BOM 文件是否符合 CycloneDX schema")
     p_val.add_argument("bom", help="BOM JSON 文件路径")
+    p_val.add_argument("--expected-sha256", default=None, help="期望 BOM 文件 sha256")
     p_val.set_defaults(func=_cmd_validate)
 
     p_drift = sub.add_parser("drift", help="扫描并记录一次漂移")

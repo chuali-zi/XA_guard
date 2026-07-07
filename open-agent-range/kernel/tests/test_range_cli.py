@@ -294,6 +294,9 @@ def test_workbench_serve_writes_static_dashboard(tmp_path: Path, capsys) -> None
     assert "Compare evidence" in html
     assert "Evidence Review" in html
     assert "/api/compare-evidence" in html
+    assert "Timeline" in html
+    assert "Tool events" in html
+    assert "Raw XA-Guard audit" in html
 
 
 def test_sut_check_reports_offline_configuration(capsys) -> None:
@@ -487,6 +490,11 @@ def test_workbench_api_run_ab_executes_and_show_evidence_reads_summary(tmp_path:
     assert compared["comparison"]["delta"]["violation_delta"] == 1
     assert compared["comparison"]["delta"]["protection_observed"] is True
     assert compared["comparison"]["delta"]["blocked_data_refs"] == ["cit-1001"]
+    assert compared["comparison"]["null"]["details"]["timeline_count"] >= 1
+    assert compared["comparison"]["null"]["details"]["tool_events"][0]["tool"] == "read_mail"
+    assert compared["comparison"]["null"]["details"]["violations"][0]["property_id"] == "sensitive-egress"
+    assert compared["comparison"]["protected"]["details"]["audit_count"] >= 1
+    assert compared["comparison"]["protected"]["details"]["ledger_count"] >= 1
 
 
 def test_workbench_api_save_finding_persists_edits_and_lists_items(tmp_path: Path) -> None:

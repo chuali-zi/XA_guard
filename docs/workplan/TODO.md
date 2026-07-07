@@ -263,11 +263,11 @@
 
 必须补：
 
-- [ ] 选择一个合法合规的外部 AIBOM 生成器或明确写“未选定外部生成器”。
-- [ ] 记录外部工具名称、版本、许可证、来源、命令和输出 hash。
-- [ ] 生成 benign、高风险、篡改、缺字段样本各 1 个。
-- [ ] 跑 `python -m xa_guard.aibom.cli validate <external-bom.json>` 和 `admit <artifact>`。
-- [ ] 做 hash mismatch / 缺字段 / 高风险 deny 负测。
+- [x] 选择一个合法合规的外部 AIBOM 生成器或明确写“未选定外部生成器”。
+- [x] 记录外部工具名称、版本、许可证、来源、命令和输出 hash。
+- [x] 生成 benign、高风险、篡改、缺字段样本各 1 个。
+- [x] 跑 `python -m xa_guard.aibom.cli validate <external-bom.json>` 和 `admit <artifact>`。
+- [x] 做 hash mismatch / 缺字段 / 高风险 deny 负测。
 - [ ] 若无法接真实 marketplace/IDE 安装链，D1 写“离线准入原型”，不要写“商店拦截已完成”。
 
 完成标准：

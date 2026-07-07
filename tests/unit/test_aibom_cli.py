@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import zipfile
 from pathlib import Path
 
 from xa_guard.aibom.cli import main
@@ -13,6 +15,14 @@ def _clean_plugin(root: Path) -> Path:
     return root
 
 
+def _zip_plugin(plugin: Path, archive: Path) -> Path:
+    with zipfile.ZipFile(archive, "w") as zf:
+        for path in plugin.rglob("*"):
+            if path.is_file():
+                zf.write(path, path.relative_to(plugin))
+    return archive
+
+
 def test_cli_admit_allows_clean_plugin(tmp_path: Path, capsys) -> None:
     plugin = _clean_plugin(tmp_path / "plugin")
 
@@ -22,6 +32,30 @@ def test_cli_admit_allows_clean_plugin(tmp_path: Path, capsys) -> None:
     assert code == 0
     assert out["decision"] == "allow"
     assert out["schema_valid"] is True
+
+
+def test_cli_admit_allows_artifact_with_matching_expected_sha256(tmp_path: Path, capsys) -> None:
+    plugin = _clean_plugin(tmp_path / "plugin")
+    archive = _zip_plugin(plugin, tmp_path / "plugin.zip")
+    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+
+    code = main(["admit", str(archive), "--expected-sha256", digest.upper()])
+    out = json.loads(capsys.readouterr().out)
+
+    assert code == 0
+    assert out["decision"] == "allow"
+
+
+def test_cli_admit_rejects_artifact_expected_sha256_mismatch(tmp_path: Path, capsys) -> None:
+    plugin = _clean_plugin(tmp_path / "plugin")
+    archive = _zip_plugin(plugin, tmp_path / "plugin.zip")
+
+    code = main(["admit", str(archive), "--expected-sha256", "0" * 64])
+    out = json.loads(capsys.readouterr().out)
+
+    assert code == 2
+    assert out["decision"] == "deny"
+    assert "sha256 mismatch" in out["reason"]
 
 
 def test_cli_bom_writes_cyclonedx_16(tmp_path: Path, capsys) -> None:
@@ -49,6 +83,41 @@ def test_cli_validate_reports_valid(tmp_path: Path, capsys) -> None:
 
     assert code == 0
     assert out["valid"] is True
+
+
+def test_cli_validate_accepts_matching_expected_sha256(tmp_path: Path, capsys) -> None:
+    from xa_guard.aibom.exporter import export_cyclonedx
+    from xa_guard.aibom.scanner import scan
+
+    plugin = _clean_plugin(tmp_path / "plugin")
+    bom_path = tmp_path / "bom.json"
+    bom_path.write_text(json.dumps(export_cyclonedx(scan(plugin))), encoding="utf-8")
+    digest = hashlib.sha256(bom_path.read_bytes()).hexdigest()
+
+    code = main(["validate", str(bom_path), "--expected-sha256", digest.upper()])
+    out = json.loads(capsys.readouterr().out)
+
+    assert code == 0
+    assert out["valid"] is True
+    assert out["sha256"] == digest
+    assert out["hash_valid"] is True
+
+
+def test_cli_validate_rejects_expected_sha256_mismatch(tmp_path: Path, capsys) -> None:
+    from xa_guard.aibom.exporter import export_cyclonedx
+    from xa_guard.aibom.scanner import scan
+
+    plugin = _clean_plugin(tmp_path / "plugin")
+    bom_path = tmp_path / "bom.json"
+    bom_path.write_text(json.dumps(export_cyclonedx(scan(plugin))), encoding="utf-8")
+
+    code = main(["validate", str(bom_path), "--expected-sha256", "0" * 64])
+    out = json.loads(capsys.readouterr().out)
+
+    assert code == 2
+    assert out["valid"] is False
+    assert out["hash_valid"] is False
+    assert any("SHA-256 mismatch" in error for error in out["errors"])
 
 
 def test_cli_validate_rejects_broken_bom(tmp_path: Path, capsys) -> None:

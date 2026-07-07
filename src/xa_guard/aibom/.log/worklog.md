@@ -2,6 +2,11 @@
 
 ---
 
+## 2026-07-07 — R8 xa-aibom CLI 正负测收敛
+`validate` 新增 `--expected-sha256` 并输出 BOM 哈希；`admit` 带 expected hash 的本地 artifact 改走 `scan_artifact`，hash 大小写归一。实跑 validate/admit 正向、篡改、缺字段、hash mismatch、高风险 deny；AIBOM 相关测试与 ruff 通过。
+
+---
+
 ## 2026-07-07 — R8 外部 CycloneDX 1.6 实跑 + schema 修复
 - 用 `@cyclonedx/cdxgen@12.7.0` 真实生成样本的 CycloneDX 1.6 产物（32 组件），`external_generator.load_external_cyclonedx` 导入 `import: PASS`（SHA-256 绑定 + jsonschema 校验），含 MCP SDK 的 `cdx:mcp:*` AI-BOM 语义。
 - 修复缺陷：`schema/cyclonedx-1.6.subset.schema.json` 的 `metadata.tools` 只允许旧版数组，拒绝 cdxgen 的 1.5+ 对象形式 `{components,services}`。放宽为 `anyOf:[array, object]`，补 `TestMetadataToolsForms` 两形式回归。

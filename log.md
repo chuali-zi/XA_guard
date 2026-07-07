@@ -1,3 +1,11 @@
+# 2026-07-07 06:20 -07:00 R8 xa-aibom validate/admit 实跑收敛
+
+- 按用户要求补跑 L3 内部 R8 的 `xa-aibom validate/admit`：外部 cdxgen CycloneDX 1.6 BOM 用 `validate --expected-sha256` 正向通过；schema-valid 篡改 BOM、错误 expected hash、缺 `bomFormat` 均 exit 2 fail-closed。
+- 制备临时样本 artifact：`python-ai-plugin.zip` 正确 hash 下 `admit` allow/grade B；同一 artifact 错误 hash 现 deny/grade F；高风险 `subprocess.Popen` artifact 正确 hash 下 deny/grade D。
+- 实跑发现并修复两处缺口：`validate` 原先无 BOM expected hash 校验；`admit <local-artifact> --expected-sha256` 原先未走 artifact hash 校验且大写 hash 不兼容。已补 CLI/scanner/gateway 回归测试。
+- 证据补入 `docs/acceptance/r8-aibom-external/evidence/l3-r8-aibom-20260707T105519Z/xa-aibom-cli-results.md`，同步更新 `RESULTS.md`、R8 README、docs 入口、TODO 和 `status.md`。仍不宣称 marketplace/IDE 安装链或完整 AI-BOM 全字段覆盖完成。
+- 验证：目标 AIBOM 测试集合 163 passed；changed-file ruff passed。
+
 # 2026-07-07 06:16 -07:00 Open Agent Range Workbench Evidence Review
 
 - 继续推进 `open-agent-range/` 的红队产品形态。本轮把 Workbench 从“跑 A/B 后吐 summary JSON”推进到浏览器内摘要级 Null vs Protected 证据并排审阅。
@@ -5,6 +13,7 @@
 - 页面新增 `Compare evidence` 按钮与 `Evidence Review` 双栏面板，展示两侧 verdict、violations、external sends、leaked refs、SUT decisions、tool events、ledger hash 和 delta。
 - 验证：`python -m pytest kernel/tests/test_range_cli.py -q` 15 passed；`python -m pytest kernel/tests -q` 118 passed。`workbench serve --no-server` smoke 通过，抽取页面脚本后 `node --check` 通过；临时 runtime 产物已清理。
 - `gpt-5.5/xhigh` 只读子 agent `Confucius` 复核后仍判定 **不完全符合 PRD/SP7**：本轮是明显产品进展，但仍只是摘要级对照，不是完整 timeline / ledger / audit / violation detail evidence browser；P0 仍包括 full-day scripted baseline、XA-Guard live 非长生命周期、缺真实 live N>=3 A/B 矩阵、完整 Web 沙盘和更深 insider consequence。
+
 # 2026-07-07 06:04 -07:00 Open Agent Range SUT audit alignment gate
 
 - 继续推进 `open-agent-range/` 的 PRD 完成态，针对上一轮 xhigh review 指出的 “Gate6 audit 与 range ledger 未逐工具尝试/裁决深度对齐” 做证据门禁加固。

@@ -710,7 +710,35 @@ def _load_attempt_summary_for_compare(path: Path) -> dict[str, Any]:
     if code != 0:
         raise ValueError(f"cannot summarize evidence {path}: {stderr or summary}")
     summary.setdefault("path", str(path))
+    summary["details"] = _load_attempt_details_for_compare(path)
     return summary
+
+
+def _load_attempt_details_for_compare(path: Path, *, limit: int = 30) -> dict[str, Any]:
+    verdict = _read_json(path / "verdict.json") if (path / "verdict.json").is_file() else {}
+    violations = verdict.get("violations", [])
+    if not isinstance(violations, list):
+        violations = []
+    timeline = _read_jsonl(path / "timeline.jsonl")
+    tool_events = _read_jsonl(path / "tool-events.jsonl")
+    audit = _read_jsonl(path / "audit.jsonl")
+    ledger = _read_jsonl(path / "ledger.jsonl")
+    raw_xaguard_audit = _read_jsonl(path / "xa-guard-audit" / "audit.jsonl")
+    return {
+        "limit": limit,
+        "timeline_count": len(timeline),
+        "tool_event_count": len(tool_events),
+        "audit_count": len(audit),
+        "ledger_count": len(ledger),
+        "violation_count": len(violations),
+        "raw_xaguard_audit_count": len(raw_xaguard_audit),
+        "timeline": timeline[:limit],
+        "tool_events": tool_events[:limit],
+        "audit": audit[:limit],
+        "ledger": ledger[:limit],
+        "violations": violations[:limit],
+        "raw_xaguard_audit": raw_xaguard_audit[:limit],
+    }
 
 
 def _api_attempt_id(principal: str) -> str:
@@ -974,7 +1002,7 @@ def render_workbench_html(state: dict[str, Any]) -> str:
         ".btn:hover{background:rgba(214,255,87,.12)}.calls{display:grid;gap:7px;margin-top:10px}.call{display:grid;grid-template-columns:24px 1fr auto;gap:8px;align-items:start;border:1px solid var(--line);background:#0b100c;padding:8px;font-family:Consolas,monospace;font-size:12px}"
         ".call b{color:var(--accent)}.call button{background:transparent;color:var(--danger);border:0;cursor:pointer}pre,code{white-space:pre-wrap;word-break:break-word}pre{background:#050805;border:1px solid var(--line);padding:10px;min-height:54px;color:#dce7d8}"
         "table{border-collapse:collapse;width:100%;background:#0b100c;font-size:12px}th,td{border:1px solid var(--line);padding:7px;text-align:left;vertical-align:top}th{color:var(--muted);font-weight:600}"
-        ".notice{border-left:3px solid var(--warn);padding:8px 10px;background:#171208;color:#ebdcc5;font-size:12px}.split{display:grid;grid-template-columns:1fr 1fr;gap:10px}.review-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.review-card{border:1px solid var(--line);background:#0b100c;padding:9px}.review-card h4{margin:0 0 8px;color:var(--accent);font-size:12px}.review-card dl{display:grid;grid-template-columns:1fr auto;gap:5px;margin:0;font-size:12px}.review-card dt{color:var(--muted)}.review-card dd{margin:0;font-family:Consolas,monospace}.delta{border:1px solid var(--line);background:#10140b;padding:9px;margin-top:8px;font-size:12px}.kbd{font-family:Consolas,monospace;color:var(--accent)}"
+        ".notice{border-left:3px solid var(--warn);padding:8px 10px;background:#171208;color:#ebdcc5;font-size:12px}.split{display:grid;grid-template-columns:1fr 1fr;gap:10px}.review-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.review-card{border:1px solid var(--line);background:#0b100c;padding:9px}.review-card h4{margin:0 0 8px;color:var(--accent);font-size:12px}.review-card dl{display:grid;grid-template-columns:1fr auto;gap:5px;margin:0 0 8px;font-size:12px}.review-card dt{color:var(--muted)}.review-card dd{margin:0;font-family:Consolas,monospace}.review-card details{border-top:1px solid var(--line);padding-top:7px;margin-top:7px}.review-card summary{cursor:pointer;color:var(--accent);font-size:12px}.review-card details pre{max-height:260px;overflow:auto;min-height:0}.delta{border:1px solid var(--line);background:#10140b;padding:9px;margin-top:8px;font-size:12px}.kbd{font-family:Consolas,monospace;color:var(--accent)}"
         "@media (max-width:1100px){.shell{grid-template-columns:1fr}.panel{min-height:auto}.seat-list{max-height:260px}}"
         "</style></head><body>"
         "<header><h1>Open Agent Range Workbench</h1>"
@@ -1045,7 +1073,10 @@ def render_workbench_html(state: dict[str, Any]) -> str:
         "async function runAb(){if(location.protocol==='file:'){byId('abResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}const finding=currentFindingPath();if(!finding){byId('abResult').textContent='Select or create a finding JSON first.';return;}byId('abResult').textContent='Running A/B...';try{const response=await fetch('/api/run-ab',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({finding_path:finding,sut_mode:byId('abSutMode').value,runs:Number(byId('abRuns').value||1),live:byId('abLive').checked,execute:true})});const data=await response.json();if(data.out_dir){lastEvidencePath=data.out_dir;byId('evidencePathInput').value=data.out_dir;}else if(data.summary_path){lastEvidencePath=data.summary_path;byId('evidencePathInput').value=data.summary_path;}byId('abResult').textContent=JSON.stringify(data,null,2);}catch(err){byId('abResult').textContent='API error: '+err.message;}}"
         "async function showEvidence(){if(location.protocol==='file:'){byId('abResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}const path=byId('evidencePathInput').value||lastEvidencePath;if(!path){byId('abResult').textContent='No evidence path available.';return;}try{const response=await fetch('/api/show-evidence',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path})});const data=await response.json();byId('abResult').textContent=JSON.stringify(data,null,2);}catch(err){byId('abResult').textContent='API error: '+err.message;}}"
         "function metricRows(summary){const decisions=summary.sut_decisions||{};return `<dl><dt>Path</dt><dd>${esc(summary.path||'')}</dd><dt>Passed</dt><dd>${esc(summary.verdict_passed)}</dd><dt>Violations</dt><dd>${esc(summary.violations_count)}</dd><dt>External sends</dt><dd>${esc(summary.external_send_count)}</dd><dt>Leaked refs</dt><dd>${esc((summary.leaked_data_refs||[]).join(', ')||'-')}</dd><dt>Decisions</dt><dd>A:${esc(decisions.allow||0)} D:${esc(decisions.deny||0)}</dd><dt>Tool events</dt><dd>${esc(summary.tool_event_count)}</dd><dt>Ledger hash</dt><dd>${esc(summary.ledger_hash_chain_ok)}</dd></dl>`;}"
-        "function renderComparison(data){const c=data.comparison||{};const d=c.delta||{};byId('evidenceReview').className='';byId('evidenceReview').innerHTML=`<div class=\"review-grid\"><div class=\"review-card\"><h4>Null baseline</h4>${metricRows(c.null||{})}</div><div class=\"review-card\"><h4>${esc(c.protected_label||'Protected')}</h4>${metricRows(c.protected||{})}</div></div><div class=\"delta\"><b>Delta</b><br>Violation delta: ${esc(d.violation_delta)} | External-send delta: ${esc(d.external_send_delta)} | Protection observed: ${esc(d.protection_observed)}<br>Blocked refs: ${esc((d.blocked_data_refs||[]).join(', ')||'-')}<br>Still leaked: ${esc((d.still_leaked_data_refs||[]).join(', ')||'-')}</div>`;}"
+        "function detailBlock(title,rows,count){return `<details><summary>${esc(title)} (${esc(count??(rows||[]).length)})</summary><pre>${esc(JSON.stringify(rows||[],null,2))}</pre></details>`;}"
+        "function detailRows(summary){const details=summary.details||{};return detailBlock('Timeline',details.timeline,details.timeline_count)+detailBlock('Tool events',details.tool_events,details.tool_event_count)+detailBlock('Audit',details.audit,details.audit_count)+detailBlock('Ledger',details.ledger,details.ledger_count)+detailBlock('Violations',details.violations,details.violation_count)+detailBlock('Raw XA-Guard audit',details.raw_xaguard_audit,details.raw_xaguard_audit_count);}"
+        "function reviewCard(title,summary){return `<div class=\"review-card\"><h4>${esc(title)}</h4>${metricRows(summary||{})}${detailRows(summary||{})}</div>`;}"
+        "function renderComparison(data){const c=data.comparison||{};const d=c.delta||{};byId('evidenceReview').className='';byId('evidenceReview').innerHTML=`<div class=\"review-grid\">${reviewCard('Null baseline',c.null||{})}${reviewCard(c.protected_label||'Protected',c.protected||{})}</div><div class=\"delta\"><b>Delta</b><br>Violation delta: ${esc(d.violation_delta)} | External-send delta: ${esc(d.external_send_delta)} | Protection observed: ${esc(d.protection_observed)}<br>Blocked refs: ${esc((d.blocked_data_refs||[]).join(', ')||'-')}<br>Still leaked: ${esc((d.still_leaked_data_refs||[]).join(', ')||'-')}</div>`;}"
         "async function compareEvidence(){if(location.protocol==='file:'){byId('abResult').textContent='Serve the workbench without --no-server to enable local API execution.';return;}const path=byId('evidencePathInput').value||lastEvidencePath;if(!path){byId('abResult').textContent='No A/B evidence path available.';return;}try{const response=await fetch('/api/compare-evidence',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path})});const data=await response.json();renderComparison(data);byId('abResult').textContent=JSON.stringify(data,null,2);}catch(err){byId('abResult').textContent='API error: '+err.message;}}"
         "document.addEventListener('click',(event)=>{const idx=event.target.dataset&&event.target.dataset.remove;if(idx!==undefined){calls.splice(Number(idx),1);renderCalls();}const surface=event.target.dataset&&event.target.dataset.surface;if(surface){byId('targetInput').value=surface;makeFinding();makeAb();}const row=event.target.closest&&event.target.closest('tr[data-finding-path]');if(row){selectFinding(findings.find((item)=>item.path===row.dataset.findingPath));}});"
         "byId('seatSelect').addEventListener('change',refreshTools);byId('toolSelect').addEventListener('change',refreshArgs);byId('addCall').addEventListener('click',addCall);byId('resetCalls').addEventListener('click',()=>{calls.length=0;renderCalls();});byId('saveFinding').addEventListener('click',saveFinding);byId('refreshFindings').addEventListener('click',refreshFindings);byId('reviewReproduced').addEventListener('click',()=>reviewFinding('reproduced'));byId('reviewRejected').addEventListener('click',()=>reviewFinding('rejected'));byId('promoteFinding').addEventListener('click',promoteFinding);byId('makeFinding').addEventListener('click',makeFinding);byId('makeAb').addEventListener('click',makeAb);byId('runSession').addEventListener('click',runSession);byId('runAb').addEventListener('click',runAb);byId('showEvidence').addEventListener('click',showEvidence);byId('compareEvidence').addEventListener('click',compareEvidence);byId('abSutMode').addEventListener('change',makeAb);byId('abRuns').addEventListener('input',makeAb);byId('abLive').addEventListener('change',makeAb);byId('findingPathInput').addEventListener('input',makeAb);['targetInput','payloadInput','taskPromptInput'].forEach((id)=>byId(id).addEventListener('input',makeFinding));byId('copyCommand').addEventListener('click',()=>navigator.clipboard&&navigator.clipboard.writeText(byId('commandOutput').textContent));"

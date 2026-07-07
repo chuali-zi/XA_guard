@@ -1,6 +1,6 @@
 # R8 外部 AIBOM/CycloneDX 生成器实跑结果
 
-状态：`PASS（外部 CycloneDX 1.6 导入 + MCP AI-BOM 语义覆盖）`。
+状态：`PASS（外部 CycloneDX 1.6 导入 + MCP AI-BOM 语义覆盖 + xa-aibom validate/admit 正负测）`。
 执行日期：2026-07-07（UTC）。执行环境与哈希见证据目录。
 
 ## 结论摘要
@@ -8,6 +8,7 @@
 - 用合法开源外部工具 `@cyclonedx/cdxgen@12.7.0`（Apache-2.0）扫描最小样本，真实生成了 CycloneDX `specVersion: "1.6"` JSON。
 - XA-Guard 只读适配器 `xa_guard.aibom.external_generator.load_external_cyclonedx` 成功导入：SHA-256 绑定校验通过、CycloneDX schema 校验通过（`jsonschema` 路径）。
 - 产物包含真实 AI-BOM 语义信号：MCP SDK 被识别为组件并带 `cdx:mcp:*` 属性和 `mcp-sdk`/`official-mcp-sdk` 标签，因此 R8 不止是普通 SBOM 导入，具备 AI-BOM 部分语义覆盖。
+- 已实跑 `python -m xa_guard.aibom.cli validate` 与 `admit`：外部 BOM 正向通过；schema-valid 篡改 BOM、错误 expected hash、缺字段 BOM 均 fail-closed；样本 artifact 正确 hash 准入 allow；错误 artifact hash 与高风险 artifact 均 deny。
 
 ## 证据目录
 
@@ -20,11 +21,24 @@
 | `aibom.sha256` | 产物 SHA-256 |
 | `cdxgen-version.txt` | `cdxgen --version` 输出（12.7.0） |
 | `xa-guard-import-result.txt` | XA-Guard 导入 + schema 校验结果（`import: PASS`） |
+| `xa-aibom-cli-results.md` | `xa-aibom validate/admit` 正向、篡改、hash mismatch、缺字段、高风险 deny 实跑矩阵 |
 | `commands.txt` | 实际执行命令与 flag 漂移说明 |
 | `environment.txt` | OS/Node/npm/Python/jsonschema/XA-Guard commit |
 | `artifact-hashes.json` | 证据目录文件 SHA-256 清单 |
 
 产物 SHA-256：`6a43e3a3b8637f7cc05c328a9261311825e4ba08ec119faf1ec0699dea1db100`
+
+## xa-aibom CLI 正负测矩阵
+
+详见证据文件 [`xa-aibom-cli-results.md`](./evidence/l3-r8-aibom-20260707T105519Z/xa-aibom-cli-results.md)。本轮覆盖：
+
+- `validate <external-bom> --expected-sha256 <bom-sha>`：exit 0，`valid=true`，`hash_valid=true`。
+- schema-valid 篡改 BOM + 原 hash：exit 2，仅 hash mismatch 即可拦截。
+- 缺 `bomFormat` BOM：exit 2，schema 层拒绝。
+- 原始 BOM + 错误 expected hash：exit 2，hash mismatch。
+- `admit <python-ai-plugin.zip> --expected-sha256 <artifact-sha>`：exit 0，`decision=allow`，`grade=B`。
+- 同一 artifact + 错误 expected hash：exit 2，`decision=deny`，`grade=F`。
+- 高风险 artifact（`subprocess.Popen`）+ 正确 expected hash：exit 2，`decision=deny`，`grade=D`。
 
 ## 与候选命令的差异（重要）
 
@@ -52,6 +66,11 @@ npx --yes @cyclonedx/cdxgen@12.7.0 \
 修复：将 `metadata.tools` 放宽为 `anyOf: [array, object{components,services}]`，
 兼容旧生产者的数组形式与新生产者的对象形式。已补两条回归测试
 （`tests/unit/test_aibom_schema_validator.py::TestMetadataToolsForms`）。修复后导入通过。
+
+本轮 `xa-aibom admit` 负测又发现并修复本地 artifact hash 缺口：CLI 传入
+`--expected-sha256` 时，普通本地路径原先仍走目录扫描，未触发 artifact hash 校验，
+导致错误 hash 仍可能 allow。现已改为只要提供 expected hash 就走 `scan_artifact`，
+并把 artifact expected hash 比较统一为大小写不敏感；错误 hash 现在 deny / exit 2。
 
 ## 不宣称项（延续原边界）
 

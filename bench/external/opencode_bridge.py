@@ -158,16 +158,18 @@ def invoke_opencode_json(
     ) as tmp_dir:
         prompt_path = Path(tmp_dir) / "turn.txt"
         prompt_path.write_text(prompt, encoding="utf-8")
-        message = f"{request_message}\n\n{prompt}"
         command = [
             executable,
             "run",
-            message,
+            request_message,
             "--pure",
+            "--auto",
             "--format",
             "json",
             "-m",
             model,
+            "--file",
+            str(prompt_path),
             "--dir",
             str(runtime_cwd),
         ]

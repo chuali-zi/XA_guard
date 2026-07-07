@@ -26,6 +26,10 @@
     "xa-guard-import-result.txt": {
       "sha256": "c00ac80a7979890ca84413759ddc4350030a15b59e07a4c8aa2339ee8d9ed441",
       "bytes": 1205
+    },
+    "xa-aibom-cli-results.md": {
+      "sha256": "99fca53549da034d84553f073fc5af3275d2a4769909d5e3a4308a20454153b6",
+      "bytes": 3681
     }
   }
 }
