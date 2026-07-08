@@ -1,3 +1,12 @@
+# 2026-07-07 17:51 -07:00 Open Agent Range final convergence for red-team usable PRD
+
+- 按用户最后一轮要求，把目标从“完美完成态”收敛为“基本符合 PRD 思想且红队可用”。本轮优先处理 `Planck`/前序 review 反复指出的 P0：XA-Guard live 非 attempt 级 session、缺真实 `null,xaguard --live --repeat 3` 矩阵、从仓库根运行 workbench 不够稳。
+- 新增 SUT 生命周期钩子 `begin_attempt()` / `end_attempt()`；`XaGuardSUT(live=True)` 现在在一次 attempt 内懒加载并复用一个真实 `xa_guard.server` stdio MCP session，attempt 结束关闭，并写入 `sut-session.json`。该证据记录 session scope、server command、process_start_count、tool_call_count、tools、closed/errors。
+- 修复 live 子进程环境：`PYTHONPATH` 现在显式包含 `open-agent-range` 根目录，确保 XA-Guard 下游 `kernel.mcp_echo_server` 从仓库根或子目录运行都能被找到。`workbench worlds` 改为从 package root 查找场景，输出仍保持 `scenarios/dctg/...` 相对路径，降低红队使用门槛。
+- 按要求启动 `gpt-5.5/xhigh` 只读子 agent `Planck` 复核；它仍判定不完全完美，但建议本轮最值得实现 attempt 级 XA-Guard live 与 `null,xaguard --live --repeat 3` 证据矩阵。本轮已完成该方向。
+- 验证：`python -m pytest open-agent-range\kernel\tests -q` 通过；真实 live smoke `run-ab --sut-mode null,xaguard --live --repeat 3` 成功，null 侧 3/3 泄漏 `cit-1001`、xaguard live 侧 3/3 拦截，`protected_infra_error_count=0`、`protection_delta=1.0`。对 `run-001/xaguard` 执行 `replay --verify-hashes --verify-ledger --verify-sut-audit --json` 通过，artifact hash 19 项、ledger projection、raw XA-Guard audit alignment 均 OK。
+- 仍未做到“完美”：full-day 的 live OpenCode 任意长度自主 agent loop、地图画布、多注入编排、权限化后台、完整 dashboard 仍不是最终工业形态。但从 PRD 思想和红队可用角度，当前已具备开放注入面、ManualSeat/Workbench、N>=3 live A/B、XA-Guard 真实在环、证据/回放/审计对齐与 finding 固化闭环。
+
 # 2026-07-07 07:58 -07:00 Open Agent Range ReactiveSeat observe-plan-act
 
 - 继续推进 `open-agent-range/` 的 P0 缺口：正常一天不能只靠 `scripted_plans_for_scenario()` 一次性固定计划。本轮新增 `ReactiveSeat`，并接入 `range day --agent reactive` / `kernel.demo --agent reactive`。

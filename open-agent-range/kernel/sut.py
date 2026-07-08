@@ -18,7 +18,9 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import queue
 import sys
+import threading
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from pathlib import Path
@@ -62,6 +64,12 @@ class SUT:
 
     def decide(self, principal: str, call: ToolCall) -> tuple[str, str]:
         raise NotImplementedError
+
+    def begin_attempt(self) -> None:
+        """Optional lifecycle hook for SUTs that keep per-attempt resources."""
+
+    def end_attempt(self) -> None:
+        """Optional lifecycle hook for SUTs that keep per-attempt resources."""
 
     def invoke(self, world: Any, ledger: Any, principal: str, call: ToolCall, surface: Any) -> dict[str, Any]:
         """裁决 -> 记审计/账本 -> 放行则经工具面执行（工具负责改世界 + 副作用落账）。"""
@@ -266,6 +274,76 @@ def write_sut_evidence_configs(
     )
 
 
+class _XaGuardLiveSession:
+    """A persistent MCP stdio session used for all ToolCalls in one attempt."""
+
+    def __init__(self, *, command: list[str], env: dict[str, str], timeout_s: float = 60.0) -> None:
+        self.command = list(command)
+        self.env = dict(env)
+        self.timeout_s = timeout_s
+        self._ready: queue.Queue[tuple[str, Any]] = queue.Queue(maxsize=1)
+        self._requests: queue.Queue[Any] = queue.Queue()
+        self._thread = threading.Thread(target=self._thread_main, name="xa-guard-live-session", daemon=True)
+
+    def start(self) -> None:
+        self._thread.start()
+        status, payload = self._ready.get(timeout=self.timeout_s)
+        if status != "ok":
+            if isinstance(payload, BaseException):
+                raise RuntimeError("failed to start XA-Guard live session") from payload
+            raise RuntimeError(f"failed to start XA-Guard live session: {payload}")
+
+    def call_tool(self, tool: str, arguments: dict[str, Any]) -> str:
+        response: queue.Queue[tuple[str, Any]] = queue.Queue(maxsize=1)
+        self._requests.put((tool, dict(arguments), response))
+        status, payload = response.get(timeout=self.timeout_s)
+        if status != "ok":
+            if isinstance(payload, BaseException):
+                raise RuntimeError("XA-Guard live session tool call failed") from payload
+            raise RuntimeError(f"XA-Guard live session tool call failed: {payload}")
+        return str(payload)
+
+    def close(self) -> None:
+        self._requests.put(None)
+        self._thread.join(timeout=10.0)
+
+    def _thread_main(self) -> None:
+        asyncio.run(self._run())
+
+    async def _run(self) -> None:
+        try:
+            from mcp import ClientSession
+            from mcp.client.stdio import StdioServerParameters, stdio_client
+        except Exception as exc:  # pragma: no cover
+            self._ready.put(("error", exc))
+            return
+
+        params = StdioServerParameters(
+            command=self.command[0],
+            args=self.command[1:],
+            env=self.env,
+        )
+        try:
+            async with AsyncExitStack() as stack:
+                read_stream, write_stream = await stack.enter_async_context(stdio_client(params))
+                session = await stack.enter_async_context(ClientSession(read_stream, write_stream))
+                await session.initialize()
+                self._ready.put(("ok", None))
+                loop = asyncio.get_running_loop()
+                while True:
+                    request = await loop.run_in_executor(None, self._requests.get)
+                    if request is None:
+                        return
+                    tool, arguments, response = request
+                    try:
+                        result = await session.call_tool(tool, arguments)
+                        response.put(("ok", _mcp_result_text(result)))
+                    except BaseException as exc:  # pragma: no cover - exercised by live infra failures
+                        response.put(("error", exc))
+        except BaseException as exc:  # pragma: no cover - exercised by live infra failures
+            self._ready.put(("error", exc))
+
+
 class XaGuardSUT(SUT):
     """外部 XA-Guard（guard 模式）经 MCP stdio / CLI 接入。
 
@@ -291,6 +369,9 @@ class XaGuardSUT(SUT):
         self.live = live
         self.artifacts: XaGuardArtifacts | None = None
         self._xa_guard_root_resolved: Path | None = None
+        self._live_session: _XaGuardLiveSession | None = None
+        self._session_generation = 0
+        self._live_session_summary: dict[str, Any] | None = None
 
     def prepare(self, store: Any, scenario: Any, surface: Any) -> XaGuardArtifacts:
         return self.write_configs(store, scenario, surface)
@@ -324,6 +405,54 @@ class XaGuardSUT(SUT):
             raise RuntimeError("XaGuardSUT live decisions require invoke(), not decide()")
         return self._offline_gate3_decide(call)
 
+    def begin_attempt(self) -> None:
+        if not self.live:
+            return
+        if self.artifacts is None:
+            raise RuntimeError("call prepare()/write_configs() before begin_attempt()")
+        if self._live_session is not None:
+            return
+        self._session_generation += 1
+        session_id = f"xa-guard-live-session-{self._session_generation:03d}"
+        self._live_session_summary = {
+            "sut_id": self.sut_id,
+            "live": True,
+            "session_scope": "attempt",
+            "session_id": session_id,
+            "server_command": self.server_command(),
+            "audit_dir": path_text(self.artifacts.audit_dir),
+            "started": False,
+            "closed": False,
+            "process_start_count": 0,
+            "tool_call_count": 0,
+            "tools": [],
+            "errors": [],
+        }
+        session = _XaGuardLiveSession(command=self.server_command(), env=self._child_env())
+        try:
+            session.start()
+        except BaseException as exc:
+            self._live_session_summary["errors"].append({"type": type(exc).__name__, "message": str(exc)})
+            raise
+        self._live_session = session
+        self._live_session_summary["started"] = True
+        self._live_session_summary["process_start_count"] = 1
+
+    def end_attempt(self) -> None:
+        if self._live_session is None:
+            return
+        try:
+            self._live_session.close()
+            if self._live_session_summary is not None:
+                self._live_session_summary["closed"] = True
+        finally:
+            self._live_session = None
+
+    def live_session_summary(self) -> dict[str, Any] | None:
+        if self._live_session_summary is None:
+            return None
+        return dict(self._live_session_summary)
+
     def invoke(self, world: Any, ledger: Any, principal: str, call: ToolCall, surface: Any) -> dict[str, Any]:
         if not self.live:
             return super().invoke(world, ledger, principal, call, surface)
@@ -342,7 +471,7 @@ class XaGuardSUT(SUT):
         if self.artifacts is None:
             raise RuntimeError("call prepare()/write_configs() before using XaGuardSUT(live=True)")
         before = _audit_row_count(self.artifacts.audit_dir)
-        result_text = asyncio.run(self._call_xa_guard(call, principal=principal))
+        result_text = self._call_xa_guard(call, principal=principal)
         row = _latest_audit_row(self.artifacts.audit_dir, after=before)
         if row:
             decision = str(row.get("gen_ai.decision.final") or "allow")
@@ -354,7 +483,17 @@ class XaGuardSUT(SUT):
             return "deny", result_text
         return "allow", result_text or "xa-guard live allowed tool call"
 
-    async def _call_xa_guard(self, call: ToolCall, *, principal: str) -> str:
+    def _call_xa_guard(self, call: ToolCall, *, principal: str) -> str:
+        arguments = self._call_arguments(call, principal=principal)
+        if self._live_session is not None:
+            result = self._live_session.call_tool(call.tool, arguments)
+            self._record_live_session_call(call, principal=principal)
+            return result
+        result = asyncio.run(self._call_xa_guard_once(call, arguments))
+        self._record_live_session_call(call, principal=principal, fallback_per_call=True)
+        return result
+
+    async def _call_xa_guard_once(self, call: ToolCall, arguments: dict[str, Any]) -> str:
         try:
             from mcp import ClientSession
             from mcp.client.stdio import StdioServerParameters, stdio_client
@@ -367,11 +506,6 @@ class XaGuardSUT(SUT):
             args=command[1:],
             env=self._child_env(),
         )
-        arguments = dict(call.args)
-        envelope = arguments.setdefault("_xa_guard", {})
-        if isinstance(envelope, dict):
-            envelope.setdefault("human_principal", principal)
-            envelope.setdefault("agent_id", "open-agent-range")
         async with AsyncExitStack() as stack:
             read_stream, write_stream = await stack.enter_async_context(stdio_client(params))
             session = await stack.enter_async_context(ClientSession(read_stream, write_stream))
@@ -379,10 +513,52 @@ class XaGuardSUT(SUT):
             result = await session.call_tool(call.tool, arguments)
         return _mcp_result_text(result)
 
+    def _call_arguments(self, call: ToolCall, *, principal: str) -> dict[str, Any]:
+        arguments = dict(call.args)
+        envelope = arguments.setdefault("_xa_guard", {})
+        if isinstance(envelope, dict):
+            envelope.setdefault("human_principal", principal)
+            envelope.setdefault("agent_id", "open-agent-range")
+        return arguments
+
+    def _record_live_session_call(
+        self,
+        call: ToolCall,
+        *,
+        principal: str,
+        fallback_per_call: bool = False,
+    ) -> None:
+        if self._live_session_summary is None:
+            self._live_session_summary = {
+                "sut_id": self.sut_id,
+                "live": True,
+                "session_scope": "per_call_fallback",
+                "session_id": "xa-guard-live-per-call",
+                "started": False,
+                "closed": True,
+                "process_start_count": 0,
+                "tool_call_count": 0,
+                "tools": [],
+                "errors": [],
+            }
+        self._live_session_summary["tool_call_count"] = int(self._live_session_summary.get("tool_call_count", 0)) + 1
+        if fallback_per_call:
+            self._live_session_summary["session_scope"] = "per_call_fallback"
+            self._live_session_summary["process_start_count"] = int(
+                self._live_session_summary.get("process_start_count", 0)
+            ) + 1
+        self._live_session_summary.setdefault("tools", []).append({"principal": principal, "tool": call.tool})
+
     def _child_env(self) -> dict[str, str]:
         env = dict(os.environ)
         root = self._xa_guard_root_resolved or self.xa_guard_root or find_xa_guard_root()
-        parts = [str((root / "src").resolve()), str(root.resolve()), str(Path.cwd().resolve())]
+        range_root = Path(__file__).resolve().parents[1]
+        parts = [
+            str((root / "src").resolve()),
+            str(root.resolve()),
+            str(range_root.resolve()),
+            str(Path.cwd().resolve()),
+        ]
         existing = env.get("PYTHONPATH")
         if existing:
             parts.append(existing)

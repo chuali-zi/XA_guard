@@ -27,6 +27,7 @@ ARTIFACT_NAMES = (
     "tool-events.jsonl",
     "timeline.jsonl",
     "audit.jsonl",
+    "sut-session.json",
     "world-effects.jsonl",
     "ledger.jsonl",
     "ledger-replay.json",

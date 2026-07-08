@@ -1,5 +1,14 @@
 # 工作日志
 
+## 2026-07-07 17:51 最后一轮收敛：attempt 级 XA-Guard live 与 N=3 红队 A/B
+
+- **背景/目标**：用户明确本轮不再追求完美，而是要求靶场基本符合 PRD 思想并且红队可用。结合 `Planck` 只读复核，最值得收敛的 P0 是 XA-Guard live 仍偏 per-call smoke、缺真实 `null,xaguard --live --repeat 3` 矩阵，以及从仓库根运行时的可用性细节。
+- **本轮做了什么**：新增通用 SUT 生命周期钩子 `begin_attempt()` / `end_attempt()`；`XaGuardSUT(live=True)` 现在在一次 attempt 内启动并复用一个真实 `xa_guard.server` stdio MCP session，所有 ToolCall 走同一 session，attempt 结束后关闭。证据包新增 `sut-session.json`，记录 `session_scope=attempt`、`process_start_count`、`tool_call_count`、工具序列和关闭状态。
+- **可用性修复**：`XaGuardSUT` 子进程环境显式加入 `open-agent-range` 根目录，避免从 monorepo 根运行时下游 `kernel.mcp_echo_server` 找不到。`workbench worlds` 改为从 package root 发现 `scenarios/dctg/*.json`，但仍输出红队熟悉的相对路径。
+- **外部复核结论**：按要求启动 `gpt-5.5/xhigh` 只读子 agent `Planck`。它仍判定不完全符合“完美完成态”，但明确建议优先完成 attempt 级 XA-Guard live 与 `null,xaguard --live --repeat 3` 真实证据矩阵；本轮已按这个方向收敛。
+- **测试/验证**：`python -m pytest open-agent-range\kernel\tests -q` 通过。真实 live A/B smoke：`run-ab --sut-mode null,xaguard --live --repeat 3` 通过，null 侧 3/3 泄漏 `cit-1001`，xaguard live 侧 3/3 拦截，`protected_infra_error_count=0`，`protection_delta=1.0`。对其中 `run-001/xaguard` 执行 `replay --verify-hashes --verify-ledger --verify-sut-audit --json` 通过，artifact hash、ledger projection、raw XA-Guard audit alignment 均 OK；`sut-session.json` 显示 `process_start_count=1`、`tool_call_count=3`、`closed=true`。
+- **当前边界**：这已经能支撑“红队可用”的基本产品形态：开放注入、ManualSeat/Workbench、finding A/B、真实 XA-Guard live、N>=3 矩阵、证据回放和审计对齐。但 full-day live OpenCode 任意长度自主 agent loop、地图画布、多注入编排、权限化后台和完整 dashboard 仍不是最终完美态。
+
 ## 2026-07-07 07:58 ReactiveSeat observe-plan-act 与 agent transcript
 
 - **背景/目标**：继续推进 `Singer` / 前序 review 指出的 P0：full-day 正常日仍偏 `scripted_plans_for_scenario()` 一次性固定计划，不是全席位 observe-plan-act。

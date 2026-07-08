@@ -26,7 +26,8 @@ from kernel.seat import GullibleSeat, ManualSeat, SeatContext
 from kernel.sut import GuardStubSUT, NullSUT, SUT, ToolCall, XaGuardSUT
 
 
-DEFAULT_WORLD_DIR = Path("scenarios") / "dctg"
+RANGE_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_WORLD_DIR = RANGE_ROOT / "scenarios" / "dctg"
 DEFAULT_FINDINGS_DIR = Path(".runtime") / "findings"
 DEFAULT_AB_DIR = Path(".runtime") / "ab"
 DEFAULT_CHALLENGES_DIR = Path("scenarios") / "challenges"
@@ -150,7 +151,11 @@ def main(argv: list[str] | None = None) -> int:
 def _cmd_worlds() -> int:
     worlds = sorted(DEFAULT_WORLD_DIR.glob("*.json"))
     for path in worlds:
-        print(path.as_posix())
+        try:
+            display = path.relative_to(RANGE_ROOT)
+        except ValueError:
+            display = path
+        print(display.as_posix())
     return 0
 
 

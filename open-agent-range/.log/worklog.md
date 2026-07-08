@@ -1,5 +1,13 @@
 # open-agent-range 工作日志
 
+## 2026-07-07 17:51 Final convergence: red-team usable live XA-Guard matrix
+- Shifted the final-round objective from perfect PRD completion to "basically PRD-aligned and red-team usable," per the user's instruction. The concrete P0 chosen from the `Planck` xhigh review was attempt-scoped XA-Guard live plus real `null,xaguard --live --repeat 3` evidence.
+- Added SUT lifecycle hooks and made `XaGuardSUT(live=True)` reuse one real `xa_guard.server` stdio MCP session for all ToolCalls in an attempt. The attempt now writes `sut-session.json` with `session_scope`, `process_start_count`, `tool_call_count`, tool sequence, close state, and errors.
+- Fixed two practical usability issues: live child processes now receive the `open-agent-range` root in `PYTHONPATH`, so `kernel.mcp_echo_server` resolves from the monorepo root; `workbench worlds` now discovers scenarios from the package root while printing relative `scenarios/dctg/...` paths.
+- Requested review: the `gpt-5.5` / `xhigh` read-only subagent `Planck` still judged the range short of the perfect completion state, but specifically recommended attempt-level live XA-Guard plus real N>=3 `null,xaguard --live` evidence as the most valuable next step. This round implements that step.
+- Verification: full `python -m pytest open-agent-range\kernel\tests -q` passed. A real live A/B smoke with `run-ab --sut-mode null,xaguard --live --repeat 3` completed with null leaking `cit-1001` in 3/3 runs, xaguard live blocking 3/3, no protected infra errors, and `protection_delta=1.0`. Replay on `run-001/xaguard` passed hash, ledger projection, and SUT/raw-XA-Guard audit alignment checks. `sut-session.json` showed one process start and three ToolCalls in the session.
+- Remaining boundary: the range is now basically red-team usable, but not a perfect final product. Full-day live OpenCode arbitrary-length autonomy, a real map canvas, multi-injection orchestration, permissioned backend, and full dashboard remain future work.
+
 ## 2026-07-07 07:58 ReactiveSeat observe-plan-act and agent transcript
 - Continued the P0 product-shape work around the scripted full-day baseline. Added `ReactiveSeat` and exposed it through `range day --agent reactive` / `kernel.demo --agent reactive`.
 - `ReactiveSeat` starts with an observation or a first business intent, then uses `on_tool_result()` to enqueue the next ToolCall after the runner returns each real tool output. The full-day reactive path now covers key Office, Ops, Atlas, contract, CI/plugin, governance, and audit flows.

@@ -55,34 +55,38 @@ def run_attempt(
     if isinstance(sut, XaGuardSUT) and sut.live and sut.artifacts is None:
         live_store = evidence_store or EvidenceStore(Path(".runtime") / "xa-guard-live" / scenario.scenario_id)
         sut.prepare(live_store, scenario, surface)
+    sut.begin_attempt()
 
-    # 1) 红队在敞开的注入面投毒（把 payload 当世界数据放进去，非脚本）。
-    #    注入先进入世界，随后业务时钟与 seat 都在同一条 timeline 上观察它。
-    apply_injections(world, scenario.injections)
-    surface = _surface_with_dynamic_tools(surface, world)
+    try:
+        # 1) 红队在敞开的注入面投毒（把 payload 当世界数据放进去，非脚本）。
+        #    注入先进入世界，随后业务时钟与 seat 都在同一条 timeline 上观察它。
+        apply_injections(world, scenario.injections)
+        surface = _surface_with_dynamic_tools(surface, world)
 
-    # 2) Seat 以身份领任务、产出工具调用尝试。
-    #    SP5 起一个 attempt 可有多个 seat_contexts；旧场景仍走单 context。
-    contexts = _seat_contexts(scenario)
-    attempts: list[ToolCall] = []
+        # 2) Seat 以身份领任务、产出工具调用尝试。
+        #    SP5 起一个 attempt 可有多个 seat_contexts；旧场景仍走单 context。
+        contexts = _seat_contexts(scenario)
+        attempts: list[ToolCall] = []
 
-    # 3) 正常业务事件与 seat/SUT activity 共用一条业务时钟。
-    #    这避免"先整批放完正常日磁带，再让待测 seat 在尾巴出手"。
-    schedule_ticks = _run_timeline_interleaved(
-        world,
-        ledger,
-        scenario=scenario,
-        contexts=contexts,
-        seat=seat,
-        sut=sut,
-        surface=surface,
-        attempts=attempts,
-    )
+        # 3) 正常业务事件与 seat/SUT activity 共用一条业务时钟。
+        #    这避免"先整批放完正常日磁带，再让待测 seat 在尾巴出手"。
+        schedule_ticks = _run_timeline_interleaved(
+            world,
+            ledger,
+            scenario=scenario,
+            contexts=contexts,
+            seat=seat,
+            sut=sut,
+            surface=surface,
+            attempts=attempts,
+        )
 
-    # 4) 判据从账本/世界读坏状态；Oracle 综合出 verdict。
-    engine = build_engine(scenario.bound_properties)
-    violations = engine.evaluate_all(ledger, world)
-    verdict = oracle_evaluate(scenario.oracle, world, ledger, sut.audit, violations)
+        # 4) 判据从账本/世界读坏状态；Oracle 综合出 verdict。
+        engine = build_engine(scenario.bound_properties)
+        violations = engine.evaluate_all(ledger, world)
+        verdict = oracle_evaluate(scenario.oracle, world, ledger, sut.audit, violations)
+    finally:
+        sut.end_attempt()
 
     if evidence_store is not None:
         _write_evidence(
@@ -277,8 +281,12 @@ def _write_evidence(
         },
     )
     if isinstance(sut, XaGuardSUT):
+        session_summary = sut.live_session_summary()
+        if session_summary is not None:
+            store.write_json("sut-session.json", session_summary)
         try:
-            sut.write_configs(store, scenario, surface)
+            if sut.artifacts is None or sut.artifacts.xa_guard_yaml.parent.resolve() != store.root.resolve():
+                sut.write_configs(store, scenario, surface)
         except FileNotFoundError:
             pass
     store.finalize_artifact_hashes()
