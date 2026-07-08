@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from xa_guard.audit.merkle import audit_file_lock, canonical_json, compute_record_hash
+from xa_guard.audit.external_signer import verify_with_external_command
 from xa_guard.audit.sm_crypto import (
     hmac_demo_key_id,
     sm2_key_id,
@@ -94,6 +95,11 @@ def verify_audit_signatures(
     *,
     mode: str,
     key_path: str = "",
+    external_verify_command: str | list[str] | tuple[str, ...] | None = None,
+    external_key_id: str = "",
+    external_algorithm: str = "EXTERNAL-HSM-SM2-SM3",
+    external_provider: str = "",
+    external_timeout_seconds: float = 10.0,
 ) -> dict[str, Any]:
     """Verify every audit record signature in strict SM2 or explicit demo mode."""
     normalized_mode = mode.lower()
@@ -109,6 +115,24 @@ def verify_audit_signatures(
 
         def verifier(payload: bytes, signature: str) -> bool:
             return sm2_verify(payload, signature, key_path, prefer_gm=False)
+    elif normalized_mode == "external":
+        if not external_verify_command:
+            raise ValueError("external signature verification requires external_verify_command")
+        if not external_key_id:
+            raise ValueError("external signature verification requires external_key_id")
+        expected_algorithm = external_algorithm
+        expected_key_id = external_key_id
+
+        def verifier(payload: bytes, signature: str) -> bool:
+            return verify_with_external_command(
+                payload,
+                signature,
+                command=external_verify_command,
+                key_id=external_key_id,
+                algorithm=external_algorithm,
+                provider=external_provider,
+                timeout_seconds=external_timeout_seconds,
+            )
     else:
         raise ValueError(f"unsupported signature verification mode: {mode}")
 

@@ -41,10 +41,19 @@ def main() -> int:
     parser.add_argument("--verify-anchor-index", action="store_true", help="also require the anchor index entry")
     parser.add_argument(
         "--require-signature",
-        choices=["sm2", "hmac-demo"],
+        choices=["sm2", "hmac-demo", "external"],
         help="require and verify every record signature in the selected mode",
     )
     parser.add_argument("--signature-key", default="", help="SM2 or demo HMAC key file")
+    parser.add_argument("--external-verify-command", default="", help="JSON stdin/stdout verifier command")
+    parser.add_argument("--external-key-id", default="", help="expected external HSM/KMS key id")
+    parser.add_argument(
+        "--external-algorithm",
+        default="EXTERNAL-HSM-SM2-SM3",
+        help="expected external signature algorithm label",
+    )
+    parser.add_argument("--external-provider", default="", help="external signer provider name")
+    parser.add_argument("--external-timeout-seconds", type=float, default=10.0)
     args = parser.parse_args()
 
     p = Path(args.path)
@@ -102,6 +111,11 @@ def main() -> int:
                 p,
                 mode=args.require_signature,
                 key_path=args.signature_key,
+                external_verify_command=args.external_verify_command or None,
+                external_key_id=args.external_key_id,
+                external_algorithm=args.external_algorithm,
+                external_provider=args.external_provider,
+                external_timeout_seconds=args.external_timeout_seconds,
             )
         except Exception as exc:
             signature_errors = 1

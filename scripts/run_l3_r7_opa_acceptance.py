@@ -25,7 +25,7 @@ from xa_guard.config import GateConfig
 from xa_guard.gates.gate3_policy import Gate3Policy
 from xa_guard.policy.layered import LayeredPolicySource, set_global_source
 from xa_guard.policy.opa_export import write_opa_bundle
-from xa_guard.types import Decision, GateContext, InputSource, RiskLevel, TaintLabel
+from xa_guard.types import GateContext, InputSource, RiskLevel, TaintLabel
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_FIXTURE = ROOT / "bench" / "cases" / "gate3-rule-fixtures.yaml"
@@ -88,6 +88,39 @@ def _opa_version(opa_path: Path) -> dict[str, Any]:
         encoding="utf-8",
     )
     return {"returncode": proc.returncode, "stdout": proc.stdout, "stderr": proc.stderr}
+
+
+def _docker_image_inspect(image: str) -> dict[str, Any]:
+    if not image:
+        return {"status": "not_configured"}
+    docker = shutil.which("docker")
+    if not docker:
+        return {"status": "blocked", "error": "docker executable not found"}
+    proc = subprocess.run(
+        [docker, "image", "inspect", image],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    if proc.returncode != 0:
+        return {"status": "blocked", "error": proc.stderr.strip(), "image": image}
+    try:
+        payload = json.loads(proc.stdout or "[]")
+    except json.JSONDecodeError as exc:
+        return {"status": "fail", "error": f"invalid docker inspect JSON: {exc}", "image": image}
+    if not payload:
+        return {"status": "blocked", "error": "docker image inspect returned no records", "image": image}
+    item = payload[0]
+    repo_digests = item.get("RepoDigests") or []
+    return {
+        "status": "pass",
+        "image": image,
+        "id": item.get("Id", ""),
+        "repo_digests": repo_digests,
+        "created": item.get("Created", ""),
+        "labels": item.get("Config", {}).get("Labels") or {},
+    }
 
 
 def _write_fake_opa(path: Path, body: str) -> None:
@@ -250,8 +283,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         },
         "fail_closed": fail_closed,
         "image_provenance": {
-            "status": "not_run",
-            "note": "This local run used tools/opa/opa.exe directly. Pinning and scanning an approved openpolicyagent/opa image digest remains separate evidence unless Docker image inspection is run by the operator.",
+            "inspect": _docker_image_inspect(args.opa_image),
+            "trivy_report": str(Path(args.trivy_report).resolve()) if args.trivy_report else "",
+            "trivy_report_sha256": _sha256(Path(args.trivy_report).resolve())
+            if args.trivy_report and Path(args.trivy_report).exists()
+            else "",
+            "note": "OPA parity uses the configured OPA executable. Image inspect and Trivy report are provenance inputs only; vulnerability acceptance still requires an approved digest or explicit risk acceptance.",
         },
     }
     report_path = out_dir / "r7-opa-acceptance-report.json"
@@ -277,6 +314,12 @@ def main() -> int:
     parser.add_argument("--opa-path", default=str(ROOT / "tools" / "opa" / ("opa.exe" if os.name == "nt" else "opa.exe")))
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--opa-timeout-seconds", type=float, default=5.0)
+    parser.add_argument(
+        "--opa-image",
+        default="",
+        help="optional OPA container image reference to inspect for provenance, e.g. openpolicyagent/opa:1.4.2-static",
+    )
+    parser.add_argument("--trivy-report", default="", help="optional existing Trivy JSON/text report to hash into evidence")
     args = parser.parse_args()
     report = run(args)
     return 0 if report["status"] == "pass" else 1

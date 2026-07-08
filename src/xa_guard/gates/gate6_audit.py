@@ -21,6 +21,7 @@ from typing import Any
 
 from xa_guard.audit.completeness import record_completeness_score
 from xa_guard.audit.faithfulness import assess_decision_faithfulness
+from xa_guard.audit.external_signer import sign_with_external_command
 from xa_guard.audit.merkle import ChainStore, canonical_json
 from xa_guard.audit.otel import to_otel_dict
 from xa_guard.audit.sm_crypto import (
@@ -53,8 +54,15 @@ class Gate6Audit(Gate):
         if not configured_mode and bool(self.opt("enable_sm2_signature", False)):
             configured_mode = "sm2" if self.hash_algo == "sm3" and self.sm2_key_path else "hmac-demo"
         self.signature_mode = configured_mode or "none"
-        if self.signature_mode not in {"none", "sm2", "hmac-demo"}:
+        if self.signature_mode not in {"none", "sm2", "hmac-demo", "external"}:
             raise ValueError(f"unsupported Gate6 signature_mode: {self.signature_mode}")
+        self.external_sign_command: str | list[str] = self.opt("external_sign_command", "") or ""
+        self.external_key_id: str = self.opt("external_key_id", "") or ""
+        self.external_algorithm: str = self.opt("external_algorithm", "EXTERNAL-HSM-SM2-SM3") or "EXTERNAL-HSM-SM2-SM3"
+        self.external_provider: str = self.opt("external_provider", "") or ""
+        self.external_timeout_seconds: float = float(self.opt("external_timeout_seconds", 10.0) or 10.0)
+        if self.signature_mode == "external" and (not self.external_sign_command or not self.external_key_id):
+            raise ValueError("Gate6 signature_mode=external requires external_sign_command and external_key_id")
 
     def evaluate(self, ctx: GateContext, stage: GateStage = GateStage.OUTBOUND) -> GateResult:
         # 1. 计算 tool_result_hash（canonical JSON）
@@ -170,6 +178,10 @@ class Gate6Audit(Gate):
         elif self.signature_mode == "hmac-demo":
             record_dict["signature_algorithm"] = "HMAC-SHA256-DEMO"
             record_dict["signature_key_id"] = hmac_demo_key_id(self.sm2_key_path)
+        elif self.signature_mode == "external":
+            record_dict["signature_algorithm"] = self.external_algorithm
+            record_dict["signature_key_id"] = self.external_key_id
+            record_dict["signature_provider"] = self.external_provider
         signer = None
         if self.signature_mode == "sm2":
             def signer(payload: bytes) -> str:
@@ -177,6 +189,16 @@ class Gate6Audit(Gate):
         elif self.signature_mode == "hmac-demo":
             def signer(payload: bytes) -> str:
                 return sm2_sign(payload, self.sm2_key_path, prefer_gm=False)
+        elif self.signature_mode == "external":
+            def signer(payload: bytes) -> str:
+                return sign_with_external_command(
+                    payload,
+                    command=self.external_sign_command,
+                    key_id=self.external_key_id,
+                    algorithm=self.external_algorithm,
+                    provider=self.external_provider,
+                    timeout_seconds=self.external_timeout_seconds,
+                ).signature
         appended = self.chain.append(record_dict, signer=signer)
         record_hash = appended.get("record_hash", "")
         audit_completeness = record_completeness_score(appended)

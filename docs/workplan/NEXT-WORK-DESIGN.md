@@ -28,7 +28,7 @@
 |---|---|---|
 | 方向 1：复杂输入链路攻击识别 | `PARTIAL` | Gate1、Spotlighting、规则/模型接入和 holdout 协议有实现/文档；正式独立 holdout 未完成 |
 | 方向 2：工具调用与任务执行安全 | `PARTIAL/BLOCKED` | Gate2/3/4/5、HITL/pending、策略和污点有实现；真实 Trae GUI 和 Linux gVisor 仍阻塞 |
-| 方向 3：插件/Skill/脚本供应链 | `PARTIAL/BLOCKED` | 内部 AIBOM gateway 和离线准入已有；合法外部 AIBOM 生成器与真实安装链未完成 |
+| 方向 3：插件/Skill/脚本供应链 | `PARTIAL/BLOCKED` | 内部 AIBOM gateway、外部 cdxgen CycloneDX 1.6 交换、CLI 准入和离线 install_plugin 准入链已有；真实 marketplace/IDE native 安装 hook 未完成 |
 | 方向 4：评测、审计溯源、持续优化 | `PARTIAL` | XA-Bench、AgentDojo/InjecAgent adapter、预算 runner、Gate6 审计链已有；正式 `$60` sampled 实跑和第三方 TSA/HSM 未完成 |
 
 ## 4. L3 / R1-R9 状态
@@ -41,9 +41,9 @@
 | R4 性能 | `DONE/PARTIAL` | 已有历史性能证据；最终提交前建议复跑 |
 | R5 Trae | `BLOCKED` | 需要真实 Trae GUI 截图/录像 |
 | R6 gVisor | `BLOCKED` | 需要 Linux/runsc 环境 |
-| R7 OPA | `PARTIAL` | parity 已有，完整 fixture/provenance 待补 |
-| R8 外部 AIBOM | `BLOCKED` | 需要合法外部生成器和产物 |
-| R9 第三方 TSA/HSM | `BLOCKED` | 本地 TSA/软件 key 只能作为 demo/CI |
+| R7 OPA | `DONE/PARTIAL` | parity/fail-closed 已有；镜像漏洞仍需 approved digest 或风险接受 |
+| R8 外部 AIBOM | `DONE/PARTIAL` | 合法外部生成器产物、CLI 准入和离线 install_plugin 准入链已通过；marketplace/IDE native hook 未完成 |
+| R9 第三方 TSA/HSM | `LIMIT/BLOCKED` | external signer bridge 已有；第三方 TSA/HSM provider 未配置，本地 TSA/软件 key 只能作为 demo/CI |
 
 ## 5. P0 执行顺序
 
@@ -59,7 +59,7 @@
 | 优先级 | 工作 | 说明 |
 |---|---|---|
 | P1 | 真实 Trae / 支持 elicitation 客户端演示 | 增强方向 2 展示可信度 |
-| P1 | 外部 AIBOM 生成器样例 | 增强方向 3 真实性 |
+| P1 | marketplace/IDE native 安装 hook | 在已有外部 AIBOM/离线准入基础上增强方向 3 真实性 |
 | P1 | Linux gVisor runsc 证据 | 增强沙箱可信度 |
 | P1 | 第三方 TSA/HSM 或明确 blocked | 增强政企证据链可信度 |
 | P2 | Agent Governance 管理 API / SSO | 当前 v1 是本地 YAML + 静态控制台 |

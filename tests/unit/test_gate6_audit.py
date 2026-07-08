@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -49,6 +50,41 @@ def _make_ctx(tool_result=None) -> GateContext:
         )
     )
     return ctx
+
+
+def _fake_external_signer(tmp_path: Path) -> list[str]:
+    script = tmp_path / "fake_external_signer.py"
+    script.write_text(
+        """
+import hashlib
+import hmac
+import json
+import sys
+
+request = json.loads(sys.stdin.read())
+secret = b"fake-provider-secret"
+payload = bytes.fromhex(request["payload_hex"])
+expected = hmac.new(secret, payload, hashlib.sha256).hexdigest()
+if request["operation"] == "sign":
+    print(json.dumps({
+        "signature": expected,
+        "key_id": request["key_id"],
+        "algorithm": request["algorithm"],
+        "provider": request.get("provider", "fake-provider"),
+    }))
+elif request["operation"] == "verify":
+    print(json.dumps({
+        "valid": hmac.compare_digest(expected, request.get("signature", "")),
+        "key_id": request["key_id"],
+        "algorithm": request["algorithm"],
+        "provider": request.get("provider", "fake-provider"),
+    }))
+else:
+    raise SystemExit(2)
+""".lstrip(),
+        encoding="utf-8",
+    )
+    return [sys.executable, str(script)]
 
 
 def test_gate6_writes_14_fields(tmp_path: Path):
@@ -241,6 +277,53 @@ def test_gate6_strict_sm2_missing_key_fails_before_write(tmp_path: Path):
     else:
         raise AssertionError("strict SM2 mode must reject a missing key")
     assert not (tmp_path / "audit.jsonl").exists()
+
+
+def test_gate6_external_signature_mode_roundtrip_and_tamper_reject(tmp_path: Path):
+    command = _fake_external_signer(tmp_path)
+    gate = Gate6Audit(
+        GateConfig(
+            enabled=True,
+            options={
+                "audit_dir": str(tmp_path),
+                "hash_algo": "sm3",
+                "signature_mode": "external",
+                "external_sign_command": command,
+                "external_key_id": "fake-hsm-key-1",
+                "external_algorithm": "EXTERNAL-HSM-SM2-SM3",
+                "external_provider": "fake-provider",
+            },
+        )
+    )
+
+    result = gate(_make_ctx(), GateStage.OUTBOUND)
+    record = json.loads((tmp_path / "audit.jsonl").read_text(encoding="utf-8"))
+    assert result.metadata["signature"] == record["signature"]
+    assert record["signature_algorithm"] == "EXTERNAL-HSM-SM2-SM3"
+    assert record["signature_key_id"] == "fake-hsm-key-1"
+    assert record["signature_provider"] == "fake-provider"
+
+    verified = verify_audit_signatures(
+        tmp_path / "audit.jsonl",
+        mode="external",
+        external_verify_command=command,
+        external_key_id="fake-hsm-key-1",
+        external_algorithm="EXTERNAL-HSM-SM2-SM3",
+        external_provider="fake-provider",
+    )
+    assert verified["ok"] is True
+
+    record["signature"] = "0" * 64
+    (tmp_path / "audit.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+    tampered = verify_audit_signatures(
+        tmp_path / "audit.jsonl",
+        mode="external",
+        external_verify_command=command,
+        external_key_id="fake-hsm-key-1",
+        external_algorithm="EXTERNAL-HSM-SM2-SM3",
+        external_provider="fake-provider",
+    )
+    assert tampered["ok"] is False
 
 
 def test_audit_record_carries_final_decision(tmp_path: Path):

@@ -11,7 +11,7 @@
 当前仓库的主要矛盾已经不是“有没有安全原型”，而是“比赛交付证据还没有收束”。
 
 - 代码层：XA-Guard 六关卡、bench、审计、AIBOM、Docker/OPA/gVisor 静态配置、R2/R3 预算型 runner、Agent Governance v1 已经很完整。
-- 证据层：L3 静态验收通过，部分真实验收通过，但真实 Trae、Linux gVisor、外部 AIBOM、第三方 TSA/HSM、R2/R3 sampled 正式结果、R1 独立 holdout 仍未闭环。
+- 证据层：L3 静态验收通过，部分真实验收通过；外部 AIBOM/CycloneDX 交换、CLI 准入和离线 install_plugin 准入链已补齐，但真实 Trae、Linux gVisor、marketplace/IDE native 安装 hook、第三方 TSA/HSM、R2/R3 sampled 正式结果、R1 独立 holdout 仍未闭环。
 - 交付层：仓库内没有发现 D1 技术方案 PDF 成稿、D3 演示视频、D4 审核通过报名表证据。官方交付最看重这三件和可复现代码链接。
 - 文档层：`docs/` 已完成物理重构。顶层只保留 `docs/README.md`，本 TODO 已迁入 `docs/workplan/`；后续工作设计见 [NEXT-WORK-DESIGN.md](./NEXT-WORK-DESIGN.md)。
 
@@ -310,8 +310,8 @@
 | R5 真实 Trae GUI | 国产生态硬承诺 | 按 `docs/acceptance/L3-trae-static-integration.md` 录屏和验审计 | Trae 客户端 |
 | R6 Linux/gVisor runsc | 证明沙箱不是静态配置 | 在 Linux 主机安装 runsc，跑 no-egress/readonly/rootless 负测 | Linux 主机 |
 | R7 OPA 完整 parity | 策略引擎可信 | 固定 OPA image digest，跑全 fixture 和 drift 负测 | OPA 镜像/二进制 |
-| R8 外部 AIBOM | 方向 3 真实性 | 选定合法外部生成器并归档 BOM | 外部工具 |
-| R9 第三方 TSA/HSM | 政企证据链可信 | 接第三方 TSA 或 HSM/KMS，跑断连/PIN/篡改负测 | 生产式密钥/服务 |
+| R8 marketplace/IDE native hook | 方向 3 真实性 | 在现有外部 BOM/CLI/离线 install_plugin PASS 基础上接真实安装链 | IDE/marketplace |
+| R9 第三方 TSA/HSM | 政企证据链可信 | 基于 external signer bridge 接第三方 TSA 或 HSM/KMS，跑断连/PIN/篡改负测 | 生产式密钥/服务 |
 | Faithfulness 大规模重放 | 防止审计字段占位 | 对真实 agent trace 独立重算 | 独立重放脚本/样本 |
 
 ## 6. P2 - 决赛和加分路线
@@ -411,9 +411,9 @@ docs/
 
 1. Trae 四案例截图/录像。
 2. R2/R3 `$6` calibration 和 sampled 主评测。
-3. 外部 AIBOM 生成器样本。
+3. marketplace/IDE native 安装 hook 或明确 blocked。
 4. Linux gVisor 或明确 blocked。
-5. 第三方 TSA/HSM 或明确 blocked。
+5. 第三方 TSA/HSM provider 或明确 blocked。
 
 ### 第 3 步：交付物写作和剪辑
 

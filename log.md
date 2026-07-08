@@ -1,3 +1,15 @@
+# 2026-07-08 01:05 -07:00 R7/R8/R9 可复跑验收入口收敛
+
+- 按用户要求避开远端 R6/runsc 验收路径，聚焦 R7/R8/R9：R7 只增强 `scripts/run_l3_r7_opa_acceptance.py` 的 OPA image inspect / Trivy report hash provenance 字段，没有修改 Docker/gVisor/R6 执行逻辑。
+- 新增 R8 可复跑脚本 `scripts/run_l3_r8_aibom_acceptance.py`：默认消费仓内 cdxgen CycloneDX 1.6 证据，重新制备 clean/risky artifact，覆盖 `load_external_cyclonedx` 导入、`xa-aibom validate/admit` 正负测、hash mismatch、缺字段、高风险 deny，以及离线 `install_plugin` clean allow / malicious deny 准入链。
+- 新增 R9 external signer bridge：`src/xa_guard/audit/external_signer.py`、Gate6 `signature_mode=external`、`verify_audit.py --require-signature external` 和外部 verifier 参数；未配置外部 provider 时 fail-closed / BLOCKED，不把 fake 或本地软件 key 冒充 HSM。
+- 新增 R9 可复跑脚本 `scripts/run_l3_r9_audit_acceptance.py`：生成并验证 SM3 审计链、SM2-with-SM3 记录签名、SM2 TSA token、anchor index、faithfulness 非固定分和 audit/signature/anchor/token 篡改负测；第三方 TSA/HSM 依赖环境变量配置。
+- 本机实跑证据：R8 `D:/xa-evidence/runs/l3-r8-aibom-20260708T075534Z-local/` 为 `status=pass`；R9 `D:/xa-evidence/runs/l3-r9-audit-20260708T075534Z-local/` 为 `status=limit`，原因是第三方 TSA/HSM provider 未配置但本地 SM3/SM2/TSA 证据和负测均通过。
+- 验证：`python -m pytest tests\unit\test_gate6_audit.py tests\unit\test_verify_audit_cli.py tests\unit\test_tsa_client.py tests\unit\test_aibom_cli.py tests\unit\test_aibom_external_generator.py -q` 通过（46 passed）；针对本轮变更文件的 `ruff check` 通过；R8/R9 acceptance 脚本实跑通过/limit 如上。
+- 已同步维护 `status.md`、`docs/workplan/NEXT-WORK-DESIGN.md` 和 `docs/workplan/TODO.md`，把 R8 的剩余 blocker 收窄为 marketplace/IDE native hook，把 R9 写成 external bridge ready 但第三方 provider 仍 BLOCKED。
+- 还没做：未接真实第三方 TSA 服务、真实 HSM/KMS SDK、真实 marketplace/IDE 安装链；未重跑全仓 pytest、R7 OPA parity、R6 远端 runsc 或 R2/R3 付费 sampled。
+- 下一步：如要把 R9 从 LIMIT 推到 PASS，需要提供第三方 TSA URL 与合法 HSM/KMS sign/verify wrapper；如要把 R8 最后 blocker 关掉，需要真实 IDE/marketplace install hook 证据。
+
 # 2026-07-08 00:04 -07:00 L3 验收证据真实性与跨机器收敛咨询
 
 - 回答用户关于 L3 验收“证据是不是会被认为是编的”、以及 Linux/远端服务器执行而证据主要落在本机 `D:\evidence` 时如何收敛的问题。
