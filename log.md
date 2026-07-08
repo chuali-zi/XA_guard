@@ -1,3 +1,12 @@
+# 2026-07-08 00:04 -07:00 L3 验收证据真实性与跨机器收敛咨询
+
+- 回答用户关于 L3 验收“证据是不是会被认为是编的”、以及 Linux/远端服务器执行而证据主要落在本机 `D:\evidence` 时如何收敛的问题。
+- 结合当前 `status.md` 的正式口径，整理出一套更可辩护的验收证据原则：原始输出优先、命令/脚本可复跑、时间线连续、输入输出可哈希、远端主机与本地 evidence 目录要用 manifest 绑定。
+- 本轮没有新增代码、没有新增测试、没有新增真实验收结果，也没有改变任何 R1-R9 通过/阻塞结论；完成的是答辩与收证方法层面的澄清。
+- 已同步维护 `status.md`，把“最终证据收束/原始证据/provenance/hash manifest/外部存证”进一步写清楚，避免仓库状态只写“还差 PDF/视频”，但没有写清“为什么这一步是 blocker”。
+- 还没做：尚未替用户自动生成统一 evidence manifest、远端主机采集脚本、打包脚本或签名脚本；也没有把现有分散在本地与 Linux 主机上的证据实际归档合并。
+- 下一步如果用户要我落地，我可以直接在仓库里补一套最小证据收束方案，例如：`evidence/README`、统一目录规范、`artifact-hashes.json` 生成脚本、远端 `session transcript + sha256sum + tar` 采集脚本，以及最终验收打包清单。
+
 # 2026-07-07 17:51 -07:00 Open Agent Range final convergence for red-team usable PRD
 
 - 按用户最后一轮要求，把目标从“完美完成态”收敛为“基本符合 PRD 思想且红队可用”。本轮优先处理 `Planck`/前序 review 反复指出的 P0：XA-Guard live 非 attempt 级 session、缺真实 `null,xaguard --live --repeat 3` 矩阵、从仓库根运行 workbench 不够稳。

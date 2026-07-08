@@ -80,7 +80,7 @@
 4. R2/R3 `subscription_budget60_v1` — 离线工具已完成续考与预算安全纠偏；旧首批真实 calibration 因 `$2/$1` 分桶耗尽停在 `$2.94602940`，7/32 complete，冻结失败且不得混入新正式分母。新预算分桶 `$6/$32/$16/$6`，默认 8 jobs/批、失败题 2 次封顶；新的付费校准、AgentDojo suite/arm 批量降本和 sampled 结果未完成。2,986-job `research_full_matrix` 为 `DEFERRED_OPTIONAL`。
 5. R8 合法外部 AIBOM 生成器 + 真实 CycloneDX 1.6 产物 — **外部产物与 CLI 准入正负测已完成（2026-07-07）**：`@cyclonedx/cdxgen@12.7.0` 真实生成 CycloneDX 1.6，`load_external_cyclonedx` 导入 `import: PASS`（SHA-256 绑定 + schema 校验，覆盖 MCP SDK AI-BOM 语义）；`xa-aibom validate/admit` 已覆盖正向、schema-valid 篡改 hash fail、缺字段 fail、artifact hash mismatch deny、高风险 artifact deny；证据已归档（`RESULTS.md` / `xa-aibom-cli-results.md`）。仍 BLOCKED：真实 marketplace/IDE 安装链与完整 AI-BOM 全字段覆盖。
 6. R9 第三方 TSA + 真实 HSM/合法 SDK + 故障负测 + faithfulness 大规模独立重放 — 需生产 key/HSM provider（本地 file TSA + 软件 SM2 key 仅为 demo/CI；BUG-R9 已修复，SM2-TSA-token anchor round-trip PASS）。
-7. 最终 PDF、视频、表单、截图、原始证据、artifact hash manifest 与外部存证/签名的收束和验收。
+7. 最终 PDF、视频、表单、截图、原始证据、artifact hash manifest 与外部存证/签名的收束和验收；当前还缺一套可答辩的 provenance 口径，用来证明本机 `D:/evidence` 与 Linux/远端主机执行证据属于同一次真实验收（至少应包含远端命令 transcript、主机标识、时间线、原始输出、sha256 manifest、打包 hash，以及本地汇总索引之间的绑定关系）。
 
 ## 距离赛题目标
 
