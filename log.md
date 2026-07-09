@@ -1,3 +1,10 @@
+# 2026-07-09 07:40 -07:00 全量脏改动提交并推送 main
+
+- 按用户要求将当前工作区全部脏改动提交并推送到远端 `main`；提交前已在 `main` 分支，无需额外 merge。
+- 提交 `5076eda`：`Add red team docs, remote runner tooling, and range verification evidence.` 共 153 个文件，包含 `open-agent-range/docs/redteam/` 红队/学生手册、`tools/evidence/` 与 `tools/remote-runner/`、`tests/remote_runner/`、`.runtime` 下 smoke/replay 证据，以及 `status.md`/`log.md` 状态更新。
+- 推送结果：`origin/main` 已从 `b6195a2` 更新到 `5076eda`；远端提示仓库新地址为 `https://github.com/chuali-zi/XA_guard.git`（当前 remote 仍指向 `agent_safety.git` 但 push 成功）。
+- 推送后工作区干净：`git status` 显示 `nothing to commit, working tree clean`。
+
 # 2026-07-09 20:30 -07:00 R2/R3 budget60 远程无人值守运行系统落地
 
 - 目标：在远程 Linux 服务器（Proxmox VM，校园网，夜间断电）上无人值守跑完 R2/R3 `subscription_budget60_v1` 抽样验收，证据严格按 `docs/acceptance/remote-evidence/EVIDENCE-LAYOUT-SPEC.md` 传回本机。监督层只包裹、不修改 `scripts/run_r2_r3_acceptance.py`。
