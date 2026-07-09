@@ -23,6 +23,12 @@
 - [reference/data-classification.md](reference/data-classification.md) — 合成数据资产目录与四级分级。
 - [reference/expansion-roadmap.md](reference/expansion-roadmap.md) — "应该拓展什么"：世界/一天的成长路线。
 
+
+**红队使用手册（`docs/redteam/`）**
+- [redteam/README.md](redteam/README.md) — 红队手册索引和实测入口。
+- [redteam/REDTEAM-AGENT-TECHNICAL-MANUAL.md](redteam/REDTEAM-AGENT-TECHNICAL-MANUAL.md) — 详细技术手册，给红队选手和自动化 agent 使用。
+- [redteam/STUDENT-QUICKSTART.md](redteam/STUDENT-QUICKSTART.md) — 学生快速上手版。
+
 **子项目设计（`docs/specs/`）**
 - [specs/SP0-walking-skeleton-design.md](specs/SP0-walking-skeleton-design.md) — SP0 走通骨架（已实现于 `spike.py`）。
 - [specs/SP1-kernel-design.md](specs/SP1-kernel-design.md) — 通用内核（吸收并泛化 arena + spike ledger）。

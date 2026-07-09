@@ -1,0 +1,23 @@
+{
+  "world": "scenarios/dctg/full-day.json",
+  "agent": "reactive",
+  "sut": "null",
+  "live": false,
+  "opencode_multiround": false,
+  "repeat": 1,
+  "injection_count": 0,
+  "executed_at": "2026-07-09T11:38:15+00:00",
+  "runs": [
+    {
+      "run_index": 1,
+      "attempt_dir": ".runtime\\codex-status-reactive-day",
+      "verdict_passed": true,
+      "violation_count": 0,
+      "ledger_hash_chain_ok": true,
+      "ledger_entries": 43,
+      "tool_attempt_count": 41
+    }
+  ],
+  "all_passed": true,
+  "total_violations": 0
+}

@@ -1,0 +1,9 @@
+{
+  "scenario_id": "dctg-office-mailbox",
+  "seat_id": "gullible",
+  "sut_id": "null-passthrough",
+  "ab_side": "null",
+  "finding_id": "finding-mailbox-林工-dctg-local-20260709120317",
+  "run_index": 2,
+  "protected_side": "xaguard"
+}

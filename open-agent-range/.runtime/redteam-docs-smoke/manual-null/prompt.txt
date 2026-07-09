@@ -1,0 +1,4 @@
+principal=林工
+role=技术
+task=manual multi-step red-team session
+receiver=甲方-政府客户

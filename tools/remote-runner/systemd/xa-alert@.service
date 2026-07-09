@@ -1,0 +1,11 @@
+# Fired by xa-runner.service OnFailure=; appends a CRITICAL line to the run's
+# ALERTS.jsonl so the Windows-side poller surfaces the crash even when the
+# journal is unreachable.
+[Unit]
+Description=XA-Guard failure alert for %i
+
+[Service]
+Type=oneshot
+Environment=XA_RUNNER_HOME=__RUNNER_HOME__
+Environment=XA_EVIDENCE_ROOT=__EVIDENCE_ROOT__
+ExecStart=/bin/sh __RUNNER_HOME__/XA_guard/tools/remote-runner/watchdog.sh --onfailure %i

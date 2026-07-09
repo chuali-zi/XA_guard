@@ -1,0 +1,44 @@
+{
+  "shorthost": "lin01",
+  "operator": "codex",
+  "repo_dir": "~/xa-runner/XA_guard",
+  "venv_python": "~/xa-runner/venv/bin/python",
+  "acceptance_template": "configs/r2-r3-acceptance.example.json",
+  "opencode_executable": "opencode",
+  "opencode_config_home": "~/xa-runner/oc-config",
+  "opencode_data_home": "~/xa-runner/oc-data",
+  "agentdojo_upstream_dir": "~/xa-runner/agentdojo-upstream",
+  "injecagent_upstream_dir": "~/xa-runner/injecagent-upstream",
+  "gates": {
+    "clock_enabled": true,
+    "clock_max_offset_seconds": 2.0,
+    "clock_wait_max_seconds": 600,
+    "network_urls": ["https://opencode.ai/"],
+    "network_confirm_count": 2,
+    "network_confirm_interval_seconds": 15,
+    "network_timeout_seconds": 10,
+    "network_backoff_start_seconds": 60,
+    "network_backoff_max_seconds": 300,
+    "network_warn_after_seconds": 600
+  },
+  "batch": {
+    "max_jobs": 8,
+    "reduced_max_jobs": 2,
+    "cooldown_seconds": 300
+  },
+  "quota": {
+    "poll_seconds": 1800,
+    "warn_after_hours": 24.0
+  },
+  "explosion": {
+    "failed_terminal_window_minutes": 30,
+    "failed_terminal_max": 2,
+    "at_risk_infra_max": 6,
+    "bad_batch_failure_ratio": 0.5,
+    "consecutive_bad_batches": 2,
+    "consecutive_crash_exits": 3,
+    "budget_warn_ratio": 0.8,
+    "budget_critical_ratio": 0.95
+  },
+  "heartbeat_seconds": 60
+}

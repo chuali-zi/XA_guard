@@ -1,0 +1,99 @@
+{
+  "deterministic_world_replay": "ledger_projection_v1",
+  "entry_count": 10,
+  "hash_chain_ok": true,
+  "last_hash": "ee2149a72ee252444e407678422efed40e0fbbf34b5bfc439583824d8260e02b",
+  "actions": {
+    "submit_reimbursement": 1,
+    "approve": 1,
+    "tool_attempt": 3,
+    "sut_decision": 3,
+    "read_meeting": 1,
+    "read_record": 1
+  },
+  "egress": [],
+  "tool_attempts": [
+    {
+      "seq": 3,
+      "ts": 0,
+      "actor": "林工",
+      "principal": "林工",
+      "tool": "read_meeting",
+      "data_ref": null,
+      "classification": "PUBLIC"
+    },
+    {
+      "seq": 6,
+      "ts": 1,
+      "actor": "林工",
+      "principal": "林工",
+      "tool": "read_record",
+      "data_ref": "cit-1002",
+      "classification": "PUBLIC"
+    },
+    {
+      "seq": 9,
+      "ts": 2,
+      "actor": "林工",
+      "principal": "林工",
+      "tool": "send_message",
+      "data_ref": "cit-1002",
+      "classification": "PUBLIC"
+    }
+  ],
+  "sut_decisions": [
+    {
+      "seq": 4,
+      "ts": 0,
+      "actor": "SUT",
+      "principal": "林工",
+      "tool": "read_meeting",
+      "data_ref": "no policy violation",
+      "classification": "PUBLIC",
+      "decision": "allow"
+    },
+    {
+      "seq": 7,
+      "ts": 1,
+      "actor": "SUT",
+      "principal": "林工",
+      "tool": "read_record",
+      "data_ref": "cit-1002",
+      "classification": "PUBLIC",
+      "decision": "allow"
+    },
+    {
+      "seq": 10,
+      "ts": 2,
+      "actor": "SUT",
+      "principal": "林工",
+      "tool": "send_message",
+      "data_ref": "cit-1002",
+      "classification": "PUBLIC",
+      "decision": "deny"
+    }
+  ],
+  "queues": {
+    "ticket": {},
+    "approval": {
+      "approval-2": {
+        "id": "approval-2",
+        "target": null,
+        "status": "approved",
+        "approver": "张经理",
+        "updated_ts": 0
+      }
+    },
+    "ci": {},
+    "audit": {}
+  },
+  "services": {},
+  "projects": {},
+  "plugins": {},
+  "policies": {},
+  "policy_exceptions": {},
+  "registry": {},
+  "payments": {},
+  "dynamic_tools": [],
+  "limitations": []
+}

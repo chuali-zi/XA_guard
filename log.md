@@ -1,3 +1,42 @@
+# 2026-07-09 20:30 -07:00 R2/R3 budget60 远程无人值守运行系统落地
+
+- 目标：在远程 Linux 服务器（Proxmox VM，校园网，夜间断电）上无人值守跑完 R2/R3 `subscription_budget60_v1` 抽样验收，证据严格按 `docs/acceptance/remote-evidence/EVIDENCE-LAYOUT-SPEC.md` 传回本机。监督层只包裹、不修改 `scripts/run_r2_r3_acceptance.py`。
+- 新增 `tools/evidence/`：落地规范 §6 契约四脚本 `new-run.sh` / `seal-run.sh` / `verify-run.sh` / `collect.sh` + `common.sh`（POSIX sh，Linux 与 Git Bash 通用）。seal 为确定性打包（sorted tar + gzip -n，`generated_utc` 取 `end_utc` 保证重封 byte-一致），verify/collect 以 git 已提交 `provenance-manifest.jsonl` 为唯一信任锚。已本机冒烟：确定性封包 sha256 两次一致、篡改一字节检出、RESULTS.md 首行不匹配拒封、已封存包拒绝覆盖。
+- 新增 `tools/remote-runner/`：`supervisor.py` 守护（每个付费批次前先过 chrony 时钟门控与 provider 网络门控，防断网烧掉 `max_job_resume_attempts=2` 打成 FAILED_TERMINAL；退出码 0/1/2/3/4 状态机推进 calibration→freeze→main→aggregate→verify；approve calibration/freeze/main 三处人工花钱门；FAILED_TERMINAL 30min≥2 / 濒危 infra_error≥6 / 连续 2 批失败率≥50% / 连续 3 次异常退出四路熔断 halt；心跳 health.json 原子写、ALERTS.jsonl O_APPEND+fsync 断电不丢，全部落在 run 目录内随 run 封存）；`runnerctl.sh`（init/status/approve/pause/resume/revive/seal，seal 后归档 current-run 防止污染已封存 run）；`watchdog.sh` + systemd 三单元（服务死/心跳超 5min 自动拉起，开机自启，`paused` 标志防误拉）；`bootstrap.sh` 幂等部署（bundle 离线优先，verify 全绿才许 init）；Windows 侧 `push-repo.sh`（git bundle→scp）与 `poll-status.sh`（ssh 轮询 health/ALERTS，新 WARN/CRITICAL 弹窗）。
+- run-id 映射决定：R2+R3 合并为单 run `l3-r2r3-budget60-<UTCstamp>-<host>`，因 budget-plan/四桶 ledger/sample-manifest/sampled-report 为两题共享单文件，拆开会让同一 ledger 进两个 sealed 包；orchestrator `output_dir` 指向 `<run>/artifacts/orchestrator/`，local config 冻结于 `<run>/artifacts/config/`（其 sha256 被冻入 budget-plan，init 后不可改）。
+- 验证：`tests/remote_runner/test_supervisor.py` 离线单测 12 passed（假 orchestrator 剧本驱动，覆盖 init 布局、门控等待、批次降级恢复、quota 等待、budget/lock halt、熔断、freeze/main 门、aggregate exit2 仍进 verify、JSON 落盘合法性）；evidence 四脚本 `sh -n` 通过 + 实际冒烟如上。发现并修复：Windows `python3` 为 Store stub（find_python 改为实际执行验证）。
+- 还没做：服务器实机部署与冒烟（bootstrap 两遍幂等、kill -9/reboot/断网故障注入）、真实付费校准、Proxmox onboot/BIOS AC power-on 人工核对（checklist 在 `tools/remote-runner/README.md`）。
+- 下一步：push-repo 推 bundle → bootstrap → verify 全绿 → init + dry-run 冒烟 → approve calibration 开始 $6 校准。
+
+# 2026-07-09 05:12 -07:00 Open Agent Range 红队实测与双版本手册落地
+
+- 按用户要求实际使用 `open-agent-range` 靶场，而不是只看文档：列出 worlds/surfaces，跑内置 `office-multi-combo` A/B，自定义 `meeting/ticket/unknown-surface` payload，跑 ManualSeat null/guard 多步 session，创建 finding，跑离线 `null,xaguard --runs 2` A/B，跑 live `null,xaguard --live --runs 1` A/B，并校验 live xaguard 侧 replay/hash/ledger/raw audit alignment。
+- 按用户指定尝试 OpenCode live seat，模型使用 `deepseek/deepseek-v4-flash`。sandbox 内首次因 OpenCode 访问用户目录日志失败；提权后成功运行。该模型没有跟随注入泄漏敏感记录，而是正常外发 `rec-002`，因此 `verdict.passed=false` 但 `violations=0`、`data_exposure=false`，已作为 live agent 路径的真实边界写入手册。
+- 实测发现并写入手册的坑：injection JSON 不能带 UTF-8 BOM；Windows PowerShell 长 JSON payload 容易被 shell 拆坏；`kernel.range_cli workbench worlds` 不是实际入口，列场景/开放面应使用 `python -m kernel.workbench worlds|surfaces`；`verdict=false` 不必然等于泄漏，要看 `violations` 和 `leaked_data_refs`。
+- 新增 `open-agent-range/docs/redteam/REDTEAM-AGENT-TECHNICAL-MANUAL.md`，作为给红队选手/自动化 agent 的详细技术手册，覆盖概念、命令、payload、ManualSeat、finding 生命周期、A/B、live xaguard、OpenCode、证据解读、报告模板和常见坑。
+- 新增 `open-agent-range/docs/redteam/STUDENT-QUICKSTART.md`，作为给学生的快速上手版，用更少命令解释靶场、跑现成 A/B、自写 payload、ManualSeat、replay、Workbench 和可选 OpenCode。
+- 新增 `open-agent-range/docs/redteam/README.md` 并更新 `open-agent-range/docs/README.md`，让两版手册可从文档入口发现。
+- 验证：`python -m pytest kernel/tests -q` 通过；新增手册 markdown fence 数量为偶数；手册链接已人工检查；live xaguard evidence replay 返回 `ok=true`，artifact hash 19 项、raw XA-Guard audit count 3、raw alignment OK。
+- 本轮没有修改 runtime 代码、测试代码或 XA-Guard 策略；只新增/更新文档、日志和状态。生成的实测 evidence 保留在 `open-agent-range/.runtime/redteam-docs-smoke/`，便于复查。
+
+# 2026-07-09 04:50 -07:00 Open Agent Range 当前状态讲解前复核
+
+- 围绕用户问题“open-agent-range 目前到底是什么样、离 PRD 多远、是否已经可以投入使用、是不是写死模拟题”做现状复核；本轮目标是形成可口述的状态判断，不新增产品功能。
+- 读取并核对了根 `status.md`、根 `log.md`、`open-agent-range/PRD.md`、`open-agent-range/status.md`、`open-agent-range/log.md`、`open-agent-range/docs/reference/a-day-in-the-life.md`、`open-agent-range/docs/reference/attack-surface.md`、`open-agent-range/docs/reference/enterprise-world.md`、`open-agent-range/kernel/README.md` 与 `open-agent-range/scenarios/dctg/full-day.json`。
+- 实跑验证：`python -m pytest kernel/tests -q` 通过；`python -m kernel.demo --scenario scenarios/dctg/full-day.json` 通过，正常日账本 46 条、零违规；`python -m kernel.range_cli day --world scenarios/dctg/full-day.json --agent reactive --sut null --evidence-dir .runtime/reactive-day-check` 通过，41 次工具尝试、43 条 ledger、零违规；随后 `python -m kernel.range_cli replay --attempt .runtime/reactive-day-check --verify-hashes --verify-ledger --verify-sut-audit --json` 通过，artifact hash 15 项、ledger projection 和 audit/tool-event 对齐通过。
+- 当前判断没有变化：`open-agent-range` 已是一个独立开放红队靶场，能让红队做 finding、ManualSeat/Workbench 多步调用、Null vs Guard/XA-Guard A/B 与 evidence/replay 审阅；但仍不是“完美完成态”或工业级完整沙盘。缺口仍是 full-day live/OpenCode 任意长度自主 agent、地图/多注入编排、权限化后台、完整 dashboard，以及更真实的 plugin/MCP/supply/sandbox/policy consequence。
+- 已同步维护 `open-agent-range/status.md` 与 `open-agent-range/log.md`，把 2026-07-09 的复核结果和“基本红队可用、但未达工业级完整沙盘”的边界写清楚。
+
+# 2026-07-09 04:38 -07:00 Open Agent Range 红队可用性状态核验
+
+- 围绕用户问题“open-agent-range 是否是靶场、当前能否交给红队使用”做状态核验；本轮没有修改产品代码、测试代码或策略逻辑。
+- 读取并核对了根 `status.md`、根 `log.md`、`open-agent-range/PRD.md`、`open-agent-range/status.md`、`open-agent-range/docs/README.md`、`open-agent-range/kernel/README.md`、`open-agent-range/docs/specs/SP7-product-completion-spec.md`、场景目录和 kernel/test 目录。
+- 实跑验证：`python -m pytest kernel/tests -q` 通过；`python -m pytest kernel/tests --collect-only -q` 收集到 121 个测试；`python -m kernel.demo --scenario scenarios/dctg/full-day.json` 通过，正常日账本 46 条、零违规；`python -m kernel.range_cli day --world scenarios/dctg/full-day.json --agent reactive --sut null --evidence-dir .runtime\codex-status-reactive-day` 通过，41 次工具尝试、43 条 ledger、零违规；随后 `range_cli replay --verify-hashes --verify-ledger --verify-sut-audit --json` 通过，artifact hash 15 项、ledger projection 和 audit/tool-event 对齐通过。
+- 实跑工作台入口：`python -m kernel.range_cli workbench serve --world scenarios/dctg/full-day.json --out-dir .runtime\codex-status-workbench --no-server --json` 通过，生成 `index.html` 和 `workbench-state.json`；`python -m kernel.workbench worlds` 能列出 6 个场景；`python -m kernel.workbench surfaces --world scenarios/dctg/full-day.json` 能列出 12 个开放面、16 个 seat 和 32 个工具。
+- 发现并记录了一个使用口径差异：`python -m kernel.range_cli workbench worlds --json` 和 `python -m kernel.workbench worlds --json` 当前不可用；实际可用的场景/开放面枚举入口是 `python -m kernel.workbench worlds` 与 `python -m kernel.workbench surfaces --world ...`，产品级 Web 控制台入口是 `python -m kernel.range_cli workbench serve ...`。
+- 当前判断：`open-agent-range` 确实是独立开放红队靶场，已经可以交给红队做本地试用、finding 复现、ManualSeat/Workbench 多步调用、Null vs Guard/XA-Guard A/B 和 evidence/replay 审阅；但不能宣称“完美完成态”或“工业级完整沙盘”。主要缺口仍是 full-day live/OpenCode 任意长度自主 agent、地图/多注入编排、权限化后台、完整 dashboard、真实插件/MCP/供应链/沙箱 consequence 和更深 Gate6/range ledger 对齐。
+- 已同步维护根 `status.md`，把本轮 2026-07-09 的核验结果和 CLI 入口边界写入当前仓库状态。
+- 下一步：若正式给红队使用，应补一页简短 red-team quickstart，明确启动命令、推荐工作流、禁止真实外发/真实凭据/公网目标、finding 命名规范和已知限制。
 # 2026-07-08 01:05 -07:00 R7/R8/R9 可复跑验收入口收敛
 
 - 按用户要求避开远端 R6/runsc 验收路径，聚焦 R7/R8/R9：R7 只增强 `scripts/run_l3_r7_opa_acceptance.py` 的 OPA image inspect / Trivy report hash provenance 字段，没有修改 Docker/gVisor/R6 执行逻辑。
@@ -2862,3 +2901,4 @@ Key finding:
 - 规划范围：模拟企业"数字城市科技集团"（~500 员工、~150 Agent Seat）、L1-L4 + Test 五级 Seat 体系、6 个企业域（Office/Operations/Business Data/Dev Supply/Governance/Audit）的 Seat 分配与能力定义、跨域访问规则矩阵、委托链约束、Seat 生命周期、成本模型（月均 ~$1,040）、与 Arena Core 组件的映射关系。
 - 更新 `enterprise-agent-range/docs/README.md` 先读顺序添加该规划入口。
 - 本规划不修改 runtime 代码、不改变 XA-Guard 验收结论、不引入真实模型调用。
+

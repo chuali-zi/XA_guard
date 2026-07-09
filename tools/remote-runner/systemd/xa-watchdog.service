@@ -1,0 +1,10 @@
+# One-shot watchdog pass; scheduled by xa-watchdog.timer.
+# Runs as root so it can `systemctl restart xa-runner`.
+[Unit]
+Description=XA-Guard runner watchdog pass
+
+[Service]
+Type=oneshot
+Environment=XA_RUNNER_HOME=__RUNNER_HOME__
+Environment=XA_EVIDENCE_ROOT=__EVIDENCE_ROOT__
+ExecStart=/bin/sh __RUNNER_HOME__/XA_guard/tools/remote-runner/watchdog.sh

@@ -1,0 +1,13 @@
+{
+  "scenario_id": "dctg-full-day-six-domain",
+  "seat_id": "reactive",
+  "sut_id": "null-passthrough",
+  "product_command": "day",
+  "agent": "reactive",
+  "model": "",
+  "opencode_multiround": false,
+  "sut": "null",
+  "live": false,
+  "run_index": 1,
+  "injection_count": 0
+}

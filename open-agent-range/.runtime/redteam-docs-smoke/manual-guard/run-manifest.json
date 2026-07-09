@@ -1,0 +1,15 @@
+{
+  "scenario_id": "dctg-office-channels",
+  "seat_id": "manual",
+  "sut_id": "guard-stub",
+  "agent": "manual-session",
+  "principal": "林工",
+  "manual_call_count": 3,
+  "manual_tools": [
+    "read_meeting",
+    "read_record",
+    "send_message"
+  ],
+  "live": false,
+  "injection_count": 3
+}

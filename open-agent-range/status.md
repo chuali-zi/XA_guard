@@ -1,6 +1,6 @@
 # Open Agent Range 状态
 
-更新时间：2026-07-07 17:51 -07:00
+更新时间：2026-07-09 05:12 -07:00
 
 ## 当前结论
 
@@ -11,6 +11,10 @@
 当前最接近完成态的部分是：`full-day.json` 的关键业务副作用已基本迁到多 seat ToolSurface 调用，`scheduled_events` 仅保留外部/背景事实（告警到达、日志/工单可读、低风险审批超时）；F5 运维告警→审批→重启由 `赵工 read_log -> request_approval` 与 `钱主管 approve -> restart_service` 推动；F3、F10、F11 已形成跨角色业务链路；F13/F14 已有 `王安全 approve -> 郑治理 modify_policy/send_message(内部通知) -> 钱审计 replay_trace/verify_chain/export_evidence` 的下午治理审计链；Dev/Gov/Audit 的 CI、插件发布、注册表更新、策略例外、trace replay、证据导出也带审批链落账；`plugin/mcp` 有 `tool-surface-drift` 与 attempt 级动态 ToolSurface；`supply/aibom` 有 `supply-chain-drift`；最小 live `XaGuardSUT` 与最小证据包已可用。
 
 当前仍 **不能** 宣称“完美完成态”。核心缺口是：正常组织行为虽已可通过 `ReactiveSeat` 以 `act -> on_tool_result -> follow-up` 的本地 observe-plan-act 状态机分步运行，但该状态机仍带 deterministic 业务规则，不是真正全席位 live/OpenCode 任意长度自主 observe-plan-act；Workbench 已具备可用红队闭环，但还不是完整 Web 产品：缺真正地图画布、多注入编排、权限化后台和完整 replay/report dashboard；SP7 九类属性族已有最小覆盖，但 policy/sandbox/insider 仍是最小世界事实判据，不是真实策略引擎、真实沙箱执行器或真实权限系统。已经收敛完成的是：live XA-Guard 不再是每 ToolCall 重启的 per-call smoke，而是 attempt 级 session；真实 `null,xaguard --live --repeat 3` 矩阵已能产出保护增量、无 infra error，并可通过 hash/ledger/SUT audit/raw XA-Guard audit replay 校验。因此当前状态可描述为 **基本红队可用的开放靶场竖切**，而非最终工业级完整沙盘。
+
+2026-07-09 本机再次复核：`python -m pytest kernel/tests -q` 通过；`python -m kernel.demo --scenario scenarios/dctg/full-day.json` 通过，正常日账本 46 条、零违规；`python -m kernel.range_cli day --world scenarios/dctg/full-day.json --agent reactive --sut null --evidence-dir .runtime/reactive-day-check` 通过，41 次工具尝试、43 条 ledger、零违规；随后 `python -m kernel.range_cli replay --attempt .runtime/reactive-day-check --verify-hashes --verify-ledger --verify-sut-audit --json` 通过，artifact hash 15 项、ledger projection 与 audit/tool-events 对齐通过。故“基本红队可用、但未达工业级完整沙盘”的判断在 2026-07-09 仍成立。
+
+2026-07-09 红队实测与手册补强：新增 docs/redteam/REDTEAM-AGENT-TECHNICAL-MANUAL.md（红队选手/agent 详细版）、docs/redteam/STUDENT-QUICKSTART.md（学生快速版）和 docs/redteam/README.md，并从 docs/README.md 挂入口。本轮实测自定义 payload、ManualSeat、finding 生命周期、离线/ live xaguard A/B 和 OpenCode deepseek/deepseek-v4-flash 路径；live xaguard 侧 replay/hash/ledger/raw audit alignment 通过。实测 evidence 位于 .runtime/redteam-docs-smoke/。
 
 ## 文档/spec 状态
 

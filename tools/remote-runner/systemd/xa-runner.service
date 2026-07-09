@@ -1,0 +1,24 @@
+# XA-Guard R2/R3 budget60 supervisor daemon.
+# Installed by bootstrap.sh units: placeholders __RUNUSER__ / __RUNNER_HOME__
+# are substituted, the unit lands in /etc/systemd/system/, then
+# `systemctl enable xa-runner` makes the run resume automatically after the
+# nightly dorm power loss.
+[Unit]
+Description=XA-Guard R2/R3 budget60 supervisor
+Wants=network-online.target chrony.service
+After=network-online.target chrony.service
+
+[Service]
+Type=simple
+User=__RUNUSER__
+Environment=XA_RUNNER_HOME=__RUNNER_HOME__
+WorkingDirectory=__RUNNER_HOME__/XA_guard
+ExecStart=__RUNNER_HOME__/venv/bin/python __RUNNER_HOME__/XA_guard/tools/remote-runner/supervisor.py run
+Restart=on-failure
+RestartSec=30
+StartLimitIntervalSec=600
+StartLimitBurst=5
+OnFailure=xa-alert@%n.service
+
+[Install]
+WantedBy=multi-user.target
