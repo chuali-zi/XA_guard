@@ -1,0 +1,50 @@
+# Auto-RedTeam conductor 配置示例。复制为 my-config.yaml 后修改。
+# 默认使用本地 CLI proposal-only 后端：Cursor Agent CLI / OpenCode / Codex 严格串行。
+# Cloud 旧后端仍可显式启用，但不再是默认路径。
+
+engine: local                       # local（本地 CLI）| cloud（Cursor Cloud，显式 opt-in）
+engines: [cursor_cli, opencode, codex]
+repo_url: https://github.com/chuali-zi/agent_safety
+starting_ref: auto-redteam/findings # 仅 cloud 旧后端使用；local 不推远端分支
+
+model_id: null                      # 仅 cloud 旧后端使用
+
+# --- 本地 CLI 模型 ---
+cursor_executable: agent            # 本机 Cursor Agent CLI；缺失时跳过 cursor_cli
+cursor_model_id: null               # Cursor 模型 ID 由本机账户默认决定；不猜测
+opencode_executable: opencode
+opencode_model_id: openai/gpt-5.6-sol
+opencode_variant: high
+codex_executable: codex
+codex_model_id: gpt-5.6-sol
+codex_reasoning_effort: high
+
+# --- 预算护栏（三重之一：Conductor 侧硬上限）---
+budget_usd: 20.0                    # 全局 USD 硬上限，超则停止起新 run
+per_objective_usd: 2.0             # 单目标 USD 上限
+max_refines_per_objective: 3       # 单目标最大自适应轮数
+run_timeout_s: 1800               # 单 run 超时（秒），超时 cancel
+max_agents: 20                     # 全局最大 agent 数
+max_active_agents: 1               # local 模式硬要求：严格串行，避免 payload 撞车
+max_runs: 100                      # 全局最大 run 数
+breaker_max_errors: 3             # 连续 error 触发 breaker，暂停该目标
+usd_per_1k_tokens: 0.01           # USD 估算单价（宁高勿低，早停）
+
+# --- 目标范围 ---
+objective_categories: [1, 2, 3, 4, 5, 6]   # 7=多模态在纯文本靶场默认关闭
+
+# --- 证据/溯源 ---
+evidence_root: D:/xa-evidence/remote/local-auto-redteam
+provenance_manifest: docs/acceptance/remote-evidence/provenance-manifest.jsonl
+mission_root: .state/missions
+novelty_registry: .state/novelty.json
+proposal_similarity_threshold: 0.86
+seed_prior_art: true
+
+# --- 本地 OAR A/B 执行 ---
+local_sut_mode: null,xaguard
+local_runs: 1
+live: false                         # true 需要显式开启；默认不跑 live SUT
+
+# --- 模式 ---
+continuous: false                  # true=队列耗尽后 replenish 持续攻坚

@@ -1,5 +1,13 @@
 # 工作日志
 
+## 2026-07-10 本地 CLI Auto-RedTeam 串行化改造
+
+- **背景/目标**：用户要求把 Cursor Cloud auto-redteam 扩展为本地 CLI 版，并补 OpenCode/Codex 自动红队，同时避免云端冲突、并行撞 payload 和复用已有成功 payload。
+- **本轮做了什么**：默认 `engine` 改为 `local`；新增 Cursor Agent CLI、OpenCode、Codex 三个 proposal-only engine；新增 scope 检查、novelty registry、attack proposal schema、严格串行 `max_active_agents=1` 和 `campaign.lock`；Conductor 负责写 finding、跑 `run-ab`、判定与封存。
+- **安全收口**：不再默认使用 Cursor Cloud；Cloud 仅保留 opt-in legacy。模型不写仓库、不跑 shell A/B、不建 PR、不联网；Cursor 本地 `agent` 缺失时只跳过，不自动安装。
+- **验证**：auto-redteam 离线测试 12 passed；conductor compileall 通过；dry-run 显示 `opencode`/`codex` 可用、`agent` 缺失。
+- **未完成**：尚未真实运行付费 campaign，尚未安装/验证 Cursor Agent CLI，未生成新的红队成果证据。
+
 ## 2026-07-09 05:12 -07:00 红队实测与双版本手册落地
 
 - **背景/目标**：用户要求实际使用靶场并给红队产出两版手册：一版给红队选手/agent 的详细技术手册，一版给学生的快速上手版。
@@ -557,4 +565,3 @@
 - 新增 `spike.py`，实现一个最小模拟世界：企业记录、外部接收方、正常背景流、hash-chain 账本、工具表面、scripted Seat、OpenCode Seat adapter、敏感数据外发属性判据。
 - 新增 `status.md`，记录当前仓库状态、已具备能力、距离 PRD 的缺口和下一步。
 - 尚未完成：还未在本日志条目写入时完成验收命令运行；OpenCode Seat 仍是一轮 JSON action plan，不是正式多轮 tool loop；还没有 XA-Guard/SUT in-the-loop、持久化账本、通用注入面或红队工作台。
-

@@ -1,6 +1,6 @@
 # Open Agent Range 状态
 
-更新时间：2026-07-09 05:12 -07:00
+更新时间：2026-07-10
 
 ## 当前结论
 
@@ -15,6 +15,8 @@
 2026-07-09 本机再次复核：`python -m pytest kernel/tests -q` 通过；`python -m kernel.demo --scenario scenarios/dctg/full-day.json` 通过，正常日账本 46 条、零违规；`python -m kernel.range_cli day --world scenarios/dctg/full-day.json --agent reactive --sut null --evidence-dir .runtime/reactive-day-check` 通过，41 次工具尝试、43 条 ledger、零违规；随后 `python -m kernel.range_cli replay --attempt .runtime/reactive-day-check --verify-hashes --verify-ledger --verify-sut-audit --json` 通过，artifact hash 15 项、ledger projection 与 audit/tool-events 对齐通过。故“基本红队可用、但未达工业级完整沙盘”的判断在 2026-07-09 仍成立。
 
 2026-07-09 红队实测与手册补强：新增 docs/redteam/REDTEAM-AGENT-TECHNICAL-MANUAL.md（红队选手/agent 详细版）、docs/redteam/STUDENT-QUICKSTART.md（学生快速版）和 docs/redteam/README.md，并从 docs/README.md 挂入口。本轮实测自定义 payload、ManualSeat、finding 生命周期、离线/ live xaguard A/B 和 OpenCode deepseek/deepseek-v4-flash 路径；live xaguard 侧 replay/hash/ledger/raw audit alignment 通过。实测 evidence 位于 .runtime/redteam-docs-smoke/。
+
+2026-07-10 auto-redteam 状态：`auto-redteam/` 默认后端已从 Cursor Cloud 改为本地 CLI proposal-only，三 engine 为 Cursor Agent CLI、OpenCode、Codex，`max_active_agents=1` 严格串行。新增 proposal schema、安全 scope 检查、novelty registry、campaign lock 和本地 A/B 执行封存链路；Cloud 仅保留 legacy opt-in。当前仅完成离线测试和 dry-run，尚未真实启动付费模型 campaign；本机缺 Cursor 独立 `agent` CLI，OpenCode/Codex 可检测为可用。
 
 ## 文档/spec 状态
 

@@ -1,3 +1,11 @@
+# 2026-07-10 本地 CLI Auto-RedTeam 串行后端落地
+
+- 按用户要求在 `feat/cursor-auto-redteam` 分支继续实现 auto-redteam：将默认路径从 Cursor Cloud 改为本地 CLI proposal-only，Cursor Agent CLI / OpenCode / Codex 严格串行，由 Conductor 统一做 scope、novelty、A/B 执行、判定和证据封存。
+- 新增 `engines.py`、`scope.py`、`novelty.py`、`attack-proposal.schema.json`、`propose-payload.md` 和 `ATTACK-CONTRACT.md`；OpenCode 固定 `openai/gpt-5.6-sol --variant high`，Codex 使用 `codex exec -m gpt-5.6-sol` + high reasoning，Cursor 本地 `agent` 缺失时只检测/跳过，不自动安装。
+- 关键安全约束：模型不写仓库、不跑 A/B、不建 PR、不联网；payload 需通过合成靶场 scope 检查和 prior-art 去重；新增 `campaign.lock` 防止多个 Conductor 并发。
+- 验证：`python -m pytest open-agent-range/auto-redteam/tests -q` 通过；`python -m compileall open-agent-range/auto-redteam/conductor` 通过；dry-run 显示本机 `agent` 缺失、`opencode`/`codex` 可用。
+- 未做：未真实启动付费模型 campaign，未自动安装 Cursor Agent CLI，未推送到 main 以外分支之外的任何远端分支。
+
 # 2026-07-09 07:40 -07:00 全量脏改动提交并推送 main
 
 - 按用户要求将当前工作区全部脏改动提交并推送到远端 `main`；提交前已在 `main` 分支，无需额外 merge。
@@ -2908,4 +2916,3 @@ Key finding:
 - 规划范围：模拟企业"数字城市科技集团"（~500 员工、~150 Agent Seat）、L1-L4 + Test 五级 Seat 体系、6 个企业域（Office/Operations/Business Data/Dev Supply/Governance/Audit）的 Seat 分配与能力定义、跨域访问规则矩阵、委托链约束、Seat 生命周期、成本模型（月均 ~$1,040）、与 Arena Core 组件的映射关系。
 - 更新 `enterprise-agent-range/docs/README.md` 先读顺序添加该规划入口。
 - 本规划不修改 runtime 代码、不改变 XA-Guard 验收结论、不引入真实模型调用。
-
