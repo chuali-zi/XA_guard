@@ -36,6 +36,7 @@ htmlcov/
 # Runtime / audit output (保留 .log/ 模块工作日志，不提交 logs/)
 logs/
 *.jsonl
+!bench/external/fixtures/*.jsonl
 !bench/.log/.gitkeep
 !**/.log/worklog.md
 !enterprise-agent-range/reports/run-p0-null-verify/*.jsonl

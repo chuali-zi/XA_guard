@@ -10,3 +10,6 @@
 *.pdf binary
 *.zip binary
 *.exe binary
+
+# These licenses are hash-bound corpus provenance artifacts.
+bench/cases/csab-gov-v1-candidate/*.txt text eol=crlf
