@@ -5,6 +5,7 @@
 - 第三次 CI 确认 fixtures 已恢复；其余 corpus mismatch 进一步定位为两份许可证各自要求不同字节换行，现分别固定 ChineseSafetyQA 为 CRLF、XAGuardAuthoredRefusal 为 LF。此前 pytest abort 发生在断言失败汇总后，待最后的哈希失败排除后继续确认。
 - 最后一份 hash 契约修复后，CI 无断言失败但 pytest 退出仍在 AgentDojo provider/native 依赖清理阶段崩溃。根因是纯文本归一化单测加载 external adapter；现将 AgentDojo 固定为独立 `agentdojo` extra，adapter 缺包时构造即硬失败，真实 R2 runner 继续由 pinned upstream bootstrap 安装。CI/组员基础验证不加载该无关依赖树。
 - AgentDojo 隔离后 Linux CI 仍有无栈 `FATAL: exception not rethrown` abort，故质量工作流改为 `-X faulthandler -vv` 保持全量执行并记录崩溃前最后一个测试/原生回溯，供继续根因修复。
+- faulthandler 确认 663 项测试均通过后仅在解释器退出崩溃，加载的原生模块仅含 PyYAML 与 `_cffi_backend`；将无上界的 `cryptography>=42` 固定为稳定的 `44.0.3`，保持真实 Ed25519/SM2 测试并规避最新 CFFI 路径的 Linux 退出兼容风险，待 CI 验证。
 - 为方便组员统一搭建开发和验证环境，新增 `requires.txt`，以 editable install 安装完整验证所需的 `crypto,bench,dev,policy,aibom,http` 可选依赖；不默认安装项目的 `model` extra。
 - 按用户要求从 `feat/cursor-auto-redteam` 切回已同步的 `main`；保留未跟踪的 `about`、`agent`、`status`，未修改或纳入本轮变更。
 - 工程检查发现无 CI 质量门禁，且 `tools/remote-runner/supervisor.py` 在 Windows 硬编码 `sh`，Git Bash 已安装但未加入 PATH 时其离线测试无法运行。
