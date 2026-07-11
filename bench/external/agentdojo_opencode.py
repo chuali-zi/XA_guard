@@ -6,13 +6,24 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from agentdojo.agent_pipeline.base_pipeline_element import BasePipelineElement
-from agentdojo.functions_runtime import EmptyEnv, Env, FunctionCall, FunctionsRuntime
-from agentdojo.types import (
-    ChatAssistantMessage,
-    ChatMessage,
-    text_content_block_from_string,
-)
+try:
+    from agentdojo.agent_pipeline.base_pipeline_element import BasePipelineElement
+    from agentdojo.functions_runtime import EmptyEnv, Env, FunctionCall, FunctionsRuntime
+    from agentdojo.types import (
+        ChatAssistantMessage,
+        ChatMessage,
+        text_content_block_from_string,
+    )
+except ModuleNotFoundError as exc:
+    if exc.name != "agentdojo" and not exc.name.startswith("agentdojo."):
+        raise
+    _AGENTDOJO_IMPORT_ERROR: ModuleNotFoundError | None = exc
+    BasePipelineElement = object
+    EmptyEnv = object
+    Env = FunctionCall = FunctionsRuntime = ChatAssistantMessage = ChatMessage = Any
+    text_content_block_from_string = None
+else:
+    _AGENTDOJO_IMPORT_ERROR = None
 
 from bench.external.opencode_bridge import (
     ProviderQuotaPaused,
@@ -37,6 +48,14 @@ def normalize_text_content(value: Any) -> str | None:
             raise ValueError("OpenCode response content block list must contain only text blocks")
         parts.append(text)
     return "".join(parts)
+
+
+def _require_agentdojo() -> None:
+    if _AGENTDOJO_IMPORT_ERROR is not None:
+        raise RuntimeError(
+            "AgentDojo is required to run this benchmark adapter; install xa-guard[agentdojo] "
+            "or the pinned upstream package first"
+        ) from _AGENTDOJO_IMPORT_ERROR
 
 
 def _message_payload(message: ChatMessage) -> dict[str, Any]:
@@ -85,6 +104,7 @@ class OpenCodeLLM(BasePipelineElement):
         max_invocation_reserve_usd: float | None = None,
         max_turn_retries: int = 1,
     ) -> None:
+        _require_agentdojo()
         self.executable = executable
         self.model = model
         self.cwd = Path(cwd)
