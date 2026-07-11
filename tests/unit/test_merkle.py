@@ -197,4 +197,3 @@ def _crash_while_holding_lock(path: str, ready) -> None:
     with store._append_lock():
         ready.set()
         os._exit(23)
-
