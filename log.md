@@ -1,6 +1,7 @@
 # 2026-07-10 主分支工程规范检查与最小修补
 
-- 为方便组员统一搭建开发和验证环境，新增 `requires.txt`，以 editable install 安装当前 README 使用的 `bench,dev,policy,aibom,http` 可选依赖；不默认安装体积较大的 model 或外部 SDK 组。
+- GitHub Actions 首次运行的 Python 3.10/3.12 矩阵均在测试收集阶段失败：`agentdojo_opencode` 无条件导入未作为仓库依赖安装的外部 AgentDojo。将其合法 MIT 发布包 `agentdojo==0.1.35` 固定为 `bench` extra。干净环境继续验证发现完整 SM2 审计测试缺 `gmssl`，因此 CI 与 `requires.txt` 统一启用已有 `crypto` extra；不通过跳过或可选导入规避测试。待推送后观察 CI。
+- 为方便组员统一搭建开发和验证环境，新增 `requires.txt`，以 editable install 安装完整验证所需的 `crypto,bench,dev,policy,aibom,http` 可选依赖；不默认安装项目的 `model` extra。
 - 按用户要求从 `feat/cursor-auto-redteam` 切回已同步的 `main`；保留未跟踪的 `about`、`agent`、`status`，未修改或纳入本轮变更。
 - 工程检查发现无 CI 质量门禁，且 `tools/remote-runner/supervisor.py` 在 Windows 硬编码 `sh`，Git Bash 已安装但未加入 PATH 时其离线测试无法运行。
 - 新增双 Python 版本 GitHub Actions 质量门禁（依赖安装、Ruff、pytest）；新增 `.gitattributes` 统一文本/二进制处理；supervisor 现在能发现 Git for Windows 的 POSIX shell。

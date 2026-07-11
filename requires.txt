@@ -1,3 +1,3 @@
 # Development and verification environment for XA-Guard contributors.
 # Install with: python -m pip install -r requires.txt
--e .[bench,dev,policy,aibom,http]
+-e .[crypto,bench,dev,policy,aibom,http]
