@@ -12,4 +12,5 @@
 *.exe binary
 
 # These licenses are hash-bound corpus provenance artifacts.
-bench/cases/csab-gov-v1-candidate/*.txt text eol=crlf
+bench/cases/csab-gov-v1-candidate/THIRD_PARTY_LICENSE.ChineseSafetyQA.txt text eol=crlf
+bench/cases/csab-gov-v1-candidate/THIRD_PARTY_LICENSE.XAGuardAuthoredRefusal.txt text eol=lf

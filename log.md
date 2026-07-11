@@ -2,6 +2,7 @@
 
 - GitHub Actions 首次运行的 Python 3.10/3.12 矩阵均在测试收集阶段失败：`agentdojo_opencode` 无条件导入未作为仓库依赖安装的外部 AgentDojo。将其合法 MIT 发布包 `agentdojo==0.1.35` 固定为 `bench` extra。干净环境继续验证发现完整 SM2 审计测试缺 `gmssl`，因此 CI 与 `requires.txt` 统一启用已有 `crypto` extra；不通过跳过或可选导入规避测试。待推送后观察 CI。
 - 依赖修复后的 CI 安装和 Ruff 均通过，但测试发现两个仓库完整性问题：外部 benchmark smoke fixtures 被全局 `*.jsonl` 忽略而未提交；hash-bound 候选语料许可证被通用 LF 属性改变。已将 fixtures 纳入版本控制，并为许可证固定 CRLF 工作树属性，保留其 manifest SHA-256 契约；待再次实测 CI。
+- 第三次 CI 确认 fixtures 已恢复；其余 corpus mismatch 进一步定位为两份许可证各自要求不同字节换行，现分别固定 ChineseSafetyQA 为 CRLF、XAGuardAuthoredRefusal 为 LF。此前 pytest abort 发生在断言失败汇总后，待最后的哈希失败排除后继续确认。
 - 为方便组员统一搭建开发和验证环境，新增 `requires.txt`，以 editable install 安装完整验证所需的 `crypto,bench,dev,policy,aibom,http` 可选依赖；不默认安装项目的 `model` extra。
 - 按用户要求从 `feat/cursor-auto-redteam` 切回已同步的 `main`；保留未跟踪的 `about`、`agent`、`status`，未修改或纳入本轮变更。
 - 工程检查发现无 CI 质量门禁，且 `tools/remote-runner/supervisor.py` 在 Windows 硬编码 `sh`，Git Bash 已安装但未加入 PATH 时其离线测试无法运行。
