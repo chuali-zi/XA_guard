@@ -5,8 +5,6 @@ import json
 import multiprocessing
 import os
 from pathlib import Path
-import subprocess
-import sys
 
 from xa_guard.audit.merkle import ChainStore, canonical_json, compute_record_hash
 
@@ -138,7 +136,6 @@ def test_chainstore_multiprocess_writers_preserve_chain(tmp_path: Path):
     for process in processes:
         process.join(30)
         assert process.exitcode == 0
-        process.close()
 
     records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     assert len(records) == 80
@@ -148,27 +145,13 @@ def test_chainstore_multiprocess_writers_preserve_chain(tmp_path: Path):
 
 def test_chainstore_os_lock_releases_when_owner_crashes(tmp_path: Path):
     path = tmp_path / "crash.jsonl"
-    # Use an independent interpreter: os._exit intentionally bypasses cleanup,
-    # so it must not leave multiprocessing tracker state in this test process.
-    script = """
-import os
-import sys
-from xa_guard.audit.merkle import ChainStore
-
-store = ChainStore(sys.argv[1])
-with store._append_lock():
-    print("locked", flush=True)
-    os._exit(23)
-"""
-    process = subprocess.Popen(
-        [sys.executable, "-c", script, str(path)],
-        stdout=subprocess.PIPE,
-        text=True,
-    )
-    assert process.stdout is not None
-    assert process.stdout.readline().strip() == "locked"
-    assert process.wait(timeout=10) == 23
-    process.stdout.close()
+    context = multiprocessing.get_context("spawn")
+    ready = context.Event()
+    process = context.Process(target=_crash_while_holding_lock, args=(str(path), ready))
+    process.start()
+    assert ready.wait(10)
+    process.join(10)
+    assert process.exitcode == 23
 
     appended = ChainStore(path).append({"trace_id": "after-crash"})
     assert appended["gen_ai.evidence.hash_prev"] == ""
@@ -209,3 +192,9 @@ def test_chainstore_verify_detects_tampering(tmp_path: Path):
 def test_canonical_json_sorted_keys_no_whitespace():
     b = canonical_json({"b": 2, "a": 1})
     assert b == b'{"a":1,"b":2}'
+def _crash_while_holding_lock(path: str, ready) -> None:
+    store = ChainStore(path)
+    with store._append_lock():
+        ready.set()
+        os._exit(23)
+
