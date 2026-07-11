@@ -31,7 +31,6 @@ from typing import Any, Callable
 
 import yaml
 
-from xa_guard.policy.compiler import compile_predicate as _compile_legacy
 from xa_guard.policy.loader import load_policy_yaml
 from xa_guard.policy.monotonicity import (
     MonotonicityReport,

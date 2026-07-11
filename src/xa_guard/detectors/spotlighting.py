@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING
 from xa_guard.detectors.base import DetectionInput
 
 if TYPE_CHECKING:
-    from xa_guard.types import GateContext, InputSource
+    from xa_guard.types import GateContext
 
 # 需要标记的来源（信任度低于 user 的）
 _UNTRUSTED_SOURCES = frozenset({"web", "document", "rag", "tool_result", "memory"})

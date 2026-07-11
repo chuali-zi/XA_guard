@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Sequence
 
 if TYPE_CHECKING:  # 仅类型检查期引用，运行时不耦合
-    from xa_guard.types import GateContext, InputSource
+    from xa_guard.types import GateContext
 
 
 # ============================================================

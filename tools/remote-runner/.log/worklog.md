@@ -1,5 +1,8 @@
 # tools/remote-runner 工作日志
 
+## 2026-07-10
+修复 Windows 未把 Git Bash 加入 PATH 时 supervisor 硬编码 `sh` 导致离线测试失败的问题：优先 PATH，回退 Git for Windows 路径；`tests/remote_runner` 13 passed。新增根 `requires.txt` 供组员安装开发验证依赖；未改远程 Linux 运行语义。
+
 ## 2026-07-09
 新建远程无人值守运行系统：supervisor.py（时钟/网络门控→budget-resume 批次状态机，
 exit 0/1/2/3/4 分类，三处人工花钱门，FAILED_TERMINAL/infra 濒危/连续坏批熔断，

@@ -33,7 +33,7 @@ from xa_guard.detectors.fusion import DEFAULT_DENY_CATEGORIES, fuse
 from xa_guard.detectors.rule_detector import RuleDetector
 from xa_guard.detectors.spotlighting import apply_spotlighting
 from xa_guard.gates.base import Gate, GateStage
-from xa_guard.types import Decision, GateContext, GateResult, InputSource
+from xa_guard.types import GateContext, GateResult, InputSource
 
 # ── 旧版兼容常量（类别分组、来源权重） ──────────────────────────────────
 _DENY_CATEGORIES = frozenset({
@@ -253,7 +253,7 @@ class Gate1Input(Gate):
                 })
 
         metadata: dict[str, Any] = {
-            "detected_patterns": [f"{l['category']}:{l['term']}" for l in all_labels if l["term"]],
+            "detected_patterns": [f"{label['category']}:{label['term']}" for label in all_labels if label["term"]],
             "source_risk_score": source_risk,
             "spotlighting": {
                 "enabled": self.spotlight_enabled,

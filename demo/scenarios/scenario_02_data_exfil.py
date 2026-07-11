@@ -30,7 +30,7 @@ from xa_guard.gates.gate4_taint import Gate4Taint
 from xa_guard.gates.gate5_sandbox import Gate5Sandbox
 from xa_guard.gates.gate6_audit import Gate6Audit
 from xa_guard.pipeline import Pipeline
-from xa_guard.types import Decision, GateContext, InputSource, TaintLabel
+from xa_guard.types import GateContext, InputSource, TaintLabel
 
 console = Console(file=io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8"), highlight=False)
 

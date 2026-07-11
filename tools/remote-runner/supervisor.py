@@ -27,6 +27,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -86,6 +87,22 @@ DEFAULT_CONFIG: dict[str, Any] = {
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def posix_shell() -> str:
+    """Return a POSIX shell, including Git for Windows when it is installed."""
+    shell = shutil.which("sh")
+    if shell:
+        return shell
+    if os.name == "nt":
+        program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+        for candidate in (
+            Path(program_files) / "Git" / "bin" / "sh.exe",
+            Path(program_files) / "Git" / "usr" / "bin" / "sh.exe",
+        ):
+            if candidate.is_file():
+                return str(candidate)
+    raise SystemExit("POSIX shell `sh` is required (install Git Bash on Windows)")
 
 
 def utc_iso(moment: datetime | None = None) -> str:
@@ -702,7 +719,7 @@ class Supervisor:
             raise SystemExit(f"refusing to init with unsynced clock ({detail}); provenance timestamps must be trustworthy")
         new_run = self.repo / "tools" / "evidence" / "new-run.sh"
         result = subprocess.run(
-            ["sh", str(new_run), TARGET, "--shorthost", self.config["shorthost"],
+            [posix_shell(), str(new_run), TARGET, "--shorthost", self.config["shorthost"],
              "--repo", str(self.repo), "--operator", self.config["operator"]],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
         )
