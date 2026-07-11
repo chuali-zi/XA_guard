@@ -13,16 +13,16 @@ authors = [{ name = "XA-Guard Team" }]
 dependencies = [
     "mcp>=1.27.0",
     "pydantic>=2.0",
-  "pyyaml==6.0.2",
+    "pyyaml>=6.0",
     "rich>=13.0",
     "anyio>=4.0",
 ]
 
 [project.optional-dependencies]
-crypto = ["cffi==1.17.1", "gmssl>=3.2.2", "cryptography==44.0.3"]
+crypto = ["gmssl>=3.2.2", "cryptography>=42.0"]
 # AIBOM 生产化（方向 3）：CycloneDX schema 校验（jsonschema）+ BOM 签名验签（cryptography）。
 # 两者都按需 import，缺库时 schema_validator 走内建结构校验、signing 走 HMAC fallback。
-aibom = ["cffi==1.17.1", "jsonschema>=4.0", "cryptography==44.0.3"]
+aibom = ["jsonschema>=4.0", "cryptography>=42.0"]
 bench = ["pytest>=8.0", "pytest-cov>=5.0", "jinja2>=3.1"]
 agentdojo = ["agentdojo==0.1.35"]
 http = ["starlette>=0.37", "uvicorn>=0.30"]

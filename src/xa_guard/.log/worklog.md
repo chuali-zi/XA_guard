@@ -1,5 +1,9 @@
 # xa_guard 模块工作日志
 
+## 2026-07-11 主助手
+- 修复 `build_pipeline` 隐式启动 watchfiles 线程且调用方无法回收的问题；仅 `run_server` 启停 watcher。
+- 新增生命周期回归测试，撤销无效依赖固定；待 Linux 双版本 CI 验证。
+
 约定：每个 agent 完成实现后追加一段，时间倒序，最简短描述。
 
 格式：

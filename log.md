@@ -9,6 +9,7 @@
 - `cryptography` 固定后退出崩溃仍复现，确认其未约束的 CFFI backend 仍为唯一可疑原生依赖。现将 `cffi` 明确固定为与 cryptography 44 兼容的 `1.17.1`，并继续以完整测试和双 Python CI 验证，不跳过测试。
 - Linux CI 在 CFFI 固定后仍于全量测试退出时崩溃。定位到锁崩溃测试使用 `multiprocessing.Event` 后由子进程 `os._exit` 绕过资源清理；改以独立 Python 解释器持锁并硬退出，保持 OS 锁自动释放的真实验证，避免将未清理的 multiprocessing tracker 资源带回 pytest 父进程。
 - 上述多进程测试结构调整经双 Python Linux CI 证实不能消除退出崩溃，已还原，不能当作根因修复。当前崩溃时仅加载 `yaml._yaml` 与 `_cffi_backend`，CFFI 1.17.1 固定无效；现固定另一未约束的原生扩展 PyYAML 6.0.2，待完整 CI 验证。
+- 2026-07-11：PyYAML 固定后 Linux 3.10/3.12 仍崩溃；3.10 退出时连续 5 次 `FATAL: exception not rethrown`。定位到 `build_pipeline()` 隐式启动 watchfiles 原生线程，而 bench/SDK 等调用方不拥有 stop 生命周期。现改为默认不启动 watcher，仅 `run_server()` 显式启用并在 finally 回收；增加生命周期回归测试，并撤销无效的 CFFI/PyYAML/cryptography 固定。
 - 为方便组员统一搭建开发和验证环境，新增 `requires.txt`，以 editable install 安装完整验证所需的 `crypto,bench,dev,policy,aibom,http` 可选依赖；不默认安装项目的 `model` extra。
 - 按用户要求从 `feat/cursor-auto-redteam` 切回已同步的 `main`；保留未跟踪的 `about`、`agent`、`status`，未修改或纳入本轮变更。
 - 工程检查发现无 CI 质量门禁，且 `tools/remote-runner/supervisor.py` 在 Windows 硬编码 `sh`，Git Bash 已安装但未加入 PATH 时其离线测试无法运行。

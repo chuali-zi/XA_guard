@@ -36,7 +36,11 @@ from xa_guard.proxy.upstream import run_stdio, run_streamable_http
 log = logging.getLogger("xa_guard.server")
 
 
-def _init_layered_policy(cfg: XAGuardConfig) -> tuple[LayeredPolicySource | None, OverlayWatcher | None]:
+def _init_layered_policy(
+    cfg: XAGuardConfig,
+    *,
+    start_overlay_watcher: bool = False,
+) -> tuple[LayeredPolicySource | None, OverlayWatcher | None]:
     """读 cfg.gates['policy_layered'] 决定是否启用双层策略 + 热加载。"""
     layered_cfg = cfg.gates.get("policy_layered")
     if layered_cfg is None or not layered_cfg.enabled:
@@ -52,7 +56,7 @@ def _init_layered_policy(cfg: XAGuardConfig) -> tuple[LayeredPolicySource | None
         src.bundle_sha[:12], src.stats(),
     )
     watcher: OverlayWatcher | None = None
-    if opts.get("hot_reload", True):
+    if start_overlay_watcher and opts.get("hot_reload", True):
         watcher = OverlayWatcher(
             src,
             opts.get("overlay_root", "policies/overlay"),
@@ -62,8 +66,12 @@ def _init_layered_policy(cfg: XAGuardConfig) -> tuple[LayeredPolicySource | None
     return src, watcher
 
 
-def build_pipeline(cfg: XAGuardConfig) -> Pipeline:
-    _source, watcher = _init_layered_policy(cfg)
+def build_pipeline(cfg: XAGuardConfig, *, start_overlay_watcher: bool = False) -> Pipeline:
+    """Build a pipeline; only lifecycle owners may request a background watcher."""
+    _source, watcher = _init_layered_policy(
+        cfg,
+        start_overlay_watcher=start_overlay_watcher,
+    )
     pipeline = Pipeline(
         gate1=Gate1Input(cfg.gate("gate1")),
         gate2=Gate2Plan(cfg.gate("gate2")),
@@ -79,7 +87,7 @@ def build_pipeline(cfg: XAGuardConfig) -> Pipeline:
 
 
 async def run_server(cfg: XAGuardConfig) -> None:
-    pipeline = build_pipeline(cfg)
+    pipeline = build_pipeline(cfg, start_overlay_watcher=True)
     router = DownstreamRouter(cfg.downstream)
     await router.start()
     try:
