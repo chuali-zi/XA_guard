@@ -6,6 +6,8 @@
 
 - [REDTEAM-AGENT-TECHNICAL-MANUAL.md](REDTEAM-AGENT-TECHNICAL-MANUAL.md)：详细技术手册，给红队选手和自动化 agent 使用。覆盖概念、命令、payload、finding、A/B、live xaguard、OpenCode、证据解读和常见坑。
 - [STUDENT-QUICKSTART.md](STUDENT-QUICKSTART.md)：学生快速上手版，用最少命令跑通一次“裸奔泄漏 / 防护拦截 / 证据回放”。
+- [REDTEAM-SUBMISSION-STUDENT.md](REDTEAM-SUBMISSION-STUDENT.md)：红队 finding 分支、成功标准、Draft PR 和独立复现的学生版指南。
+- [REDTEAM-SUBMISSION-AGENT.md](REDTEAM-SUBMISSION-AGENT.md)：给自动化 Agent/复现者/维护者的完整提交协议，定义结果分类、坏状态合同、A/B 不变量、evidence 门禁、PR 契约和 promotion 条件。
 
 ## 2026-07-09 实测入口
 
