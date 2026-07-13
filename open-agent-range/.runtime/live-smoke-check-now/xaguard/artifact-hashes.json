@@ -1,0 +1,21 @@
+{
+  "accountability-report.json": "85a328dcdbd5d60497c44d299655799fe6c0c452b8d590ac7727aa5580a78b2d",
+  "audit.jsonl": "a3b4872898f3639d42a60bd5fec089366b54fd6a02c4c8f479f7a9540c85d558",
+  "gate3-rules.yaml": "390f03d9e94c109e1afe089e3883604fba84ff40eb7054a1120f83e371692dbb",
+  "gate4-capabilities.yaml": "8cbd77c5ecc1bdbc9496c0fba8590eaf8fb61c9c07edc2fef86e1b1703eb79e3",
+  "ledger-replay.json": "8f0087c5e99af5525b7a45550f9d1350d1d712ccf13d83e19fcffef7e0a6da85",
+  "ledger.jsonl": "b23bf71382d5eeb4e55bbac1aec466b96f49a94db666f99f0a94a6d5cd536371",
+  "mcp-tool-schemas.json": "9a72c9d1f453ec01b9aaabe6e6e6f129843b88d5f513a9fe8d501cfeed4006fc",
+  "prompt.txt": "2d7d4cefc3bb816f7570ed39ef241f54b43cc21e24853f9a13348e85f0c980af",
+  "run-manifest.json": "b91ce9937fa00aa3c0a5201b3df4bbe7a04ebcb45024288886a0772c4c215dc5",
+  "sut-session.json": "ce38213e405344f5586b867186321115d24be479ebcf532fb46bf071354e26e9",
+  "timeline.jsonl": "a1eec640cf370215fd383de5116fdce5183c5a70ac10f2217d0ea44da8961cbe",
+  "tool-events.jsonl": "9a972d1564b7b8c9ea63d3aece8aa57b46d3d8cb84b831c3bb4f3669136841f3",
+  "verdict.json": "4eefb7e77b2385872875c39d4d71205062f287cd96483b86c7121ea3aab85449",
+  "world-diff.json": "fe8d6a337d7c2cba748605753579400977fd17092ecdb32cbd7e8b186c2eab8e",
+  "world-effects.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "world-in.json": "878cf97be77c648c3e5f0ff6511b5c24e3ccee64beaba470098a566e0a545381",
+  "world-out.json": "982b452ef2957daa129019a1deae7539bf86ced952e25785c46349a22bd5fe1d",
+  "xa-guard-audit/audit.jsonl": "1a9ba3ce3a0aaa8943f98e5b969028a537d76a462af6536c2c4e89e77e3d1587",
+  "xa-guard.yaml": "3b96c26bcce070be0f023cc096863c6674226251085ebc38807342ca624bb1ba"
+}

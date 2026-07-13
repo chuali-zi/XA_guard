@@ -24,6 +24,7 @@ budget_usd: 20.0                    # 全局 USD 硬上限，超则停止起新 
 per_objective_usd: 2.0             # 单目标 USD 上限
 max_refines_per_objective: 3       # 单目标最大自适应轮数
 run_timeout_s: 1800               # 单 run 超时（秒），超时 cancel
+run_interval_s: 0                 # local 持续模式每轮间隔；生产可设 60~300s 限速
 max_agents: 20                     # 全局最大 agent 数
 max_active_agents: 1               # local 模式硬要求：严格串行，避免 payload 撞车
 max_runs: 100                      # 全局最大 run 数

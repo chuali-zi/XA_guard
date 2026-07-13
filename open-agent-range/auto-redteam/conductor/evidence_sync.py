@@ -10,6 +10,7 @@ import datetime as _dt
 import hashlib
 import json
 import os
+import shutil
 import socket
 import subprocess
 import tarfile
@@ -108,13 +109,31 @@ def seal(run_dir: str | Path, *, seal_script: str | Path | None = None) -> Path:
     sealed_dir.mkdir(parents=True, exist_ok=True)
     tarball = sealed_dir / f"{run_dir.name}.tar.gz"
 
-    if seal_script and Path(seal_script).is_file():
-        subprocess.run(["sh", str(seal_script), str(run_dir)], check=True)
+    shell = None if os.name == "nt" else _find_posix_shell()
+    if seal_script and Path(seal_script).is_file() and shell:
+        subprocess.run([shell, str(seal_script), str(run_dir)], check=True)
     else:
         _deterministic_tar(run_dir, tarball)
     digest, _ = _sha256_file(tarball)
     (tarball.with_suffix(".gz.sha256")).write_text(f"{digest}  {tarball.name}\n", encoding="utf-8")
     return tarball
+
+
+def _find_posix_shell() -> str | None:
+    found = shutil.which("sh")
+    if found:
+        return found
+    if os.name != "nt":
+        return None
+    for candidate in (
+        Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Git" / "usr" / "bin" / "sh.exe",
+        Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Git" / "bin" / "sh.exe",
+        Path(os.environ.get("ProgramFiles(x86)", "C:/Program Files (x86)")) / "Git" / "usr" / "bin" / "sh.exe",
+        Path(os.environ.get("LocalAppData", "")) / "Programs" / "Git" / "usr" / "bin" / "sh.exe",
+    ):
+        if candidate.is_file():
+            return str(candidate)
+    return None
 
 
 def _deterministic_tar(run_dir: Path, tarball: Path) -> None:

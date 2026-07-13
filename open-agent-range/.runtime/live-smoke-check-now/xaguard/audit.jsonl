@@ -1,0 +1,3 @@
+{"decision": "allow", "reason": "gate2_plan: warned", "tool": "read_mail"}
+{"decision": "allow", "reason": "gate2_plan: warned", "tool": "read_record"}
+{"decision": "deny", "reason": "gate3_policy: Open Agent Range sensitive external egress deny", "tool": "send_message"}

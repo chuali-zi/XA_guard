@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-import io
 import json
 import sys
 import threading
@@ -21,8 +20,15 @@ sys.path.insert(0, str(AUTO_REDTEAM_ROOT))
 
 from conductor import cursor_client as cc  # noqa: E402
 from conductor import evidence_sync  # noqa: E402
-from conductor.conductor import Conductor, DEFAULT_CONFIG, render_prompt  # noqa: E402
-from conductor.engines import CodexEngine, CursorCliEngine, OpenCodeEngine, parse_engine_output  # noqa: E402
+from conductor.conductor import render_prompt  # noqa: E402
+from conductor.engines import (  # noqa: E402
+    CodexEngine,
+    CursorCliEngine,
+    EngineError,
+    EngineResult,
+    OpenCodeEngine,
+    parse_engine_output,
+)
 from conductor.evaluator import (  # noqa: E402
     RESULT_BLOCKED, RESULT_INFRA, RESULT_LIMIT, RESULT_PASS, judge,
 )
@@ -163,6 +169,22 @@ def test_objective_queue_coverage_and_novelty():
     assert obj.weight < w0
 
 
+def test_objective_queue_restores_replenished_variants():
+    original = ObjectiveQueue([1])
+    original.replenish()
+    variant = next(o for o in original.all() if o.id == "cat1-mailbox-office-mail-exfil-v1")
+    original.record_attempt(variant.id, "fingerprint-v1")
+    original.mark_covered(variant.id)
+
+    restored = ObjectiveQueue([1])
+    restored.load_state(original.to_state())
+
+    loaded = next(o for o in restored.all() if o.id == variant.id)
+    assert loaded.covered is True
+    assert loaded.attempts == 1
+    assert loaded.fingerprints == {"fingerprint-v1"}
+
+
 def test_evidence_build_run_dir(tmp_path):
     from conductor.evaluator import Verdict
     v = Verdict(win=True, result_label=RESULT_BLOCKED, breach_null=True, breach_protected=False,
@@ -189,6 +211,23 @@ def test_evidence_build_run_dir(tmp_path):
                                     git_head="deadbeef", objective_id="cat1-x", verdict=v)
     line = json.loads(manifest.read_text(encoding="utf-8").strip())
     assert line["tarball_sha256"] and line["verdict"] == RESULT_BLOCKED
+
+
+def test_evidence_seal_falls_back_when_shell_missing(tmp_path, monkeypatch):
+    from conductor import evidence_sync
+    from conductor.evaluator import Verdict
+    v = Verdict(win=False, result_label=RESULT_INFRA, breach_null=False, breach_protected=False,
+                null_asr=None, protected_asr=None, block_reason="infra", risk="infra", fingerprint="infra")
+    run_dir = evidence_sync.build_run_dir(
+        tmp_path, "run-shell-missing",
+        meta={}, console_log="", commands=[], artifacts={"summary.json": b"{}"}, verdict=v,
+    )
+    script = tmp_path / "seal-run.sh"
+    script.write_text("#!/bin/sh\nexit 2\n", encoding="utf-8")
+    monkeypatch.setattr(evidence_sync, "_find_posix_shell", lambda: None)
+    tarball = evidence_sync.seal(run_dir, seal_script=script)
+    assert tarball.is_file()
+    assert tarball.with_suffix(".gz.sha256").is_file()
 
 
 def test_render_prompt_substitutes():
@@ -262,6 +301,106 @@ def test_novelty_registry_rejects_exact_duplicate(tmp_path):
     assert not second.accepted and second.reason == "exact-duplicate"
 
 
+def test_local_engine_error_does_not_cover_objective(tmp_path, monkeypatch):
+    from conductor.conductor import Conductor, DEFAULT_CONFIG
+
+    class FailingEngine:
+        name = "failing"
+        executable = "failing"
+
+        def available(self):
+            return True
+
+        def propose(self, *_args, **_kwargs):
+            raise EngineError("synthetic auth failure")
+
+    cfg = dict(DEFAULT_CONFIG)
+    cfg.update({"engines": ["opencode"], "evidence_root": str(tmp_path / "evidence"), "provenance_manifest": str(tmp_path / "manifest.jsonl")})
+    conductor = Conductor(cfg, client=None, state_dir=tmp_path / "state")
+    conductor.local_engines = [FailingEngine()]
+    monkeypatch.setattr(conductor, "_seal_local_run", lambda *_args, **_kwargs: None)
+
+    obj = conductor.queue.next()
+    verdict = conductor._run_local_objective(obj)
+
+    assert verdict.result_label == RESULT_INFRA
+    assert obj.covered is False
+    assert obj.attempts == 0
+
+
+def test_local_successful_ab_covers_objective(tmp_path, monkeypatch):
+    from conductor.conductor import Conductor, DEFAULT_CONFIG
+
+    class StaticEngine:
+        name = "static"
+        executable = "static"
+
+        def available(self):
+            return True
+
+        def propose(self, *_args, **_kwargs):
+            return EngineResult("static", ["static"], 0, "{}", "", _sample_proposal())
+
+    summary = {
+        "null": {"status": "ok", "violations_count": 1, "leaked_data_refs": ["cit-1001"], "violation_property_ids": ["sensitive-egress"]},
+        "xaguard": {"status": "ok", "violations_count": 0, "leaked_data_refs": []},
+        "guarded": {"status": "ok", "violations_count": 0, "leaked_data_refs": []},
+        "asr_null": 1,
+        "asr_guard": 0,
+    }
+    cfg = dict(DEFAULT_CONFIG)
+    cfg.update({
+        "objective_categories": [1],
+        "engines": ["opencode"],
+        "evidence_root": str(tmp_path / "evidence"),
+        "provenance_manifest": str(tmp_path / "manifest.jsonl"),
+        "novelty_registry": str(tmp_path / "novelty.json"),
+        "seed_prior_art": False,
+    })
+    conductor = Conductor(cfg, client=None, state_dir=tmp_path / "state")
+    conductor.local_engines = [StaticEngine()]
+    obj = next(o for o in conductor.queue.all() if o.id == "cat1-mailbox-office-mail-exfil-v0")
+    monkeypatch.setattr(conductor.queue, "next", lambda: obj)
+    monkeypatch.setattr(conductor, "_execute_local_ab", lambda *_args, **_kwargs: summary)
+    monkeypatch.setattr(conductor, "_seal_local_run", lambda *_args, **_kwargs: None)
+
+    verdict = conductor._run_local_objective(obj)
+
+    assert verdict.result_label == RESULT_BLOCKED
+    assert obj.covered is True
+    assert obj.attempts == 1
+
+
+def test_campaign_breaks_on_consecutive_infra(tmp_path, monkeypatch):
+    from conductor.conductor import Conductor, DEFAULT_CONFIG
+
+    cfg = dict(DEFAULT_CONFIG)
+    cfg.update({"breaker_max_errors": 2, "max_runs": 10, "run_interval_s": 0})
+    conductor = Conductor(cfg, client=None, state_dir=tmp_path / "state")
+    calls = {"count": 0}
+
+    def fail(_obj):
+        calls["count"] += 1
+        return judge({"null": {"status": "infra_error"}, "xaguard": {"status": "infra_error"}, "asr_null": None, "asr_guard": None})
+
+    monkeypatch.setattr(conductor, "run_objective", fail)
+    conductor.run_campaign()
+
+    assert calls["count"] == 2
+
+
+def test_campaign_lock_reclaims_dead_pid(tmp_path):
+    from conductor.conductor import CampaignLock
+
+    lock_path = tmp_path / "campaign.lock"
+    lock_path.write_text("pid=-1\n", encoding="utf-8")
+
+    with CampaignLock(lock_path):
+        assert f"pid={__import__('os').getpid()}" in lock_path.read_text(encoding="utf-8")
+
+    assert not lock_path.exists()
+
+
 def test_local_engine_commands_are_restricted(tmp_path):
     cursor = CursorCliEngine(executable="agent", model=None, timeout_s=30)
     cursor_cmd, _, _ = cursor.build_command(tmp_path)
@@ -272,19 +411,46 @@ def test_local_engine_commands_are_restricted(tmp_path):
     opencode_cmd, _, opencode_env = opencode.build_command(tmp_path)
     assert "--variant" in opencode_cmd and "high" in opencode_cmd
     assert "--auto" not in opencode_cmd
+    assert opencode_cmd.index("-m") < len(opencode_cmd) - 1
+    assert opencode_cmd[-1].startswith("Return exactly one compact JSON")
     assert opencode_env["OPENCODE_DISABLE_PROJECT_CONFIG"] == "1"
     assert '"bash": "deny"' in opencode_env["OPENCODE_CONFIG_CONTENT"]
 
     codex = CodexEngine(executable="codex", model="gpt-5.6-sol", reasoning_effort="high", timeout_s=30)
     codex_cmd, stdin_marker, _ = codex.build_command(tmp_path, tmp_path / "schema.json")
     assert "exec" in codex_cmd and "--ephemeral" in codex_cmd
-    assert "read-only" in codex_cmd and "never" in codex_cmd
+    assert "read-only" in codex_cmd
+    assert "--dangerously-bypass-approvals-and-sandbox" not in codex_cmd
+    assert "--output-schema" not in codex_cmd
     assert stdin_marker == "<stdin>"
+
+
+def test_windows_executable_resolution_prefers_native_launcher(monkeypatch):
+    from conductor import engines
+
+    monkeypatch.setattr(engines.os, "name", "nt")
+    monkeypatch.setattr(
+        engines.shutil,
+        "which",
+        lambda name: "C:/npm/codex.cmd" if name == "codex.cmd" else None,
+    )
+
+    assert engines.available_executable("codex") == "C:/npm/codex.cmd"
 
 
 def test_parse_engine_output_from_json_events():
     stdout = json.dumps({"type": "text", "part": {"text": "prefix {\"objective_id\":\"o1\"}"}}) + "\n"
     assert parse_engine_output(stdout)["objective_id"] == "o1"
+
+
+def test_parse_engine_output_prefers_codex_agent_message():
+    stdout = "\n".join(
+        [
+            json.dumps({"type": "item.completed", "item": {"type": "command_execution", "command": "dir", "aggregated_output": "{}"}}),
+            json.dumps({"type": "item.completed", "item": {"type": "agent_message", "text": '{"objective_id":"final"}'}}),
+        ]
+    )
+    assert parse_engine_output(stdout)["objective_id"] == "final"
 
 
 # 允许直接 python 运行（无 pytest 也能跑核心断言）

@@ -14,13 +14,13 @@ import subprocess
 import sys
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from . import cursor_client as cc
 from . import evidence_sync, promote
 from .engines import EngineError, LocalEngine, build_engines
-from .evaluator import Verdict, judge
+from .evaluator import RESULT_INFRA, Verdict, judge
 from .novelty import NoveltyRegistry
 from .objectives import Objective, ObjectiveQueue
 from .scope import check_proposal
@@ -49,6 +49,7 @@ DEFAULT_CONFIG = {
     "per_objective_usd": 2.0,
     "max_refines_per_objective": 3,
     "run_timeout_s": 1800,
+    "run_interval_s": 0,
     "max_agents": 20,
     "max_active_agents": 1,
     "max_runs": 100,
@@ -249,6 +250,7 @@ class Conductor:
         summary = _infra_summary("proposal-not-executed")
         verdict: Verdict | None = None
         proposal: dict | None = None
+        ran_ab = False
         try:
             result = engine.propose(
                 prompt,
@@ -275,9 +277,11 @@ class Conductor:
                     finding_path = self._write_local_finding(mission_dir, obj, proposal)
                     artifacts["finding.json"] = finding_path.read_bytes()
                     summary = self._execute_local_ab(mission_dir, finding_path, commands, console_lines)
+                    ran_ab = True
                     verdict = judge(summary, risk=obj.risk)
-                    self.novelty.record(proposal, engine=engine.name, verdict=verdict.result_label)
-                    self.queue.record_attempt(obj.id, verdict.fingerprint)
+                    if verdict.result_label != RESULT_INFRA:
+                        self.novelty.record(proposal, engine=engine.name, verdict=verdict.result_label)
+                        self.queue.record_attempt(obj.id, verdict.fingerprint)
         except EngineError as exc:
             console_lines.append(f"[engine-error] {exc}")
             artifacts["engine-error.txt"] = str(exc).encode("utf-8")
@@ -288,13 +292,15 @@ class Conductor:
             summary = _infra_summary("local-error", errors=[str(exc)])
         if verdict is None:
             verdict = judge(summary, risk=obj.risk)
-            self.queue.record_attempt(obj.id, verdict.fingerprint)
+            if verdict.result_label != RESULT_INFRA:
+                self.queue.record_attempt(obj.id, verdict.fingerprint)
         artifacts["summary.json"] = json.dumps(summary, ensure_ascii=False, indent=2).encode("utf-8")
         artifacts.update(_collect_files(mission_dir / "ab", prefix="ab"))
         self._seal_local_run(obj, engine.name, mission_id, verdict, "\n".join(console_lines) + "\n", commands, artifacts, summary)
         if proposal is not None and verdict.promotable():
             self._promote(obj, engine.name, mission_id, verdict)
-        self.queue.mark_covered(obj.id)
+        if ran_ab and verdict.result_label != RESULT_INFRA:
+            self.queue.mark_covered(obj.id)
         self.budget.runs += 1
         self.budget.agents += 1
         self._save_state()
@@ -516,6 +522,7 @@ class Conductor:
 
     # -- campaign loop --
     def run_campaign(self) -> None:
+        consecutive_errors = 0
         while not self.stop_requested() and not self.budget.exhausted():
             if self.budget.agents >= self.cfg["max_agents"] or self.budget.runs >= self.cfg["max_runs"]:
                 break
@@ -525,9 +532,24 @@ class Conductor:
                     break
                 self.queue.replenish()
                 continue
-            self.run_objective(obj)
+            verdict = self.run_objective(obj)
+            if verdict and verdict.result_label == RESULT_INFRA:
+                consecutive_errors += 1
+                if consecutive_errors >= int(self.cfg.get("breaker_max_errors", 3)):
+                    break
+            else:
+                consecutive_errors = 0
+            self._sleep_between_runs()
         if self.stop_requested():
             self._kill_switch()
+
+    def _sleep_between_runs(self) -> None:
+        interval = float(self.cfg.get("run_interval_s", 0) or 0)
+        if interval <= 0 or self.stop_requested() or self.budget.exhausted():
+            return
+        deadline = time.time() + interval
+        while time.time() < deadline and not self.stop_requested():
+            time.sleep(min(1.0, deadline - time.time()))
 
     def _kill_switch(self) -> None:
         # cancel/archive best-effort; active-run bookkeeping omitted for brevity
@@ -574,7 +596,18 @@ class CampaignLock:
     def __enter__(self) -> "CampaignLock":
         self.path.parent.mkdir(parents=True, exist_ok=True)
         flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
-        self.fd = os.open(str(self.path), flags)
+        try:
+            self.fd = os.open(str(self.path), flags)
+        except FileExistsError:
+            try:
+                content = self.path.read_text(encoding="utf-8")
+                old_pid = int(content.partition("pid=")[2].splitlines()[0])
+            except (OSError, ValueError, IndexError):
+                raise
+            if _pid_alive(old_pid):
+                raise
+            self.path.unlink(missing_ok=True)
+            self.fd = os.open(str(self.path), flags)
         os.write(self.fd, f"pid={os.getpid()}\n".encode("utf-8"))
         return self
 
@@ -591,6 +624,24 @@ class CampaignLock:
 # ---------------------------------------------------------------- helpers
 def _is_local_engine(config: dict) -> bool:
     return str(config.get("engine", "local")).lower() in {"local", "cli"}
+
+
+def _pid_alive(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+
+        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)
+        if not handle:
+            return False
+        ctypes.windll.kernel32.CloseHandle(handle)
+        return True
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
 
 
 def _resolve_auto_path(path: str | Path) -> Path:

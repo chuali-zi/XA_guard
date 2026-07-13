@@ -34,6 +34,11 @@ def available_executable(executable: str) -> str | None:
     """Return the resolved executable path, or None if it is not on PATH."""
     if Path(executable).is_file():
         return executable
+    if os.name == "nt" and not Path(executable).suffix:
+        for suffix in (".exe", ".cmd", ".bat", ".com"):
+            resolved = shutil.which(executable + suffix)
+            if resolved:
+                return resolved
     return shutil.which(executable)
 
 
@@ -73,6 +78,11 @@ def _parse_jsonl_text_events(stdout: str) -> str:
             value = event["part"].get("text")
             if isinstance(value, str):
                 parts.append(value)
+        item = event.get("item")
+        if isinstance(item, dict) and item.get("type") == "agent_message":
+            value = item.get("text")
+            if isinstance(value, str):
+                parts.append(value)
         message = event.get("message")
         if isinstance(message, dict):
             for item in message.get("content", []) or []:
@@ -108,11 +118,13 @@ class LocalEngine:
         raise NotImplementedError
 
     def propose(self, prompt: str, *, mission_dir: Path, schema_path: Path | None = None) -> EngineResult:
-        if not self.available():
+        resolved_executable = available_executable(self.executable)
+        if not resolved_executable:
             raise EngineError(f"{self.name} executable not found: {self.executable}")
         prompt_path = mission_dir / "prompt.md"
         prompt_path.write_text(prompt, encoding="utf-8")
         command, stdin_text, env_updates = self.build_command(mission_dir, schema_path)
+        command[0] = resolved_executable
         env = os.environ.copy()
         env.update(env_updates)
         try:
@@ -129,13 +141,13 @@ class LocalEngine:
                 check=False,
             )
         except subprocess.TimeoutExpired as exc:
-            stdout = exc.stdout.decode("utf-8", "replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")
             stderr = exc.stderr.decode("utf-8", "replace") if isinstance(exc.stderr, bytes) else (exc.stderr or "")
             raise EngineError(f"{self.name} timed out after {self.timeout_s}s: {stderr[-1000:]}") from exc
         except OSError as exc:
             raise EngineError(f"{self.name} could not start: {exc}") from exc
         if completed.returncode != 0:
-            raise EngineError(f"{self.name} exited {completed.returncode}: {completed.stderr[-1200:]}")
+            detail = completed.stderr[-1200:] or completed.stdout[-1200:]
+            raise EngineError(f"{self.name} exited {completed.returncode}: {detail}")
         proposal = parse_engine_output(completed.stdout)
         return EngineResult(
             engine=self.name,
@@ -203,7 +215,6 @@ class OpenCodeEngine(LocalEngine):
         cmd = [
             self.executable,
             "run",
-            "Return exactly one compact JSON object matching prompt.md. No prose, markdown, tools, or code fences.",
             "--pure",
             "--format",
             "json",
@@ -215,6 +226,7 @@ class OpenCodeEngine(LocalEngine):
             str(mission_dir / "prompt.md"),
             "--dir",
             str(mission_dir),
+            "Return exactly one compact JSON object matching prompt.md. No prose, markdown, tools, or code fences.",
         ]
         return cmd, None, env
 
@@ -238,14 +250,10 @@ class CodexEngine(LocalEngine):
             f'model_reasoning_effort="{self.reasoning_effort}"',
             "-s",
             "read-only",
-            "-a",
-            "never",
             "-C",
             str(mission_dir),
             "--json",
         ]
-        if schema_path is not None:
-            cmd.extend(["--output-schema", str(schema_path)])
         cmd.append("-")
         return cmd, "<stdin>", {}
 

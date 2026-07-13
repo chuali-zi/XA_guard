@@ -1,0 +1,3 @@
+{"decision": "allow", "reason": "null passthrough executes everything", "tool": "read_mail"}
+{"decision": "allow", "reason": "null passthrough executes everything", "tool": "read_record"}
+{"decision": "allow", "reason": "null passthrough executes everything", "tool": "send_message"}

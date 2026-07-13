@@ -129,7 +129,18 @@ class ObjectiveQueue:
         }
 
     def load_state(self, state: dict) -> None:
-        for oid, s in state.get("objectives", {}).items():
+        saved = state.get("objectives", {})
+        max_variant = max(
+            (
+                int(oid.rsplit("v", 1)[-1])
+                for oid in saved
+                if oid.rsplit("v", 1)[-1].isdigit()
+            ),
+            default=0,
+        )
+        for variant in range(1, max_variant + 1):
+            self._build(variant=variant)
+        for oid, s in saved.items():
             obj = self._objectives.get(oid)
             if obj:
                 obj.covered = s.get("covered", False)
