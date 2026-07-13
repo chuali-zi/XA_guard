@@ -6,6 +6,7 @@
 - 第一次完整全仓回归运行至 100% 后有 1 个真实失败：`test_chainstore_multiprocess_writers_preserve_chain` 在 Windows 四进程并发写时第 32 条断链。未修改测试；定位为 `(st_size, st_mtime_ns)` 缓存被错误用于跨进程正确性判断。修复为 named mutex 临界区内 O(末行)读取权威 tail hash，构造恢复同样加锁；Windows 持久 tail reader 使用 READ/WRITE/DELETE 共享句柄，兼顾归档轮转。
 - 修复验证：最终实现完整 Merkle/归档 12 passed；并发用例额外 10/10 轮通过；500 条基准约 1151 records/s 且链验证通过。最终全仓 673 collected，672 passed、1 skipped；唯一 skip 是本机缺少 `xa-guard/sandbox:latest`，非代码失败。CI 口径 Ruff PASS，L3 static verifier 11/11 sections PASS；扩大 Ruff 到 tests 时发现 16 个既有测试风格问题，按仓库规则未修改测试代码。
 - 当前尚未完成：本条记录时发布分支还未 push、远端 PR 还未创建；推送结果和最终 commit/PR 由本轮最终交付消息报告。
+- 发布等待期间 maintainer 完成最后一轮 `oar-localrt-20260713T032915Z-chuali`，结果为 `INFRA_ERROR`；provenance 已追加且没有冒充 finding，随后确认无 Auto-RedTeam 进程继续写入。
 
 # 2026-07-12 Agent Identity + Undo 正式产品接入
 

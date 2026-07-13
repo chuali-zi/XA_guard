@@ -81,7 +81,7 @@ Carol 通过独立 Bearer session 补偿并恢复世界前态。证据见
 [Agent Identity 与 Undo 架构](docs/architecture/agent-identity-and-undo.md) 和
 [`configs/xa-guard.identity-undo.yaml`](configs/xa-guard.identity-undo.yaml)。仍未完成真实政企 IdP 联调、JWKS 轮换演练、KMS/HSM 托管、多地域一致性与补偿失败调度。
 
-Auto-RedTeam Conductor 与持续运行维护层已联调运行：外层提案固定 Codex `gpt-5.6-sol`，OAR 内部 OpenCodeSeat 默认 `deepseek/deepseek-v4-flash`；维护器 PID/进度监控、异常恢复、退避熔断、持久 stop/resume、陈旧锁恢复和连续业务错误熔断可用。mailbox/rag/ticket/rag-index 已生成 proposal/finding、完成 Null vs XA-Guard A/B 并封存，结果均为诚实的 `LIMIT`（两侧均无泄漏）；本地 maintainer 状态已正常完成。Conductor merge 与 maintenance 修正已进入发布分支，仍需远端 PR 合并后才属于默认分支发布能力。
+Auto-RedTeam Conductor 与持续运行维护层已联调运行：外层提案固定 Codex `gpt-5.6-sol`，OAR 内部 OpenCodeSeat 默认 `deepseek/deepseek-v4-flash`；维护器 PID/进度监控、异常恢复、退避熔断、持久 stop/resume、陈旧锁恢复和连续业务错误熔断可用。mailbox/rag/ticket/rag-index 已生成 proposal/finding、完成 Null vs XA-Guard A/B 并封存为诚实 `LIMIT`；后续 tool-args 尝试为 `INFRA_ERROR`，没有冒充 finding。本地 maintainer 已正常完成。Conductor merge 与 maintenance 修正已进入发布分支，仍需远端 PR 合并后才属于默认分支发布能力。
 
 **enterprise-agent-range/** 为早期独立设计区，能力已主要由 OAR 承接；不作为主叙事。
 

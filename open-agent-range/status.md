@@ -22,7 +22,7 @@
 
 Git 集成状态：远端默认分支仍为 `origin/main@b381189`。本地发布分支 `agent/identity-undo-repo-cleanup` 已以 `36d503f` 完成 `feat/cursor-auto-redteam` merge，并以 `c482b29` 收入 maintenance 修正与 live smoke 证据；在远端 PR 合并前不得表述为默认分支已发布。`origin` 指向 `https://github.com/chuali-zi/XA_guard.git`。
 
-Auto-RedTeam Conductor 与 `auto-redteam/maintain.py` 已端到端运行。模型分工固定为外层 Codex `gpt-5.6-sol` 生成 proposal，靶场内部 OpenCodeSeat 默认 `deepseek/deepseek-v4-flash`；维护器覆盖进程/进度健康、异常恢复、退避熔断、持久 stop/resume、陈旧锁恢复和业务连续错误熔断。mailbox/rag/ticket/rag-index 已生成 proposal/finding并完成 Null vs XA-Guard A/B；最新成功封存的 scope 对齐 run `oar-localrt-20260713T031843Z-chuali` 为诚实 `LIMIT`，其后 `032206` 为 `INFRA_ERROR`。本地 maintainer 已正常完成，当前没有宣称后台仍在运行；完整能力待发布分支 PR 合并。
+Auto-RedTeam Conductor 与 `auto-redteam/maintain.py` 已端到端运行。模型分工固定为外层 Codex `gpt-5.6-sol` 生成 proposal，靶场内部 OpenCodeSeat 默认 `deepseek/deepseek-v4-flash`；维护器覆盖进程/进度健康、异常恢复、退避熔断、持久 stop/resume、陈旧锁恢复和业务连续错误熔断。mailbox/rag/ticket/rag-index 已生成 proposal/finding并完成 Null vs XA-Guard A/B；最新成功封存的 scope 对齐 run `oar-localrt-20260713T031843Z-chuali` 为诚实 `LIMIT`，其后 tool-args 尝试截至 `032915` 均为 `INFRA_ERROR`。本地 maintainer 已正常完成，当前没有宣称后台仍在运行；完整能力待发布分支 PR 合并。
 
 分支治理已部分工程化：`main` 作为唯一长期产品分支；功能/修复/文档和红队 finding 使用短命分支，尽早开 Draft PR，通过 squash merge 进 main 后删除 head branch；红队分支统一命名 `redteam/<member>/<finding-id>-<slug>`，一分支只承载一个 finding，作者不能自己宣布 reproduced。已合并分支不用作历史档案，历史由 main commit/PR/tag/challenge 保留。本仓库本地 Git 已设置 `fetch.prune=true`，GitHub `delete_branch_on_merge` 已从 false 开启为 true，后续 PR 合并后远端 head branch 会自动删除。尚未实施的是 main branch protection/ruleset（禁止 force push/删除、必须 PR/review/CI），这需根据团队当前工作流另行确认。
 
