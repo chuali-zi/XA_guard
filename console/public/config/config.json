@@ -1,0 +1,7 @@
+{
+  "oidcIssuer": "http://localhost:13081/realms/xa-guard",
+  "oidcClientId": "xa-console",
+  "apiBasePath": "/control/v1",
+  "defaultAgentId": "general-office-agent",
+  "tokenStorage": "memory"
+}

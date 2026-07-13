@@ -1,0 +1,102 @@
+{{- if .Values.console.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "xa-guard.componentName" (dict "root" . "component" "console") }}
+  labels:
+    {{- include "xa-guard.componentLabels" (dict "root" . "component" "console") | nindent 4 }}
+spec:
+  replicas: {{ .Values.console.replicas }}
+  selector:
+    matchLabels:
+      {{- include "xa-guard.componentSelectorLabels" (dict "root" . "component" "console") | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "xa-guard.componentSelectorLabels" (dict "root" . "component" "console") | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "xa-guard.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: console
+          image: {{ include "xa-guard.image" (dict "root" . "image" .Values.console.image) | quote }}
+          imagePullPolicy: {{ .Values.console.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- with .Values.console.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.console.args }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "xa-guard.fullname" . }}-config
+          env:
+            - name: PORT
+              value: {{ .Values.console.containerPort | quote }}
+            - name: OIDC_ISSUER
+              value: {{ .Values.global.oidc.issuer | quote }}
+            - name: OIDC_PUBLIC_ISSUER
+              value: {{ .Values.global.oidc.issuer | quote }}
+            - name: OIDC_CONFIDENTIAL_CLIENT_ID
+              value: {{ .Values.global.oidc.confidentialClientId | quote }}
+            - name: OIDC_EXCHANGE_AUDIENCE
+              value: {{ .Values.global.oidc.audience | quote }}
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "global.externalSecrets.runtime is required" .Values.global.externalSecrets.runtime }}
+                  key: {{ .Values.global.oidc.confidentialClientSecretKey }}
+            - name: CONTROL_API_BASE_URL
+              value: http://{{ include "xa-guard.componentName" (dict "root" . "component" "api") }}:{{ .Values.api.service.port }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.console.containerPort }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.console.probes.liveness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.console.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.console.probes.liveness.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.console.probes.readiness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.console.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.console.probes.readiness.periodSeconds }}
+          resources:
+            {{- toYaml .Values.console.resources | nindent 12 }}
+          volumeMounts:
+            - name: public-config
+              mountPath: /app/dist/config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: public-config
+          configMap:
+            name: {{ include "xa-guard.fullname" . }}-config
+            items:
+              - key: console-config.json
+                path: config.json
+        - name: tmp
+          emptyDir: {}
+{{- end }}

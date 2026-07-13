@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "xa-guard.fullname" . }}-config
+  labels:
+    {{- include "xa-guard.labels" . | nindent 4 }}
+data:
+  XA_GUARD_DEPLOYMENT_PROFILE: {{ ternary "reference" "production" .Values.referenceInfra.enabled | quote }}
+  XA_GUARD_LOG_LEVEL: {{ .Values.config.logLevel | quote }}
+  XA_GUARD_OIDC_ISSUER: {{ required "global.oidc.issuer is required" .Values.global.oidc.issuer | quote }}
+  XA_GUARD_OIDC_DISCOVERY_URL: {{ required "global.oidc.discoveryUrl is required" .Values.global.oidc.discoveryUrl | quote }}
+  XA_GUARD_OIDC_AUDIENCE: {{ required "global.oidc.audience is required" .Values.global.oidc.audience | quote }}
+  XA_GUARD_OIDC_INTROSPECTION_CLIENT_ID: {{ .Values.global.oidc.introspectionClientId | quote }}
+  XA_GUARD_OIDC_INTROSPECTION_REQUIRED: {{ .Values.global.oidc.introspectionRequired | quote }}
+  XA_GUARD_POSTGRES_SSLMODE: {{ .Values.global.postgres.sslMode | quote }}
+  XA_GUARD_KMS_PROVIDER: {{ .Values.global.kms.provider | quote }}
+  XA_GUARD_KMS_ENDPOINT: {{ .Values.global.kms.endpoint | quote }}
+  XA_GUARD_MIGRATION_REQUIRED: {{ .Values.config.migrationRequired | quote }}
+  XA_GUARD_WORKER_LEASE_SECONDS: {{ .Values.config.worker.leaseSeconds | quote }}
+  XA_GUARD_WORKER_HEARTBEAT_SECONDS: {{ .Values.config.worker.heartbeatSeconds | quote }}
+  XA_GUARD_WORKER_RETRY_SCHEDULE_SECONDS: {{ .Values.config.worker.retryScheduleSeconds | quote }}
+  XA_GUARD_JWKS_STALE_GRACE_SECONDS: {{ .Values.config.jwks.staleGraceSeconds | quote }}
+  XA_GUARD_REFERENCE_CONFIG: /etc/xa-guard/xa-guard.yaml
+  XA_GUARD_EFFECT_CONTRACTS: {{ .Values.config.contractsFile | quote }}
+  XA_GUARD_GOVERNANCE_CEILING: {{ .Values.config.assignmentCeilingFile | quote }}
+  REFERENCE_BUSINESS_API_URL: http://{{ include "xa-guard.componentName" (dict "root" . "component" "business-api") }}:{{ .Values.businessApi.service.port }}
+  xa-guard.yaml: |
+    xa_guard:
+      upstream:
+        transport: streamable-http
+        host: 0.0.0.0
+        port: {{ .Values.api.containerPort }}
+      identity:
+        enabled: true
+        required: true
+        required_scopes: [xa.invoke]
+        oidc_discovery_url: {{ .Values.global.oidc.discoveryUrl | quote }}
+        introspection_required_for_privileged_operations: {{ .Values.global.oidc.introspectionRequired }}
+        issuers:
+          - issuer: {{ .Values.global.oidc.issuer | quote }}
+            audiences: [{{ .Values.global.oidc.audience | quote }}]
+            jwks_uri: {{ .Values.global.oidc.jwksUri | quote }}
+            algorithms: [RS256, ES256, EdDSA]
+      resilience:
+        enabled: true
+        backend: postgresql
+        postgres_dsn_env: XA_GUARD_DATABASE_URL
+        contracts_file: {{ .Values.config.contractsFile | quote }}
+        key_provider: {{ .Values.global.kms.provider | quote }}
+        keyring_env: XA_GUARD_KEK_KEYRING
+      governance:
+        enabled: false
+        registry_file: {{ .Values.config.assignmentCeilingFile | quote }}
+      gates:
+        gate1:
+          enabled: true
+          patterns_file: /app/policies/baseline/gate1_input_patterns.yaml
+        gate2:
+          enabled: true
+          tool_risk_file: /app/policies/baseline/gate2_tool_risks.yaml
+        gate3:
+          enabled: true
+          backend: python
+          policy_file: /app/policies/baseline/gate3_rules.yaml
+        gate4:
+          enabled: true
+          strict_mode: true
+          tool_capabilities_file: /app/policies/baseline/gate4_capabilities.yaml
+        gate5:
+          enabled: false
+        gate6:
+          enabled: true
+          audit_dir: /app/logs/reference-audit
+          hash_algo: sha256
+          signature_mode: none
+  console-config.json: |
+    {
+      "oidcIssuer": {{ .Values.global.oidc.issuer | quote }},
+      "oidcClientId": {{ .Values.global.oidc.publicClientId | quote }},
+      "apiBasePath": "/control/v1",
+      "defaultAgentId": "general-office-agent",
+      "tokenStorage": "memory"
+    }

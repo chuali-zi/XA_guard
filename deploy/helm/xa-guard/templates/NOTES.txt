@@ -1,0 +1,12 @@
+XA-Guard has been rendered with profile:
+  {{ ternary "reference interface" "production external infrastructure" .Values.referenceInfra.enabled }}
+
+Required pre-existing Secrets:
+  runtime:      {{ .Values.global.externalSecrets.runtime }}
+    keys: {{ .Values.global.postgres.dsnSecretKey }}, {{ .Values.global.oidc.confidentialClientSecretKey }}, {{ .Values.global.oidc.introspectionClientSecretKey }}, {{ .Values.global.kms.keyringSecretKey }}, {{ .Values.global.internalAuthorizationSecretKey }}
+  business API: {{ .Values.global.externalSecrets.businessApi }}
+    keys: {{ .Values.businessApi.databaseDsnSecretKey }}, {{ .Values.businessApi.apiKeySecretKey }}
+
+The chart does not install PostgreSQL, Keycloak, or a KMS. External egress is
+denied by default. Supply only approved endpoint CIDRs through
+networkPolicy.externalEgressCidrs (or the explicit reference override).

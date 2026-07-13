@@ -43,6 +43,8 @@
 | **B3** | Null vs XA-Guard live A/B | 真实 `xa_guard.server` session、`protection_delta` | `DONE` | OAR `run-ab --sut-mode null,xaguard --live` |
 | **B4** | Ledger replay + audit 对齐 | hash ledger、`replay --verify-sut-audit`、raw XA-Guard audit | `DONE` | OAR `range_cli replay` |
 | **B5** | 一键可复现证据链 | 单命令或短脚本产出标准 evidence 目录 | `DONE` | [canonical run 与 hash](./EVIDENCE-CONSOLIDATION.md#2-canonical-主证据) |
+| **B6** | 可信 Agent Identity | PKCE 登录、Standard Token Exchange、双主体与动态 assignment | `PARTIAL` | [Identity + Undo 架构](../architecture/agent-identity-and-undo.md)、`scripts/verify_reference_e2e.py`；待 REFERENCE-READY 证据封存后改为 DONE |
+| **B7** | 可验证 Undo | PostgreSQL intent、独立审批、六关补偿、业务恢复与事件链 | `PARTIAL` | `src/xa_guard/control/`、`docker-compose.reference.yml`；待故障注入/并发/浏览器验收和 evidence manifest 后改为 DONE |
 
 ### 赛题四方向映射（Tier B 为主叙事）
 
@@ -117,6 +119,7 @@ python -m kernel.range_cli run-ab `
 
 - **OAR** 是红队竖切与证据链中心，不是完整工业级 7×24 在线沙盘；ReactiveSeat 为确定性状态机，非任意长度 live agent。
 - **XA-Guard 主产品**：六关 + 审计 + AIBOM + Docker 部署已可演示；20 会话 HTTP 容量为 LIMIT，不宣称生产容量。
+- **Identity + Undo**：核心与 reference Compose 双人协议链已实现，但 B6/B7 保持 `PARTIAL`；未完成全部 REFERENCE-READY/HA-READY 验收前，不写成生产 IAM、绝对 exactly-once 或通用数据库回滚。
 - **未交付**：D1 PDF、D2 clean release freeze、D3 视频、D4 报名证据。B5 canonical OAR 证据已封存。
 - **L3 文档**：`L3-test-and-acceptance.md` 中的 R2–R9 BLOCKED 语言描述的是**历史工程验收面**，不是 Delivery v2 比赛缺口。
 

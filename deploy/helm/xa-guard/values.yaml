@@ -1,0 +1,276 @@
+nameOverride: ""
+fullnameOverride: ""
+
+global:
+  imagePullSecrets: []
+  externalSecrets:
+    # These Secrets must be provisioned by the platform or an external-secrets
+    # controller. This chart intentionally never renders secret material.
+    runtime: xa-guard-runtime
+    businessApi: xa-guard-business-api
+  oidc:
+    issuer: https://idp.example.gov/realms/xa-guard
+    discoveryUrl: https://idp.example.gov/realms/xa-guard/.well-known/openid-configuration
+    jwksUri: https://idp.example.gov/realms/xa-guard/protocol/openid-connect/certs
+    audience: xa-guard-api
+    publicClientId: xa-guard-console
+    confidentialClientId: xa-guard-bff
+    confidentialClientSecretKey: oidc-client-secret
+    introspectionClientId: xa-guard-api
+    introspectionClientSecretKey: oidc-introspection-client-secret
+    introspectionRequired: true
+  postgres:
+    dsnSecretKey: database-url
+    sslMode: verify-full
+  kms:
+    provider: external
+    endpoint: https://kms.example.gov
+    keyringSecretKey: kek-keyring
+  internalAuthorizationSecretKey: internal-authorization-key
+
+referenceInfra:
+  # Production uses external OIDC, PostgreSQL, and KMS. Setting this flag only
+  # switches the advertised deployment profile; this chart does not install
+  # Keycloak/PostgreSQL/KMS subcharts.
+  enabled: false
+  oidcService: ""
+  postgresService: ""
+  kmsService: ""
+  networkPolicy:
+    # Optional reference-only CIDRs. They are used only when enabled=true and
+    # must still be supplied explicitly by the operator.
+    externalEgressCidrs: []
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+  automountServiceAccountToken: false
+
+podAnnotations: {}
+podLabels: {}
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+  readOnlyRootFilesystem: true
+
+config:
+  logLevel: INFO
+  contractsFile: /app/policies/baseline/tool_effects.yaml
+  assignmentCeilingFile: /app/configs/governance.enterprise-static.yaml
+  migrationRequired: true
+  worker:
+    leaseSeconds: 60
+    heartbeatSeconds: 20
+    retryScheduleSeconds: "5,30,120"
+  jwks:
+    staleGraceSeconds: 900
+
+api:
+  enabled: true
+  replicas: 2
+  image:
+    repository: ghcr.io/chuali-zi/xa-guard
+    tag: "0.1.0"
+    digest: ""
+    pullPolicy: IfNotPresent
+  command: ["python"]
+  args: ["-m", "xa_guard.control.api"]
+  containerPort: 8080
+  service:
+    type: ClusterIP
+    port: 80
+    annotations: {}
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: "2"
+      memory: 1Gi
+  probes:
+    liveness:
+      path: /livez
+      initialDelaySeconds: 10
+      periodSeconds: 10
+    readiness:
+      path: /readyz
+      initialDelaySeconds: 5
+      periodSeconds: 5
+  pdb:
+    enabled: true
+    minAvailable: 1
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+worker:
+  enabled: true
+  replicas: 2
+  image:
+    repository: ghcr.io/chuali-zi/xa-guard
+    tag: "0.1.0"
+    digest: ""
+    pullPolicy: IfNotPresent
+  command: ["python"]
+  args: ["-m", "xa_guard.control.worker"]
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+    limits:
+      cpu: "1"
+      memory: 768Mi
+  probes:
+    liveness:
+      command: ["python", "-c", "import os; os.kill(1, 0)"]
+      initialDelaySeconds: 10
+      periodSeconds: 10
+    readiness:
+      command: ["python", "-c", "import os; os.kill(1, 0)"]
+      initialDelaySeconds: 5
+      periodSeconds: 5
+  pdb:
+    enabled: true
+    minAvailable: 1
+businessApi:
+  enabled: true
+  replicas: 1
+  image:
+    repository: ghcr.io/chuali-zi/xa-guard-business-api
+    tag: "0.1.0"
+    digest: ""
+    pullPolicy: IfNotPresent
+  command: ["python"]
+  args: ["-m", "xa_guard.reference.ticket_api"]
+  containerPort: 8081
+  databaseDsnSecretKey: database-url
+  apiKeySecretKey: api-key
+  service:
+    type: ClusterIP
+    port: 80
+    annotations: {}
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  probes:
+    liveness:
+      path: /livez
+      initialDelaySeconds: 10
+      periodSeconds: 10
+    readiness:
+      path: /readyz
+      initialDelaySeconds: 5
+      periodSeconds: 5
+  pdb:
+    enabled: true
+    minAvailable: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+
+console:
+  enabled: true
+  replicas: 1
+  image:
+    repository: ghcr.io/chuali-zi/xa-guard-console
+    tag: "0.1.0"
+    digest: ""
+    pullPolicy: IfNotPresent
+  command: []
+  args: []
+  containerPort: 8080
+  service:
+    type: ClusterIP
+    port: 80
+    annotations: {}
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  probes:
+    liveness:
+      path: /healthz
+      initialDelaySeconds: 10
+      periodSeconds: 10
+    readiness:
+      path: /healthz
+      initialDelaySeconds: 5
+      periodSeconds: 5
+  pdb:
+    enabled: true
+    minAvailable: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+
+migration:
+  enabled: true
+  image:
+    repository: ghcr.io/chuali-zi/xa-guard
+    tag: "0.1.0"
+    digest: ""
+    pullPolicy: IfNotPresent
+  command: ["python"]
+  args: ["-m", "xa_guard.control.migrate"]
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 86400
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: xa-guard.example.gov
+      paths:
+        - path: /control
+          pathType: Prefix
+          component: api
+        - path: /mcp
+          pathType: Prefix
+          component: api
+        - path: /
+          pathType: Prefix
+          component: console
+  tls: []
+
+networkPolicy:
+  enabled: true
+  ingressNamespaceSelector:
+    matchLabels:
+      kubernetes.io/metadata.name: ingress-nginx
+  # Empty means fail closed for external egress. Standard NetworkPolicy cannot
+  # target DNS names; supply only approved endpoint CIDRs here, or enforce FQDN
+  # policy with the cluster CNI.
+  externalEgressCidrs: []
+  extraIngress: []
+  extraEgress: []

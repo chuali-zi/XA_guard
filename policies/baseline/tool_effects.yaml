@@ -1,11 +1,47 @@
-version: xa-guard-tool-effects/v1
+version: xa-guard-tool-effects/v2
 tools:
   business_submit_ticket:
+    contract_version: "2"
+    success:
+      pointer: "$result#/ok"
+      equals: true
     side_effect_level: high
     reversibility: compensatable
+    undo_window_seconds: 3600
     recovery_fields:
       ticket_id: "$result#/body/ticket_id"
+    compensation_tool: business_cancel_ticket
+    compensation_arguments:
+      ticket_id: "$recovery#/ticket_id"
+      reason: "$request#/reason"
+    idempotency:
+      header: Idempotency-Key
+      value: effect_id
+    retry:
+      delays_seconds: [5, 30, 120]
+      retry_on: [network_error, timeout, rate_limited, upstream_error]
+    reconciliation_method: get_ticket
+    # v1 aliases remain temporarily so the default-off SQLite compatibility
+    # backend can read the same contract during the migration window.
     undo_tool: business_cancel_ticket
     undo_arguments:
       ticket_id: "$recovery#/ticket_id"
       reason: "$request#/reason"
+
+  business_cancel_ticket:
+    contract_version: "2"
+    success:
+      pointer: "$result#/ok"
+      equals: true
+    side_effect_level: high
+    reversibility: manual_required
+    undo_window_seconds: 0
+    recovery_fields: {}
+    compensation_tool: ""
+    compensation_arguments: {}
+    idempotency:
+      header: Idempotency-Key
+      value: request_id
+    retry:
+      delays_seconds: [5, 30, 120]
+      retry_on: [network_error, timeout, rate_limited, upstream_error]

@@ -1,3 +1,18 @@
+# 2026-07-12 Identity + Undo Reference 实际实现与验收收口
+
+- 按计划先处理代码基线：将 PR #3 从 draft 转 ready 并 merge 到 `main`（merge commit `dfeaf41c835e71a6f1a67b790e23ecbf5fad9b1a`），随后在 `feat/identity-undo-reference` 开发。识别并保留 Auto-RedTeam/remote-evidence 三处既有脏改动，没有把它们混入本功能实现。
+- 新增 `src/xa_guard/control/` 正式 reference 路径：Keycloak OIDC discovery/JWKS/introspection、`act.sub`/`azp` 双主体映射、PostgreSQL dynamic assignment 与 YAML ceiling 实时交集、Bearer Control API、安全错误和 metrics。修复审查发现的 JSONB 双重编码、请求体 tenant/effect 覆盖、旧 ceiling assignment 继续生效、trace header/body 不一致、OIDC 旧 kid 回退和角色来源过宽等问题。
+- 新增 asyncpg EffectStore 与三版编号 migration：migration advisory lock、assignment/effect/Undo/event/ticket 表、intent execution lease、租户隔离、幂等请求、事件 hash chain、SKIP LOCKED compensation claim、lease CAS、事务化失败/管理员重试。写操作改为先 `prepared`、再以 `effect_id` 调下游、最后加密完成；数据库准备失败时不会进入下游。
+- 副作用合同升级为 v2；恢复材料使用每记录随机 DEK + AES-GCM，DEK 由版本化 KEK 包裹，支持旧 key 解密和 rewrap。SQLite 保留旧兼容和单测；新增只读 SQLite→PostgreSQL provenance 导入器，恢复材料不迁移且强制 `manual_required`，并补充备份/恢复文档。
+- 新增 stateful reference ticket API：create/query/by-effect/cancel、`open -> cancelled`、Effect 幂等、补偿参数 fingerprint 和冲突 409。新增独立 Worker：60 秒 lease、20 秒 heartbeat、5/30/120 秒 retry、内部签名授权、实时 assignment/ceiling、补偿重进六关；修复 heartbeat 丢失后旧 Worker 仍继续、failure event 脱离 lease、admin retry 不重签和未知 kid 刷新放大问题。
+- 新增 React 19 + TypeScript + Vite Console 和 Node BFF：六个固定页面、深墨/纸白/朱红政企审计视觉、Keycloak PKCE S256、token 仅内存、Standard Token Exchange V2、Agent token 不返回浏览器、无角色切换。实际运行发现 BFF 把 Agent client 当作 requested audience，修正为 Agent client 作为 token-exchange requester/`azp`，`xa-guard-api` 作为资源 audience；Console 5 tests、production build 与 npm audit（0 vulnerabilities）通过。
+- 新增 `docker-compose.reference.yml`、锁 digest 的 Keycloak 26.7.0/PostgreSQL 17.6/Python 3.12.11 镜像、Keycloak realm 模板、随机 gitignored bootstrap 和 Docker Secrets。第一次启动暴露 reference 用户缺 email 导致 VERIFY_PROFILE，已修 realm 模板；随后仅删除本轮生成的两个 Compose volumes，从空数据库执行 `python scripts/reference_stack.py up` 成功，schema v3、三条 assignment seed 和六个常驻服务健康。
+- 新增 `scripts/verify_reference_e2e.py`，真实执行 Authorization Code + PKCE（未启用 direct grant）：Alice `sub`/assignment 校验、创建工单/Effect、Undo 幂等 replay、自批 403；Dora 使用独立会话批准；Worker 补偿。最终 PostgreSQL/业务组合状态为 `compensated:cancelled:true`，原 trace 与补偿 trace 不同，脚本不打印或持久 token。由于当前没有可用交互式浏览器实例，只完成协议级 PKCE，不宣称浏览器 UI 已验收。
+- 新增 Helm chart：API/Worker/Business/Console、migration Job、外部 Secret/ConfigMap、Ingress、NetworkPolicy、PDB、API HPA；默认使用外部 OIDC/PostgreSQL/key provider，NetworkPolicy 无 `0.0.0.0/0`，runtime env/ports/probes 已与代码对齐。Helm 3.17.3 strict lint 和 17-resource template 断言通过；没有运行 kind，未宣称 `HA-READY`。
+- 新增 Identity/Undo/crypto/contract/intent/reliability/deployment 测试，没有修改既有测试断言。最终 CI 口径 Ruff PASS；全仓 pytest 691 collected、691 passed、0 failed、0 skipped（285.998 秒）；`git diff --check` PASS。pytest 的 `testpaths=["tests"]` 不收集 OAR/Auto-RedTeam 子目录。
+- 更新 README、Identity + Undo 架构、D1 主创新章节、D3 固定八镜头、Delivery v2 B6/B7 和 partial evidence；重写 `status.md` 为当前仓库状态。B6/B7 保持 `PARTIAL`，总状态统一为 `CORE-IMPLEMENTED / DEPLOYMENT-PENDING`。
+- 本轮未完成：交互式浏览器 Alice/Dora/Admin 人工 UI 验收；Compose 全部身份负测、PostgreSQL/API/Worker/KEK 故障注入；双审批并发和 10 并发 p95；最终脱敏 artifact manifest；kind 多副本、Pod 接管、外部 OIDC/PostgreSQL/key provider 替换与 Helm rollback。因此没有标记 `REFERENCE-READY` 或 `HA-READY`。下一步应先完成 REFERENCE-READY 故障/性能/浏览器验收并封存 B6/B7 证据，再做 kind HA 验收。
+
 # 2026-07-12 仓库脏状态收敛、全仓回归与发布准备
 
 - 按用户要求处理全部脏改动并准备提交推送。发现 `main` 正处于未结束 merge；确认无未解决冲突后先以 `36d503f` 完成 `feat/cursor-auto-redteam` merge，再在 `agent/identity-undo-repo-cleanup` 发布分支以 `c482b29` 提交 maintenance 修正与其所引用的完整 live smoke evidence。

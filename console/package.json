@@ -1,0 +1,32 @@
+{
+  "name": "xa-guard-console",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n bff,web -c red,cyan \"npm:dev:bff\" \"npm:dev:web\"",
+    "dev:bff": "node --watch bff/server.mjs",
+    "dev:web": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build",
+    "start": "node bff/server.mjs",
+    "test": "node --test bff/*.test.mjs"
+  },
+  "dependencies": {
+    "express": "5.1.0",
+    "helmet": "8.1.0",
+    "keycloak-js": "26.2.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.8",
+    "@types/react-dom": "19.1.6",
+    "@vitejs/plugin-react": "4.6.0",
+    "concurrently": "9.2.0",
+    "typescript": "5.8.3",
+    "vite": "7.3.6"
+  }
+}

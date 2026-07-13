@@ -1,46 +1,36 @@
 # D3 演示视频脚本
 
-> 目标：最终视频不超过 10 分钟。
-> 原则：展示真实链路，未完成项只说限制，不硬演。
+> 目标：最终视频不超过 10 分钟。主线固定为“前有身份、途中六关、后有撤销、全程有证据”；OAR A/B 作为量化支撑，不抢双人闭环主镜头。
 
-## 视频结构
+## 固定八镜头
 
-| 时间 | 内容 | 必须展示 |
+| 时间 | 镜头 | 屏幕与旁白要点 |
 |---|---|---|
-| 0:00-0:30 | 项目定位 | XA-Guard Agent Gateway 一句话和四方向覆盖 |
-| 0:30-1:30 | 架构总览 | 双面 MCP 代理、六关卡、审计链 |
-| 1:30-2:45 | 输入攻击拦截 | 间接注入样例、Gate1/Gate3 命中、trace_id |
-| 2:45-4:00 | 工具调用和数据流 | 敏感数据、污点传播、越权 deny |
-| 4:00-5:15 | 人在环路审批 | pending fallback 或支持 elicitation 客户端；Trae 未实测时不说 native |
-| 5:15-6:30 | Agent Governance v1 | 员工-Agent-数据域矩阵、工资条越权 deny、HR 审批 |
-| 6:30-7:30 | 供应链准入 | AIBOM preflight、高风险插件 deny |
-| 7:30-8:30 | 审计回放 | Gate6 timeline、hash chain、verify_audit |
-| 8:30-9:30 | OAR 主评测 | canonical N=3：Null 3/3 泄漏、XA-Guard 3/3 拦截、replay/raw audit alignment |
-| 9:30-10:00 | 总结 | 政企价值、当前限制、下一步 |
+| 0:00–0:50 | 1. Alice 登录 | Alice 经 Keycloak PKCE 独立登录；“我的 Agent”只显示 assignment 授权的 `general-office-agent`，展开 human→Agent→工具→数据域链。 |
+| 0:50–1:50 | 2. 执行前拒绝 | 展示伪造 Agent 或越权工具请求被 401/403；业务 API 调用计数不变。旁白：身份和 assignment 在六关之前失败关闭。 |
+| 1:50–3:10 | 3. 真实副作用 | Alice 委托办公 Agent 创建一张错误工单；展示 Gate1–6 trace、PostgreSQL `prepared -> available` Effect、业务状态 `open` 与 Undo 截止时间。 |
+| 3:10–4:00 | 4. 自批失败 | Alice 发起 Undo，再尝试批准；返回职责分离拒绝。Alice 页面不提供角色切换，不通过前端伪装 Dora。 |
+| 4:00–5:20 | 5. Dora 独立审批 | 退出 Alice，Dora 独立 Keycloak 登录；“待我审批”看到同租户 pending，查看 Effect 与理由后批准。 |
+| 5:20–6:40 | 6. Worker 重新过六关 | 展示内部签名授权摘要、Worker lease/heartbeat、补偿 `business_cancel_ticket` 再次进入 Governance + Gate1–6；工单恢复为 `cancelled`。 |
+| 6:40–8:10 | 7. 审计证据 | 控制台时间轨并列原动作 trace、审批身份、补偿 trace、业务前后态、assignment 版本、Gate6/Effect 两条 hash chain。补充 OAR canonical N=3：Null 3/3 泄漏、XA-Guard 3/3 拦截。 |
+| 8:10–9:30 | 8. 部署与边界 | 展示 `python scripts/reference_stack.py up`、六服务健康状态、Helm 双副本架构。明确：不可逆动作只人工处置；至少一次 + 下游幂等；外部 IdP/KMS/PostgreSQL 与 kind 故障恢复仍需组织/HA 验收。 |
+
+9:30–10:00 预留片尾、字幕和命令/hash，不新增功能镜头。
+
+## 统一旁白
+
+> 传统 IAM 只回答谁登录，传统审计只回答发生了什么。XA-Guard 同时绑定“谁委托了哪个 Agent”，并为 Agent 的真实副作用提供受控补偿能力——前有身份、途中六关、后有撤销、全程有证据。
+
+可以说：Reference Compose 的 PKCE、token exchange、动态 assignment、PostgreSQL Effect、独立审批和工单补偿协议链已实际跑通。
+
+不能说：已达到 `REFERENCE-READY` 或 `HA-READY`，除非对应验收项和 evidence manifest 已封存；不能说绝对 exactly-once、通用 Undo、第三方生产 KMS/IdP 已落地。
 
 ## 录制前清单
 
-- [ ] 确认仓库 clean 或记录 dirty 状态。
-- [ ] 准备独立 demo audit 目录，避免混用历史日志。
-- [ ] 准备 3 个最小场景：拦截、审批/拒绝、审计回放。
-- [ ] 屏幕不出现 API key、OpenCode token、operator token、个人隐私。
-- [ ] 所有数字与 D1 草稿、status 保持一致。
-- [ ] 使用 [证据收敛总表](../acceptance/EVIDENCE-CONSOLIDATION.md) 的 canonical hash 和边界。
-
-## 旁白口径
-
-- 可以说：核心原型已具备，静态验收和部分真实验证已完成。
-- 可以说：Agent Governance v1 已合入主线，但默认关闭。
-- 不能说：L3 最终验收已通过。
-- 不能说：R2/R3 sampled 已达标，除非真实跑完。
-- 不能说：Trae native elicitation 已验证，除非有真实 GUI 证据。
-- 不能说：第三方 TSA/HSM 已接入，除非有第三方证据。
-- 可以说：本地 canonical N=3 finding 中 `protection_delta=1.0`；必须同时说明这是确定性本地实验，不是公开 benchmark 总体 ASR。
-
-## 输出物
-
-- [ ] 原始录屏文件。
-- [ ] 剪辑工程。
-- [ ] 最终视频文件。
-- [ ] 视频 hash。
-- [ ] 使用到的命令和证据路径。
+- [ ] 用全新 `.runtime/reference` 启动，三个账号密码只在离屏位置读取。
+- [ ] 交互式浏览器完成 Alice、Dora、Admin 三账号人工验收并录制；禁止角色切换模拟。
+- [ ] 身份负测证明下游执行数为 0。
+- [ ] 准备一条干净 Effect，记录业务 `open -> cancelled`、原/补偿 trace 和事件链。
+- [ ] 屏幕不出现 token、client secret、KEK、数据库 DSN、个人信息。
+- [ ] 展示的数字、状态与 `status.md`、Delivery v2、evidence manifest 一致。
+- [ ] 最终视频小于 10 分钟，生成 SHA-256 并记录使用命令。

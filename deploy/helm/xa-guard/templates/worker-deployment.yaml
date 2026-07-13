@@ -1,0 +1,112 @@
+{{- if .Values.worker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "xa-guard.componentName" (dict "root" . "component" "worker") }}
+  labels:
+    {{- include "xa-guard.componentLabels" (dict "root" . "component" "worker") | nindent 4 }}
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "xa-guard.componentSelectorLabels" (dict "root" . "component" "worker") | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "xa-guard.componentSelectorLabels" (dict "root" . "component" "worker") | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "xa-guard.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: worker
+          image: {{ include "xa-guard.image" (dict "root" . "image" .Values.worker.image) | quote }}
+          imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- with .Values.worker.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.worker.args }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "xa-guard.fullname" . }}-config
+          env:
+            - name: XA_GUARD_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "global.externalSecrets.runtime is required" .Values.global.externalSecrets.runtime }}
+                  key: {{ .Values.global.postgres.dsnSecretKey }}
+            - name: XA_GUARD_KEK_KEYRING
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.externalSecrets.runtime }}
+                  key: {{ .Values.global.kms.keyringSecretKey }}
+            - name: XA_GUARD_INTERNAL_AUTH_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.externalSecrets.runtime }}
+                  key: {{ .Values.global.internalAuthorizationSecretKey }}
+            - name: XA_GUARD_OIDC_INTROSPECTION_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.externalSecrets.runtime }}
+                  key: {{ .Values.global.oidc.introspectionClientSecretKey }}
+            - name: REFERENCE_BUSINESS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.externalSecrets.businessApi }}
+                  key: {{ .Values.businessApi.apiKeySecretKey }}
+          livenessProbe:
+            exec:
+              command:
+                {{- toYaml .Values.worker.probes.liveness.command | nindent 16 }}
+            initialDelaySeconds: {{ .Values.worker.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.worker.probes.liveness.periodSeconds }}
+          readinessProbe:
+            exec:
+              command:
+                {{- toYaml .Values.worker.probes.readiness.command | nindent 16 }}
+            initialDelaySeconds: {{ .Values.worker.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.worker.probes.readiness.periodSeconds }}
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/xa-guard
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            - name: logs
+              mountPath: /app/logs
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "xa-guard.fullname" . }}-config
+        - name: tmp
+          emptyDir: {}
+        - name: logs
+          emptyDir: {}
+{{- end }}

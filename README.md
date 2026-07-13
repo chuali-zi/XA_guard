@@ -4,7 +4,7 @@
 > 题目：**面向政企场景的大模型智能体安全关键技术研究**
 > 提交截止：**2026-09-15 24:00**
 >
-> ⚠ 本仓库当前为 **XA-Guard 核心产品可演示 + Open Agent Range 主评测证据可复现**；比赛交付口径见 [DELIVERY-v2](./docs/acceptance/DELIVERY-v2.md)，仓库状态见 [status.md](./status.md)。L3 清单仅作工程参考：[L3 测试与验收说明](./docs/acceptance/L3-test-and-acceptance.md)（已弃用为比赛承诺）。
+> ⚠ 当前统一口径为 **CORE-IMPLEMENTED / DEPLOYMENT-PENDING**：六关与 OAR 主证据可复现，Identity + Undo reference 协议闭环已跑通，但完整 REFERENCE-READY/HA-READY 验收尚未封存。比赛交付口径见 [DELIVERY-v2](./docs/acceptance/DELIVERY-v2.md)，仓库状态见 [status.md](./status.md)。
 
 ---
 
@@ -12,7 +12,7 @@
 
 > 给政府和国企用的 AI 助手装一套"安全管理系统"——任何遵循 MCP 协议的 LLM 客户端（Trae / Cursor / CodeBuddy / Qoder CN ...）改一行配置就能接入，Agent Gateway 先做员工 / Agent / 数据域治理预检，再由 6 关卡逐层拦截，输出可法庭呈堂的国密审计证据链。
 
-正式默认关闭能力已包含可信 human→agent 身份绑定与补偿式 Undo；生产配置和边界见 [Agent Identity + Undo](./docs/architecture/agent-identity-and-undo.md)。
+可信 human→agent 身份绑定与补偿式 Undo 已进入独立 reference 正式代码路径；旧 MCP/SQLite 兼容路径仍默认关闭且不作为落地证据。架构和边界见 [Agent Identity + Undo](./docs/architecture/agent-identity-and-undo.md)。
 
 ## 它是什么
 
@@ -140,7 +140,24 @@ python scripts/verify_l3_static.py --section all `
 双 500 候选语料位于 `bench/cases/csab-gov-v1-candidate/`：当前为 500 refusal + 500 non-refusal、1000 个唯一规范化 payload，implementation profile 可验。R1 已移出 L3 验收范围；该语料和 holdout 工具仅作为非阻塞研究/防冒充资产保留，不能作为 formal 双 500 或正式 Recall/FPR 成绩。
 
 LangChain/LangGraph 已提供 `protect_tool(s)`、`guard_callable`、Runnable/Agent wrapper、callback observer、一次性审批恢复和 graph node/tool 适配。Gate6 的 `xa-guard-decision-faithfulness/v1` 会按决策、规则命中、理由和下游动作一致性计算并记录 algorithm/evidence，不再固定输出 `1.0`。两者仍需真实受支持版本、真实 agent/trace 和 transport 的端到端及独立重放证据。
-## Docker Compose 一键部署（L3 原型）
+## Identity + Undo Reference Compose
+
+```powershell
+# 生成 gitignored 随机凭据并启动 PostgreSQL、Keycloak、API、Worker、
+# stateful ticket API 与 Console/BFF
+python scripts/reference_stack.py up
+
+# 真实 Authorization Code + PKCE、Token Exchange、Alice/Dora 双人补偿闭环
+python scripts/verify_reference_e2e.py
+
+# 控制台与 Keycloak
+# http://localhost:13080
+# http://localhost:13081
+```
+
+凭据位于 `.runtime/reference/credentials.json`，密码、client secret、KEK 和内部签名 key 不进入仓库。Reference 仅绑定 localhost；远程环境必须使用 TLS。该入口已验证协议级 `open -> cancelled`，但浏览器三账号人工录屏、完整故障注入、10 并发 p95 与 kind 多副本仍未完成，因此尚不标记 `REFERENCE-READY`。详见 [reference 部署说明](./deploy/reference/README.md)。
+
+## Docker Compose 一键部署（旧 L3 原型）
 
 ```bash
 # 构建并启动 Streamable HTTP MCP 入口

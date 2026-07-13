@@ -1,0 +1,24 @@
+{{- $root := . -}}
+{{- $components := list
+  (dict "name" "api" "enabled" (and .Values.api.enabled .Values.api.pdb.enabled) "pdb" .Values.api.pdb)
+  (dict "name" "worker" "enabled" (and .Values.worker.enabled .Values.worker.pdb.enabled) "pdb" .Values.worker.pdb)
+  (dict "name" "business-api" "enabled" (and .Values.businessApi.enabled .Values.businessApi.pdb.enabled) "pdb" .Values.businessApi.pdb)
+  (dict "name" "console" "enabled" (and .Values.console.enabled .Values.console.pdb.enabled) "pdb" .Values.console.pdb)
+-}}
+{{- range $component := $components }}
+{{- if $component.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "xa-guard.componentName" (dict "root" $root "component" $component.name) }}
+  labels:
+    {{- include "xa-guard.componentLabels" (dict "root" $root "component" $component.name) | nindent 4 }}
+spec:
+  minAvailable: {{ $component.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "xa-guard.componentSelectorLabels" (dict "root" $root "component" $component.name) | nindent 6 }}
+{{- end }}
+{{- end }}
+

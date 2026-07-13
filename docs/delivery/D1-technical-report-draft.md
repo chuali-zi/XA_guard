@@ -7,7 +7,7 @@
 
 ## 1. 摘要
 
-- 项目一句话：XA-Guard 是面向政企智能体的 Agent Gateway 与双面 MCP 安全代理。
+- 项目一句话：XA-Guard 是面向政企智能体的 Agent Gateway：绑定“谁委托哪个 Agent”，让真实副作用可受控补偿并留下完整证据。
 - 覆盖方向：输入攻击识别、工具执行约束、供应链安全、评测审计溯源。
 - 主评测结论：Open Agent Range 企业场景竖切下，Null vs XA-Guard live A/B 观测到可复核的 `protection_delta`；六关卡 demo 与审计链可回放。
 - 当前边界：D1/D3/D4 交付物进行中；不以 AgentDojo ASR 或 budget60 作为本文达标声明。
@@ -26,6 +26,34 @@
 - 六关卡：Gate1 输入、Gate2 审批、Gate3 策略、Gate4 污点、Gate5 沙箱、Gate6 审计。
 - Agent Governance v1：员工、Agent、数据域、预算和审批的本地治理预检（默认关闭）。
 - Open Agent Range：独立企业红队靶场，XA-Guard 作为 live SUT，产出 Tier B 主证据。
+
+### 3.1 主创新：从登录身份到可恢复 Agent 行为
+
+传统 IAM 只回答谁登录，传统审计只回答发生了什么。XA-Guard 把责任链和恢复链接到同一条实际执行路径：
+
+```text
+human sub -> Agent act.sub/azp -> tenant -> dynamic assignment ∩ YAML ceiling
+          -> XA-Guard Gate1–6 -> prepared Effect -> business side effect
+          -> independent approval -> signed compensation -> Gate1–6 -> evidence
+```
+
+核心差异包括：
+
+- **human→agent 双主体链**：浏览器用 Authorization Code + PKCE；BFF 代表已登录人员执行 Standard Token Exchange，Agent token 不进入浏览器持久存储。
+- **动态 Agent assignment**：human/group 可用哪些 Agent、Agent 可用哪些工具/数据域存入 PostgreSQL；每次调用都与静态 ceiling 重新相交，撤销立即生效。
+- **intent-first Effect**：写操作先登记 `prepared`，再用 `effect_id` 作为下游幂等键；数据库不可用时下游执行数必须为零。
+- **补偿状态机与职责分离**：申请人与审批人不能是同一 `sub`；批准后由独立 lease Worker 重新经过治理和六关执行补偿。
+- **诚实恢复语义**：不可逆动作进入 `manual_required`；系统声明“至少一次调度 + 下游幂等有效一次”，不宣称绝对 exactly-once 或通用数据库回滚。
+
+对照设计：
+
+| 组别 | 身份链 | 副作用恢复 | 证据能力 | 预期问题 |
+|---|---|---|---|---|
+| Null / 无 Identity | 仅客户端自报或共享账号 | 无 | 业务日志零散 | 无法证明谁委托哪个 Agent，越权在执行前不可可靠拒绝 |
+| 只有审计 | 可记录 human/Agent 字段 | 无 | 能回答发生了什么 | 已发生错误副作用无法进入受控恢复闭环 |
+| Identity + Undo | OIDC 双主体 + 实时 assignment | v2 合同 + 独立审批 + Worker | 原 trace、补偿 trace、Effect/Gate6 两条链 | 在可逆合同边界内同时实现事前授权、事中六关、事后恢复 |
+
+Reference Compose 已通过 Alice/Dora 的真实 PKCE + token exchange 协议链和工单 `open -> cancelled`；交互式浏览器录屏、故障注入全集、并发 p95 与 kind 多副本仍未完成，因此当前口径是 `CORE-IMPLEMENTED / REFERENCE-VALIDATION-IN-PROGRESS`，不是生产落地声明。
 
 ## 4. 关键技术一：复杂输入链路攻击识别
 

@@ -37,6 +37,9 @@ class VerifiedIdentity:
     permissions: tuple[str, ...]
     kid: str
     jti_sha256: str
+    preferred_username: str = ""
+    roles: tuple[str, ...] = ()
+    groups: tuple[str, ...] = ()
 
 
 class JWTIdentityVerifier:
@@ -84,10 +87,19 @@ class JWTIdentityVerifier:
         )
         actor = claims.get("act") if isinstance(claims.get("act"), dict) else {}
         human = str(claims.get("sub") or "")
-        agent = str(actor.get("sub") or "")
+        # External STS actor binding is authoritative. Keycloak Standard Token
+        # Exchange V2 identifies the confidential Agent client through `azp`.
+        agent = str(actor.get("sub") or claims.get("azp") or "")
         tenant = str(claims.get("tenant_id") or "")
         if not human or not agent or not tenant:
-            raise IdentityError("sub, act.sub and tenant_id are required")
+            raise IdentityError("sub, tenant_id, and act.sub or azp are required")
+        realm_access = claims.get("realm_access") if isinstance(claims.get("realm_access"), dict) else {}
+        roles: set[str] = set(_strings(realm_access.get("roles")))
+        resources = claims.get("resource_access") or {}
+        if isinstance(resources, dict):
+            for value in resources.values():
+                if isinstance(value, dict):
+                    roles.update(_strings(value.get("roles")))
         issued_at, expires_at = int(claims["iat"]), int(claims["exp"])
         if expires_at - issued_at > self.cfg.max_token_ttl_seconds:
             raise IdentityError("token lifetime exceeds configured maximum")
@@ -101,6 +113,9 @@ class JWTIdentityVerifier:
             "tools": list(_strings(claims.get("tools"))),
             "data_domains": list(_strings(claims.get("data_domains"))),
             "permissions": list(_strings(claims.get("permissions"))),
+            "preferred_username": str(claims.get("preferred_username") or human),
+            "roles": sorted(roles),
+            "groups": list(_strings(claims.get("groups"))),
             "kid": str(header.get("kid") or ""),
             "jti_sha256": hashlib.sha256(str(claims.get("jti") or "").encode()).hexdigest(),
         }
@@ -146,6 +161,9 @@ def identity_from_access_token(token: AccessToken) -> VerifiedIdentity:
         permissions=_strings(claims.get("permissions")),
         kid=str(claims.get("kid") or ""),
         jti_sha256=str(claims.get("jti_sha256") or ""),
+        preferred_username=str(claims.get("preferred_username") or token.subject or ""),
+        roles=_strings(claims.get("roles")),
+        groups=_strings(claims.get("groups")),
     )
 
 

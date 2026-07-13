@@ -1,0 +1,14 @@
+apiVersion: v2
+name: xa-guard
+description: XA-Guard identity, governance, effect recovery, and audit control plane
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.27.0-0"
+home: https://github.com/chuali-zi/XA_guard
+sources:
+  - https://github.com/chuali-zi/XA_guard
+annotations:
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/containsSecurityUpdates: "false"
+

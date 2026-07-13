@@ -1,0 +1,123 @@
+{{- if .Values.api.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "xa-guard.componentName" (dict "root" . "component" "api") }}
+  labels:
+    {{- include "xa-guard.componentLabels" (dict "root" . "component" "api") | nindent 4 }}
+spec:
+  replicas: {{ .Values.api.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "xa-guard.componentSelectorLabels" (dict "root" . "component" "api") | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "xa-guard.componentSelectorLabels" (dict "root" . "component" "api") | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "xa-guard.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: api
+          image: {{ include "xa-guard.image" (dict "root" . "image" .Values.api.image) | quote }}
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- with .Values.api.command }}
+          command:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.api.args }}
+          args:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "xa-guard.fullname" . }}-config
+          env:
+            - name: PORT
+              value: {{ .Values.api.containerPort | quote }}
+            - name: XA_GUARD_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "global.externalSecrets.runtime is required" .Values.global.externalSecrets.runtime }}
+                  key: {{ .Values.global.postgres.dsnSecretKey }}
+            - name: XA_GUARD_OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.externalSecrets.runtime }}
+                  key: {{ .Values.global.oidc.confidentialClientSecretKey }}
+            - name: XA_GUARD_OIDC_INTROSPECTION_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.externalSecrets.runtime }}
+                  key: {{ .Values.global.oidc.introspectionClientSecretKey }}
+            - name: XA_GUARD_KEK_KEYRING
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.externalSecrets.runtime }}
+                  key: {{ .Values.global.kms.keyringSecretKey }}
+            - name: XA_GUARD_INTERNAL_AUTH_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.externalSecrets.runtime }}
+                  key: {{ .Values.global.internalAuthorizationSecretKey }}
+            - name: REFERENCE_BUSINESS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.externalSecrets.businessApi }}
+                  key: {{ .Values.businessApi.apiKeySecretKey }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.api.containerPort }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.api.probes.liveness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.api.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.api.probes.liveness.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.api.probes.readiness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.api.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.api.probes.readiness.periodSeconds }}
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/xa-guard
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            - name: logs
+              mountPath: /app/logs
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "xa-guard.fullname" . }}-config
+        - name: tmp
+          emptyDir: {}
+        - name: logs
+          emptyDir: {}
+{{- end }}

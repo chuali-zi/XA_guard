@@ -1,0 +1,32 @@
+{
+  "schema": "xa-guard-reference-verification/v0.1",
+  "status": "partial_not_reference_ready",
+  "local_date": "2026-07-12",
+  "ready_checks": {
+    "postgresql": true,
+    "oidc_jwks": true
+  },
+  "protocol_flow": {
+    "authorization_code_pkce": "passed",
+    "standard_token_exchange_v2": "passed",
+    "alice_subject_and_assignment": "passed",
+    "intent_and_effect": "passed",
+    "undo_idempotency": "passed",
+    "alice_self_approval_rejection": "passed",
+    "dora_independent_approval": "passed",
+    "worker_compensation": "passed",
+    "business_final_state": "cancelled",
+    "separate_traces": true,
+    "tokens_persisted_or_printed": false
+  },
+  "not_verified": [
+    "interactive_browser_three-account_visual_acceptance",
+    "complete_compose_identity_negative_matrix",
+    "postgres_failure_zero_downstream",
+    "api_crash_window_reconciliation",
+    "worker_lease_takeover_fault_injection",
+    "compose_kek_rewrap",
+    "concurrency_p95",
+    "kind_ha_and_rollback"
+  ]
+}

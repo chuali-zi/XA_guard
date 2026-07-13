@@ -1,0 +1,113 @@
+{
+  "realm": "xa-guard",
+  "enabled": true,
+  "displayName": "XA-Guard Reference Identity",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": false,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "roles": {
+    "realm": [
+      {"name": "undo.request"},
+      {"name": "undo.approve"},
+      {"name": "undo.admin"},
+      {"name": "governance.admin"}
+    ]
+  },
+  "groups": [
+    {"name": "engineering-team"},
+    {"name": "security-approvers"},
+    {"name": "governance-admins"}
+  ],
+  "clients": [
+    {
+      "clientId": "xa-console",
+      "name": "XA-Guard Browser Console",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:13080/*"],
+      "webOrigins": ["http://localhost:13080"],
+      "attributes": {"pkce.code.challenge.method": "S256"},
+      "protocolMappers": [
+        {"name": "tenant-id", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "consentRequired": false, "config": {"user.attribute": "tenant_id", "claim.name": "tenant_id", "jsonType.label": "String", "access.token.claim": "true", "id.token.claim": "true"}},
+        {"name": "groups", "protocol": "openid-connect", "protocolMapper": "oidc-group-membership-mapper", "consentRequired": false, "config": {"claim.name": "groups", "full.path": "false", "access.token.claim": "true", "id.token.claim": "true"}},
+        {"name": "agent-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper", "consentRequired": false, "config": {"included.client.audience": "general-office-agent", "access.token.claim": "true"}}
+      ]
+    },
+    {
+      "clientId": "general-office-agent",
+      "name": "General Office Agent BFF",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "__BFF_CLIENT_SECRET__",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "attributes": {"standard.token.exchange.enabled": "true"},
+      "protocolMappers": [
+        {"name": "tenant-id", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "consentRequired": false, "config": {"user.attribute": "tenant_id", "claim.name": "tenant_id", "jsonType.label": "String", "access.token.claim": "true"}},
+        {"name": "groups", "protocol": "openid-connect", "protocolMapper": "oidc-group-membership-mapper", "consentRequired": false, "config": {"claim.name": "groups", "full.path": "false", "access.token.claim": "true"}},
+        {"name": "api-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper", "consentRequired": false, "config": {"included.client.audience": "xa-guard-api", "access.token.claim": "true"}}
+      ]
+    },
+    {
+      "clientId": "xa-guard-api",
+      "name": "XA-Guard Resource Server",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "__API_CLIENT_SECRET__",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false
+    }
+  ],
+  "users": [
+    {
+      "id": "10000000-0000-0000-0000-000000000001",
+      "username": "alice",
+      "enabled": true,
+      "email": "alice@reference.invalid",
+      "emailVerified": true,
+      "firstName": "Alice",
+      "lastName": "工程申请人",
+      "attributes": {"tenant_id": ["acme-corp"]},
+      "groups": ["/engineering-team"],
+      "realmRoles": ["undo.request"],
+      "credentials": [{"type": "password", "value": "__ALICE_PASSWORD__", "temporary": false}]
+    },
+    {
+      "id": "10000000-0000-0000-0000-000000000002",
+      "username": "dora",
+      "enabled": true,
+      "email": "dora@reference.invalid",
+      "emailVerified": true,
+      "firstName": "Dora",
+      "lastName": "安全审批人",
+      "attributes": {"tenant_id": ["acme-corp"]},
+      "groups": ["/security-approvers"],
+      "realmRoles": ["undo.approve"],
+      "credentials": [{"type": "password", "value": "__DORA_PASSWORD__", "temporary": false}]
+    },
+    {
+      "id": "10000000-0000-0000-0000-000000000003",
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@reference.invalid",
+      "emailVerified": true,
+      "firstName": "Admin",
+      "lastName": "治理管理员",
+      "attributes": {"tenant_id": ["acme-corp"]},
+      "groups": ["/governance-admins"],
+      "realmRoles": ["governance.admin", "undo.admin", "undo.approve", "undo.request"],
+      "credentials": [{"type": "password", "value": "__GOVERNANCE_ADMIN_PASSWORD__", "temporary": false}]
+    }
+  ]
+}

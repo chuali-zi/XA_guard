@@ -1,117 +1,84 @@
 # 仓库状态：XA-Guard / XA-202620
 
-> 快照日期：**2026-07-12**
-> **活跃口径**：[docs/acceptance/DELIVERY-v2.md](docs/acceptance/DELIVERY-v2.md)（Tier A/B/C + 退役清单）
-> 工程参考（非比赛承诺）：[docs/acceptance/L3-test-and-acceptance.md](docs/acceptance/L3-test-and-acceptance.md)
-> 本文件仅描述当前仓库状态与真实差距，不记录工作历史（见 [log.md](log.md)）。
-
----
+> 快照日期：**2026-07-12**（America/Los_Angeles）
+> 当前统一口径：**CORE-IMPLEMENTED / DEPLOYMENT-PENDING**
+> 比赛交付口径：[docs/acceptance/DELIVERY-v2.md](docs/acceptance/DELIVERY-v2.md)
+> 本文件只描述当前状态；工作历史见 [log.md](log.md)。
 
 ## 总体结论
 
-仓库已达到 **XA-Guard 核心产品可演示 + 工程验收资产齐备 + Open Agent Range 主评测证据可复现** 的状态。
+XA-Guard 六关、OAR 主评测和新 Identity + Undo 核心代码均已实现。Reference Compose 已从空 PostgreSQL volume 一键构建启动，并通过真实 Keycloak Authorization Code + PKCE、Standard Token Exchange V2、Alice 创建工单、Alice 自批拒绝、Dora 独立批准、Worker 补偿、业务 `open -> cancelled` 的协议级闭环。
 
-- **主评测叙事**：Open Agent Range（OAR）企业场景竖切、Null vs XA-Guard live A/B、`protection_delta`、ledger replay 与 raw XA-Guard audit 对齐——见 [DELIVERY-v2 Tier B](docs/acceptance/DELIVERY-v2.md#tier-b--产品可信度主证据靶场中心)。
-- **不再使用**「L3 最终验收 BLOCKED」作为项目主状态；历史 L3 R2–R9 BLOCKED 语言仅描述工程验收面，多数项已 **RETIRED** 为比赛硬承诺（见 DELIVERY-v2 退役表）。
-- **真实差距（Tier A）**：D1 PDF、D2 clean release freeze、D3 视频、D4 报名证据。B5 canonical OAR 证据链已封存。
-- **正式新增（默认关闭）**：可信双主体 Agent Identity + 补偿式 Undo 已从两轮竖切迁入 `src/xa_guard` 正式运行路径；提供 JWT/JWKS HTTP/stdio 身份绑定、加密 EffectStore、职责分离审批、六关补偿、业务工单 cancel 适配和生产配置模板。上线仍需接入真实 IdP/JWKS、密钥管理和业务环境验收。
+当前仍**不是** `REFERENCE-READY`，也不是 `HA-READY`：交互式浏览器三账号人工 UI 验收、完整故障注入/身份负测/并发性能和 kind 多副本验收尚未封存。Delivery v2 的 B6/B7 因此保持 `PARTIAL`，不得改写为生产 IAM、绝对 exactly-once 或通用数据库 Undo 已落地。
 
-GitHub Actions 双 Python 质量门禁历史通过（Linux 3.10/3.12）。本轮本机全仓 673 collected，672 passed、1 skipped（仅因缺少 `xa-guard/sandbox:latest`）；CI 口径 Ruff PASS，L3 static verifier 11/11 sections PASS。完整证据状态见 [证据收敛总表](docs/acceptance/EVIDENCE-CONSOLIDATION.md)。
+## 当前能力状态
 
-Identity + Undo 受影响范围 68 passed；OAR 非默认收集测试 33 passed。全仓首轮发现 ChainStore Windows 多进程低概率断链，未修改测试，已将权威尾校验从不可靠的 size/mtime 判据改为锁内 O(末行)读取，并允许 Windows audit rotation；最终实现完整 Merkle/归档 12 passed、并发压力额外 10/10 轮通过、500 条基准约 1151 records/s，随后全仓回归通过。详见 [正式接入验证](docs/evidence/agent-identity-undo-formal-2026-07-12/README.md)。
-
----
-
-## Delivery v2 状态一览
-
-| 层级 | 项 | 状态 | 说明 |
-|---|---|---|---|
-| **Tier A** | D1 PDF ≤30 页 | `TODO` | 草稿 [docs/delivery/D1-technical-report-draft.md](docs/delivery/D1-technical-report-draft.md) |
-| **Tier A** | D2 代码 + README/部署 | `PARTIAL` | 六关、Compose、测试、README 具备；release freeze 与最终 hash 待做 |
-| **Tier A** | D3 视频 ≤10 分钟 | `TODO` | 脚本 [docs/delivery/D3-video-script.md](docs/delivery/D3-video-script.md) |
-| **Tier A** | D4 报名 | `TODO` | 仓库无审核通过证据；人工确认 |
-| **Tier B** | B1 六关拦截 | `DONE` | demo + MCP e2e + `verify_audit` |
-| **Tier B** | B2 OAR 企业场景 | `DONE` | full-day 六域、多角色业务链 |
-| **Tier B** | B3 live A/B | `DONE` | `null,xaguard --live --repeat 3`，`protection_delta=1.0` |
-| **Tier B** | B4 ledger + audit 对齐 | `DONE` | `replay --verify-sut-audit` |
-| **Tier B** | B5 一键证据链 | `DONE` | canonical OAR N=3 已标准封存并写入 provenance |
-| **Tier C** | R4 性能 | `DONE` | 支持 D1 附录 |
-| **Tier C** | R7 OPA | `DONE` | 支持 D1 附录；镜像 CVE 需风险接受说明 |
-| **Tier C** | R8 cdxgen + install_plugin | `DONE` | 支持方向 3 附录 |
-| **Tier C** | R2/R3 budget60 | `RETIRED` | 工具保留，背景实验可选 |
-| **RETIRED** | R1 holdout / dual-500 | `RETIRED` | 研究资产 |
-| **RETIRED** | R5 Trae GUI / R6 runsc / R9 第三方 TSA/HSM 等 | `RETIRED` | 见 DELIVERY-v2 退役表；R6 system runsc 远端附录证据已采集，rootless runsc 为 LIMIT |
-
----
-
-## XA-Guard 主产品能力（支撑证据，非比赛 blocker）
-
-| 能力面 | 状态 | 边界 |
+| 能力面 | 状态 | 当前事实与边界 |
 |---|---|---|
-| 六关卡 pipeline（Gate1–6） | `DONE` | L3 静态 S1–S7 历史 PASS；MCP e2e、压力测试已覆盖 |
-| Agent Governance v1 | `DONE` | 默认关闭；本地治理预检，非生产 IAM |
-| Agent Identity + Undo | `IMPLEMENTED / DEFAULT-OFF` | 正式 HTTP/stdio JWT/JWKS 绑定、AES-GCM SQLite、幂等/租户隔离/职责分离、六关补偿已接入；非通用数据库回滚，多地域/KMS/真实 IdP 待部署验收 |
-| 审计链 SM3/SM2/TSA/faithfulness | `DONE` | 本地 TSA/软件 key；第三方 TSA 为 Tier C/RETIRED |
-| Docker Compose + healthz | `DONE` | R6 Docker 部署 PASS；远端 system Docker + gVisor runsc PASS 已回传并锚定，rootless runsc LIMIT；gVisor runsc 全验收不作比赛硬承诺 |
-| OPA Gate3 parity | `DONE` | 64 fixtures 一致；默认镜像有 CVE 发现 |
-| AIBOM + 外部 cdxgen | `DONE` | marketplace/IDE hook RETIRED |
-| CSAB-Gov-mini / bench 工具 | `DONE` | 290 seed；非国标完整 500+ 语料 |
-| R4 性能 | `DONE` | 10 会话达标；20 会话 LIMIT |
-| 全仓测试 | `DONE / 1 ENV SKIP` | 673 collected，672 passed；仅本机缺 sandbox 镜像 skip，非代码失败 |
+| Gate1–6 与 Gate6 审计 | `DONE` | 既有 MCP/demo/OAR 路径保留；新原动作和补偿也进入相同 Pipeline |
+| OAR B1–B5 主证据 | `DONE` | canonical Null vs XA-Guard A/B、ledger replay 与 audit 对齐保持原状态 |
+| Keycloak/OIDC 身份 | `CORE-IMPLEMENTED` | discovery/JWKS 启动必需；普通离线验签；敏感接口 introspection；`act.sub` 优先、Keycloak `azp` reference 映射；未知 kid 有刷新、负缓存和节流 |
+| 动态 Agent assignment | `CORE-IMPLEMENTED` | PostgreSQL human/group→Agent→tool/data-domain，有效期/版本/变更人；每次调用与 YAML ceiling 相交，撤销即时生效 |
+| PostgreSQL EffectStore | `CORE-IMPLEMENTED` | asyncpg、编号 migration、schema v3、migration lock、事件 hash chain；旧 MCP/SQLite 路径保留原兼容语义，不具备新 intent/lease 保证，只作单测且不作为比赛证据 |
+| intent-first 写入 | `CORE-IMPLEMENTED` | `prepared` + execution lease 后才调用下游；`effect_id` 是幂等键；过期 lease 才允许 reconciler 接管 |
+| 恢复材料加密 | `CORE-IMPLEMENTED` | 每 Effect 随机 DEK、AES-GCM、版本化 KEK wrap、旧 key 解密与 rewrap API；Compose 使用 Docker Secret keyring |
+| Undo/审批/Worker | `CORE-IMPLEMENTED` | SOD、Undo 窗口、内部签名授权、SKIP LOCKED、60s lease/20s heartbeat、5/30/120 retry、admin 有界重签；至少一次 + 下游幂等 |
+| Reference ticket API | `CORE-IMPLEMENTED` | stateful PostgreSQL create/query/by-effect/cancel，`open -> cancelled`，相同补偿幂等，不同上下文 409；只在内部网络 |
+| Control API | `CORE-IMPLEMENTED` | `/me`、agents、tickets、effects/timeline、Undo、assignments、livez/readyz/metrics；错误统一脱敏并带一致 trace |
+| React Console/BFF | `BUILT / VISUAL-QA-PENDING` | 六固定页面、PKCE S256、内存 token、Agent confidential BFF token exchange、无角色切换；npm build/test/audit 已过，交互浏览器人工验收未做 |
+| Reference Compose | `PROTOCOL-E2E-PASS / NOT READY` | PostgreSQL 17.6、Keycloak 26.7.0 和 Python/Node 基础镜像锁 digest；随机 gitignored secrets；从空 volume 重建与协议闭环已过 |
+| Helm/HA | `CHART-IMPLEMENTED / KIND-PENDING` | API/Worker/Business/Console、migration、Ingress、Secret 引用、NetworkPolicy、PDB、API HPA；lint/template 通过；未做 kind、Pod 接管、rollback/外部服务替换 |
 
----
+## 本轮可复核结果
 
-## Open Agent Range（主评测叙事）
+- 从空 reference volumes 执行 `python scripts/reference_stack.py up` 成功；六个常驻服务健康，migration/seed 一次性任务成功。
+- `/readyz`：PostgreSQL 与 OIDC/JWKS 均为 true；schema version 3；三条 seed assignment 的 tools/domains 均为 JSONB array。
+- `python scripts/verify_reference_e2e.py`：真实 PKCE + token exchange；Alice immutable `sub`/assignment 验证；Effect 创建；Undo 幂等 replay；Alice self-approval 403；Dora 独立 approval；Worker compensation；结果 `compensated:cancelled:true`。
+- `/metrics` 已输出 JWKS、身份拒绝原因、Effect、Undo、重试、队列深度和 active assignment。
+- Console：5 tests passed，production build passed，npm audit 为 0 vulnerabilities。
+- Helm 3.17.3：`helm lint --strict` 通过；默认模板 17 resources，默认 NetworkPolicy 无 `0.0.0.0/0`；未执行 kind。
+- 最终 CI 口径 Ruff 通过；全仓 pytest **691 collected / 691 passed / 0 failed / 0 skipped**；`git diff --check` 通过。pytest `testpaths=["tests"]`，不包含 OAR/Auto-RedTeam 目录。
 
-独立目录 [open-agent-range/](open-agent-range/)：PRD 冻结；SP2+ full-day 六域竖切；ReactiveSeat；attempt 级真实 `xa_guard.server` live session；canonical N=3 中 Null 3/3 泄漏、XA-Guard 3/3 拦截、0 infra error、`protection_delta=1.0`；7/7 attempt replay 通过，XA-Guard 侧 ledger 与 raw audit 逐序对齐；workbench HTTP 可 manual-session / A/B / evidence review。
+部分 reference 验证记录见 [docs/evidence/agent-identity-undo-reference-2026-07-12/README.md](docs/evidence/agent-identity-undo-reference-2026-07-12/README.md)。该目录明确未封存为最终 B6/B7 证据。
 
-**边界**：非完整工业级在线沙盘；ReactiveSeat 为确定性状态机；F15 等为最小落点。细节见 [open-agent-range/status.md](open-agent-range/status.md)。
+## REFERENCE-READY 差距
 
-2026-07-12 新增隔离 feasibility experiment：Ed25519 双主体签名身份的 4 类负测均在 executor 前拒绝；
-`update_registry` 原动作与第二主体补偿均经过真实 XA-Guard Pipeline 并恢复前态；`send_message` 如实标记为不可逆；
-Gate6/OAR 两条 hash chain 均通过。证据见
-[agent-identity-undo-spike-2026-07-12](docs/evidence/agent-identity-undo-spike-2026-07-12/README.md)。
-第一轮未实现 HTTP 身份入口、加密 EffectStore、重启恢复或并发控制；这些可行性问题由下述第二轮继续验证。
+以下项未完成，全部通过并生成最终 manifest 后才可标记 `REFERENCE-READY`：
 
-第二轮进一步通过实验性 MCP Bearer middleware 保护真实 Streamable HTTP session：缺/坏 token 为 401，身份冲突和 tool scope 越权为 403，拒绝路径下游零执行；
-EffectRecord 使用 AES-GCM 加密写入 SQLite，重新创建 store 后可恢复，错误密钥拒绝，幂等申请稳定，两个独立 store 并发 claim 只有一个成功；
-Carol 通过独立 Bearer session 补偿并恢复世界前态。证据见
-[agent-identity-undo-spike-round2-2026-07-12](docs/evidence/agent-identity-undo-spike-round2-2026-07-12/README.md)。
-上述实验结论现已产品化进入正式 HTTP/stdio 入口、GateContext/Gate6 schema、业务 API 连接器、配置与回归测试。正式实现见
-[Agent Identity 与 Undo 架构](docs/architecture/agent-identity-and-undo.md) 和
-[`configs/xa-guard.identity-undo.yaml`](configs/xa-guard.identity-undo.yaml)。仍未完成真实政企 IdP 联调、JWKS 轮换演练、KMS/HSM 托管、多地域一致性与补偿失败调度。
+1. 交互式浏览器完成 Alice、Dora、Admin 三账号 UI 登录、页面隔离和录屏；当前环境没有可用浏览器控制实例，只有真实 PKCE 协议自动验收。
+2. Compose 级身份负测全集：坏签名、错误 audience、伪造 human/Agent/tenant、无 assignment、撤销 assignment、跨租户不可见，并证明下游调用数为 0。
+3. PostgreSQL 断连零下游；API 在下游成功/Effect 未完成窗口被杀后的 reconciler 恢复。
+4. Worker 补偿中被杀、lease 到期由另一 Worker 接管，并确认工单只有一次有效取消。
+5. 错误 KEK、增加新 KEK、旧记录读取与在线 rewrap 的整栈演练。
+6. 双审批并发单任务、10 并发 identity/effect 新增开销 p95 ≤ 50ms、批准到恢复 ≤ 30s 的正式数据。
+7. 脱敏 evidence 包：业务前后态、claims 摘要、assignment 版本、Effect/Undo events、双 trace、Gate6/Effect chain 校验和 artifact manifest。
 
-Auto-RedTeam Conductor 与持续运行维护层已联调运行：外层提案固定 Codex `gpt-5.6-sol`，OAR 内部 OpenCodeSeat 默认 `deepseek/deepseek-v4-flash`；维护器 PID/进度监控、异常恢复、退避熔断、持久 stop/resume、陈旧锁恢复和连续业务错误熔断可用。mailbox/rag/ticket/rag-index 已生成 proposal/finding、完成 Null vs XA-Guard A/B 并封存为诚实 `LIMIT`；后续 tool-args 尝试为 `INFRA_ERROR`，没有冒充 finding。本地 maintainer 已正常完成。Conductor merge 与 maintenance 修正已进入发布分支，仍需远端 PR 合并后才属于默认分支发布能力。
+## HA-READY 差距
 
-**enterprise-agent-range/** 为早期独立设计区，能力已主要由 OAR 承接；不作为主叙事。
+- kind/Kubernetes 实际安装；API 与 Worker 至少各 2 副本。
+- 删除 API Pod 不影响请求；删除 lease Worker 后另一副本接管。
+- migration 重跑、滚动升级、Helm rollback 与 schema/effect 可读性。
+- 外部 OIDC、PostgreSQL、key provider 各一项替换测试。
+- NetworkPolicy 实际连通性证明，而不只是模板静态检查。
 
----
+## Delivery v2 与赛题距离
 
-## 剩余真实差距（非退役项）
+| 层级 | 项 | 状态 |
+|---|---|---|
+| Tier A | D1 ≤30 页 PDF | `TODO`；草稿已增加 Identity + Undo 主创新章节 |
+| Tier A | D2 代码/部署 | `PARTIAL`；主体具备，release freeze/final hash 未做 |
+| Tier A | D3 ≤10 分钟视频 | `TODO`；已改为固定八镜头双人闭环脚本 |
+| Tier A | D4 报名 | `TODO`；人工事项 |
+| Tier B | B1–B5 六关/OAR | `DONE` |
+| Tier B | B6 可信 Agent Identity | `PARTIAL`；待 REFERENCE-READY evidence 封存 |
+| Tier B | B7 可验证 Undo | `PARTIAL`；待 REFERENCE-READY evidence 封存 |
 
-1. **D1**：30 页 PDF 成稿（OAR A/B + 六关 demo 为主实验）。
-2. **D3**：≤10 分钟视频（拦截、审批/阻断、审计、OAR 镜头）。
-3. **D4**：报名系统审核通过证据（人工）。
-4. **D2 release**：clean worktree、final commit/hash manifest、与 D1 命令一致。
+比赛主叙事统一为：
 
-可选 Tier C：R2/R3 背景跑数、Trae 截图——不阻塞提交。
+> 传统 IAM 只回答谁登录，传统审计只回答发生了什么。XA-Guard 同时绑定“谁委托了哪个 Agent”，并为 Agent 的真实副作用提供受控补偿能力——前有身份、途中六关、后有撤销、全程有证据。
 
----
+## 仓库与工作树
 
-## 距离赛题官方要求
-
-按 [事实源 §1.8](docs/source-of-truth/事实源.md)：四件必交材料中 **D2 主体已具备**，**D1/D3/D4 未完成**；可选补充（评测脚本、攻击样例、审计样例）可从 OAR evidence 与 `verify_audit` 组装。
-
-评分维度上：**实际效果** 靠 OAR A/B + 六关 live demo；**技术创新** 靠 Agent Gateway + 六关 + 国密审计 + OAR 靶场；**方案完整性** 靠四方向映射与 DELIVERY-v2 诚实验边界；**展示表达** 靠 D3。
-
----
-
-## 文档入口
-
-- 交付口径：[docs/acceptance/DELIVERY-v2.md](docs/acceptance/DELIVERY-v2.md)
-- 证据总表：[docs/acceptance/EVIDENCE-CONSOLIDATION.md](docs/acceptance/EVIDENCE-CONSOLIDATION.md)
-- 执行 TODO：[docs/workplan/TODO.md](docs/workplan/TODO.md)
-- 文档导航：[docs/README.md](docs/README.md)
-- Identity + Undo 可行性：[docs/planning/agent-identity-undo-feasibility.md](docs/planning/agent-identity-undo-feasibility.md)
-- Identity + Undo 第二轮：[docs/planning/agent-identity-undo-feasibility-round2.md](docs/planning/agent-identity-undo-feasibility-round2.md)
-- Identity + Undo 正式架构：[docs/architecture/agent-identity-and-undo.md](docs/architecture/agent-identity-and-undo.md)
+- 现有 PR #3 已合并到 `main`；本轮实现位于 `feat/identity-undo-reference`，尚未提交/推送。
+- 以下既有脏改动不属于本轮 Identity + Undo，实现中未覆盖或混入：`docs/acceptance/remote-evidence/provenance-manifest.jsonl`、`open-agent-range/auto-redteam/conductor/conductor.py`、`open-agent-range/auto-redteam/tests/test_conductor_offline.py`。
+- `.runtime/reference/` 被 gitignore，包含本机随机凭据与密钥，不得提交。
