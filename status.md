@@ -1,91 +1,96 @@
 # 仓库状态：XA-Guard / XA-202620
 
-> 2026-07-11 工程规范快照：`main` 的 GitHub Actions 双 Python 质量门禁已通过 Linux Python 3.10/3.12 验证。此前退出崩溃根因是 `build_pipeline()` 泄漏 watchfiles 原生线程；现仅 `run_server()` 作为生命周期所有者显式启停 OverlayWatcher，run `29142949530` 全绿。无效的 CFFI/PyYAML/cryptography 固定已撤销，Actions 已升级到 Node 24 版本。本机 Ruff 和全仓 pytest 通过；未改变真实验收边界或 L3 最终 BLOCKED 结论。
-> 快照日期：2026-07-09（仓库环境；XA-Guard 主产品新增 R8/R9 可复跑 acceptance 脚本和 R9 external signer bridge；独立 Enterprise Agent Range 已具备 P1/P2 本地能力、office/mail live 竖切、Arena Core 第一层解耦、红队靶场 docs 收束、attempt evidence store、tool surface、policy overlay、OpenCode/SUT adapter、redteam finding 工作流和最小 `arena` CLI 工作台；Open Agent Range 已推进到 SP2+ 六域活世界最小竖切 + full-day 关键业务副作用大幅迁出 scheduled tape + F3/F10/F11/F13/F14 多角色业务链路 + ManualSeat CLI 单步/多步入口 + ReactiveSeat 本地 observe-plan-act full-day + Workbench HTTP 本地 API 可执行 manual-session、finding save/list/review/promote、A/B run、evidence summary/compare/detail/run catalog + Guard/XA-Guard 类 SUT 裁决事实进入 hash ledger + `Ledger.replay()` projection v1/关键终态复原 + SP3/SP4.1/SP5 离线闭环 + attempt 级真实 XA-Guard live SUT session + 真实 `null,xaguard --live --repeat 3` 红队 A/B 证据矩阵 + plugin/mcp tool-surface-drift + supply/aibom supply-chain-drift consequence + `range day/replay/report/sut check/workbench serve` 产品入口 + OpenCode 多轮 day 产品级 mock 回归 + promote 证据门禁 + replay/promote audit alignment + SP7 最小证据包（含 `agent-transcript.jsonl` / `sut-session.json`）状态。2026-07-07 17:51 `gpt-5.5/xhigh` Planck review 仍判定未达到“完美完成态”，但当前已基本符合 PRD 思想并可供红队本地使用；2026-07-09 本地复核确认 `kernel/tests`、full-day demo、ReactiveSeat day evidence、replay 校验和 workbench 静态控制台生成均可运行；同日新增 Open Agent Range 红队 agent 详细手册与学生快速上手手册，并实测自定义 payload、ManualSeat、finding、离线/live xaguard A/B 和 OpenCode `deepseek/deepseek-v4-flash` 路径）
-> 本文件仅描述当前仓库状态、验收边界与剩余差距，不记录工作历史。
-> 2026-06-20 已在 commit `432ebbc` 实跑 L3 静态验收 S1–S7（全 PASS，123 测试）与能力范围内真实验收 R2/R3/R4/R6/R7/R9；证据目录 `D:/evidence/l3-20260620T090452Z/`（final-report.json + artifact-hashes.json 149 文件）。R6 Docker build/up+healthz 已 PASS（gVisor runsc 仍 BLOCKED，Windows 无 runsc）。BUG-R9 已修复+回归测试。仍 BLOCKED：R1 独立双 500/holdout、R5 真实 Trae GUI、R6 gVisor runsc（需 Linux）、R8 外部 AIBOM 生成器、R9 第三方 TSA/HSM；R2/R3 比赛目标现按 OpenCode Go 订阅 `$60` 预算型抽样管理。
-> 2026-06-21 对 commit `6cf1ce9` 复核：统一静态 verifier `11/11` sections PASS；全量 pytest 在默认 Windows/CP1252 子进程环境为 `561 passed, 1 failed, 1 skipped`，总覆盖率 `79%`。唯一失败是 `validate_csab_gov_mini.py` 输出 Unicode 箭头触发 `UnicodeEncodeError`，设置 `PYTHONUTF8=1` 后该用例通过；唯一 skip 是本机缺 `xa-guard/sandbox:latest` 测试镜像。故当前不能写”默认环境全量测试全绿”。
-> 2026-06-22 用户授权的 `$10` 首批运行已安全停止，证据 `D:/evidence/r2-r3-budget10-20260622/`。实际新增 provider 成本 `$2.94602940`（calibration `$1.95051700` + retry `$0.99551240`），87 次调用全部 settled、无未知成本；32 calibration jobs 为 7 complete / 25 infra_error，其中 24 个在桶余额不足时调用前阻断、1 个为 OpenCode content schema 波动。校准不完整，`budget-freeze` 正确拒绝，未生成正式 sample manifest 或 sampled 指标；旧 7 个结果不得混入正式分母。当前新正式口径为 `subscription_budget60_v1`：总 cap `$60`，calibration `$6`、R2 `$32`、R3 `$16`、retry `$6`。离线 runner 已修复 content block、R2/R3 turn retry、retry 分桶、预算停止、provider 配额暂停、结果 provenance，以及按全局未完成列表续考；AgentDojo 同一 job 恢复时不再强制重跑已完成内部 task。单题连续基础设施失败默认最多 2 次，之后不再阻塞后续题。尚未做新的付费校准。2,986-job 全矩阵仍为 `DEFERRED_OPTIONAL`。
-> 2026-06-22 当前工作树离线验证：R2/R3 目标测试 `32 passed`，changed-file ruff PASS；设置 `PYTHONUTF8=1` 的全仓测试共 585 项，结果 `584 passed, 1 skipped`，唯一 skip 为本机缺 `xa-guard/sandbox:latest`；统一静态 verifier `11/11` sections PASS。未执行任何模型调用。
-> 2026-06-23 新增 `docs/research/force-ai-security-2026/`，将用户提供的 FORCE 原动力大会企业 AI / 智能体安全 PPT 照片整理为专题资料：逐页笔记、风险图谱、治理架构、数据/控制流安全、XA-Guard 映射和行动清单。该资料属于研究与答辩素材沉淀，不改变当前代码验收状态，也不构成任何新增测试或正式验收通过声明。
-> 2026-06-30 新增 `docs/workplan/TODO.md` 作为当前下一步执行入口，并更新 `docs/README.md` 导航。该整理明确官方 D1-D4、赛题四方向证据、L3 BLOCKED 项、R2/R3 sampled 口径和 docs 后续整理计划；不改变代码能力、测试结果或 L3 验收状态。
-> 2026-06-30 Agent Governance v1 已从 `codex/agent-governance-platform` 合入当前 main 工作树：新增本地治理 registry、Gate1 前治理预检、MCP `_xa_guard` envelope 提取与剥离、`gen_ai.governance.*` 审计字段、pending ledger 透传、Gate3 治理变量和静态治理控制台；已包含 review 修复（空 allow-list 默认 fail-closed、跨主体 `all` 不自动放行、Capability Token 只落摘要、前端治理控制台 HTML escape、默认 tenant 回写）。该能力默认关闭，不改变既有 L3 验收口径。
-> 2026-06-30 合并后验证：治理单测/集成/配置 20 passed；pipeline/Gate3/Gate6/pending/MCP e2e 回归通过；R2/R3 预算关键测试 32 passed；ruff 针对变更 Python 文件通过；`node --check frontend/governance.js` 通过；治理样例 JSON/NDJSON 解析通过；设置 `PYTHONPATH=src;.` 与 `PYTHONUTF8=1` 后全仓 `pytest -q` 通过，唯一 skip 仍为本机缺 `xa-guard/sandbox:latest` 镜像。
-> 2026-06-30 docs 已完成物理重构：`docs/` 顶层只保留 `README.md`，原顶层文档迁入 `source-of-truth/`、`planning/`、`workplan/`、`delivery/`、`acceptance/`、`gates/`、`bench-redteam/`、`research/`；新增 `docs/workplan/NEXT-WORK-DESIGN.md`、D1 草稿、D3 视频脚本和提交清单骨架。该整理不改变代码能力、测试结果、L3 验收或比赛达标结论。
-> 2026-07-01 新增全链路额外压力测试 `tests/integration/test_full_gate_stress_extra.py`：覆盖企业治理预检与 Gate1-Gate6 的 allow/deny/require_approval/warn、审批恢复、审批篡改、出向拦截、executor 异常和审计链。为保持既有静态 verifier 路径契约，补充 docs 顶层兼容入口指向重构后的真实文档；这不改变 L3 真实验收 blocker。
-> 2026-07-01 修复 Gate4 出向 `output_taint` 未回写 `ctx.taint` 导致 Gate6 审计敏感级别可能保留入向标签的问题；新增真实下游业务 HTTP API stdio adapter、仓库内 `.env.example`、业务 API 配置、Gate3/Gate4 策略登记、企业 registry 授权路径和验收文档。新增业务 API 单测/集成 11 passed；ruff 通过。
-> 2026-07-01 用户确认后启动 Docker Desktop 并构建本机 `xa-guard/sandbox:latest`；`tests/integration/test_sandbox_runner.py` 从 skip 变为真实执行通过，验证禁网和只读 rootfs；全仓 `PYTHONPATH=src;.` 下 `pytest -q` 通过，当前无 skip 摘要。
-> 2026-07-01 新增项目级 `.opencode/opencode.json`，将本仓默认 OpenCode 模型与内置 build/plan/general/explore agent 配置为 `openai/gpt-5.5`，并设置 `options.reasoningEffort: xhigh`；该配置仅影响重启后的 OpenCode 会话，不改变 XA-Guard 产品能力或验收结论。
-> 2026-07-01 新增 `enterprise-agent-range/` 独立企业级智能体安全靶场设计区，包含自有 `docs/`、`status.md` 和 `.log/worklog.md`；设计覆盖重型企业场景、解耦契约、架构、数据模型、数据流、攻击分类、场景矩阵、评测指标和证据规范。该目录明确只把 XA-Guard 作为外部 `SUT`，不导入 `src/xa_guard`、不复用既有 `docs/`，当前仅为文档设计，不改变 XA-Guard 运行时能力或 L3 验收状态。
-> 2026-07-07 `open-agent-range/` 当前是独立开放红队靶场新目录：`PRD.md` 已冻结；已从 SP0 walking skeleton 推进到 SP2+ 六域活世界最小竖切（`full-day.json`、业务时钟、队列/审批状态、同 tick 并发批次、多 seat 轮转交错）+ full-day 关键业务副作用大幅迁出 scheduled tape（scheduler 主要保留外部/背景事实，关键动作由 seat ToolSurface 调用落账）+ F3 报销审批支付 seat/SUT/ToolSurface 链路（小王提交、张经理审批、陈会计按审批链支付）+ F10 合同处理 seat/SUT/ToolSurface 链路（李法务读取合同附件/合同/承包商名册并起草，刘主管审批合同处理）+ F11 Atlas 跨部门项目依赖 seat/SUT/ToolSurface 链路（韩项目查询项目/派单/申请审批，吴架构按委托读 repo，陆运维审批并切换 atlas-api）+ F13/F14 下午治理策略例外与审计 replay trace 链路（王安全审批、郑治理修改 `agent-handbook` 策略例外并内部通知、钱审计 replay/verify/export）+ Guard/XA-Guard 类 SUT 裁决事实进入 hash ledger + `Ledger.replay()` projection v1/关键终态复原（含 projects/policies/policy_exceptions）+ `range day/replay/report/sut check/workbench serve` 产品命令薄入口 + SP3 多角度注入可消费 + plugin/mcp `tool-surface-drift` + supply/aibom `supply-chain-drift` + policy `policy-exception-abuse` + plugin/mcp `sandbox-escape-attempt` + attempt 级动态 ToolSurface + SP4.1 finding 队列/A-B/审核（含 Null vs XA-Guard 离线/live 入口、live `INFRA_ERROR` 不计分）+ promote 证据门禁 + ManualSeat CLI 单步与多步手动 ToolCall 入口 + Workbench HTTP 本地 `/api/manual-session`、`/api/run-ab`、`/api/show-evidence` 可直接执行浏览器中构造的多步手动会话、一次本地 A/B 和 evidence summary 读取 + OpenCode 多轮 day 产品级 mock 回归 + SP5 最小追责 + 最小真实 XA-Guard live SUT + SP7 最小证据包（world-in/out/diff、timeline、ledger replay projection、accountability report）。2026-07-07 00:57 本地验证为 `kernel/tests` 114 tests passed，workbench 生成 smoke 与页面 JS `node --check` 通过；最近 `gpt-5.5/xhigh` 子 agent `Nash` 仍判定未完全符合 PRD。它仍不是完整持久在线自由沙盒：正常 seat 行为仍偏 demo scripted，F15 仍是最小安全外发/内部通知落点，动态/真实下游工具 replay payload、Gate6/range ledger 深度对齐、完整 Web UI、多 finding 持久编辑、地图点击注入、证据并排审阅、任意长度真实 agent loop、insider/真实供应链/真实 MCP consequence、真实策略/沙箱执行器和真实 live N>=3 证据矩阵仍未完成。
-> 2026-07-05 本机完成 L3 R7 OPA 验收扩展，证据目录 `/mnt/d/evidence/l3-r7-20260706T055152Z/`：新增 R7 验收脚本，修复 WSL 下 `tools/opa/opa.exe` 自动发现、Rego truthiness 与 OPA timeout，增加 strict bundle SHA 漂移 fail-closed。64 个 Gate3 baseline 正/负 fixtures 在 Python backend 与 strict OPA backend 100% 一致；缺 OPA executable、OPA timeout、非法响应和 bundle drift 四项均 fail-closed 且无下游执行；OPA Compose profile 构建并健康启动，容器内 `/usr/local/bin/opa version` 为 1.4.2；默认 `openpolicyagent/opa:1.4.2-static` digest `sha256:3c995dc8a59f6ddfd92eb7404d2f7ff9fe71cd025d9251199957a8a6afbfd76e` 已用 Trivy 扫描。扫描发现 2 Critical、26 High、36 Medium、3 Low、1 Unknown，因此 R7 功能验收可记 PASS，但生产镜像仍需换 approved digest 或正式风险接受，不能写“镜像安全无发现”。
-> 2026-07-05 本机复跑 L3 R4 性能完整验收，证据目录 `docs/evidence/l3-r4-20260705-current/`：性能入口单测 7 passed；进程内 500 请求/并发 10 为 P50 4.362ms、P95 36.042ms、262.301 QPS、RSS 62.172MB、530 审计验链通过；Streamable HTTP 10 sessions/500 请求为 P95 185.518ms、69.876 QPS、RSS 102.867MB、500/500 marker 匹配、审计链通过、active sessions=0；两项均满足 PRD medium targets。20 sessions/500 请求作为容量边界：无错误、无串话、无审计丢失、active sessions=0，但 P95 483.732ms > 300ms，继续记录为 LIMIT，未声明 20 会话支持。
-> 2026-07-09 新增 R2/R3 budget60 远程无人值守运行系统：`tools/evidence/` 落地证据规范 §6 契约四脚本（new-run/seal-run/verify-run/collect，确定性封包 + git 锚定 manifest 校验，本机冒烟通过）；`tools/remote-runner/` 提供 supervisor 守护（时钟/网络门控防断网烧 resume attempts、phase 状态机、approve calibration/freeze/main 三处人工花钱门、四路熔断、心跳/ALERTS 断电安全落盘）、runnerctl 操作 CLI、watchdog+systemd 开机自启、bootstrap 幂等部署（bundle 离线优先）和 Windows 侧 push-repo/poll-status；`tests/remote_runner/` 离线单测 12 passed。该系统尚未在真实服务器部署或执行付费评测，R2/R3 sampled 结果仍 NOT RUN。
-> 2026-07-08 本机收敛 R7/R8/R9 可复跑入口：R7 `scripts/run_l3_r7_opa_acceptance.py` 增加可选 OPA image inspect / Trivy report hash provenance 字段，不改变 R6/runsc 远端验收路径；新增 R8 `scripts/run_l3_r8_aibom_acceptance.py`，实跑证据 `D:/xa-evidence/runs/l3-r8-aibom-20260708T075534Z-local/` 为 `status=pass`，覆盖外部 cdxgen CycloneDX 1.6 导入、`xa-aibom validate/admit` 正负测和离线 `install_plugin` 准入链；新增 R9 external signer bridge（Gate6 `signature_mode=external` + `verify_audit.py --require-signature external`），R9 acceptance 证据 `D:/xa-evidence/runs/l3-r9-audit-20260708T075534Z-local/` 为 `status=limit`：本地 SM3 链、SM2 签名、SM2 TSA token、anchor、faithfulness 非固定分和篡改负测均通过，但 `XA_GUARD_EXTERNAL_TSA_URL` / `XA_GUARD_EXTERNAL_SIGN_CMD` / `XA_GUARD_EXTERNAL_VERIFY_CMD` / `XA_GUARD_EXTERNAL_KEY_ID` 未配置，第三方 TSA/HSM 仍如实 BLOCKED。
+> 快照日期：**2026-07-11**
+> **活跃口径**：[docs/acceptance/DELIVERY-v2.md](docs/acceptance/DELIVERY-v2.md)（Tier A/B/C + 退役清单）
+> 工程参考（非比赛承诺）：[docs/acceptance/L3-test-and-acceptance.md](docs/acceptance/L3-test-and-acceptance.md)
+> 本文件仅描述当前仓库状态与真实差距，不记录工作历史（见 [log.md](log.md)）。
+
+---
 
 ## 总体结论
 
-仓库已达到 **L3 静态实现验收通过 + L3 核心工程原型可运行 + 部分真实环境验收通过**：
-- 静态 S1–S7 全部 PASS（双 500 implementation、Gate1 holdout 协议、AgentDojo/InjecAgent runner、性能入口、Trae/gVisor/OPA 静态、AIBOM/国密/审计/faithfulness 单测；S7 含 BUG-R9 回归测试 123 passed）。
-- 真实验收已通过：R4 性能（进程内 500 + HTTP 10 会话/500，四项 PRD 中等档全达标）、R6 Docker build/up + healthz（6/6 steps PASS，容器 live healthy）、R7 OPA 功能验收（64 个 Gate3 baseline 正/负 fixtures Python/strict OPA 100% 一致，缺 binary/timeout/非法响应/bundle drift 均 fail-closed；OPA Compose profile healthy；默认 OPA 镜像扫描有漏洞发现，生产前需换 approved digest 或风险接受）、R8 外部 cdxgen CycloneDX 1.6 导入 + `xa-aibom`/离线 `install_plugin` 准入正负测、R2 install_plugin + AgentDojo baseline + InjecAgent base/defended 真实 opencode smoke（官方上游 pinned，official_claim=False）、R9 本地 SM2-with-SM3 签验 + 篡改检出 + faithfulness 独立重算 + 本地 TSA anchor（含 SM2-TSA-token 路径，BUG-R9 修复后 PASS）。
-- 20 会话容量如实记录为 LIMIT（最新复跑 P95 483.732ms > 300ms），未声明支持。
-- BUG-R9（SM2-TSA-token anchor 验证 mismatch）已修复：`tsa.py` `_payload_for_hash` 排除 `sm2_tsa_*` 字段，新增回归测试，S7 全套 123 passed 无回归。
-- BUG-R9 修复及回归测试已进入 commit `6cf1ce9`，本快照随之同步。2026-06-21 全量测试默认 Windows 编码下还有 1 个可复现兼容性失败。
-- 当前 main 工作树的 Agent Governance v1 进一步补齐“员工、Agent、数据域、预算/产出归属”的企业控制面；当前治理预检为 fail-closed 语义，Capability Token 仅落摘要，静态控制台已做基础 HTML 转义。该能力默认关闭，不改变既有 L3 验收口径，也不构成 SaaS 或完整 Shadow AI / 多 Agent 编排治理实现声明。
+仓库已达到 **XA-Guard 核心产品可演示 + 工程验收资产齐备 + Open Agent Range 主评测证据可复现** 的状态。
 
-当前仍**不能宣称“L3 最终验收通过”或“赛题最终达标”**。剩余比赛差距：R1 正式双 500/holdout 独立评测、R2/R3 `subscription_budget60_v1` 真实校准与 sampled 结果、R5 真实 Trae GUI、R6 真实 Linux/gVisor runsc 隔离、R8 marketplace/IDE native 安装链（外部 CycloneDX 1.6 产物导入、`xa-aibom validate/admit` 和离线 `install_plugin` 准入链已实跑 PASS）、R9 第三方 TSA/HSM provider 实证，以及 D1/D3/D4 交付物。2,986-job 全矩阵不在比赛差距内。
+- **主评测叙事**：Open Agent Range（OAR）企业场景竖切、Null vs XA-Guard live A/B、`protection_delta`、ledger replay 与 raw XA-Guard audit 对齐——见 [DELIVERY-v2 Tier B](docs/acceptance/DELIVERY-v2.md#tier-b--产品可信度主证据靶场中心)。
+- **不再使用**「L3 最终验收 BLOCKED」作为项目主状态；历史 L3 R2–R9 BLOCKED 语言仅描述工程验收面，多数项已 **RETIRED** 为比赛硬承诺（见 DELIVERY-v2 退役表）。
+- **真实差距（Tier A）**：D1 PDF、D2 clean release freeze、D3 视频、D4 报名证据。B5 canonical OAR 证据链已封存。
 
-按 PRD 的 D2 代码交付清单看，README、Compose、79% 覆盖率、六关测试、32 条 Gate3 baseline 规则、审计实现和 Apache-2.0 LICENSE 已具备；公开 remote 已配置，但真实 Trae 验收仍缺。按项目自定义的 `docs/acceptance/L3-test-and-acceptance.md`，R1/R2/R3/R5/R6/R8/R9 仍有必验项 BLOCKED，因此 L3 整体仍为 **BLOCKED，而非 PASS**；其中 R2/R3 blocker 是预算型抽样工具/结果未完成，不是可选全矩阵未跑。仓库内也未发现 D1 技术方案成稿、D3 演示视频或 D4 报名材料；这不影响代码静态 L3，但影响赛题完整交付。
+GitHub Actions 双 Python 质量门禁已通过（Linux 3.10/3.12）。本轮 Ruff PASS；全仓 667 collected，666 passed、1 skipped（本机无 sandbox image）；static verifier 11/11 PASS。完整证据状态见 [证据收敛总表](docs/acceptance/EVIDENCE-CONSOLIDATION.md)。
 
-2026-06-23 新增的原动力大会 AI 安全专题资料进一步强化了“Agent Gateway、Agent 身份治理、控制流/数据流隔离、AI Resilience、多 Agent 编排治理”的产品叙事，但目前只是文档沉淀，尚未转化为新的实现、测试或验收证据。
+---
 
-2026-07-02 `enterprise-agent-range/` 当前状态：P1 回放基线保留 242 cases、66 个 mock tool、P2 能力子包已实现本地确定性能力；office/mail arena live 竖切保留既有 guard/null 2x2 smoke 证据。2026-07-02 晚已清理靶场 docs，删除旧编号文档和 `docs/superpowers/`，新增 `docs/plan/redteam-arena-refactor-plan.md`；代码侧已完成 Arena Core 第一层解耦：`WorldSpec`、`ChallengeSuite`、`ToolSurface`、`PolicyOverlay`、`EvidenceStore`、OpenCode agent seat、XA-Guard SUT adapter、redteam `Finding` 工作流均已拆出，`arena/live.py` 已接入 evidence store。CLI 已新增最小红队台 `arena worlds|surfaces|challenges|init-finding|promote|show|run-ab`，旧 `arena-live` 与 `finding-*` 入口保持兼容。本轮验证为本地非 live：263 个 unittest 通过、P1 manifest validate 通过、CLI smoke 通过、range runtime 无 `xa_guard` import；未运行真实 OpenCode/GLM live 调用。它仍是独立靶场工作区，不属于 XA-Guard 主产品源码，不进入现有 L3 通过项，也不代表任何外部 SUT 已通过正式评测。
+## Delivery v2 状态一览
 
-2026-06-30 后，`docs/README.md` 是文档唯一入口，`docs/workplan/NEXT-WORK-DESIGN.md` 是下一步工作设计入口，`docs/workplan/TODO.md` 是详细 TODO；`status.md` 仍只描述当前仓库状态和验收边界，工作历史继续写入 `log.md`。
+| 层级 | 项 | 状态 | 说明 |
+|---|---|---|---|
+| **Tier A** | D1 PDF ≤30 页 | `TODO` | 草稿 [docs/delivery/D1-technical-report-draft.md](docs/delivery/D1-technical-report-draft.md) |
+| **Tier A** | D2 代码 + README/部署 | `PARTIAL` | 六关、Compose、测试、README 具备；release freeze 与最终 hash 待做 |
+| **Tier A** | D3 视频 ≤10 分钟 | `TODO` | 脚本 [docs/delivery/D3-video-script.md](docs/delivery/D3-video-script.md) |
+| **Tier A** | D4 报名 | `TODO` | 仓库无审核通过证据；人工确认 |
+| **Tier B** | B1 六关拦截 | `DONE` | demo + MCP e2e + `verify_audit` |
+| **Tier B** | B2 OAR 企业场景 | `DONE` | full-day 六域、多角色业务链 |
+| **Tier B** | B3 live A/B | `DONE` | `null,xaguard --live --repeat 3`，`protection_delta=1.0` |
+| **Tier B** | B4 ledger + audit 对齐 | `DONE` | `replay --verify-sut-audit` |
+| **Tier B** | B5 一键证据链 | `DONE` | canonical OAR N=3 已标准封存并写入 provenance |
+| **Tier C** | R4 性能 | `DONE` | 支持 D1 附录 |
+| **Tier C** | R7 OPA | `DONE` | 支持 D1 附录；镜像 CVE 需风险接受说明 |
+| **Tier C** | R8 cdxgen + install_plugin | `DONE` | 支持方向 3 附录 |
+| **Tier C** | R2/R3 budget60 | `RETIRED` | 工具保留，背景实验可选 |
+| **RETIRED** | R1 holdout / dual-500 | `RETIRED` | 研究资产 |
+| **RETIRED** | R5 Trae GUI / R6 runsc / R9 第三方 TSA/HSM 等 | `RETIRED` | 见 DELIVERY-v2 退役表；R6 system runsc 远端附录证据已采集，rootless runsc 为 LIMIT |
 
-## 当前实现快照
+---
 
-| 验收面 | 当前状态 | 边界 |
+## XA-Guard 主产品能力（支撑证据，非比赛 blocker）
+
+| 能力面 | 状态 | 边界 |
 |---|---|---|
-| L3 static-only (S1–S7) | 2026-06-20 实跑全 PASS：S1 双 500 implementation + formal 负测、S2 holdout 协议 8 测、S3 runner 9 测、S4 性能入口 7 测、S5 Trae 3/3、S6 compose+gVisor/OPA/deployment+17 测+OPA bundle、S7 修复后 123 测 | 静态 PASS 不等于最终验收 PASS；BUG-R9 修复现已进入 `6cf1ce9` |
-| 当前全仓测试/覆盖率 | 2026-07-01：新增全链路压力测试 23 passed；新增业务 API adapter 单测/集成 11 passed；Gate/治理/审计/配置/策略资产回归通过；已构建本机 `xa-guard/sandbox:latest`，sandbox runner 真实执行通过；`PYTHONPATH=src;.` 下全仓 `pytest -q` PASS，当前无 skip 摘要；ruff PASS。最近记录覆盖率仍为 79% | 本轮未重新生成 coverage；真实业务 API 使用本地 fake server 验证，尚未接生产 endpoint；Docker 镜像存在于本机 Docker Desktop 存储，不属于仓库内容 |
-| Agent Governance v1 | 已合入 main 工作树：本地 registry、运行时 preflight、MCP `_xa_guard` envelope、审计扩展字段、`frontend/governance.html` 控制台和工资条越权/HR 审批样例；包含 fail-closed allow-list、跨主体访问限制、token 摘要审计、前端 HTML 转义和默认 tenant 一致性修复；合并后目标测试与相关回归通过 | 默认关闭；v1 是私有化演示控制面，不是 SaaS；成本为估算归属，不是供应商账单；尚未接真实企业 SSO/IAM、真实 Trae GUI 或多 Agent 编排治理 |
-| 真实业务 API adapter | 新增 `demo.targets.business_api_target` stdio MCP adapter，固定暴露 `business_get_status`、`business_query_record`、`business_submit_ticket`；仓库内 `.env.example`、`.gitignore` 忽略真实 `.env`、`configs/xa-guard.business-api.yaml`、Gate3/Gate4 策略和企业 registry 授权路径已具备；API key 不进入工具参数、pending ledger 或 Gate6 audit | 本轮只用本地 fake HTTP server 做成功/401/429/5xx/timeout/非 JSON/脱敏和 pipeline 集成验证；不写系统环境变量，不写用户目录配置，不代表真实业务 API 已上线 |
-| 双 500 语料 (R1) | implementation profile 500+500、1000 唯一 payload、17 类各≥29 已实测验过；formal 正确非零退出 | formal 所需独立 attestation/taxonomy/semantic-group 复核 BLOCKED，不能作为正式双 500 |
-| Decision faithfulness (R9c) | 本轮 25 条真实签名审计独立重算 100% 一致；直接函数验证非固定 1.0（不一致 deny→0.45） | 真实 agent trace 的大规模独立重放未完成 |
-| LangChain / LangGraph | wrapper、callback/observer、HITL resume、node/tool 等适配已实现 | 固定真实版本及真实 agent/transport 端到端验收未完成 |
-| Trae (R5) | 配置模板、接入文档和 allow/deny/taint/pending 四案例静态资产 S5 PASS | 真实 Trae GUI 工具发现/调用/HITL/日志/截图 BLOCKED（按用户指示跳过 GUI） |
-| gVisor (R6) | 静态 runsc/禁网/只读根/非 root/cap_drop/no-new-priv/资源限制 S6 验过；**Docker build/up + healthz 真实 PASS（6/6 steps，容器 live healthy，镜像 xa-guard:latest+sandbox:latest 构建成功）** | 真实 Linux/runsc 隔离 BLOCKED：Windows Docker Desktop 无 runsc runtime（runtimes=[runc,containerd,nvidia]），需 Linux 主机 |
-| OPA (R7) | 2026-07-05 本机完整功能验收 PASS：本地 OPA 1.17.0 与 Python backend 对 32 条 Gate3 baseline 规则的 64 个正/负 fixtures 100% 一致；strict OPA 对缺 executable、timeout、非法响应和 bundle SHA drift 均 fail-closed 且无下游执行；OPA Compose profile 使用 `openpolicyagent/opa:1.4.2-static` 构建并健康启动，容器内 OPA 1.4.2 可执行；证据 `/mnt/d/evidence/l3-r7-20260706T055152Z/`；2026-07-08 R7 脚本新增可选 OPA image inspect / Trivy report hash provenance 字段 | 默认 OPA 镜像 digest 已固定并用 Trivy 扫描，但发现 2 Critical / 26 High / 36 Medium / 3 Low / 1 Unknown；生产交付前需换 approved digest 或给出正式风险接受，不能宣称镜像扫描“无发现”；本轮未重跑远端 R6/runsc |
-| AIBOM (R2/R8) | 内部扫描/评级/签名/漂移/离线 preflight S7 测过；真实 opencode install_plugin smoke PASS（AIBOM F deny）；**R8 已实跑（2026-07-07）：`@cyclonedx/cdxgen@12.7.0` 真实生成 CycloneDX 1.6 产物，`load_external_cyclonedx` 导入 `import: PASS`（SHA-256 绑定 + schema 校验），覆盖 MCP SDK AI-BOM 语义；`xa-aibom validate/admit` 正向、schema-valid 篡改、错误 hash、缺字段、高风险 artifact deny 均实跑；2026-07-08 新增 `run_l3_r8_aibom_acceptance.py` 并实跑 `D:/xa-evidence/runs/l3-r8-aibom-20260708T075534Z-local/`，复核外部 BOM 导入、CLI 正负测和离线 `install_plugin` clean allow / malicious deny 准入链，`status=pass`** | marketplace/IDE native 安装链、完整 AI-BOM 全字段覆盖仍 BLOCKED；外部产物、CLI 准入和离线 install_plugin 准入链已实跑，仍不宣称商店/IDE hook |
-| 审计与国密 (R9) | 本轮真实 SM2-with-SM3 签验 25 条 0 错误 + 篡改检出；本地 TSA anchor（**含 SM2-TSA-token 路径，BUG-R9 修复后 PASS**）验过；faithfulness 重算 PASS；2026-07-08 新增 Gate6 `signature_mode=external` 与 `verify_audit.py --require-signature external`，用于接合法 HSM/KMS SDK wrapper；新增 `run_l3_r9_audit_acceptance.py` 并实跑 `D:/xa-evidence/runs/l3-r9-audit-20260708T075534Z-local/`，本地 SM3/SM2/TSA/anchor/faithfulness/篡改负测通过，`status=limit` | 第三方 TSA/HSM 仍 BLOCKED：当前未配置 `XA_GUARD_EXTERNAL_TSA_URL` / `XA_GUARD_EXTERNAL_SIGN_CMD` / `XA_GUARD_EXTERNAL_VERIFY_CMD` / `XA_GUARD_EXTERNAL_KEY_ID`；本地 file TSA + 软件 SM2 key 仅为 demo/CI |
-| 外部 benchmark (R2/R3) | 完整矩阵 CLI 保持兼容；`subscription_budget60_v1` 已实现确定性 manifest、四桶 ledger、调用前熔断、全局未完成题续考、完成题跳过、AgentDojo 内部 task cache 复用、R2/R3 turn retry 的 retry 分桶、provider 配额暂停、跨 resume 失败上限、运行前 commit/clean/权限 hash 复核及 sampled Wilson 聚合；profile/claim scope 也与冻结配置一致。默认每批 8 jobs、单题最多 2 次基础设施尝试。目标回归 32 项与 ruff 已通过。2026-06-22 历史 `$10` 运行仍只有 7/32 calibration jobs complete，不进入新正式指标。2026-07-09 新增 `tools/remote-runner/` 远程无人值守运行系统（门控/状态机/熔断/watchdog/systemd/断电续跑，离线单测 12 passed）与 `tools/evidence/` 规范契约脚本 | 新 `$60` 正式校准和 sampled 结果仍 NOT RUN；远程运行系统未实机部署冒烟。AgentDojo suite/arm 批量运行和官方 utility trace 批量复用仍未实现；OpenCode 内部工具禁用仍依赖 `--pure`、隔离目录及已冻结权限配置，尚无经真实 CLI 验证的更细粒度硬开关；`$0.20` 是调用前保守预留，不是 provider 单次响应的可证明上限。旧结果不得写入正式分母 |
-| 性能 (R4) | 2026-07-05 复跑：进程内 500 P50 4.362ms/P95 36.042ms/QPS 262.301/RSS 62.172MB；HTTP 10×500 P95 185.518ms/QPS 69.876/RSS 102.867MB、500/500 审计 marker 匹配、active sessions=0，全达标；证据 `docs/evidence/l3-r4-20260705-current/` | 20 会话容量 LIMIT（最新 P95 483.732ms > 300ms，未声明支持）；多 worker/TLS/多机 soak 未跑 |
-| 研究与答辩资料 | `docs/research/force-ai-security-2026/` 已整理 FORCE 原动力大会企业 AI / 智能体安全现场照片，形成逐页笔记、风险图谱、治理架构、数据/控制流安全、XA-Guard 映射和落地清单；可用于后续 D1 技术方案、答辩 PPT 和产品叙事补强 | 来源为现场照片和用户口述印象，未做外部事实核验；其中外部事件、金额、法律案例、厂商能力不得直接作为正式引用；尚未转化为代码实现或验收证据 |
-| 文档执行入口 | `docs/README.md` 已成为唯一文档入口；`docs/workplan/NEXT-WORK-DESIGN.md` 汇总下一步工作设计；`docs/workplan/TODO.md` 保留详细 TODO；`docs/delivery/` 已有 D1 草稿、D3 视频脚本和提交清单骨架 | 本次仅重构文档结构、修链接和补工作设计，不新增代码能力、测试结果、付费评测或正式提交材料 |
-| OpenCode 项目配置 | 仓库内新增 `.opencode/opencode.json`，项目默认模型为 `openai/gpt-5.5`，内置 build/plan/general/explore agent 均设置 `options.reasoningEffort: xhigh` | 配置需重启 OpenCode 后生效；未改全局用户配置，不改变 XA-Guard 运行时或验收状态 |
-| Enterprise Agent Range | 独立靶场已具备 P1 replay 基线（242 cases / 66 mock tools / HTML+compare 报告）、P2 本地能力子包、office/mail arena live 竖切和 guard/null 2x2 smoke；Arena Core 第一层已拆出 `WorldSpec` / `ChallengeSuite` / `ToolSurface` / `PolicyOverlay` / `EvidenceStore` / OpenCode agent seat / XA-Guard SUT adapter / redteam `Finding`；`arena/live.py` 已接入 EvidenceStore；CLI 已新增最小红队台 `arena worlds|surfaces|challenges|init-finding|promote|show|run-ab`；docs 已收束为 `docs/README.md`、`docs/plan/`、`docs/architecture/`、`docs/redteam/`、`docs/reference/` | 仍严格作为独立工作区，不导入 `src/xa_guard`、不复用 XA-Guard bench/schema/helper，不改变 L3 验收结论；live 仍是 N=1 smoke，本轮未跑真实模型；attempt/report -> regression promotion、live N 次统计、完整报告层和更多企业域尚未实现；未接真实生产 API/HSM/TSA/公网目标 |
-| Open Agent Range | 独立开放红队靶场新目录，PRD 已冻结；SP2+ 已有 `kernel/scheduler.py`、`scheduled_events`、`scenarios/dctg/full-day.json`、六域正常日、业务时钟、approval/ticket/ci/notification/audit 队列、审批通过/超时、CI retry、同 tick 并发批次和多 seat tick 轮转交错；full-day 关键业务副作用已大幅迁出 scheduled tape，关键动作由 seat ToolSurface 调用落账；F3 报销审批支付、F10 合同处理、F11 Atlas 跨部门依赖和 F13/F14 治理审计链均已形成 seat/SUT/ToolSurface 链路；新增 `ReactiveSeat` 本地 observe-plan-act 入口，`range day --agent reactive` 会通过 `act -> on_tool_result -> follow-up` 分步跑 full-day 并写 `agent-transcript.jsonl` / `seat-events.jsonl`；`XaGuardSUT(live=True)` 已从 per-call smoke 升级为 attempt 级真实 `xa_guard.server` stdio MCP session，并写 `sut-session.json`；真实 `run-ab --sut-mode null,xaguard --live --repeat 3` 已通过，null 侧 3/3 泄漏 `cit-1001`，xaguard live 侧 3/3 拦截，无 infra error，`protection_delta=1.0`；Guard/XA-Guard 类 SUT 会将 `tool_attempt` / `sut_decision` 写入 hash ledger；`Ledger.replay()` 已有 `ledger_projection_v1` 并可复原 full-day 关键终态；`range day/replay/report/sut check/workbench serve` 已有产品命令入口，`replay --verify-sut-audit` 已支持 tool-events / range audit / ledger attempt-decision / raw XA-Guard audit 逐序对齐；`workbench serve` 现在生成交互式红队控制台，可浏览器内选择 seat/tool、构造多步 ToolCall、通过开放注入面按钮填充 target、创建/编辑/保存/review/promote finding、执行 A/B、读取 summary、扫描 A/B run catalog、按 run_index 做 Null vs Protected 对照并展开 timeline/tool-events/audit/ledger/violations/raw-XA-Guard 明细；SP3 多角度注入可消费，plugin/mcp/supply/aibom/policy/sandbox 均有最小 consequence；2026-07-09 本地复核：`python -m pytest kernel/tests -q` 通过（collect-only 121 tests），`full-day` demo 通过，`range_cli day --agent reactive --sut null` 生成 41 次工具尝试/43 条 ledger/零违规 evidence，`range_cli replay --verify-hashes --verify-ledger --verify-sut-audit --json` 通过，`workbench serve --no-server` 生成 `index.html` 与 `workbench-state.json`；红队枚举场景/开放面实际入口为 `python -m kernel.workbench worlds` 与 `python -m kernel.workbench surfaces --world ...`，产品级控制台入口为 `python -m kernel.range_cli workbench serve ...` | 仍是独立靶场工作区，不进入 XA-Guard 主产品 L3 结论；当前可描述为基本红队可用的开放靶场竖切，而非完整工业级沙盘。ReactiveSeat 仍是 deterministic 状态机，不是真正 full-day live/OpenCode 任意长度自主 agent；F15 仍是最小安全外发/内部通知落点；Workbench 仍缺真正地图画布、多注入编排、权限化后台和完整 dashboard；动态/真实下游 replay payload、principal/data_ref/side-effect 级深对齐、insider/真实供应链/真实 MCP consequence、真实策略/沙箱执行器仍需深化；不使用真实数据/凭据/公网目标 |
+| 六关卡 pipeline（Gate1–6） | `DONE` | L3 静态 S1–S7 历史 PASS；MCP e2e、压力测试已覆盖 |
+| Agent Governance v1 | `DONE` | 默认关闭；本地治理预检，非生产 IAM |
+| 审计链 SM3/SM2/TSA/faithfulness | `DONE` | 本地 TSA/软件 key；第三方 TSA 为 Tier C/RETIRED |
+| Docker Compose + healthz | `DONE` | R6 Docker 部署 PASS；远端 system Docker + gVisor runsc PASS 已回传并锚定，rootless runsc LIMIT；gVisor runsc 全验收不作比赛硬承诺 |
+| OPA Gate3 parity | `DONE` | 64 fixtures 一致；默认镜像有 CVE 发现 |
+| AIBOM + 外部 cdxgen | `DONE` | marketplace/IDE hook RETIRED |
+| CSAB-Gov-mini / bench 工具 | `DONE` | 290 seed；非国标完整 500+ 语料 |
+| R4 性能 | `DONE` | 10 会话达标；20 会话 LIMIT |
+| 全仓测试 | `PARTIAL` | 历史记录全绿；sandbox 镜像本机可能 skip |
 
-## 本轮性能证据（2026-07-05 复跑）
+---
 
-- 证据目录：`docs/evidence/l3-r4-20260705-current/`，含 `README.md` 与 `artifact-hashes.json`。
-- 进程内六 Gate 500 请求/并发 10：P50 `4.362 ms`、P95 `36.042 ms`、`262.301 QPS`、峰值 RSS `62.172 MB`、530 审计验链通过，四项 PRD 中等档全达标。
-- 单进程 Streamable HTTP 10 sessions/500 请求：P95 `185.518 ms`、`69.876 QPS`、峰值 RSS `102.867 MB`、500/500 调用成功、500/500 审计 marker 匹配、关闭后 active=0，全达标。
-- 20 sessions/500 请求容量测试：20 会话全部建立/回收、无串话/无审计丢失/验链通过，但 P95 `483.732 ms` > 300ms 门槛，如实记录为容量 LIMIT，未声明 20 会话支持。
-- 范围：单进程、规则模式、in-process pipeline + Gate6 落盘 / 单 uvicorn worker + 共享 stdio 下游、allow-only；不含 MCP stdio/HTTP 传输、真实模型推理、真实工具耗时、容器网络、多机 soak。
+## Open Agent Range（主评测叙事）
 
-## 未完成的正式验收（BLOCKED 清单）
+独立目录 [open-agent-range/](open-agent-range/)：PRD 冻结；SP2+ full-day 六域竖切；ReactiveSeat；attempt 级真实 `xa_guard.server` live session；canonical N=3 中 Null 3/3 泄漏、XA-Guard 3/3 拦截、0 infra error、`protection_delta=1.0`；7/7 attempt replay 通过，XA-Guard 侧 ledger 与 raw audit 逐序对齐；workbench HTTP 可 manual-session / A/B / evidence review。
 
-1. R1 双 500 formal 独立复核 + Gate1 独立 holdout 数据/阈值锁定/Recall/FPR 正式结论 — 需独立评测方。
-2. R5 真实 Trae 四案例 + 截图/录像 — 需真实 Trae GUI（按用户指示本轮跳过）。
-3. R6 真实 Linux/gVisor runsc 隔离/故障/性能 — Docker build/up + healthz 已 PASS，但 runsc 需 Linux 主机安装（Windows Docker Desktop 无 runsc runtime）。
-4. R2/R3 `subscription_budget60_v1` — 离线工具已完成续考与预算安全纠偏；旧首批真实 calibration 因 `$2/$1` 分桶耗尽停在 `$2.94602940`，7/32 complete，冻结失败且不得混入新正式分母。新预算分桶 `$6/$32/$16/$6`，默认 8 jobs/批、失败题 2 次封顶。2026-07-09 已新增远程无人值守运行系统 `tools/remote-runner/`（时钟/网络门控、phase 状态机、三处人工花钱门、四路熔断、watchdog+systemd 开机自启、断电安全落盘、Windows 侧轮询报警）与部署引导，离线单测 12 passed；但服务器实机部署、冒烟与新的付费校准/sampled 结果仍 NOT RUN。2,986-job `research_full_matrix` 为 `DEFERRED_OPTIONAL`。
-5. R8 合法外部 AIBOM 生成器 + 真实 CycloneDX 1.6 产物 — **外部产物、CLI 准入正负测和离线 `install_plugin` 准入链已完成**：`@cyclonedx/cdxgen@12.7.0` 真实生成 CycloneDX 1.6，`load_external_cyclonedx` 导入 `import: PASS`（SHA-256 绑定 + schema 校验，覆盖 MCP SDK AI-BOM 语义）；`xa-aibom validate/admit` 已覆盖正向、schema-valid 篡改 hash fail、缺字段 fail、artifact hash mismatch deny、高风险 artifact deny；2026-07-08 新脚本证据 `D:/xa-evidence/runs/l3-r8-aibom-20260708T075534Z-local/` 为 `status=pass`。仍 BLOCKED：真实 marketplace/IDE native 安装 hook 与完整 AI-BOM 全字段覆盖。
-6. R9 第三方 TSA + 真实 HSM/合法 SDK + 故障负测 + faithfulness 大规模独立重放 — 本轮已具备 external signer bridge，可把 Gate6 payload 交给合法 HSM/KMS SDK wrapper 签名并用 `verify_audit.py --require-signature external` 复核；本地 R9 acceptance `D:/xa-evidence/runs/l3-r9-audit-20260708T075534Z-local/` 为 `status=limit`。仍需生产 key/HSM provider 与第三方 TSA（本地 file TSA + 软件 SM2 key 仅为 demo/CI；BUG-R9 已修复，SM2-TSA-token anchor round-trip PASS）。
-7. 最终 PDF、视频、表单、截图、原始证据、artifact hash manifest 与外部存证/签名的收束和验收。provenance 口径已有规范（`docs/acceptance/remote-evidence/EVIDENCE-LAYOUT-SPEC.md`）且其 §6 契约脚本已于 2026-07-09 在 `tools/evidence/` 落地（new-run/seal-run/verify-run/collect：run 目录七件套、确定性封包、git 锚定 manifest 校验，本机冒烟通过），但 `provenance-manifest.jsonl`/`PROVENANCE.md` 仍为空——尚无任何真实远端 run 走完 封存→采集→提交 manifest 的闭环。
+**边界**：非完整工业级在线沙盘；ReactiveSeat 为确定性状态机；F15 等为最小落点。细节见 [open-agent-range/status.md](open-agent-range/status.md)。
 
-## 距离赛题目标
+Auto-RedTeam 持续运行维护层已在当前工作树实现并通过 6 项离线测试，具备进程/进度健康检查、异常恢复、退避熔断、持久 stop/resume 与状态落盘，且维护心跳不会冒充业务进度；但完整 Conductor 源码仍只在未合并的 `feat/cursor-auto-redteam`，因此当前 `main` 尚不能宣称端到端持续自动红队可运行。
 
-核心安全链路、L3 静态资产和验证入口已具备。R2/R3 的 `subscription_budget60_v1` 离线工程能力现已完成，但新的正式校准和 sampled 结果尚未产生，因此比赛证据仍待完成；2,986-job 全矩阵继续为可选研究扩展。当前仍 BLOCKED：R1 独立双 500/holdout、R2/R3 真实预算型评测、R5 真实 Trae、R6 Linux/runsc、R8 marketplace/IDE native 安装链（外部 CycloneDX 1.6 产物导入、CLI 准入和离线 install_plugin 准入链已实跑 PASS）、R9 第三方 TSA/HSM provider 实证，以及最终交付物。R7 OPA 功能验收已完成，但默认 OPA 镜像扫描存在漏洞发现，生产交付前还需 approved digest 或风险接受。仓库状态保持：**L3 静态实现验收通过 + 部分真实验收通过；L3 最终验收 BLOCKED**。
+**enterprise-agent-range/** 为早期独立设计区，能力已主要由 OAR 承接；不作为主叙事。
 
+---
+
+## 剩余真实差距（非退役项）
+
+1. **D1**：30 页 PDF 成稿（OAR A/B + 六关 demo 为主实验）。
+2. **D3**：≤10 分钟视频（拦截、审批/阻断、审计、OAR 镜头）。
+3. **D4**：报名系统审核通过证据（人工）。
+4. **D2 release**：clean worktree、final commit/hash manifest、与 D1 命令一致。
+
+可选 Tier C：R2/R3 背景跑数、Trae 截图——不阻塞提交。
+
+---
+
+## 距离赛题官方要求
+
+按 [事实源 §1.8](docs/source-of-truth/事实源.md)：四件必交材料中 **D2 主体已具备**，**D1/D3/D4 未完成**；可选补充（评测脚本、攻击样例、审计样例）可从 OAR evidence 与 `verify_audit` 组装。
+
+评分维度上：**实际效果** 靠 OAR A/B + 六关 live demo；**技术创新** 靠 Agent Gateway + 六关 + 国密审计 + OAR 靶场；**方案完整性** 靠四方向映射与 DELIVERY-v2 诚实验边界；**展示表达** 靠 D3。
+
+---
+
+## 文档入口
+
+- 交付口径：[docs/acceptance/DELIVERY-v2.md](docs/acceptance/DELIVERY-v2.md)
+- 证据总表：[docs/acceptance/EVIDENCE-CONSOLIDATION.md](docs/acceptance/EVIDENCE-CONSOLIDATION.md)
+- 执行 TODO：[docs/workplan/TODO.md](docs/workplan/TODO.md)
+- 文档导航：[docs/README.md](docs/README.md)

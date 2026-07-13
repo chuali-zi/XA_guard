@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xa-guard/open-agent-range/auto-redteam/finding-report.schema.json",
+  "title": "Auto-RedTeam Finding Report",
+  "description": "云端 agent 每次攻击产出的结构化 finding 报告，与 OAR 七件套证据配套。",
+  "type": "object",
+  "required": ["objective_id", "attack_category", "surface", "world", "payload_ref", "ab", "evidence", "verdict"],
+  "properties": {
+    "objective_id": {"type": "string"},
+    "attack_category": {"type": "integer", "minimum": 1, "maximum": 7},
+    "surface": {"type": "string", "description": "OAR 开放面，如 mailbox/rag/log/ticket/inter-seat/..."},
+    "world": {"type": "string", "description": "OAR dctg 场景名"},
+    "target": {"type": "string", "description": "目标席位/数据资产"},
+    "task_prompt": {"type": "string", "description": "掩护用的正常用户任务"},
+    "expected_risk": {"enum": ["sensitive-egress", "privilege-escalation", "unattributable-harm"]},
+    "payload_ref": {"type": "string", "description": "scenarios/injections/*.json 相对路径"},
+    "refine_round": {"type": "integer", "minimum": 0},
+    "refine_strategy": {"type": "string"},
+    "ab": {
+      "type": "object",
+      "required": ["asr_null", "asr_guard"],
+      "properties": {
+        "asr_null": {"type": ["number", "null"]},
+        "asr_guard": {"type": ["number", "null"]},
+        "protection_delta": {"type": ["number", "null"]},
+        "null_violations": {"type": "integer"},
+        "guard_violations": {"type": "integer"},
+        "leaked_data_refs": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "verdict": {
+      "type": "object",
+      "required": ["result_label"],
+      "properties": {
+        "result_label": {"enum": ["PASS", "BLOCKED", "LIMIT", "INFRA_ERROR"]},
+        "breach_null": {"type": "boolean"},
+        "breach_protected": {"type": "boolean"},
+        "fingerprint": {"type": "string"}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "description": "七件套证据文件的相对路径",
+      "properties": {
+        "run_dir": {"type": "string"},
+        "summary": {"type": "string"},
+        "ledger_replay": {"type": "string"},
+        "accountability_report": {"type": "string"},
+        "artifact_hashes": {"type": "string"}
+      }
+    },
+    "repro_commands": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

@@ -17,7 +17,8 @@
 | [03_supply_chain](./03_supply_chain) | 第三方组件可信审计（AIBOM / 开源工具 / 真实事件） | 2 | 11 | ✓ |
 | [04_eval_audit](./04_eval_audit) | 评测审计（评测基准 / 运行追溯 / CoT 忠实度） | 13 | 18 | ✓ |
 | [05_standards](./05_standards) | 合规标准（中国 / 国际） | 0 | 14 | ✓ |
-| **总计** | | **55** | **86** | **5** |
+| [06_agent_redteam](./06_agent_redteam) | 智能体红队攻击方法学（攻击面分类 / 自适应攻击 / 自动化评估） | 0 | 8 | ✓ |
+| **总计** | | **55** | **94** | **6** |
 
 > 注：方向 5 的合规文档基本无公开 PDF（需到官方网站访问），故只有 md 介绍。
 > 方向 3 的开源工具类不下载 PDF，故 md 多于 PDF。
@@ -97,6 +98,17 @@
 - **合规对齐**：[AIR-Bench](./04_eval_audit/4.1_benchmarks/2024-AIR-Bench.md), [ASB](./04_eval_audit/4.1_benchmarks/2024-ASB.md)
 - **间接注入**：[InjecAgent](./01_input_attack/1.4_indirect_injection/2024-InjecAgent.md)
 - **政企用例设计参考**：[05_standards](./05_standards) 全部
+
+### 我要做自动红队（Cursor 全自动攻坚工作流）
+- **攻击面骨架**：[2026-AttackSurfaceSurvey](./06_agent_redteam/2026-AttackSurfaceSurvey.md)（7 类分类 + principal trust inversion 根因）
+- **自适应闭环**：[2025-AdaptiveAttacks](./06_agent_redteam/2025-AdaptiveAttacks.md)（未破→变形→重跑的理论依据）
+- **目标选择/novelty**：[2026-PISmith](./06_agent_redteam/2026-PISmith.md)（RL 红队思想）
+- **具体 payload 变体**：[2025-ChatInject](./06_agent_redteam/2025-ChatInject.md)（chat-template 滥用）
+- **自动化评估方法论**：[2025-AutoInjectAgentic](./06_agent_redteam/2025-AutoInjectAgentic.md)
+- **多席位/委派攻击**：[2025-MultiAgentSecurity](./06_agent_redteam/2025-MultiAgentSecurity.md)
+- **强防御参照**：[2025-MetaSecAlign](./06_agent_redteam/2025-MetaSecAlign.md)
+- **落地代码**：[open-agent-range/auto-redteam/](../../../open-agent-range/auto-redteam/)
+- **必读**：[06_agent_redteam/README.md](./06_agent_redteam/README.md)
 
 ### 我要做 AIBOM 准入网关（加分项）
 - **学术框架**：[Agentic-AIBOM](./03_supply_chain/2026-Agentic-AIBOM.md), [AIRS-Framework](./03_supply_chain/2025-AIRS-Framework.md)

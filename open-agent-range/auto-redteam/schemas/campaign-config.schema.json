@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xa-guard/open-agent-range/auto-redteam/campaign-config.schema.json",
+  "title": "Auto-RedTeam Campaign Config",
+  "type": "object",
+  "required": ["engine", "repo_url", "starting_ref", "budget_usd"],
+  "properties": {
+    "engine": {"enum": ["local", "cli", "cloud"]},
+    "engines": {
+      "type": "array",
+      "items": {"enum": ["cursor_cli", "opencode", "codex"]},
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "repo_url": {"type": "string", "format": "uri"},
+    "starting_ref": {"type": "string", "description": "隔离分支；不得为 main/master"},
+    "model_id": {"type": ["string", "null"]},
+    "cursor_executable": {"type": "string"},
+    "cursor_model_id": {"type": ["string", "null"]},
+    "opencode_executable": {"type": "string"},
+    "opencode_model_id": {"type": "string"},
+    "opencode_variant": {"type": "string"},
+    "codex_executable": {"type": "string"},
+    "codex_model_id": {"type": "string"},
+    "codex_reasoning_effort": {"type": "string"},
+    "budget_usd": {"type": "number", "exclusiveMinimum": 0},
+    "per_objective_usd": {"type": "number", "exclusiveMinimum": 0},
+    "max_refines_per_objective": {"type": "integer", "minimum": 0},
+    "run_timeout_s": {"type": "integer", "minimum": 1},
+    "max_agents": {"type": "integer", "minimum": 1},
+    "max_active_agents": {"const": 1},
+    "max_runs": {"type": "integer", "minimum": 1},
+    "breaker_max_errors": {"type": "integer", "minimum": 1},
+    "usd_per_1k_tokens": {"type": "number", "minimum": 0},
+    "objective_categories": {
+      "type": "array",
+      "items": {"type": "integer", "minimum": 1, "maximum": 7},
+      "uniqueItems": true
+    },
+    "evidence_root": {"type": "string"},
+    "provenance_manifest": {"type": "string"},
+    "mission_root": {"type": "string"},
+    "novelty_registry": {"type": "string"},
+    "proposal_similarity_threshold": {"type": "number", "minimum": 0, "maximum": 1},
+    "seed_prior_art": {"type": "boolean"},
+    "local_sut_mode": {"type": "string"},
+    "local_runs": {"type": "integer", "minimum": 1},
+    "live": {"type": "boolean"},
+    "continuous": {"type": "boolean"}
+  },
+  "not": {"properties": {"starting_ref": {"enum": ["main", "master"]}}},
+  "additionalProperties": true
+}

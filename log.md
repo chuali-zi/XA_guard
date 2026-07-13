@@ -1,3 +1,44 @@
+# 2026-07-12 Open Agent Range Auto-RedTeam 持续运行维护层
+
+- 新增 `open-agent-range/auto-redteam/maintain.py`，作为 Conductor 外层跨平台前台 supervisor：进程和状态进度监控、异常退出/卡死恢复、指数退避、重启熔断、正常完成不重启、原子健康状态、持久 stop/resume、单实例锁与日志轮转。
+- 新增维护说明、模块工作日志和 6 个纯离线测试，覆盖维护心跳不冒充 Conductor 进度。验证结果为 pytest 6 passed，Ruff、`py_compile`、`git diff --check` 通过；未启动真实 agent、未联网、未产生费用、未修改既有测试代码。
+- 客观边界：当前 `main` 不含完整 Auto-RedTeam Conductor 源码，完整实现仍位于未合并分支 `feat/cursor-auto-redteam`。维护层当前可独立验证，但端到端持续红队仍需先审查/整合该分支，再做 crash/hang/预算/stop 故障注入和外层服务部署。
+
+# 2026-07-11 全部证据收敛、canonical OAR 封存与交付收尾
+
+- 全量盘点仓内 `docs/evidence`、acceptance evidence、OAR `.runtime`、Enterprise reports，以及本地 `D:/xa-evidence`、legacy `D:/evidence` 和已回传 `ubuntu-test`。新增 `docs/acceptance/EVIDENCE-CONSOLIDATION.md`、`docs/evidence/EVIDENCE-INDEX.json` 与证据入口 README，按 canonical/current/supporting/legacy/private 分类。
+- 发现旧文档宣称 OAR N=3，但当前可见 `redteam-docs-smoke` 仅 N=1。新建 `.runtime/delivery-v2-canonical-20260711T123009Z/` 实跑：full-day 41 tool attempts、43 ledger、0 violations；live N=3 中 Null 3/3 泄漏、XA-Guard 3/3 拦截、0 infra error、`protection_delta=1.0`。7/7 attempt replay 均通过，XA-Guard 三侧 raw audit 逐序对齐。
+- 将 120 个 OAR 原始文件汇聚到标准 run `oar-delivery-v2-20260711T123124Z-win-local`，封存 127 files / 451499 bytes；tarball 78889 bytes，SHA-256 `cffa89fb2ded79cb17685348bfb6571d85c3c233ad963528ca79b89e2ec49aa5`。run 119-file manifest 与 tarball provenance 均验证通过，B5 改为 DONE。
+- 横向校验：R4 8/8、R7 20/20、R8 7/7、R9 10/10 artifact hashes；R9 3 条 SM3 chain、SM2 signatures、anchor 通过；R6 两个 sealed tarball 与 provenance 通过。R8 原仓内副本受 Git EOL 转换影响导致 5 个文本 hash mismatch，现将该证据目录设为 `-text` 并恢复原始绑定字节，复验 7/7。
+- 当前代码验证：Ruff PASS；pytest 667 collected，666 passed、1 skipped（本机缺 `xa-guard/sandbox:latest`）；L3 static verifier 11/11 sections PASS。未修改测试代码。
+- 已同步 DELIVERY-v2、status、TODO、D1 草稿、D3 脚本、submission checklist、docs 导航、OAR status/log 和 remote-evidence 台账。仍未完成：D1 PDF、D2 clean release freeze、D3 视频、D4 报名人工材料；本轮未 commit/push，provenance 需提交推送后才成为远端 git 信任锚。
+
+# 2026-07-11 远端 xa-evidence 回传与 provenance 锚定
+
+- 按用户要求连接远端 `ubuntu-test`（100.126.230.111），确认实际证据根为 `/home/ubuntu/xa-evidence`，不是下划线目录；本地规范位置按 `docs/acceptance/remote-evidence/EVIDENCE-LAYOUT-SPEC.md` 落到 `D:/xa-evidence/remote/ubuntu-test/`。
+- 已回传完整远端证据镜像：13 个目录、158 个文件、782683 bytes；端到端 SHA-256 校验显示本地/远端 158 个文件 0 缺失、0 额外、0 hash mismatch。
+- 已把两个 sealed run 写入 git 信任锚：`l3-r6-runsc-20260708T081901Z-ubuntu-test` 为 R6 system Docker + runsc PASS；`l3-r6-rootless-runsc-20260708T081932Z-ubuntu-test` 为 rootless + runsc LIMIT。同步更新 `docs/acceptance/remote-evidence/PROVENANCE.md` 与 `provenance-manifest.jsonl`。
+- 为非交互密码 SFTP，在 `C:/Users/chual/AppData/Local/Temp/opencode/xa-paramiko-venv` 临时安装 `paramiko`；未加入项目依赖。未修改测试代码，未 commit/push。
+
+# 2026-07-11 Delivery v2 文档口径全面收敛
+
+- 按用户决策，用 **Delivery v2** 替代「L3 最终验收 BLOCKED」作为项目主叙事：官方 D1–D4 为 Tier A；产品可信度以 **Open Agent Range**（OAR）A/B + 六关 demo/audit 为 Tier B 主证据；R4/R7/R8 等为 Tier C 加分；大量原 L3 项明确 **RETIRED**（R1 holdout、subscription_budget60_v1 mandatory、2986 全矩阵、R9 第三方 TSA/HSM、R8 marketplace hooks、R6 runsc 全验收、R5 Trae native、GB/T 45654 完整语料、enterprise-agent-range 主叙事等）。
+- **新建** `docs/acceptance/DELIVERY-v2.md`：Tier A/B/C、退役表、状态图例、四方向映射、诚实边界、OAR 可复现命令块、交叉链接。
+- **全文替换** `status.md`：Delivery v2 为活跃口径；L3 文档标为工程参考；DONE/PARTIAL/TODO/RETIRED 分层；OAR 为主评测叙事；真实差距仅 D1/D3/D4 + B5 证据封存；不把退役项写为 BLOCKED。
+- **更新** `docs/README.md`、`docs/workplan/TODO.md`、`docs/delivery/D1-technical-report-draft.md`、`docs/acceptance/L3-test-and-acceptance.md`（弃用横幅）、根 `README.md`、`docs/delivery/submission-checklist.md`、`docs/research/force-ai-security-2026/06-action-checklist.md`。
+- **跟进消除冲突（同日晚）**：全文对齐 `docs/workplan/NEXT-WORK-DESIGN.md`；`docs/planning/PRD.md` 顶部声明 DELIVERY-v2 优先于 PRD KPI；`R2-R3矩阵自动验收使用说明.md` 与 `R2-R3完整矩阵预算分析.md` 加 Tier C/RETIRED 横幅。
+- **未完成**：D1 PDF、D3 视频、D4 报名证据、B5 canonical OAR 证据目录封存。
+- **未做**：未修改测试代码；未删除 L3-test-and-acceptance.md；未 commit。
+
+# 2026-07-11 L3 验收口径收敛：R1 退役
+
+- 按用户明确决策，将原 L3 R1“正式双 500 + Gate1 独立 holdout”移出 L3 验收范围。客观原因是该项依赖独立评测方、隐藏数据封存、独立 attestation 和阈值锁定，当前现实条件无法完成；同时比赛方案原文及 `docs/planning/PRD.md` 的 L3 定义未把它列为硬门槛。
+- 更新 `docs/acceptance/L3-test-and-acceptance.md`：删除 R1 真实验收条目，明确 R1 不参与 PASS/FAIL/BLOCKED 判定；为兼容既有脚本、证据目录和历史报告，保留 R2–R9 原编号，不做重编号。
+- 保留双 500 candidate、formal 防冒充负测和 Gate1 holdout 协议代码/文档，不删除实现；统一将其表述为非阻塞研究/回归资产，不再安排 formal 验收，不得宣称正式双 500 或 Recall/FPR 成绩。`docs/gates/gate1-holdout-protocol.md` 已增加退役状态提示。
+- 同步更新根 `README.md`、`docs/README.md`、D1 草稿、TODO、NEXT-WORK-DESIGN 和 `status.md`，从 L3 blocker、差距、下一步和最终判定中移除 R1，避免“已砍但仍写待完成”的文档冲突。
+- 当前完成：R1 文档口径已收敛，`git diff --check` 通过；未修改运行时代码或测试代码，未删除候选语料/工具，未执行测试（本轮仅文档变更）。
+- 当前未完成：L3 其余 R2–R9 的必要性和门槛尚未在本轮继续降级或重定义；L3 最终状态仍为 BLOCKED。下一步应逐项审查 R2–R9 是否属于 PRD L3 硬门槛、比赛 Must、加分项或研究扩展，再进一步收敛最终验收集合。
+
 # 2026-07-10 主分支工程规范检查与最小修补
 
 - GitHub Actions 首次运行的 Python 3.10/3.12 矩阵均在测试收集阶段失败：`agentdojo_opencode` 无条件导入未作为仓库依赖安装的外部 AgentDojo。将其合法 MIT 发布包 `agentdojo==0.1.35` 固定为 `bench` extra。干净环境继续验证发现完整 SM2 审计测试缺 `gmssl`，因此 CI 与 `requires.txt` 统一启用已有 `crypto` extra；不通过跳过或可选导入规避测试。待推送后观察 CI。
