@@ -1,5 +1,8 @@
 # auto-redteam 工作日志
 
+## 2026-07-12 · 持续运行修复与真实产出
+定位 CLI 参数、Codex Windows shim/JSONL/schema、失败误标 covered、熔断、变体恢复和陈旧锁问题并修复；补齐 CATEGORY_GRID 合法 surface allowlist。外层用 Codex gpt-5.6-sol，OAR OpenCodeSeat 保持 DeepSeek。27 项测试及 Ruff 通过，多类完整 run 诚实封存为 LIMIT；本轮 maintainer 已正常完成，未宣称仍在后台运行。
+
 ## 2026-07-10 · 本地三 CLI 串行后端
 将默认后端从 Cursor Cloud 改为 local proposal-only：Cursor Agent CLI / OpenCode / Codex 严格串行，新增 `engines.py`、`scope.py`、`novelty.py`、proposal schema/prompt 与安全契约。Conductor 统一执行 A/B 与证据封存。已通过离线测试和 compileall；未跑真实付费 campaign，Cursor `agent` 当前缺失。
 

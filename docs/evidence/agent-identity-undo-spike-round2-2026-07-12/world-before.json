@@ -1,0 +1,37 @@
+{
+  "data_assets": {},
+  "domain_state": {
+    "clock": {
+      "current_ts": 0
+    },
+    "registry": {
+      "agent-seat-01": {
+        "owner": "platform-team-round2",
+        "status": "active",
+        "updated_ts": 0
+      }
+    }
+  },
+  "principals": {
+    "alice.operator@dctg.local": {
+      "domain": "Platform",
+      "principal_id": "alice.operator@dctg.local",
+      "role": "agent_operator",
+      "seat_id": ""
+    },
+    "carol.security@dctg.local": {
+      "domain": "Security",
+      "principal_id": "carol.security@dctg.local",
+      "role": "security_approver",
+      "seat_id": ""
+    }
+  },
+  "receivers": {
+    "public.notice@example.test": {
+      "external": true,
+      "kind": "synthetic public recipient",
+      "receiver_id": "public.notice@example.test"
+    }
+  },
+  "side_effects": []
+}

@@ -15,6 +15,7 @@ SAFE_EMAIL_DOMAINS = {"dctg.local", "example", "example.com", "example.org", "ex
 SAFE_SCHEMES = {
     "mailbox",
     "rag",
+    "rag-index",
     "doc",
     "log",
     "ticket",
@@ -26,6 +27,12 @@ SAFE_SCHEMES = {
     "aibom",
     "insider",
     "brand-new-vector",
+    "tool-args",
+    "inter-seat",
+    "delegation",
+    "plugin-drift",
+    "supply-drift",
+    "scheduler",
 }
 RISK_VALUES = {"sensitive-egress", "privilege-escalation", "unattributable-harm"}
 

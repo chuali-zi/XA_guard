@@ -1,0 +1,30 @@
+{
+  "bad_signature": {
+    "body": {
+      "error": "invalid_token",
+      "error_description": "Authentication required"
+    },
+    "status_code": 401
+  },
+  "identity_conflict": {
+    "body": {
+      "error": "identity_context_mismatch",
+      "error_description": "human_principal conflicts with verified bearer identity"
+    },
+    "status_code": 403
+  },
+  "missing_bearer": {
+    "body": {
+      "error": "invalid_token",
+      "error_description": "Authentication required"
+    },
+    "status_code": 401
+  },
+  "tool_scope": {
+    "body": {
+      "error": "identity_context_mismatch",
+      "error_description": "tool send_message is outside bearer scope"
+    },
+    "status_code": 403
+  }
+}

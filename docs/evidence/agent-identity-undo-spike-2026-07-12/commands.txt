@@ -1,0 +1,2 @@
+$env:PYTHONPATH='src;open-agent-range;.'
+python open-agent-range/experiments/agent_identity_undo/vertical_slice.py --out docs/evidence/agent-identity-undo-spike-2026-07-12

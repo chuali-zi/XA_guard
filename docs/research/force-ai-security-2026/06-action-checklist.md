@@ -245,4 +245,4 @@ flowchart LR
 - 涉及外部事件、金额、组织报告、法律案例，正式报告引用前必须二次查证。
 - 不要把 PrivLLM、TEE、AICC、UndoAI 等写成当前仓库已实现能力；它们目前只能作为启发、路线或对标。
 - 不要把“多 Agent 编排治理”写成已完整实现；当前仓库更接近 Agent Gateway / 单 Agent 运行时管控原型。
-- 不要为了贴热点弱化现有验收边界；`status.md` 仍应如实写 L3 最终验收 BLOCKED。
+- 不要为了贴热点弱化现有验收边界；比赛交付口径以 [DELIVERY-v2](../../acceptance/DELIVERY-v2.md) 与 [status.md](../../../status.md) 为准，勿恢复「L3 最终 BLOCKED」主叙事。

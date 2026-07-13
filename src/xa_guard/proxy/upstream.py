@@ -32,11 +32,15 @@ from xa_guard.pipeline import Pipeline
 from xa_guard.proxy.downstream import DownstreamRouter
 from xa_guard.proxy.pending import PendingApprovalStore, arguments_are_redacted, redact_arguments
 from xa_guard.types import Decision, GateContext, GateResult, InputSource
+from xa_guard.identity import VerifiedIdentity, binding_error, identity_from_access_token
 
 log = logging.getLogger("xa_guard.proxy.upstream")
 
 _PENDING_LIST_TOOL = "xa_guard_list_pending_approvals"
 _PENDING_APPROVE_TOOL = "xa_guard_approve_pending"
+_EFFECT_LIST_TOOL = "xa_guard_list_effects"
+_UNDO_REQUEST_TOOL = "xa_guard_request_undo"
+_UNDO_APPROVE_TOOL = "xa_guard_approve_undo"
 _AIBOM_INSTALL_TOOL = "install_plugin"
 _GOVERNANCE_ENVELOPE_KEY = "_xa_guard"
 _CAPABILITY_SUMMARY_FIELDS = {
@@ -115,27 +119,35 @@ def _capability_token_summary(envelope: dict[str, Any]) -> dict[str, Any]:
     return summary
 
 
-def _ctx_with_governance(name: str, arguments: dict[str, Any], envelope: dict[str, Any]) -> GateContext:
+def _ctx_with_governance(
+    name: str,
+    arguments: dict[str, Any],
+    envelope: dict[str, Any],
+    verified_identity: VerifiedIdentity | None = None,
+) -> GateContext:
+    human = verified_identity.human_principal if verified_identity else str(
+        envelope.get("human_principal") or envelope.get("principal_id")
+        or envelope.get("principal") or envelope.get("employee_id") or ""
+    )
     return GateContext(
         tool_name=name,
         arguments=arguments,
         session_history=[],
         input_sources=[InputSource.USER],
-        tenant_id=str(envelope.get("tenant_id") or envelope.get("tenant") or ""),
-        human_principal=str(
-            envelope.get("human_principal")
-            or envelope.get("principal_id")
-            or envelope.get("principal")
-            or envelope.get("employee_id")
-            or ""
-        ),
-        agent_id=str(envelope.get("agent_id") or ""),
+        tenant_id=verified_identity.tenant_id if verified_identity else str(envelope.get("tenant_id") or envelope.get("tenant") or ""),
+        human_principal=human,
+        agent_id=verified_identity.agent_id if verified_identity else str(envelope.get("agent_id") or ""),
         data_domain=str(envelope.get("data_domain") or ""),
         resource_owner=str(envelope.get("resource_owner") or ""),
         task_id=str(envelope.get("task_id") or ""),
         cost_estimate_usd=_float_field(envelope, "cost_estimate_usd"),
         output_estimate=str(envelope.get("output_estimate") or ""),
         capability_token_summary=_capability_token_summary(envelope),
+        identity_verified=verified_identity is not None,
+        identity_issuer=verified_identity.issuer if verified_identity else "",
+        identity_kid=verified_identity.kid if verified_identity else "",
+        identity_jti_sha256=verified_identity.jti_sha256 if verified_identity else "",
+        identity_scopes=list(verified_identity.scopes) if verified_identity else [],
     )
 
 
@@ -225,6 +237,8 @@ def _build_app(
     downstream_router: DownstreamRouter,
     *,
     require_operator_token: bool = False,
+    stdio_identity: VerifiedIdentity | None = None,
+    resilience_manager: Any = None,
 ) -> Server:
     app: Server = Server("xa-guard")
     pending = PendingApprovalStore(ledger_path=_pending_ledger_path(pipeline))
@@ -251,8 +265,24 @@ def _build_app(
     @app.call_tool()
     async def _call_tool(name: str, arguments: dict[str, Any]) -> list[mtypes.TextContent]:
         arguments = arguments or {}
+        verified_identity = stdio_identity
+        identity_cfg = getattr(getattr(pipeline, "cfg", None), "identity", None)
+        if identity_cfg is not None and identity_cfg.enabled and stdio_identity is None:
+            from mcp.server.auth.middleware.auth_context import get_access_token
+            access_token = get_access_token()
+            if access_token is not None:
+                verified_identity = identity_from_access_token(access_token)
+        if verified_identity is not None:
+            raw_envelope = arguments.get(_GOVERNANCE_ENVELOPE_KEY)
+            envelope = raw_envelope if isinstance(raw_envelope, dict) else {}
+            identity_error = binding_error(verified_identity, name, envelope)
+            if identity_error:
+                log.warning("trusted identity binding denied in MCP handler: %s", identity_error)
+                return [mtypes.TextContent(type="text", text=f"⚠ XA-Guard identity binding rejected: {identity_error}")]
 
         async def _executor(c: GateContext) -> Any:
+            if resilience_manager is not None:
+                return await resilience_manager.execute(c, downstream_router.call_tool)
             return await downstream_router.call_tool(c)
 
         if name == _PENDING_LIST_TOOL:
@@ -269,9 +299,32 @@ def _build_app(
                 executor=_executor,
                 require_configured_token=require_operator_token,
             )
+        if name in {_EFFECT_LIST_TOOL, _UNDO_REQUEST_TOOL, _UNDO_APPROVE_TOOL}:
+            if resilience_manager is None:
+                return [mtypes.TextContent(type="text", text="⚠ XA-Guard resilience is disabled")]
+            if verified_identity is None:
+                return [mtypes.TextContent(type="text", text="⚠ XA-Guard verified identity is required")]
+            try:
+                if name == _EFFECT_LIST_TOOL:
+                    if not ({"undo.request", "undo.approve"} & set(verified_identity.permissions)):
+                        raise PermissionError("identity lacks effect-list permission")
+                    value = {"effects": resilience_manager.store.list_effects(verified_identity.tenant_id, int(arguments.get("limit", 50)))}
+                elif name == _UNDO_REQUEST_TOOL:
+                    value = resilience_manager.request_undo(verified_identity, arguments)
+                else:
+                    value = await resilience_manager.approve_undo(
+                        verified_identity,
+                        arguments,
+                        pipeline,
+                        downstream_router.call_tool,
+                    )
+                return [mtypes.TextContent(type="text", text=json.dumps(value, ensure_ascii=False, sort_keys=True))]
+            except Exception as exc:
+                log.warning("resilience control operation rejected: %s", exc)
+                return [mtypes.TextContent(type="text", text=f"⚠ XA-Guard undo operation rejected: {exc}")]
 
         tool_arguments, governance_envelope = _pop_governance_envelope(arguments)
-        ctx = _ctx_with_governance(name, tool_arguments, governance_envelope)
+        ctx = _ctx_with_governance(name, tool_arguments, governance_envelope, verified_identity)
         if name == _AIBOM_INSTALL_TOOL:
             ctx.append(
                 _aibom_install_preflight(tool_arguments, offline_store=aibom_offline_store)
@@ -368,9 +421,27 @@ def _control_tools() -> list[mtypes.Tool]:
             description="List XA-Guard HITL approvals waiting for manual operator action.",
             inputSchema={
                 "type": "object",
-                "properties": {"operator_token": {"type": "string"}},
+                "properties": {
+                    "operator_token": {"type": "string"},
+                    "_xa_guard": {"type": "object"},
+                },
                 "additionalProperties": False,
             },
+        ),
+        mtypes.Tool(
+            name=_EFFECT_LIST_TOOL,
+            description="List reversible effects in the verified identity's tenant.",
+            inputSchema={"type": "object", "properties": {"limit": {"type": "integer"}, "_xa_guard": {"type": "object"}}, "additionalProperties": False},
+        ),
+        mtypes.Tool(
+            name=_UNDO_REQUEST_TOOL,
+            description="Request compensation of a recorded effect; approval is always separate.",
+            inputSchema={"type": "object", "properties": {"effect_id": {"type": "string"}, "reason": {"type": "string"}, "idempotency_key": {"type": "string"}, "_xa_guard": {"type": "object"}}, "required": ["effect_id", "reason", "idempotency_key"], "additionalProperties": False},
+        ),
+        mtypes.Tool(
+            name=_UNDO_APPROVE_TOOL,
+            description="Approve and execute a compensation through all six XA-Guard gates.",
+            inputSchema={"type": "object", "properties": {"request_id": {"type": "string"}, "reason": {"type": "string"}, "_xa_guard": {"type": "object"}}, "required": ["request_id", "reason"], "additionalProperties": False},
         ),
         mtypes.Tool(
             name=_PENDING_APPROVE_TOOL,
@@ -383,6 +454,7 @@ def _control_tools() -> list[mtypes.Tool]:
                     "approver": {"type": "string"},
                     "reason": {"type": "string"},
                     "operator_token": {"type": "string"},
+                    "_xa_guard": {"type": "object"},
                 },
                 "required": ["trace_id", "approve"],
                 "additionalProperties": False,
@@ -634,9 +706,21 @@ def _to_text_contents(tool_result: Any) -> list[mtypes.TextContent]:
     return [mtypes.TextContent(type="text", text=str(tool_result))]
 
 
-async def run_stdio(pipeline: Pipeline, downstream_router: DownstreamRouter) -> None:
+async def run_stdio(pipeline: Pipeline, downstream_router: DownstreamRouter, resilience_manager: Any = None) -> None:
     """启动 stdio MCP server，阻塞直到客户端断开。"""
-    app = _build_app(pipeline, downstream_router)
+    identity = None
+    identity_cfg = getattr(getattr(pipeline, "cfg", None), "identity", None)
+    if identity_cfg is not None and identity_cfg.enabled:
+        from xa_guard.identity import JWTIdentityVerifier
+        token = os.getenv(identity_cfg.stdio_token_env, "")
+        if not token and identity_cfg.required:
+            raise RuntimeError(f"required stdio identity token is absent: {identity_cfg.stdio_token_env}")
+        if token:
+            access_token = await JWTIdentityVerifier(identity_cfg).verify_token(token)
+            if access_token is None:
+                raise RuntimeError("stdio identity token verification failed")
+            identity = identity_from_access_token(access_token)
+    app = _build_app(pipeline, downstream_router, stdio_identity=identity, resilience_manager=resilience_manager)
     init_opts: InitializationOptions = app.create_initialization_options()
     async with stdio_server() as (read_stream, write_stream):
         log.info("xa-guard stdio server started")
@@ -649,6 +733,7 @@ async def run_streamable_http(
     host: str = "127.0.0.1",
     port: int = 3000,
     session_idle_timeout_seconds: float = 300.0,
+    resilience_manager: Any = None,
 ) -> None:
     """启动 Streamable HTTP MCP server，阻塞直到 uvicorn 退出。"""
     try:
@@ -665,6 +750,7 @@ async def run_streamable_http(
         host=host,
         port=port,
         session_idle_timeout_seconds=session_idle_timeout_seconds,
+        resilience_manager=resilience_manager,
     )
     config = uvicorn.Config(asgi_app, host=host, port=port, log_level="info")
     server = uvicorn.Server(config)
@@ -680,6 +766,7 @@ def _build_streamable_http_asgi_app(
     host: str = "127.0.0.1",
     port: int = 3000,
     session_idle_timeout_seconds: float = 300.0,
+    resilience_manager: Any = None,
 ) -> Any:
     """Build the stateful multi-session MCP ASGI application."""
     try:
@@ -701,6 +788,7 @@ def _build_streamable_http_asgi_app(
         pipeline,
         downstream_router,
         require_operator_token=True,
+        resilience_manager=resilience_manager,
     )
 
     allowed_hosts = [
@@ -742,6 +830,23 @@ def _build_streamable_http_asgi_app(
             if transport is not None and transport.is_terminated:
                 manager._server_instances.pop(session_id, None)
 
+    protected_mcp: Any = _handle_mcp
+    identity_cfg = getattr(getattr(pipeline, "cfg", None), "identity", None)
+    if identity_cfg is not None and identity_cfg.enabled:
+        from mcp.server.auth.middleware.auth_context import AuthContextMiddleware
+        from mcp.server.auth.middleware.bearer_auth import BearerAuthBackend, RequireAuthMiddleware
+        from starlette.middleware.authentication import AuthenticationMiddleware
+        from xa_guard.identity import IdentityBindingMiddleware, JWTIdentityVerifier
+
+        protected_mcp = IdentityBindingMiddleware(protected_mcp)
+        if identity_cfg.required:
+            protected_mcp = RequireAuthMiddleware(protected_mcp, required_scopes=identity_cfg.required_scopes)
+        protected_mcp = AuthContextMiddleware(protected_mcp)
+        protected_mcp = AuthenticationMiddleware(
+            protected_mcp,
+            backend=BearerAuthBackend(JWTIdentityVerifier(identity_cfg)),
+        )
+
     async def _healthz(_request):
         return JSONResponse(
             {
@@ -762,8 +867,8 @@ def _build_streamable_http_asgi_app(
         lifespan=_lifespan,
         routes=[
             Route("/healthz", endpoint=_healthz, methods=["GET"]),
-            Mount("/mcp", app=_handle_mcp),
-            Mount("/", app=_handle_mcp),
+            Mount("/mcp", app=protected_mcp),
+            Mount("/", app=protected_mcp),
         ]
     )
     asgi_app.state.session_manager = manager

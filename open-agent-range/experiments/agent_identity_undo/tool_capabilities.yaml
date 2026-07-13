@@ -1,0 +1,14 @@
+tools:
+  - tool_name: update_registry
+    capabilities: [AUTHZ_ADMIN]
+    input_max_taint: CONFIDENTIAL
+    output_taint: INTERNAL
+    risk_level: yellow
+    description: Synthetic registry mutation used only by the feasibility experiment.
+
+  - tool_name: send_message
+    capabilities: [NETWORK_EXTERNAL, NOTIFY]
+    input_max_taint: PUBLIC
+    output_taint: PUBLIC
+    risk_level: yellow
+    description: Synthetic public-message egress used as the irreversible control.

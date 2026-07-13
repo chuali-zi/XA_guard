@@ -1,5 +1,21 @@
 # L3 测试与验收说明
 
+> **⚠ 已弃用为比赛交付承诺（2026-07-11）**
+> 比赛交什么、欠什么以 **[DELIVERY-v2.md](./DELIVERY-v2.md)** 为唯一权威口径。
+> 本文档保留作工程验收参考（静态 S1–S7、R2–R9 命令与证据格式），其中的 BLOCKED/NOT RUN 语言 **不** 代表当前项目主状态或赛题硬门槛。
+> 仓库状态见 [status.md](../../status.md)。
+
+## 退役项速查（不再作为交付承诺）
+
+| 项 | 说明 |
+|---|---|
+| R1 | 独立 holdout / formal dual-500 — 研究资产 |
+| `subscription_budget60_v1` | 非比赛 mandatory 指标 |
+| `research_full_matrix` | 2986 jobs 可选研究 |
+| R5 Trae GUI / R6 runsc 全验收 / R9 第三方 TSA/HSM | 见 DELIVERY-v2 Tier C / RETIRED |
+| R8 marketplace/IDE hooks | 离线准入已够 |
+| L3 整体 BLOCKED 叙事 | 已由 Delivery v2 替代 |
+
 ## 1. 范围与状态
 
 本文是项目自定义的可执行验收清单，不是比赛官方验收规范，也不是已完成报告。本轮定义静态实现验收、比赛预算型真实评测和研究级扩展验收，**不宣称任何未执行命令已通过或指标已达标**。[比赛方案原文](../source-of-truth/XA-202620中国雄安集团数字城市科技有限公司-面向政企场景的大模型智能体安全关键技术研究比赛方案.pdf)第 3-4 页要求可复现关键技术结果与量化测试效果，但没有指定 AgentDojo/InjecAgent 全矩阵。命令从仓库根目录执行，证据建议写入仓库外的 `D:\evidence\l3-<UTC>\`（下文为 `$E`）。
@@ -9,6 +25,8 @@
 - **比赛目标 `subscription_budget60_v1`**：OpenCode Go 订阅额度按约 `$60` 硬上限管理，R2/R3 采用预注册的 baseline/defended 分层抽样；完成后只能声明预算约束下的 sampled 结果，并按 5h/周额度限制分批 resume。
 - **研究级扩展 `research_full_matrix`**：AgentDojo 949 case 与 InjecAgent DS/base 544 case 的 baseline/defended 全矩阵，共 2,986 jobs；仅在赞助额度、免费模型或本地算力可用时执行，不作为比赛交付 PASS/BLOCKED 的必要条件。
 
+验收编号保持稳定，但 **R1 已于 2026-07-11 退役并移出 L3 验收范围**。R1 原要求“正式双 500 + Gate1 独立 holdout”，依赖独立评测方、隐藏数据封存和阈值锁定，现实条件下无法完成；比赛方案原文及 PRD 的 L3 定义也未把它列为硬门槛。为避免破坏既有脚本、证据目录和历史报告，R2–R9 不重编号。仓库现有双 500 candidate、formal 负测和 holdout 协议只作为非阻塞研究/防冒充资产保留，不得据此宣称 formal Recall/FPR 成绩。
+
 - `PASS`：已执行、零退出且原始证据满足标准。
 - `FAIL`：已执行但结果、规模、完整性或 hash 不满足。
 - `BLOCKED`：缺独立数据、外部设施、凭据或客户端；不得降级为 PASS。
@@ -16,7 +34,9 @@
 
 每包证据至少含冻结 commit、dirty 状态、UTC、软硬件版本、完整命令/退出码/stdout/stderr、脱敏配置、逐条原始结果、报告及 SHA-256。指标必须能从原始记录重算。
 
-## 2. 本轮静态实现验收
+## 2. 静态实现与非阻塞资产验证
+
+S1/S2 是已退役 R1 留下的研究资产验证，不进入 L3 PASS/FAIL/BLOCKED 判定；S3–S7 用于证明相应验收入口和静态资产存在，也不替代第 3 节真实验收。
 
 ### S1 双 500 implementation/formal
 
@@ -29,7 +49,7 @@
   ```
 - **成功标准**：implementation 为 500 refusal + 500 non-refusal、1000 个归一化 payload 唯一、17 类各不少于 20，manifest/artifact/license commitment 匹配。当前素材的 formal 必须非零退出并指出缺 hash-bound 独立 attestation、逐条 taxonomy 独立复核和 `semantic_group_reviewed=true`；这是防冒充负测成功。
 - **证据**：两份 JSON、pytest 输出、manifest 及引用文件 hash。
-- **FAIL/BLOCKED**：implementation 任一条件不符或 formal 意外通过为 FAIL；独立材料未提供时正式双 500 为 BLOCKED，不能以 implementation 替代。
+- **资产判定**：implementation 任一条件不符或 formal 意外通过为资产回归 FAIL；独立材料未提供是预期边界，不再记为 L3 BLOCKED，也不能以 implementation 替代 formal 成绩。
 
 ### S2 Gate1 独立 holdout 协议
 
@@ -41,7 +61,7 @@
   ```
 - **成功标准**：system lock、manifest、calibration threshold lock、holdout verify 齐全；漂移非零退出；formal 强制每 split 120 attacks（六类各 20）+ 381 negatives、独立性和 Recall/FPR 约束。
 - **证据**：pytest/help 输出及源码 hash。
-- **FAIL/BLOCKED**：formal 可绕过独立声明、漂移可通过或 smoke 可标正式成绩为 FAIL；独立数据未揭示为真实验收 BLOCKED。
+- **资产判定**：formal 可绕过独立声明、漂移可通过或 smoke 可标正式成绩为资产回归 FAIL；没有独立数据不再记为 L3 BLOCKED。
 
 ### S3 AgentDojo/InjecAgent runner
 
@@ -114,13 +134,7 @@
 
 ## 3. 后续真实验收
 
-### R1 正式双 500 与 Gate1 独立 holdout
-
-- **前置**：独立评测方在代码/策略/阈值冻结后制题并保管；clean worktree；独立 attestation、逐条 taxonomy/semantic group 复核；揭示前外部存证 manifest/system-lock hash。
-- **命令**：双 500 分别执行 `validate_csab_corpus.py --profile formal`。Gate1 依次执行 `build-system-lock`、`build-manifest`、calibration `evaluate_gate1.py`、`lock-threshold`、holdout evaluation、`verify-holdout`；完整参数见 `docs/gates/gate1-holdout-protocol.md`。
-- **成功标准**：双 500 formal 零退出；holdout 不搜索阈值，Recall 点估计 >=85%，FPR 点估计及双侧 95% Wilson 上界均 <=1%，commitment 全匹配。
-- **证据**：封存摘要、attestation、隐藏集 manifest、system/threshold locks、逐条 evaluation/result、日志及 hash。
-- **FAIL/BLOCKED**：独立性、规模、审阅、置信区间或 hash 不满足为 FAIL；数据/评测方未提供为 BLOCKED。不得用仓库 seed、implementation 或 smoke 替代。
+R1 已退役，不再出现在真实验收清单中；编号从 R2 继续，以兼容既有证据和工具。
 
 ### R2/R3 `subscription_budget60_v1`（比赛正式目标）
 
@@ -206,4 +220,4 @@
 - **证据**：final report、artifact hash manifest、二者 hash、外部存证回执。
 - **FAIL/BLOCKED**：引用缺失、hash 不符、只 hash 报告、覆盖失败结果或把 BLOCKED 写成 PASS 均为 FAIL；外部存证设施缺失时该子项 BLOCKED，本地 hash manifest 仍必须完成。
 
-只有项目自定义的全部必验项有可复核证据并达标，才能写“L3 验收通过”。任何必验 FAIL 使 L3 整体 FAIL；任何必验 BLOCKED/NOT RUN 使 L3 整体 BLOCKED。`research_full_matrix` 属可选扩展，其 `DEFERRED_OPTIONAL` 不进入 L3 或比赛完成度判定。比赛交付状态必须另按比赛方案原文与 PRD Must 判定；可写“静态实现验收通过”或“`subscription_budget60_v1` sampled 评测完成”，但必须紧邻列出证据范围与尚未完成的必验项。
+只有仍在范围内的项目自定义必验项有可复核证据并达标，才能写“L3 验收通过”。任何范围内必验 FAIL 使 L3 整体 FAIL；任何范围内必验 BLOCKED/NOT RUN 使 L3 整体 BLOCKED。已退役 R1、S1/S2 研究资产和 `research_full_matrix` 均不进入 L3 或比赛完成度判定。比赛交付状态必须另按比赛方案原文与 PRD Must 判定；可写“静态实现验收通过”或“`subscription_budget60_v1` sampled 评测完成”，但必须紧邻列出证据范围与尚未完成的范围内必验项。

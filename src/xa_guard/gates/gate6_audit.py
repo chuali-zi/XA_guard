@@ -165,6 +165,17 @@ class Gate6Audit(Gate):
             gen_ai_governance_decision_reason_code=str(governance_metadata.get("decision_reason_code") or ""),
             gen_ai_governance_role_ids=list(governance_metadata.get("role_ids") or []),
             gen_ai_governance_approval_policy_id=str(governance_metadata.get("approval_policy_id") or ""),
+            gen_ai_identity_verified=ctx.identity_verified,
+            gen_ai_identity_issuer=ctx.identity_issuer,
+            gen_ai_identity_kid=ctx.identity_kid,
+            gen_ai_identity_jti_sha256=ctx.identity_jti_sha256,
+            gen_ai_identity_scopes=list(ctx.identity_scopes),
+            gen_ai_resilience_effect_id=ctx.effect_id,
+            gen_ai_resilience_side_effect_level=ctx.side_effect_level,
+            gen_ai_resilience_reversibility=ctx.reversibility,
+            gen_ai_resilience_undo_status=ctx.undo_status,
+            gen_ai_resilience_compensates_effect_id=ctx.compensates_effect_id,
+            gen_ai_resilience_operation_kind=ctx.operation_kind,
         )
 
         # 6. 序列化 → ChainStore 追加（落盘并计算 record_hash）

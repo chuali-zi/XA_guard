@@ -178,6 +178,13 @@ tools:
     risk_level: red
     description: 真实业务 HTTP API 工单提交；写入/外发型操作必须进入 HITL 审批。
 
+  - tool_name: business_cancel_ticket
+    capabilities: [NETWORK_EXTERNAL, NOTIFY]
+    input_max_taint: INTERNAL
+    output_taint: INTERNAL
+    risk_level: red
+    description: 工单提交的补偿动作；仍须经过完整六关与独立审批身份。
+
   - tool_name: export_generated_content
     capabilities: [NETWORK_EXTERNAL, CONTENT_PUBLISH]
     input_max_taint: PUBLIC

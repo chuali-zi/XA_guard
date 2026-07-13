@@ -260,6 +260,13 @@ class BusinessApiClient:
             body["record_id"] = record_id
         return self._request("POST", "/tickets", body=body)
 
+    def cancel_ticket(self, *, ticket_id: str, reason: str) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            f"/tickets/{urllib.parse.quote(ticket_id, safe='')}/cancel",
+            body={"reason": reason},
+        )
+
     def _request(
         self,
         method: str,
@@ -384,6 +391,20 @@ async def list_tools() -> list[types.Tool]:
                 "additionalProperties": False,
             },
         ),
+        types.Tool(
+            name="business_cancel_ticket",
+            description="Compensate a prior ticket submission using its recovery ticket ID.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "ticket_id": {"type": "string"},
+                    "reason": {"type": "string"},
+                    "_xa_guard": _GOVERNANCE_ENVELOPE_SCHEMA,
+                },
+                "required": ["ticket_id", "reason"],
+                "additionalProperties": False,
+            },
+        ),
     ]
 
 
@@ -439,6 +460,17 @@ def _dispatch(name: str, args: dict[str, Any]) -> dict[str, Any]:
                     priority=str(args.get("priority") or "normal"),
                     record_id=str(args.get("record_id") or ""),
                 )
+            case "business_cancel_ticket":
+                ticket_id = str(args.get("ticket_id") or "").strip()
+                reason = str(args.get("reason") or "").strip()
+                if not ticket_id or not reason:
+                    return {
+                        "ok": False,
+                        "status": 0,
+                        "error_type": "validation_error",
+                        "message": "ticket_id and reason are required",
+                    }
+                return client.cancel_ticket(ticket_id=ticket_id, reason=reason)
             case _:
                 return {
                     "ok": False,

@@ -33,8 +33,8 @@ from conductor.evaluator import (  # noqa: E402
     RESULT_BLOCKED, RESULT_INFRA, RESULT_LIMIT, RESULT_PASS, judge,
 )
 from conductor.novelty import NoveltyRegistry  # noqa: E402
-from conductor.objectives import ObjectiveQueue  # noqa: E402
-from conductor.scope import check_proposal  # noqa: E402
+from conductor.objectives import CATEGORY_GRID, ObjectiveQueue  # noqa: E402
+from conductor.scope import SAFE_SCHEMES, check_proposal  # noqa: E402
 
 
 # --------------------------------------------------------------- fake API
@@ -289,6 +289,11 @@ def test_scope_rejects_public_targets_and_mismatch():
     assert any("objective_id" in error for error in result.errors)
     assert any("URL" in error for error in result.errors)
     assert any("8.8.8.8" in error for error in result.errors)
+
+
+def test_scope_allows_every_configured_objective_surface():
+    configured = {cell["surface"] for cells in CATEGORY_GRID.values() for cell in cells}
+    assert configured <= SAFE_SCHEMES
 
 
 def test_novelty_registry_rejects_exact_duplicate(tmp_path):

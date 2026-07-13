@@ -7,4 +7,6 @@
 
 | run_id | host | target | end_utc | tarball_sha256 | files | bytes | result |
 |---|---|---|---|---|---:|---:|---|
-| _（尚无已封存 run）_ | | | | | | | |
+| l3-r6-runsc-20260708T081901Z-ubuntu-test | ubuntu-test | R6-RUNSC-SYSTEM | 2026-07-08T08:19:10Z | 21ec6c6460377294290db6c19b5f98d32cd681c589e4ea58b0c5d4587095e987 | 35 | 148722 | PASS |
+| l3-r6-rootless-runsc-20260708T081932Z-ubuntu-test | ubuntu-test | R6-RUNSC-ROOTLESS | 2026-07-08T08:19:33Z | ed63536572244ba7a4788d289b71feada26e9c267326fe0776ed762d96e7571b | 19 | 91857 | LIMIT |
+| oar-delivery-v2-20260711T123124Z-win-local | win-local | OAR-DELIVERY-V2 | 2026-07-11T12:32:36Z | cffa89fb2ded79cb17685348bfb6571d85c3c233ad963528ca79b89e2ec49aa5 | 127 | 451499 | PASS |

@@ -1,0 +1,83 @@
+{
+  "schema_version": "xa-guard-evidence-index/v1",
+  "snapshot_utc": "2026-07-11T12:41:10Z",
+  "delivery_authority": "docs/acceptance/DELIVERY-v2.md",
+  "canonical": {
+    "run_id": "oar-delivery-v2-20260711T123124Z-win-local",
+    "target": "OAR-DELIVERY-V2",
+    "result": "PASS",
+    "run_path": "D:/xa-evidence/runs/oar-delivery-v2-20260711T123124Z-win-local",
+    "sealed_path": "D:/xa-evidence/sealed/oar-delivery-v2-20260711T123124Z-win-local.tar.gz",
+    "tarball_sha256": "cffa89fb2ded79cb17685348bfb6571d85c3c233ad963528ca79b89e2ec49aa5",
+    "file_count": 127,
+    "total_bytes": 451499,
+    "git_head": "c68c4be7ed4899c2fcdab556c45fc9bcc2b67cb5",
+    "git_dirty": true,
+    "metrics": {
+      "live_ab_runs": 3,
+      "null_leaks": 3,
+      "protected_leaks": 0,
+      "protected_infra_errors": 0,
+      "protection_delta": 1.0,
+      "full_day_tool_attempts": 41,
+      "full_day_ledger_entries": 43,
+      "full_day_violations": 0
+    }
+  },
+  "sealed_supporting": [
+    {
+      "run_id": "l3-r6-runsc-20260708T081901Z-ubuntu-test",
+      "result": "PASS",
+      "tarball_sha256": "21ec6c6460377294290db6c19b5f98d32cd681c589e4ea58b0c5d4587095e987"
+    },
+    {
+      "run_id": "l3-r6-rootless-runsc-20260708T081932Z-ubuntu-test",
+      "result": "LIMIT",
+      "tarball_sha256": "ed63536572244ba7a4788d289b71feada26e9c267326fe0776ed762d96e7571b"
+    }
+  ],
+  "supporting": [
+    {
+      "id": "r4-performance",
+      "classification": "tier-c-current",
+      "path": "docs/evidence/l3-r4-20260705-current",
+      "manifest_sha256": "0eca56a334ebca98935187d08c2cdb61a204a42d2e25c4d9981107fb575fdde5",
+      "verification": "8/8 PASS"
+    },
+    {
+      "id": "r7-opa",
+      "classification": "tier-c-local",
+      "path": "D:/evidence/l3-r7-20260706T055152Z",
+      "manifest_sha256": "fb5c85304733a9ec7444a57e4620d4d6d2e1491e7b04c0b8bee0ee75187e35c4",
+      "verification": "20/20 PASS; image vulnerability findings retained"
+    },
+    {
+      "id": "r8-aibom",
+      "classification": "tier-c-current",
+      "path": "docs/acceptance/r8-aibom-external/evidence/l3-r8-aibom-20260707T105519Z",
+      "manifest_sha256": "c41c1eca667a69b1c4603f70ea226265a9b2d1cd48c97fb030ca59650b78f5b2",
+      "verification": "7/7 PASS"
+    },
+    {
+      "id": "r9-local-audit",
+      "classification": "supporting-private-limit",
+      "path": "D:/xa-evidence/runs/l3-r9-audit-20260708T075534Z-local",
+      "manifest_sha256": "7a5e7751a8bd49035bbc0b4d5bc2e4abb5a8b15e4c87043519679a69595f0b35",
+      "verification": "10/10 PASS; SM3/SM2/anchor PASS",
+      "publish": false,
+      "reason": "contains demo private keys; external TSA/HSM absent"
+    }
+  ],
+  "retired_or_legacy": [
+    "D:/evidence/l3-20260620T090452Z",
+    "D:/evidence/r2-r3-*",
+    "open-agent-range/.runtime except the canonical source directory",
+    "enterprise-agent-range/reports"
+  ],
+  "manual_remaining": [
+    "D1 final PDF <=30 pages",
+    "D2 clean release commit and final hash manifest",
+    "D3 final video <=10 minutes",
+    "D4 approved and stamped registration form"
+  ]
+}

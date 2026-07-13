@@ -14,3 +14,6 @@
 # These licenses are hash-bound corpus provenance artifacts.
 bench/cases/csab-gov-v1-candidate/THIRD_PARTY_LICENSE.ChineseSafetyQA.txt text eol=crlf
 bench/cases/csab-gov-v1-candidate/THIRD_PARTY_LICENSE.XAGuardAuthoredRefusal.txt text eol=lf
+
+# R8 acceptance evidence is byte-bound by its artifact-hashes.json manifest.
+docs/acceptance/r8-aibom-external/evidence/l3-r8-aibom-20260707T105519Z/** -text

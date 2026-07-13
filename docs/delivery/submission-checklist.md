@@ -1,30 +1,33 @@
 # 最终提交清单
 
 > 目标：提交前一张表看清楚 D1-D4、补充材料、证据 hash、红线检查。
+> **交付口径**：[../acceptance/DELIVERY-v2.md](../acceptance/DELIVERY-v2.md)
 > 官方赛题依据：[../source-of-truth/XA-202620中国雄安集团数字城市科技有限公司-面向政企场景的大模型智能体安全关键技术研究比赛方案.pdf](../source-of-truth/XA-202620中国雄安集团数字城市科技有限公司-面向政企场景的大模型智能体安全关键技术研究比赛方案.pdf)
 
-## D1-D4
+## D1-D4（Tier A）
 
 | 交付物 | 状态 | 文件/链接 | 负责人确认 |
 |---|---|---|---|
 | D1 技术方案 PDF，不超过 30 页 | `TODO` | 待从 D1 草稿导出 | [ ] |
 | D2 原型代码仓库链接 | `PARTIAL` | GitHub main + release commit | [ ] |
 | D3 演示视频，不超过 10 分钟 | `TODO` | 待录制/导出 | [ ] |
-| D4 审核通过报名表 | `BLOCKED` | 需人工确认系统审核通过 | [ ] |
+| D4 审核通过报名表 | `TODO` | 需人工确认系统审核通过 | [ ] |
 
-## 证据包
+## 证据包（Tier B 为主）
+
+权威清单、hash 和发布取舍见 [证据收敛总表](../acceptance/EVIDENCE-CONSOLIDATION.md)。
 
 - [ ] final commit hash。
 - [ ] `git status --short` 干净截图或文本。
-- [ ] 全仓 pytest 输出。
-- [ ] L3 static verifier 输出。
-- [ ] 性能报告。
-- [ ] 审计样例与 `verify_audit.py` 输出。
-- [ ] R2/R3 sampled 报告或明确 `NOT RUN/BLOCKED` 说明。
-- [ ] Trae GUI 截图/录像或明确 `BLOCKED`。
-- [ ] 外部 AIBOM 产物或明确 `BLOCKED`。
-- [ ] 第三方 TSA/HSM 证据或明确 `BLOCKED`。
-- [ ] artifact hash manifest。
+- [x] 全仓 pytest 输出（2026-07-11：667 collected，666 passed、1 sandbox image skip）。
+- [x] L3 static verifier 输出（工程参考，11/11 sections PASS）。
+- [x] **OAR canonical 证据目录**：`oar-delivery-v2-20260711T123124Z-win-local`。
+- [x] OAR live A/B summary：N=3、`protection_delta=1.0`、7/7 replay PASS。
+- [x] 六关 demo/audit 证据入口与本地 SM3/SM2 校验。
+- [x] 性能报告（Tier C 附录，可选）。
+- [x] R8 cdxgen / install_plugin 证据（Tier C 附录，可选）。
+- [ ] R2/R3 sampled：仅当背景实验已跑时附；否则标 `RETIRED` / 省略。
+- [x] artifact hash manifest 与 sealed provenance。
 
 ## 邮件与附件
 
@@ -45,7 +48,6 @@
 - [ ] 不暴露 API key、token、私钥、账号。
 - [ ] 不暴露无关个人隐私。
 - [ ] 所有达标数字都有证据来源。
-- [ ] 未完成项写 `BLOCKED` 或 future work，不写成已完成。
+- [ ] 未完成项写限制或 future work；**退役项**（见 DELIVERY-v2）不写成 blocker。
 - [ ] 本地 TSA/软件 key 不写成第三方 TSA/HSM。
-- [ ] Trae fallback 不写成 native elicitation。
-- [ ] `$60` sampled 未跑完前，不写 R2/R3 达标。
+- [ ] 主评测叙事为 OAR A/B，不把 AgentDojo ASR 或 budget60 写成 mandatory 达标。

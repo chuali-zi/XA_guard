@@ -1,0 +1,87 @@
+{
+  "audit_bad_line": null,
+  "checks": {
+    "audit_chain_ok": true,
+    "compensation_trace_distinct": true,
+    "identity_denied_executor_count": 0,
+    "identity_negative_cases_all_denied": true,
+    "irreversible_truthful": true,
+    "ledger_chain_ok": true,
+    "raw_token_absent": true,
+    "self_approval_denied": true,
+    "state_restored": true,
+    "valid_identity_action_executed": true
+  },
+  "conclusion": "GO",
+  "counts": {
+    "audit_records": 7,
+    "effect_events": 7,
+    "executor_calls": 3,
+    "ledger_entries": 9
+  },
+  "effects": [
+    {
+      "after_sha256": "9c8e266183864bb91ce77517c299fbc96c910061d14e7b0a0cb542e0b244454b",
+      "agent_id": "open-agent-range",
+      "before_sha256": "cdfb9be5839d1fe490e347ca850358f07498d65d9b03c9071df0efa0ec0f75c6",
+      "compensation_trace_id": "c632f2f7-1d74-4e3e-8c59-c968b893138b",
+      "effect_id": "effect-ad65c398-edb",
+      "principal": "alice.operator@dctg.local",
+      "reversibility": "reversible",
+      "status": "compensated",
+      "tool_name": "update_registry",
+      "trace_id": "ad65c398-edb6-4c29-92be-3a691ebb0b74"
+    },
+    {
+      "after_sha256": "798cd355120817de72a700f58118188dc5732a322dd7a629f45d451bd783b520",
+      "agent_id": "open-agent-range",
+      "before_sha256": "",
+      "compensation_trace_id": "",
+      "effect_id": "effect-b7dedd17-0ab",
+      "principal": "alice.operator@dctg.local",
+      "reversibility": "irreversible",
+      "status": "irreversible",
+      "tool_name": "send_message",
+      "trace_id": "b7dedd17-0ab4-4135-9e97-ccc6a8fa5a3c"
+    }
+  ],
+  "limitations": [
+    "in-memory experiment issuer; not OIDC, JWKS discovery, or MCP transport authentication",
+    "in-memory recovery material; not encrypted durable storage or restart recovery",
+    "single reversible OAR object; not a generic business-system undo guarantee",
+    "single-process execution; no concurrency or distributed transaction proof"
+  ],
+  "negative_identity_cases": {
+    "bad_signature": {
+      "allowed": false,
+      "decision": "deny",
+      "reason": "experiment_identity: signature verification failed",
+      "trace_id": "f5acefd0-1dbe-4be5-b76b-87b8de60cd09"
+    },
+    "expired": {
+      "allowed": false,
+      "decision": "deny",
+      "reason": "experiment_identity: credential is expired or not active",
+      "trace_id": "fe4c5bc6-415b-4daf-ba3a-30dcfa8ed92d"
+    },
+    "self_report_conflict": {
+      "allowed": false,
+      "decision": "deny",
+      "reason": "experiment_identity: human principal conflicts with signed credential",
+      "trace_id": "913d5d7f-a35a-4f44-8455-7aab36bf60b2"
+    },
+    "wrong_audience": {
+      "allowed": false,
+      "decision": "deny",
+      "reason": "experiment_identity: audience mismatch",
+      "trace_id": "2591792d-a35f-4d09-b18b-683d3d8ff997"
+    }
+  },
+  "public_key_sha256": "ba8ce89877e87d11318b20107324c034c3410970b567537c8ad453639a0f7e02",
+  "schema_version": "xa-guard-identity-undo-feasibility/v0.1",
+  "traces": {
+    "compensation": "c632f2f7-1d74-4e3e-8c59-c968b893138b",
+    "irreversible_action": "b7dedd17-0ab4-4135-9e97-ccc6a8fa5a3c",
+    "original_action": "ad65c398-edb6-4c29-92be-3a691ebb0b74"
+  }
+}
