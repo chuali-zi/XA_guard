@@ -1,3 +1,97 @@
+# 2026-07-12 仓库脏状态收敛、全仓回归与发布准备
+
+- 按用户要求处理全部脏改动并准备提交推送。发现 `main` 正处于未结束 merge；确认无未解决冲突后先以 `36d503f` 完成 `feat/cursor-auto-redteam` merge，再在 `agent/identity-undo-repo-cleanup` 发布分支以 `c482b29` 提交 maintenance 修正与其所引用的完整 live smoke evidence。
+- 分类并排除不应提交内容：Auto-RedTeam `.state/` 锁/PID/log/mission 状态、个人 `my-try-ab-offline`、含本机绝对路径的 `opencode-maintained.yaml`；删除三个 0 字节孤立文件 `about`、`agent`、`status`。秘密扫描未发现私钥、JWT、Bearer/API token 或硬编码密码；Round2 SQLite 只含 AES-GCM nonce/密文，无解密 key。
+- Auto-RedTeam 默认范围外测试 26 passed，live smoke artifact manifest 0 mismatch；随后 OAR Auto-RedTeam + Identity/Undo 实验合计 33 passed。Identity/Undo 正式受影响范围此前 68 passed。
+- 第一次完整全仓回归运行至 100% 后有 1 个真实失败：`test_chainstore_multiprocess_writers_preserve_chain` 在 Windows 四进程并发写时第 32 条断链。未修改测试；定位为 `(st_size, st_mtime_ns)` 缓存被错误用于跨进程正确性判断。修复为 named mutex 临界区内 O(末行)读取权威 tail hash，构造恢复同样加锁；Windows 持久 tail reader 使用 READ/WRITE/DELETE 共享句柄，兼顾归档轮转。
+- 修复验证：最终实现完整 Merkle/归档 12 passed；并发用例额外 10/10 轮通过；500 条基准约 1151 records/s 且链验证通过。最终全仓 673 collected，672 passed、1 skipped；唯一 skip 是本机缺少 `xa-guard/sandbox:latest`，非代码失败。CI 口径 Ruff PASS，L3 static verifier 11/11 sections PASS；扩大 Ruff 到 tests 时发现 16 个既有测试风格问题，按仓库规则未修改测试代码。
+- 当前尚未完成：本条记录时发布分支还未 push、远端 PR 还未创建；推送结果和最终 commit/PR 由本轮最终交付消息报告。
+- 发布等待期间 maintainer 完成最后一轮 `oar-localrt-20260713T032915Z-chuali`，结果为 `INFRA_ERROR`；provenance 已追加且没有冒充 finding，随后确认无 Auto-RedTeam 进程继续写入。
+
+# 2026-07-12 Agent Identity + Undo 正式产品接入
+
+- 目标：按用户确认把两轮可行性竖切迁入 XA-Guard 正式工程；保留旧配置默认行为，新生产 profile 显式开启并失败关闭。
+- 新增 `src/xa_guard/identity.py`：PyJWT/JWKS 验签，精确 issuer 与算法白名单，audience、`exp/iat/jti`、最大 TTL、scope 校验；绑定 human `sub`、agent `act.sub`、tenant、tools、data domains 和 permissions。HTTP 使用 MCP 官方 Bearer/AuthContext/RequireAuth middleware，body envelope 冲突在执行器前 403；stdio 使用环境注入的进程级短期令牌，必需令牌缺失/无效时拒绝启动。运行态和审计只保存 token/jti 摘要，不保存原始 Bearer。
+- 新增 `src/xa_guard/resilience.py` 与 `policies/baseline/tool_effects.yaml`：副作用合同、AES-256-GCM SQLite EffectStore、AAD 绑定、事件前向哈希、租户隔离、幂等 Undo request、SQLite 条件 claim 与请求/审批职责分离。恢复材料、幂等键和请求理由不以明文落库。
+- 在 MCP 正式控制面新增 `xa_guard_list_effects`、`xa_guard_request_undo`、`xa_guard_approve_undo`。审批身份只能来自已验签 token；补偿工具重新进入 Governance + Gate1–6，补偿失败记录为 `compensation_failed`，不是绕过策略的管理员操作。
+- 扩展 GateContext、Gate6 AuditRecord 和持久 pending context，写入可信身份与 effect/compensation 关联字段。既有配置保持 identity/resilience 默认关闭；新增 `configs/xa-guard.identity-undo.yaml` 生产模板，启用时缺 JWKS 或恢复密钥会失败关闭。
+- 扩展真实业务连接器：新增固定路径 `business_cancel_ticket`，将 `business_submit_ticket` 的返回 `ticket_id` 作为加密恢复字段；更新 Gate4 capability 和治理注册表，增加独立 `undo_approver` / Dora 审批主体。
+- 新增正式架构/上线说明 `docs/architecture/agent-identity-and-undo.md`，记录密钥注入、token claims、职责分离、依赖许可证和真实边界。PyJWT（MIT）与 cryptography（Apache-2.0/BSD）许可证与项目兼容，纳入直接依赖/AIBOM 范围。
+- 新增测试只覆盖新能力，没有修改既有测试断言：身份验签/坏签名/错误 audience/超长 TTL/body 冲突、密文不含恢复明文、幂等与自批拒绝、补偿上下文、业务 cancel 固定路径。身份/Undo、业务 downstream、Streamable HTTP、pending、Gate6、Governance 受影响范围 68 passed；Ruff、compileall、`git diff --check` 通过。
+- 全量 `pytest -q` 两次分别在 124 秒和 304 秒达到外层命令超时，`pytest -vv` 定位尝试也在 94 秒超时且工具未返回中间 stdout；超时后未残留 pytest 子进程。当前工作树包含大量与本功能无关的未合并改动，因此本轮不宣称全仓通过，也不把超时归因于 Identity + Undo。正式验证口径见 `docs/evidence/agent-identity-undo-formal-2026-07-12/README.md`。
+- 当前未完成：真实 IdP/JWKS/KMS 联调、JWKS/数据密钥轮换演练、多地域主动—主动 EffectStore、自动补偿重试/人工修复队列、真实业务环境端到端演练和 UI。生产配置中的示例 issuer/audience/JWKS 路径必须由部署方替换，仓库不提供不安全默认密钥。
+
+# 2026-07-12 Auto-RedTeam 后台维护与有效产出恢复
+
+- 检查后台后确认 maintainer/Conductor 进程存活，但历史轮次均为 `INFRA_ERROR`：OpenCode CLI 参数顺序导致模型参数未生效且缺 OpenAI key，失败任务仍被标为 covered、同一空结果指纹重复写入，形成伪产出。
+- 按模型分工将外层提案切为 Codex `gpt-5.6-sol`，保留 OAR OpenCodeSeat 默认 `deepseek/deepseek-v4-flash`；修复 Windows `.cmd` launcher、Codex strict schema 不兼容及 JSONL agent_message 解析。
+- 修复失败不再 covered/污染 novelty、连续 infra error 熔断、重启恢复 v1/v2 变体、陈旧 campaign lock 回收；提示明确为隔离合成安全回归并禁止工具调用。未绕过 provider 安全拒绝。
+- 修复后首个完整 run `oar-localrt-20260713T025443Z-chuali` 生成 proposal/finding，finding 校验与 Null/XA-Guard A/B 均成功，ledger hash chain 正常并已封存；结果为 `LIMIT`，两侧均无泄漏，未冒充漏洞或拦截成果。
+- 后续监控发现 `rag-index` 连续三次被 scope allowlist 拒绝并按新熔断停止；根因是 `CATEGORY_GRID` 合法 surface 未与 allowlist 对齐。补齐全部已配置 surface 后，`oar-localrt-20260713T031843Z-chuali` 完整 A/B 通过并诚实封存为 `LIMIT`，后台已恢复。
+- 验证：Auto-RedTeam 27 项离线测试通过，Ruff、py_compile、`git diff --check` 通过，已核对有效 tarball SHA-256。后台 maintainer 与 Conductor 继续健康运行；并行工作已将基线合入 `c482b29`，本轮 scope/日志未 commit/push。
+
+# 2026-07-12 Agent Identity + Undo 第二轮竖切
+
+- 在第一轮 `FEASIBILITY GO` 基础上完成第二轮隔离实验，新增第二轮设计/执行文档；范围固定为真实 Streamable HTTP Bearer 身份入口与 AES-GCM 加密 SQLite EffectStore，仍未修改 `src/xa_guard`、默认配置、正式 Governance schema 或既有测试。
+- 使用 MCP SDK `TokenVerifier`、Bearer middleware、`AccessToken` 和真实 XA-Guard Streamable HTTP ASGI app：缺 token、坏签名返回 401，签名人类身份与 `_xa_guard` 冲突、tool scope 越权返回 403，四类拒绝路径 executor 调用为 0。Alice/Carol 分别通过独立 MCP ClientSession 和 Bearer token 执行原动作与补偿。
+- 新增加密 EffectStore：AES-256-GCM，AAD 绑定 effect/tenant/tool/schema；SQLite 保存 effect、幂等 Undo request 和 append-only hash event。正确密钥跨 store 实例恢复，错误密钥拒绝，数据库原始字节不含 `platform-team-round2` 前态明文。
+- 状态机验证通过：相同幂等键只创建一个 request；Alice 自批因职责分离拒绝；两个独立 store 并发 claim 只有一个成功；Carol 补偿后世界恢复，第三次打开 store 仍为 `compensated`，补偿 trace 与原 trace 不同。
+- 生成 `docs/evidence/agent-identity-undo-spike-round2-2026-07-12/`：2 条 Gate6 audit、4 条 OAR ledger、5 条 EffectStore hash event、加密 SQLite、HTTP 负测、三份世界快照和 12 项稳定 artifact；audit/ledger/event 三条 chain 与 manifest 均通过，0 missing、0 hash mismatch，未落私钥、AES key 或完整 Bearer token。
+- 首次第二轮测试因 ASGI body replay 后未把后续 receive 交还原通道而超时；修复后会话正常关闭。首次 evidence manifest 误收 SQLite 临时 `-shm` 文件，进程结束后复验缺失；现排除 `-wal/-shm`，删除不完整包并重新生成稳定 evidence。上述失败均如实处理，没有放宽断言。
+- 验证完成：第二轮 3 项测试连续 3 轮均通过；第一轮 3 项测试通过；相关身份/治理/审批/OAR 基线 51 passed；Ruff、`git diff --check` 通过；第二轮 12 项 artifact hash 复验通过。未修改测试代码，未运行全仓测试。
+- 未完成且未宣称完成：生产 IdP/OIDC/JWKS、token revocation/轮换、正式 XA-Guard HTTP/stdio 身份接入、KMS/HSM、多主机数据库、补偿失败重试、真实业务连接器和正式 Undo API/UI。下一步需先评审是否把实验接口迁入正式架构。
+
+# 2026-07-12 Agent Identity + Undo 文档与最小竖切可行性实验
+
+- 按用户要求暂不改正式产品，新增 `docs/planning/agent-identity-undo-feasibility.md` 与 `docs/workplan/agent-identity-undo-vertical-slice.md`，明确可信双主体身份、reversible/compensatable/irreversible 边界、Go/No-Go 条件和未交付范围。
+- 在 `open-agent-range/experiments/agent_identity_undo/` 新增隔离实验，没有修改 `src/xa_guard`、默认配置、正式 Governance schema 或既有测试。实验用进程内 Ed25519 compact JWS，把真实 XA-Guard Pipeline/Governance/Gate6 与 OAR World/ToolSurface/Ledger 接通。
+- 实验结果为 `GO`：坏签名、过期、错误 audience、自报 principal 冲突全部 deny 且拒绝阶段 executor 调用为 0；Alice 合法执行 `update_registry`，Alice 自批 Undo 被职责分离拒绝，Carol 通过独立签名身份补偿并恢复原 entry；`send_message` 只标记 `irreversible/manual_required`，未伪造召回。
+- 生成 `docs/evidence/agent-identity-undo-spike-2026-07-12/`：7 条 Gate6 audit、9 条 OAR ledger、7 条 effect event、三份世界快照和 10 项 artifact hash；Gate6/OAR hash chain、状态恢复、trace 分离、token 不落盘均通过，manifest 复验 0 mismatch。
+- 首次实验运行如实失败：`update_registry` 未登记 Gate4 capability，真实 Pipeline 在出向阶段 fail closed；补充仅供实验使用的可信 capability 声明后通过。正式证据首次生成又发现 Base64URL 尾字符篡改可能不改变签名字节，改为翻转实际签名字节，并将 3 项实验测试连续重复 5 轮验证稳定。
+- 验证完成：相关身份/治理/审批/OAR 基线 51 passed；新增实验 3 passed；实验测试重复 5 轮均为 3 passed；artifact manifest 10 项 0 mismatch。Ruff 首轮只发现一个未使用导入，源码已删除；未修改测试代码。
+- 未完成且未宣称完成：真实 IdP/OIDC/JWKS、MCP HTTP/stdio 传输认证、正式 registry/schema、加密持久化 EffectStore、重启恢复、并发补偿、生产连接器、正式 Undo API/UI。本实验只证明进入下一阶段具有可行性；是否产品化需后续评审。
+
+# 2026-07-12 Open Agent Range Auto-RedTeam 持续运行维护层
+
+- 新增 `open-agent-range/auto-redteam/maintain.py`，作为 Conductor 外层跨平台前台 supervisor：进程和状态进度监控、异常退出/卡死恢复、指数退避、重启熔断、正常完成不重启、原子健康状态、持久 stop/resume、单实例锁与日志轮转。
+- 新增维护说明、模块工作日志和 6 个纯离线测试，覆盖维护心跳不冒充 Conductor 进度。验证结果为 pytest 6 passed，Ruff、`py_compile`、`git diff --check` 通过；未启动真实 agent、未联网、未产生费用、未修改既有测试代码。
+- 客观边界：当前 `main` 不含完整 Auto-RedTeam Conductor 源码，完整实现仍位于未合并分支 `feat/cursor-auto-redteam`。维护层当前可独立验证，但端到端持续红队仍需先审查/整合该分支，再做 crash/hang/预算/stop 故障注入和外层服务部署。
+
+# 2026-07-11 全部证据收敛、canonical OAR 封存与交付收尾
+
+- 全量盘点仓内 `docs/evidence`、acceptance evidence、OAR `.runtime`、Enterprise reports，以及本地 `D:/xa-evidence`、legacy `D:/evidence` 和已回传 `ubuntu-test`。新增 `docs/acceptance/EVIDENCE-CONSOLIDATION.md`、`docs/evidence/EVIDENCE-INDEX.json` 与证据入口 README，按 canonical/current/supporting/legacy/private 分类。
+- 发现旧文档宣称 OAR N=3，但当前可见 `redteam-docs-smoke` 仅 N=1。新建 `.runtime/delivery-v2-canonical-20260711T123009Z/` 实跑：full-day 41 tool attempts、43 ledger、0 violations；live N=3 中 Null 3/3 泄漏、XA-Guard 3/3 拦截、0 infra error、`protection_delta=1.0`。7/7 attempt replay 均通过，XA-Guard 三侧 raw audit 逐序对齐。
+- 将 120 个 OAR 原始文件汇聚到标准 run `oar-delivery-v2-20260711T123124Z-win-local`，封存 127 files / 451499 bytes；tarball 78889 bytes，SHA-256 `cffa89fb2ded79cb17685348bfb6571d85c3c233ad963528ca79b89e2ec49aa5`。run 119-file manifest 与 tarball provenance 均验证通过，B5 改为 DONE。
+- 横向校验：R4 8/8、R7 20/20、R8 7/7、R9 10/10 artifact hashes；R9 3 条 SM3 chain、SM2 signatures、anchor 通过；R6 两个 sealed tarball 与 provenance 通过。R8 原仓内副本受 Git EOL 转换影响导致 5 个文本 hash mismatch，现将该证据目录设为 `-text` 并恢复原始绑定字节，复验 7/7。
+- 当前代码验证：Ruff PASS；pytest 667 collected，666 passed、1 skipped（本机缺 `xa-guard/sandbox:latest`）；L3 static verifier 11/11 sections PASS。未修改测试代码。
+- 已同步 DELIVERY-v2、status、TODO、D1 草稿、D3 脚本、submission checklist、docs 导航、OAR status/log 和 remote-evidence 台账。仍未完成：D1 PDF、D2 clean release freeze、D3 视频、D4 报名人工材料；本轮未 commit/push，provenance 需提交推送后才成为远端 git 信任锚。
+
+# 2026-07-11 远端 xa-evidence 回传与 provenance 锚定
+
+- 按用户要求连接远端 `ubuntu-test`（100.126.230.111），确认实际证据根为 `/home/ubuntu/xa-evidence`，不是下划线目录；本地规范位置按 `docs/acceptance/remote-evidence/EVIDENCE-LAYOUT-SPEC.md` 落到 `D:/xa-evidence/remote/ubuntu-test/`。
+- 已回传完整远端证据镜像：13 个目录、158 个文件、782683 bytes；端到端 SHA-256 校验显示本地/远端 158 个文件 0 缺失、0 额外、0 hash mismatch。
+- 已把两个 sealed run 写入 git 信任锚：`l3-r6-runsc-20260708T081901Z-ubuntu-test` 为 R6 system Docker + runsc PASS；`l3-r6-rootless-runsc-20260708T081932Z-ubuntu-test` 为 rootless + runsc LIMIT。同步更新 `docs/acceptance/remote-evidence/PROVENANCE.md` 与 `provenance-manifest.jsonl`。
+- 为非交互密码 SFTP，在 `C:/Users/chual/AppData/Local/Temp/opencode/xa-paramiko-venv` 临时安装 `paramiko`；未加入项目依赖。未修改测试代码，未 commit/push。
+
+# 2026-07-11 Delivery v2 文档口径全面收敛
+
+- 按用户决策，用 **Delivery v2** 替代「L3 最终验收 BLOCKED」作为项目主叙事：官方 D1–D4 为 Tier A；产品可信度以 **Open Agent Range**（OAR）A/B + 六关 demo/audit 为 Tier B 主证据；R4/R7/R8 等为 Tier C 加分；大量原 L3 项明确 **RETIRED**（R1 holdout、subscription_budget60_v1 mandatory、2986 全矩阵、R9 第三方 TSA/HSM、R8 marketplace hooks、R6 runsc 全验收、R5 Trae native、GB/T 45654 完整语料、enterprise-agent-range 主叙事等）。
+- **新建** `docs/acceptance/DELIVERY-v2.md`：Tier A/B/C、退役表、状态图例、四方向映射、诚实边界、OAR 可复现命令块、交叉链接。
+- **全文替换** `status.md`：Delivery v2 为活跃口径；L3 文档标为工程参考；DONE/PARTIAL/TODO/RETIRED 分层；OAR 为主评测叙事；真实差距仅 D1/D3/D4 + B5 证据封存；不把退役项写为 BLOCKED。
+- **更新** `docs/README.md`、`docs/workplan/TODO.md`、`docs/delivery/D1-technical-report-draft.md`、`docs/acceptance/L3-test-and-acceptance.md`（弃用横幅）、根 `README.md`、`docs/delivery/submission-checklist.md`、`docs/research/force-ai-security-2026/06-action-checklist.md`。
+- **跟进消除冲突（同日晚）**：全文对齐 `docs/workplan/NEXT-WORK-DESIGN.md`；`docs/planning/PRD.md` 顶部声明 DELIVERY-v2 优先于 PRD KPI；`R2-R3矩阵自动验收使用说明.md` 与 `R2-R3完整矩阵预算分析.md` 加 Tier C/RETIRED 横幅。
+- **未完成**：D1 PDF、D3 视频、D4 报名证据、B5 canonical OAR 证据目录封存。
+- **未做**：未修改测试代码；未删除 L3-test-and-acceptance.md；未 commit。
+
+# 2026-07-11 L3 验收口径收敛：R1 退役
+
+- 按用户明确决策，将原 L3 R1“正式双 500 + Gate1 独立 holdout”移出 L3 验收范围。客观原因是该项依赖独立评测方、隐藏数据封存、独立 attestation 和阈值锁定，当前现实条件无法完成；同时比赛方案原文及 `docs/planning/PRD.md` 的 L3 定义未把它列为硬门槛。
+- 更新 `docs/acceptance/L3-test-and-acceptance.md`：删除 R1 真实验收条目，明确 R1 不参与 PASS/FAIL/BLOCKED 判定；为兼容既有脚本、证据目录和历史报告，保留 R2–R9 原编号，不做重编号。
+- 保留双 500 candidate、formal 防冒充负测和 Gate1 holdout 协议代码/文档，不删除实现；统一将其表述为非阻塞研究/回归资产，不再安排 formal 验收，不得宣称正式双 500 或 Recall/FPR 成绩。`docs/gates/gate1-holdout-protocol.md` 已增加退役状态提示。
+- 同步更新根 `README.md`、`docs/README.md`、D1 草稿、TODO、NEXT-WORK-DESIGN 和 `status.md`，从 L3 blocker、差距、下一步和最终判定中移除 R1，避免“已砍但仍写待完成”的文档冲突。
+- 当前完成：R1 文档口径已收敛，`git diff --check` 通过；未修改运行时代码或测试代码，未删除候选语料/工具，未执行测试（本轮仅文档变更）。
+- 当前未完成：L3 其余 R2–R9 的必要性和门槛尚未在本轮继续降级或重定义；L3 最终状态仍为 BLOCKED。下一步应逐项审查 R2–R9 是否属于 PRD L3 硬门槛、比赛 Must、加分项或研究扩展，再进一步收敛最终验收集合。
+
 # 2026-07-10 主分支工程规范检查与最小修补
 
 - GitHub Actions 首次运行的 Python 3.10/3.12 矩阵均在测试收集阶段失败：`agentdojo_opencode` 无条件导入未作为仓库依赖安装的外部 AgentDojo。将其合法 MIT 发布包 `agentdojo==0.1.35` 固定为 `bench` extra。干净环境继续验证发现完整 SM2 审计测试缺 `gmssl`，因此 CI 与 `requires.txt` 统一启用已有 `crypto` extra；不通过跳过或可选导入规避测试。待推送后观察 CI。
@@ -2929,4 +3023,3 @@ Key finding:
 - 规划范围：模拟企业"数字城市科技集团"（~500 员工、~150 Agent Seat）、L1-L4 + Test 五级 Seat 体系、6 个企业域（Office/Operations/Business Data/Dev Supply/Governance/Audit）的 Seat 分配与能力定义、跨域访问规则矩阵、委托链约束、Seat 生命周期、成本模型（月均 ~$1,040）、与 Arena Core 组件的映射关系。
 - 更新 `enterprise-agent-range/docs/README.md` 先读顺序添加该规划入口。
 - 本规划不修改 runtime 代码、不改变 XA-Guard 验收结论、不引入真实模型调用。
-

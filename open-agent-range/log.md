@@ -1,5 +1,83 @@
 # 工作日志
 
+## 2026-07-12 Auto-RedTeam 持续运行维护层
+
+- 在 `auto-redteam/maintain.py` 新增跨平台前台 supervisor，监控 Conductor 进程和 `.state` 进度，异常退出/进度超时后指数退避恢复；正常完成不重启，一小时默认最多重启 5 次后熔断，避免故障循环烧费。
+- 增加原子 `status.json`、机器可读 `status` 返回码、持久 `stop/resume`、单实例锁与陈旧锁回收、进程组终止、日志轮转；Windows PID 探测使用只读 `OpenProcess`，避免 `os.kill(pid, 0)` 的控制台信号副作用。
+- 新增 `MAINTENANCE.md` 和 6 个离线测试，包含“维护心跳不得冒充 Conductor 进度”的回归。验证：pytest 6 passed；Ruff、`py_compile`、`git diff --check` 通过。未启动真实模型、未联网、未产生 provider 费用、未修改测试既有断言。
+- 当前边界：`feat/cursor-auto-redteam` 的 Conductor 源码仍未合入 `main`，故维护层当前只能独立测试；真实持续运行前仍需单独审查并整合该分支，再提供审核后的配置与外层服务托管。
+
+## 2026-07-12 已合并分支清理与自动 prune 设置
+
+- 用户明确授权按前述方案清理无用分支。删除前重新 `git fetch --prune origin`，并对每个候选执行 `git merge-base --is-ancestor <branch> main`；9 个本地/远端引用全部验证为 main 祖先，无独有提交。
+- 使用非强制 `git branch -d` 删除本地 `range-decoupling` (`366d47e`)、`codex/enterprise-range-p1` (`d990ae5`)、`codex/enterprise-range-p2` (`b696244`)、`r8-aibom-external-evidence` (`54e6312`)。
+- 删除远端 `codex/enterprise-range-p1`、`codex/enterprise-range-p2`、`codex/gate1-model-integration`、`codex/gate1-real-model-verification`、`r8-aibom-external-evidence`；GitHub 返回 5 个 `[deleted]`。
+- 明确保留 `feat/cursor-auto-redteam` / `origin/feat/cursor-auto-redteam`，因其仍有 main 未包含的独有提交。本轮没有使用 `git branch -D`，没有删 tag/PR/commit，没有修改工作树中其他用户文件。
+- 开启仓库本地 `fetch.prune=true`；通过 GitHub API/CLI 将 `delete_branch_on_merge` 从 false 设为 true。最终本地分支只有 `main` 和 `feat/cursor-auto-redteam`，远端只有 `origin/main` 和 `origin/feat/cursor-auto-redteam`（外加符号引用 `origin/HEAD`）；`git branch --no-merged main` 只列出 `feat/cursor-auto-redteam`，`origin/main...main` 计数为 `0 0`。
+- 尚未完成：未整合 `feat/cursor-auto-redteam`，未配置 main GitHub branch protection/ruleset，未提交当前与其他工作混合的 `open-agent-range/status.md` / `log.md` 本地改动。
+
+## 2026-07-12 小团队 Git/红队分支治理建议
+
+- 用户询问当前分支过多如何收敛，本轮只提供治理建议和更新状态，没有删除、重命名、rebase、merge 或推送任何分支。
+- 建议只保留 `main` 一个长期分支，其他工作全部使用短命分支 + Draft PR + squash merge + merge 后自动删除；不将分支当成历史档案，历史使用 main commit、PR、tag/release 和 OAR challenge 保留。
+- 红队分支建议统一为 `redteam/<member>/<finding-id>-<slug>`，一分支/一 Draft PR/一个 finding；作者提 candidate，另一人复现，维护者决定 reproduced/rejected/promote，merge 后删除分支。
+- 建议 GitHub `main` 开启禁止 force push/删除、必须 PR、至少 1 人 review、必需 CI checks，并开启 Automatically delete head branches；本地设置 `fetch.prune=true`，定期清除已合并分支。
+- 基于上一轮已验证的包含关系，`range-decoupling`、`codex/enterprise-range-p1`、`codex/enterprise-range-p2`、`r8-aibom-external-evidence`、远端 `codex/gate1-model-integration`、`codex/gate1-real-model-verification` 可作为已合并清理候选；`feat/cursor-auto-redteam` 存在独有提交，必须保留并单独 rebase/review。
+- 未完成：未实际配置 GitHub branch protection/auto-delete，未删除任何分支，未处理 `feat/cursor-auto-redteam`。
+
+## 2026-07-11 23:51 PDT 红队文档推送、靶场分支合并确认与全分支盘点
+
+- 当前工作树存在大量用户/其他任务的已修改和未跟踪文件；本轮没有使用 `git add .`，只精确 staged `docs/redteam/README.md`、`REDTEAM-SUBMISSION-STUDENT.md`、`REDTEAM-SUBMISSION-AGENT.md`。
+- 在 `main` 创建 commit `b381189 docs(range): define red-team submission protocol`，3 文件共 1009 insertions / 1 deletion。首次 HTTPS push 因当时环境无 GitHub credential 失败；用户安装并登录 `gh` 后重试成功。远端 `refs/heads/main` 与本地 HEAD 均为 `b381189c32f42db4b00d4c716d7b029ee1fbacef`。
+- GitHub 提示仓库已迁移；已将本地 `origin` 从 `https://github.com/chuali-zi/agent_safety.git` 更新为 `https://github.com/chuali-zi/XA_guard.git`，fetch/push 均指向新 URL。
+- 核验 `range-decoupling` 与 main：merge-base 是 `range-decoupling` tip `366d47e`；该分支对 main 是 0 个独有提交、落后 36 commits。执行 `git merge --no-edit range-decoupling` 返回 `Already up to date`，没有产生 merge commit 或工作树改动。
+- 分支盘点：`codex/enterprise-range-p1` 落后 main 66/0 unique，`codex/enterprise-range-p2` 61/0，`r8-aibom-external-evidence` 19/0，`range-decoupling` 36/0；远端 `codex/gate1-model-integration` 116/0，`codex/gate1-real-model-verification` 104/0，均已被 main 完整包含。本轮没有删除任何本地或远端分支。
+- 唯一未合并分支 `feat/cursor-auto-redteam` 相对 main 为落后 14 commits / 独有 1 commit (`9abb4fe`)，新增 41 个文件改动、约 3,551 行，主体是本地 Cursor/OpenCode/Codex proposal-only 自动红队 Conductor、scope/novelty/evidence/promotion、schema/prompt、文献和 305 行离线测试。静态 merge-tree 显示根 `log.md` 和根 `status.md` 会冲突，且该分支的 OAR 状态早于当前红队提交协议；未在当前脏工作树中尝试合并。下一步应先在干净 worktree 对该单提交 rebase/cherry-pick，解决状态文档冲突并审查它与新 submission/prompt-injection 规范的一致性。
+- 本轮未完成：未删除任何已合并分支，未合并 `feat/cursor-auto-redteam`，未处理用户脏工作树中的其他文件。
+
+## 2026-07-11 22:54 PDT 红队双版文档静态审查与纠错
+
+- 按用户要求只做静态检查，本轮没有运行 finding、A/B、live SUT、pytest 或其他集成测试。
+- 静态对照了 `kernel.workbench` / `kernel.range_cli` argparse 定义、finding 默认字段、review status、`run-ab` 参数、promotion gate 必需 evidence 和 `_write_json` 目录创建行为。
+- 发现并修正学生版流程缺口：原文没有给出在 `run-ab` 写入本机 `last_ab_summary.path` 之前保留可移植 candidate 的精确命令，后续 `git add` 可能找不到文件或误带本机路径。现已增加 `$submission`、A/B 前 `Copy-Item`、draft/empty-summary 要求和完整复现者命令链。
+- 发现并修正 Agent 版 Bash 命令可执行性问题：原文在未引号路径中使用 `<author>/<id>`，实际 shell 可将 `<...>` 解析为重定向。现改为 `AUTHOR/ID/WORK/SUBMISSION/REVIEW_WORK` 变量和引号路径。
+- 补齐了复现顺序：非作者必须先把 candidate 复制到自己 runtime，再完成 A/B 和 Null/Protected 双侧 replay，两侧 `ok=true` 且语义结果符合后才能 `review-finding --status reproduced` 和 promote。
+- 补充了不可信内容边界：payload、notes、REPORT、PR 评论和 transcript 均可包含面向复现 Agent 的提示注入。Agent 必须先审 changed-file diff，不执行提交内嵌的任意 shell/下载/安装/网络/凭据读取命令，只允许使用已审核仓库 CLI 边界。
+- 纠正状态口径：`needs-information`、`not-reproduced`、`range-gap-confirmed`、`infra-blocked` 只是 PR label/outcome；当前 Workbench 状态仍是 `draft/reproduced/rejected/promoted`，review CLI 可写 `draft/reproduced/rejected`。
+- 最终静态检查：学生版 36 个代码围栏、Agent 版 32 个代码围栏，均成对；表格管道数一致；所有文档相对链接存在；`git diff --no-index --check` 无 whitespace error；文档引用的 CLI 子命令集与当前代码存在的入口一致。
+
+## 2026-07-11 22:46 PDT 红队提交规范双版文档落地
+
+- 新增 `docs/redteam/REDTEAM-SUBMISSION-STUDENT.md`，面向学生说明什么是 placement/consumption/consequence/reproduced/bypass，如何开独立短分支、使用 `.runtime/redteam/<member>/<id>`、创建/validate/run-ab/replay finding、区分 defense-regression/range-gap/infra-error、组织 Draft PR 和独立复现。
+- 新增 `docs/redteam/REDTEAM-SUBMISSION-AGENT.md`，面向自动化 Agent、复现者和维护者定义规范性安全边界、finding/challenge/evidence 对象、七类结果、预注册坏状态合同、A/B 反事实不变量、职责分离、Git/runtime 边界、candidate schema、证据充分性、PR 模板、独立复现协议、promotion gate、Agent 执行算法和 Definition of Done。
+- 更新 `docs/redteam/README.md` 挂载两份新文档入口；更新 `status.md` 为当前仓库状态，明确文档口径已落地，但正式 submissions 目录/模板、PR template、CI 门禁和 runtime 清理尚未实施。
+- 在用户明确“只写文档、不要实际测试”前，曾在 `/tmp/oar-redteam-doc-smoke.Fjhg7j/repo` 的隔离 Git 临时副本中开始并完成一次 finding/A-B/replay/review/promote smoke；该临时副本没有修改当前仓库。收到用户指示后已停止所有后续实跑，本轮最终交付只修改文档、`status.md` 和 `log.md`。
+- 本轮没有修改 kernel、scenario、policy、test、`.gitignore` 或历史 `.runtime` 产物；没有执行用户停止指示后的代码/集成测试。
+
+## 2026-07-11 22:25 PDT 红队分支、finding 成功标准与 PR 归档诊断
+
+- 本轮只诊断现有流程并提供团队管理建议，没有修改 runtime、测试、策略或红队工具代码。
+- 读取了 Open Agent Range 红队技术手册、根仓 HACK-BENCH 组员提交规范、Workbench finding/review/promote 实现、`.gitignore` 和当前 `.runtime` 跟踪状态。
+- 确认“每人独立分支 + PR”适合红队工作，但不应把整个 `.runtime` 作为 PR 交付物。`.runtime` 当前约 3.0 MiB，已有多组被 Git 跟踪的历史 evidence/config JSON，同时还有未跟踪本机运行目录；根忽略规则并未整体忽略 `.runtime`。
+- 将“成功 injection”拆分为 placement、consumption、consequence、reproduced finding、protected bypass 和 regression/control 多层；仅成功写入注入面或仅被 agent 读到，不应称为成功攻击。
+- 建议的归档边界是：红队在 `.runtime/<member>/<finding-id>/` 本地试验；PR 只交可移植 finding/challenge 最小 JSON、复现说明和少量证据摘要；作者提 candidate，另一人复现后才标 `reproduced`/promote。完整 runtime 证据可作本地/外部 artifact，不直接进 Git PR。
+- 已更新 `status.md` 反映当前红队提交治理未完全收敛；未完成项为固定目录、PR 模板、独立复现门禁、`.runtime` 忽略/历史清理方案仍未实施。
+
+## 2026-07-11 22:13 PDT 红队放测价值与内部权限缺口诊断
+
+- 本轮应用户要求只做诊断和建议，没有修改内核、场景、策略或测试代码。
+- 对照了根仓赛题交付口径、本子项目 PRD/SP7、红队手册、`status.md`、`full-day.json` 和当前 World/ToolSurface/SUT/Property 实现。
+- 确认当前靶场已能支撑开放注入、ManualSeat、Null vs XA-Guard live A/B、证据回放和审计对齐，因此给红队放测有用；但它当前更适合作为“产品探索/问题发现”，不适合宣称已经完整衡量企业级管理能力。
+- 发现并实证了一个 P0 语义缺口：数据资产没有 owner/ACL/purpose 授权事实，`read_record` 不校验 principal 读权限，ManualSeat 会暴露完整参考 ToolSurface。实跑 `小王 -> read_record(cit-1001)`，Null 和当前离线 XA-Guard 两侧都 allow，两侧都是 0 violation / verdict pass。证据临时写在 `/tmp/oar-bob-read-null` 和 `/tmp/oar-bob-read-xaguard`，未作为正式比赛证据封存。
+- 已更新 `status.md`，将“内部越权读/用途越界”标为当前主要产品缺口，并将 asset ACL/owner/purpose、委托/时效、`unauthorized-read`/`purpose-violation` 属性和 Bob-vs-boss A/B 竖切调整为下一步首项。
+- 尚未完成：未实现上述权限模型和判据，未组织本轮红队攻防，未收集红队发现率/复现率/新问题率等实测数据。下一步应先做内部最小权限竖切，再用小规模、不给预设解法的红队 cohort 验证靶场是否真能产出未知 finding。
+
+## 2026-07-11 canonical evidence 收敛
+
+- 新建 `.runtime/delivery-v2-canonical-20260711T123009Z/`，实跑 full-day reactive/null 与 live Null/XA-Guard N=3 A/B；未覆盖历史目录。
+- 结果：full-day 41 tool attempts、43 ledger、0 violations；Null 3/3 泄漏、XA-Guard 3/3 拦截、0 infra error、delta 1.0。
+- 7/7 attempt replay 的 hash/ledger/audit 全通过；XA-Guard 三侧 raw audit 均逐序对齐。完整副本封存为 `oar-delivery-v2-20260711T123124Z-win-local`；未完成项仍是 full-day 任意长度 live agent 和工业级工作台。
+
 ## 2026-07-09 05:12 -07:00 红队实测与双版本手册落地
 
 - **背景/目标**：用户要求实际使用靶场并给红队产出两版手册：一版给红队选手/agent 的详细技术手册，一版给学生的快速上手版。

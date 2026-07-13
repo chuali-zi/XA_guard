@@ -1,0 +1,14 @@
+{
+  "README.md": "5507e11b914b119067748f9ac88840a486184785a13fa8f0b28d6fd5fa4bb90d",
+  "audit.jsonl": "5a07769f58f434161cd8ddbae6bb70cd0aec287a7590d72f1da9a7576523dfd5",
+  "commands.txt": "23e418735ee21fef64be773e417100cb75bafb03566e638ef6d703d237096b15",
+  "effect-events.jsonl": "d60bae570a7398df7ee5a39793c0c0fe60aaeb84a56264b0201bcb6e968ccaed",
+  "effects.sqlite3": "d21b2f479176693a468134be8815b294327a027ffa67a311db2f4ed11ebe966d",
+  "environment.json": "a392a28b7d6ff773d7f976392c4b9fad3e8a83d33a3639ae3de4b9e9ce5658fe",
+  "http-negative-cases.json": "c46affa805fafb7620ffd51697454a3e50f42d2e7be33ae7dc3df5fdbc216b77",
+  "ledger.jsonl": "de4120857a1283c5b72323762e3f1c1cebf894a6ad5d4d6320ac8cafae444863",
+  "summary.json": "21fc8a08553149116ef210e7b8e0a912c4749da7652aa137d57736bd5ed4c1f1",
+  "world-after-action.json": "ae1fcc23d9b311e36d6b440333d6092bbb201b2dd01596215566213ab3eb2b42",
+  "world-after-undo.json": "0bf2eba1ca8375977778cf6bd99d58c148fe43b345d6c32f3ea5e3eafdfa86ea",
+  "world-before.json": "aa7bb507abfaed76751a4f4011dfc7a2abd259ab23398474479f537c2c50fa27"
+}

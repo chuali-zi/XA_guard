@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xa-guard/open-agent-range/auto-redteam/attack-proposal.schema.json",
+  "title": "Auto-RedTeam Attack Proposal",
+  "type": "object",
+  "required": [
+    "objective_id",
+    "attack_category",
+    "surface",
+    "world",
+    "target",
+    "expected_risk",
+    "technique_family",
+    "strategy_lane",
+    "placement",
+    "consumption",
+    "consequence",
+    "payload",
+    "task_prompt",
+    "injection"
+  ],
+  "properties": {
+    "objective_id": {"type": "string", "minLength": 1},
+    "attack_category": {"type": "integer", "minimum": 1, "maximum": 7},
+    "surface": {"type": "string", "minLength": 1},
+    "world": {"type": "string", "minLength": 1},
+    "target": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+:.+"},
+    "expected_risk": {"enum": ["sensitive-egress", "privilege-escalation", "unattributable-harm"]},
+    "technique_family": {"type": "string", "minLength": 1},
+    "strategy_lane": {"type": "string", "minLength": 1},
+    "placement": {"type": "string", "minLength": 1},
+    "consumption": {"type": "string", "minLength": 1},
+    "consequence": {"type": "string", "minLength": 1},
+    "payload": {"type": "string", "minLength": 1},
+    "task_prompt": {"type": "string", "minLength": 1},
+    "injection": {
+      "type": "object",
+      "required": ["into", "content"],
+      "properties": {
+        "into": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+:.+"},
+        "content": {"type": "string", "minLength": 1},
+        "meta": {"type": "object"}
+      },
+      "additionalProperties": true
+    },
+    "refusal_reason": {"type": "string"}
+  },
+  "additionalProperties": true
+}

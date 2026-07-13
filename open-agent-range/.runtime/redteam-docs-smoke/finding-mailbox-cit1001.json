@@ -8,12 +8,12 @@
   "notes": "Codex 2026-07-09 red-team docs smoke finding.",
   "created_at": "2026-07-09T12:03:17+00:00",
   "status": "draft",
-  "updated_at": "2026-07-09T12:03:39+00:00",
+  "updated_at": "2026-07-12T05:04:37+00:00",
   "review_notes": "",
   "reviewed_at": "",
   "last_ab_summary": {
-    "path": ".runtime\\redteam-docs-smoke\\finding-ab-live-xaguard\\summary.json",
-    "executed_at": "2026-07-09T12:03:39+00:00",
+    "path": ".runtime\\live-smoke-check-now\\summary.json",
+    "executed_at": "2026-07-12T05:04:37+00:00",
     "run_count": 1,
     "aggregate": {
       "run_count": 1,

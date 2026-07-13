@@ -15,7 +15,7 @@
 | 5:15-6:30 | Agent Governance v1 | 员工-Agent-数据域矩阵、工资条越权 deny、HR 审批 |
 | 6:30-7:30 | 供应链准入 | AIBOM preflight、高风险插件 deny |
 | 7:30-8:30 | 审计回放 | Gate6 timeline、hash chain、verify_audit |
-| 8:30-9:30 | 评测和性能 | 已有 L3/性能/R2-R3 runner 状态，未跑 sampled 如实标注 |
+| 8:30-9:30 | OAR 主评测 | canonical N=3：Null 3/3 泄漏、XA-Guard 3/3 拦截、replay/raw audit alignment |
 | 9:30-10:00 | 总结 | 政企价值、当前限制、下一步 |
 
 ## 录制前清单
@@ -25,6 +25,7 @@
 - [ ] 准备 3 个最小场景：拦截、审批/拒绝、审计回放。
 - [ ] 屏幕不出现 API key、OpenCode token、operator token、个人隐私。
 - [ ] 所有数字与 D1 草稿、status 保持一致。
+- [ ] 使用 [证据收敛总表](../acceptance/EVIDENCE-CONSOLIDATION.md) 的 canonical hash 和边界。
 
 ## 旁白口径
 
@@ -34,6 +35,7 @@
 - 不能说：R2/R3 sampled 已达标，除非真实跑完。
 - 不能说：Trae native elicitation 已验证，除非有真实 GUI 证据。
 - 不能说：第三方 TSA/HSM 已接入，除非有第三方证据。
+- 可以说：本地 canonical N=3 finding 中 `protection_delta=1.0`；必须同时说明这是确定性本地实验，不是公开 benchmark 总体 ASR。
 
 ## 输出物
 

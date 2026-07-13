@@ -1,0 +1,76 @@
+# Production profile. Replace the JWKS path and inject both secrets via the
+# environment; XA-Guard intentionally has no development-key fallback.
+xa_guard:
+  upstream:
+    transport: streamable-http
+    host: 127.0.0.1
+    port: 3000
+
+  downstream:
+    - name: business_api
+      command: ["python", "-m", "demo.targets.business_api_target"]
+      transport: stdio
+      env_passthrough:
+        - BUSINESS_API_BASE_URL
+        - BUSINESS_API_KEY
+        - BUSINESS_API_TIMEOUT_SECONDS
+        - BUSINESS_API_ALLOW_INSECURE_LOCAL
+        - BUSINESS_API_ENV_FILE
+
+  identity:
+    enabled: true
+    required: true
+    required_scopes: [xa.invoke]
+    max_token_ttl_seconds: 300
+    clock_skew_seconds: 30
+    issuers:
+      - issuer: https://id.example.gov/agent-tokens
+        audiences: [https://xa-guard.example.gov/mcp]
+        jwks_file: /etc/xa-guard/identity-jwks.json
+        algorithms: [RS256, ES256, EdDSA]
+
+  resilience:
+    enabled: true
+    contracts_file: policies/baseline/tool_effects.yaml
+    store_path: ./logs/resilience/effects.sqlite3
+    key_env: XA_GUARD_RECOVERY_KEY
+
+  governance:
+    enabled: true
+    registry_file: configs/governance.enterprise-static.yaml
+    default_tenant: acme-corp
+
+  gates:
+    gate1:
+      enabled: true
+      patterns_file: policies/baseline/gate1_input_patterns.yaml
+    gate2:
+      enabled: true
+      hitl_required_for: [red]
+      approval_token_ttl_seconds: 300
+      prefer_layered: true
+    gate3:
+      enabled: true
+      backend: python
+      policy_file: policies/baseline/gate3_rules.yaml
+      prefer_layered: true
+    gate4:
+      enabled: true
+      strict_mode: true
+      tool_capabilities_file: policies/baseline/gate4_capabilities.yaml
+      prefer_layered: true
+    gate5:
+      enabled: false
+    gate6:
+      enabled: true
+      audit_dir: ./logs/identity-undo-audit
+      hash_algo: sha256
+      signature_mode: none
+    policy_layered:
+      enabled: true
+      baseline_manifest: policies/baseline/manifest.yaml
+      overlay_root: policies/overlay
+      hot_reload: true
+
+  pending_approvals_path: ./logs/runtime/identity_undo_pending.jsonl
+  tool_capabilities_file: policies/baseline/gate4_capabilities.yaml

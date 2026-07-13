@@ -1,9 +1,11 @@
 # XA-Guard PRD · 产品需求文档
 
+> ⚠ **比赛交付口径（2026-07-11 起）**：以 [`docs/acceptance/DELIVERY-v2.md`](../acceptance/DELIVERY-v2.md) 为权威。本 PRD 的 KPI、`subscription_budget60_v1`、L3 必验等 **不** 自动构成当前提交承诺；主评测叙事为 Open Agent Range Tier B。工程 L3 见 [L3-test-and-acceptance.md](../acceptance/L3-test-and-acceptance.md)（已弃用为比赛承诺）。
+>
 > ⚠ **本文档遵循 [`docs/source-of-truth/事实源.md`](../source-of-truth/事实源.md) 作为权威事实源**。如有冲突以事实源为准。
 > 上次纠偏：2026-05-24（基于事实源 v1.1）
 >
-> **文档定位**：项目最重要的"标尺"。让团队知道"什么时候算做完"、"做到什么程度算好"。**所有目标量化、客观、可勾选**。
+> **文档定位**：产品目标与 KPI **研究标尺**（How well we aspired）。**什么时候算「比赛交卷」**见 DELIVERY-v2 Tier A/B/C。
 >
 > **读者**：① 项目所有成员（必读，每周对照检查）② 雄安专家评审 ③ 未来接入方
 >

@@ -1,0 +1,12 @@
+{
+  "README.md": "a3859a6363aa4a791b2ad79e391fb639200755f3087e0cabcd80670cd30e4ae5",
+  "audit.jsonl": "330b7441033feefee8fcf1b3cf215d017d2b9ccc3cc62d93c8bc68cce11d5b39",
+  "commands.txt": "a8e57b541ed80610544b3fadf836ab69025a73c9d154345eb0f63dd7716d045a",
+  "effect-events.jsonl": "897150e8f5a253772400351fd98c6e6ae512c0980c5ed3f44abee5824b503c30",
+  "environment.json": "a392a28b7d6ff773d7f976392c4b9fad3e8a83d33a3639ae3de4b9e9ce5658fe",
+  "ledger.jsonl": "d64efba4f8c51e5a41318be54e78121d719c4206d511502d16be98394a721da6",
+  "summary.json": "16e1a7e92b75c4fd9353f17ffaf77dfce9451f547387b1db31c0fba51f23d5c1",
+  "world-after-action.json": "ae1fcc23d9b311e36d6b440333d6092bbb201b2dd01596215566213ab3eb2b42",
+  "world-after-undo.json": "aecb69778415a4da06b443d9c7a4b300f3a8c46fa2a564ba549ed4a35435f758",
+  "world-before.json": "5a51947fca32397287d67ef2dfa6b1f759e37b8411f2376be7dc85154dcbcda7"
+}

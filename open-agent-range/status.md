@@ -1,8 +1,10 @@
 # Open Agent Range 状态
 
-更新时间：2026-07-09 05:12 -07:00
+更新时间：2026-07-12 PDT
 
 ## 当前结论
+
+2026-07-11 已重新生成并标准封存比赛 canonical 证据：`oar-delivery-v2-20260711T123124Z-win-local`。Full-day 为 41 tool attempts / 43 ledger / 0 violations；live A/B 为 N=3，Null 3/3 泄漏、XA-Guard 3/3 拦截、0 infra error、`protection_delta=1.0`；7/7 attempt replay 全通过。sealed SHA-256 为 `cffa89fb2ded79cb17685348bfb6571d85c3c233ad963528ca79b89e2ec49aa5`，详见根仓 [证据总表](../docs/acceptance/EVIDENCE-CONSOLIDATION.md)。
 
 仓库当前是 **SP2+ 六域活世界竖切增强 + full-day 关键业务副作用大幅迁出 scheduled tape + F3/F10/F11/F13/F14 多角色业务链路 + SP3 多面注入落位/读侧扩展 + 语义型注入 consequence（plugin/mcp -> tool-surface-drift，supply/aibom -> supply-chain-drift，policy -> policy-exception-abuse，plugin/mcp -> sandbox-escape-attempt）+ SP4.1 finding 队列/审核/Null vs GuardStub/XA-Guard A-B 入口 + ManualSeat CLI 单步/多步手动尝试入口 + ReactiveSeat 本地 observe-plan-act full-day + Workbench 本地 API 可执行多步 manual-session / finding save-list-review-promote / A-B run / evidence summary / evidence compare detail / evidence run catalog + promote 证据门禁检查 protected audit/ledger alignment + SP5 最小追责/审批绕过竖切 + Guard/XA-Guard 类 SUT 裁决事实进入 hash ledger + `replay --verify-sut-audit` 逐序对齐 tool-events/range audit/ledger decision/raw XA-Guard audit + `Ledger.replay()` projection v1 + `range day/replay/report/sut check/workbench serve` 产品命令入口 + OpenCode 多轮 day 产品级 mock 回归 + attempt 级真实 XA-Guard live SUT session + `null,xaguard --live --repeat 3` 红队 A/B 证据矩阵 + SP6/SP7 最小证据包补强（含 `agent-transcript.jsonl` / `sut-session.json`） + SP7 产品完成态 spec 已补强**。
 
@@ -11,6 +13,18 @@
 当前最接近完成态的部分是：`full-day.json` 的关键业务副作用已基本迁到多 seat ToolSurface 调用，`scheduled_events` 仅保留外部/背景事实（告警到达、日志/工单可读、低风险审批超时）；F5 运维告警→审批→重启由 `赵工 read_log -> request_approval` 与 `钱主管 approve -> restart_service` 推动；F3、F10、F11 已形成跨角色业务链路；F13/F14 已有 `王安全 approve -> 郑治理 modify_policy/send_message(内部通知) -> 钱审计 replay_trace/verify_chain/export_evidence` 的下午治理审计链；Dev/Gov/Audit 的 CI、插件发布、注册表更新、策略例外、trace replay、证据导出也带审批链落账；`plugin/mcp` 有 `tool-surface-drift` 与 attempt 级动态 ToolSurface；`supply/aibom` 有 `supply-chain-drift`；最小 live `XaGuardSUT` 与最小证据包已可用。
 
 当前仍 **不能** 宣称“完美完成态”。核心缺口是：正常组织行为虽已可通过 `ReactiveSeat` 以 `act -> on_tool_result -> follow-up` 的本地 observe-plan-act 状态机分步运行，但该状态机仍带 deterministic 业务规则，不是真正全席位 live/OpenCode 任意长度自主 observe-plan-act；Workbench 已具备可用红队闭环，但还不是完整 Web 产品：缺真正地图画布、多注入编排、权限化后台和完整 replay/report dashboard；SP7 九类属性族已有最小覆盖，但 policy/sandbox/insider 仍是最小世界事实判据，不是真实策略引擎、真实沙箱执行器或真实权限系统。已经收敛完成的是：live XA-Guard 不再是每 ToolCall 重启的 per-call smoke，而是 attempt 级 session；真实 `null,xaguard --live --repeat 3` 矩阵已能产出保护增量、无 infra error，并可通过 hash/ledger/SUT audit/raw XA-Guard audit replay 校验。因此当前状态可描述为 **基本红队可用的开放靶场竖切**，而非最终工业级完整沙盘。
+
+组织内部最小权限是当前最重要的语义缺口：场景已声明 principal/role/domain，SeatContext 也可限制席位所见摘要和工具名，但数据资产尚未声明 owner/ACL/purpose/delegation 等授权事实，`read_record` 执行体也不校验 principal 对指定 asset 的读权限。ManualSeat 还会为指定 principal 暴露整个参考 ToolSurface。2026-07-11 最小实证中，`小王 -> read_record(cit-1001)` 在 Null 与当前离线 XA-Guard 两侧均 allow，且均被靶场判为 0 violation / verdict pass。因此仓库目前能证明“越边界外发可检测/可防护”，但还不能证明“老板 agent 可读、普通员工 agent 不可读”这类企业内部授权隔离。
+
+红队提交治理已有双版文档口径：`docs/redteam/REDTEAM-SUBMISSION-STUDENT.md` 面向学生，定义成功层级、短分支、`.runtime` 本地实验边界、Draft PR、独立复现和提交前检查；`docs/redteam/REDTEAM-SUBMISSION-AGENT.md` 面向 Agent/复现者/维护者，定义 placement/consumption/consequence、defense-regression、protected-bypass、range-gap、infra-error、坏状态合同、A/B 不变量、evidence/PR/promotion gate 和职责分离。两份文档都明确 `.runtime` 不作为整树 PR 交付物，不允许通过修改测试/降级策略让 finding 成功。尚未工程落地的是正式 `redteam/submissions` 目录/模板文件、PR template、CI schema/diff 门禁，以及 `.runtime` 忽略与历史跟踪产物的单独清理方案。
+
+两份新文档已完成纯静态一致性检查：Markdown code fence 成对（学生版 36、Agent 版 32），表格列数一致，相对链接存在，无 diff whitespace error，文档所用 `workbench` / `range_cli` 子命令和参数与当前 argparse 定义对齐。静态审查已修正：A/B 前复制可移植 candidate 的时点、复现者完整 A/B/replay/review/promote 顺序、Bash 裸 `<author>/<id>` 重定向风险、`needs-information` 非 Workbench status 的口径，以及 Agent 对不可信 payload/REPORT/PR 的 prompt-injection/任意命令执行边界。本结论只是静态文档校验，不声称本轮又做了新的 A/B/live 运行验证。
+
+Git 集成状态：远端默认分支仍为 `origin/main@b381189`。本地发布分支 `agent/identity-undo-repo-cleanup` 已以 `36d503f` 完成 `feat/cursor-auto-redteam` merge，并以 `c482b29` 收入 maintenance 修正与 live smoke 证据；在远端 PR 合并前不得表述为默认分支已发布。`origin` 指向 `https://github.com/chuali-zi/XA_guard.git`。
+
+Auto-RedTeam Conductor 与 `auto-redteam/maintain.py` 已端到端运行。模型分工固定为外层 Codex `gpt-5.6-sol` 生成 proposal，靶场内部 OpenCodeSeat 默认 `deepseek/deepseek-v4-flash`；维护器覆盖进程/进度健康、异常恢复、退避熔断、持久 stop/resume、陈旧锁恢复和业务连续错误熔断。mailbox/rag/ticket/rag-index 已生成 proposal/finding并完成 Null vs XA-Guard A/B；最新成功封存的 scope 对齐 run `oar-localrt-20260713T031843Z-chuali` 为诚实 `LIMIT`，其后 tool-args 尝试截至 `032915` 均为 `INFRA_ERROR`。本地 maintainer 已正常完成，当前没有宣称后台仍在运行；完整能力待发布分支 PR 合并。
+
+分支治理已部分工程化：`main` 作为唯一长期产品分支；功能/修复/文档和红队 finding 使用短命分支，尽早开 Draft PR，通过 squash merge 进 main 后删除 head branch；红队分支统一命名 `redteam/<member>/<finding-id>-<slug>`，一分支只承载一个 finding，作者不能自己宣布 reproduced。已合并分支不用作历史档案，历史由 main commit/PR/tag/challenge 保留。本仓库本地 Git 已设置 `fetch.prune=true`，GitHub `delete_branch_on_merge` 已从 false 开启为 true，后续 PR 合并后远端 head branch 会自动删除。尚未实施的是 main branch protection/ruleset（禁止 force push/删除、必须 PR/review/CI），这需根据团队当前工作流另行确认。
 
 2026-07-09 本机再次复核：`python -m pytest kernel/tests -q` 通过；`python -m kernel.demo --scenario scenarios/dctg/full-day.json` 通过，正常日账本 46 条、零违规；`python -m kernel.range_cli day --world scenarios/dctg/full-day.json --agent reactive --sut null --evidence-dir .runtime/reactive-day-check` 通过，41 次工具尝试、43 条 ledger、零违规；随后 `python -m kernel.range_cli replay --attempt .runtime/reactive-day-check --verify-hashes --verify-ledger --verify-sut-audit --json` 通过，artifact hash 15 项、ledger projection 与 audit/tool-events 对齐通过。故“基本红队可用、但未达工业级完整沙盘”的判断在 2026-07-09 仍成立。
 
@@ -136,9 +150,12 @@
 
 ## 下一步
 
-1. 把 deterministic `scripted_plans_for_scenario()` 升级为可替换的 full-day observe-plan-act seat loop：支持 OpenCode/ManualSeat 任意长度多轮、跨 tick 观察工具输出、失败重试和人工注入红队操作，而不是按 principal 写死计划。
-2. 继续把 `XaGuardSUT(live=True)` 从 attempt 级 session 推进到更完整的 live 运行产品：支持 full-day/opencode live 矩阵、长时间多 attempt session 池、真实下游世界同步和更深 Gate6/range ledger 对齐；当前 `run-ab --sut-mode null,xaguard --live --repeat 3` 已有有效证据。
-3. 让账本记录每一次 `tool_attempt/sut_decision`，实现 Gate6 audit 与 range ledger 的 hash/seq 对齐，deny/proxy 也能追责。
-4. 把 `Ledger.replay()` 从 full-day 关键终态 projection 扩展到真实/动态工具完整 replay，并把 `range replay/report` 从摘要 CLI 升级为完整可浏览 evidence dashboard。
-5. 扩展工作台到更完整 Web 后端：真正地图画布、多注入编排、live N>=3 A/B 矩阵、evidence 并排审核和 replay/report dashboard；当前 `workbench serve` 已有本地 `manual-session`、`save/list/review/promote-finding`、`run-ab`、`show-evidence` API。
-6. 继续深化语义型注入 consequence：plugin/mcp 接真实 MCP downstream/策略拦截；supply/aibom 接真实构建/包管理器模拟；insider 接权限/seat 行为变化；policy/sandbox 接真实策略例外生命周期和真实沙箱执行器。
+1. 独立审查并整合 `feat/cursor-auto-redteam`，解决状态文档冲突；随后用审核配置执行 maintainer + Conductor 端到端故障注入，确认 crash、hang、stop、预算耗尽和重启熔断行为。
+2. 先补“组织内部越权读”竖切：在场景数据中声明 asset ACL/owner/purpose、principal/role/domain 授权和委托/时效；将真实授权校验放在 SUT/受代理工具边界，并新增 `unauthorized-read` / `purpose-violation` 地面真值属性与 Bob-vs-boss A/B 证据。
+3. 将已写入双版文档的红队提交协议工程化：新增正式 `redteam/submissions` 目录与 finding/REPORT/evidence-summary 模板、PR template、schema/diff CI 门禁；`.runtime` 忽略和历史跟踪产物清理需单独评审，不在本次文档任务内擅自删除。
+4. 把 deterministic `scripted_plans_for_scenario()` 升级为可替换的 full-day observe-plan-act seat loop：支持 OpenCode/ManualSeat 任意长度多轮、跨 tick 观察工具输出、失败重试和人工注入红队操作，而不是按 principal 写死计划。
+5. 继续把 `XaGuardSUT(live=True)` 从 attempt 级 session 推进到更完整的 live 运行产品：支持 full-day/opencode live 矩阵、长时间多 attempt session 池、真实下游世界同步和更深 Gate6/range ledger 对齐；当前 `run-ab --sut-mode null,xaguard --live --repeat 3` 已有有效证据。
+6. 让账本记录每一次 `tool_attempt/sut_decision`，实现 Gate6 audit 与 range ledger 的 hash/seq 对齐，deny/proxy 也能追责。
+7. 把 `Ledger.replay()` 从 full-day 关键终态 projection 扩展到真实/动态工具完整 replay，并把 `range replay/report` 从摘要 CLI 升级为完整可浏览 evidence dashboard。
+8. 扩展工作台到更完整 Web 后端：真正地图画布、多注入编排、live N>=3 A/B 矩阵、evidence 并排审核和 replay/report dashboard；当前 `workbench serve` 已有本地 `manual-session`、`save/list/review/promote-finding`、`run-ab`、`show-evidence` API。
+9. 继续深化语义型注入 consequence：plugin/mcp 接真实 MCP downstream/策略拦截；supply/aibom 接真实构建/包管理器模拟；insider 接权限/seat 行为变化；policy/sandbox 接真实策略例外生命周期和真实沙箱执行器。

@@ -91,8 +91,12 @@ async def run_server(cfg: XAGuardConfig) -> None:
     router = DownstreamRouter(cfg.downstream)
     await router.start()
     try:
+        resilience_manager = None
+        if cfg.resilience.enabled:
+            from xa_guard.resilience import ResilienceManager
+            resilience_manager = ResilienceManager(cfg.resilience)
         if cfg.upstream.transport == "stdio":
-            await run_stdio(pipeline, router)
+            await run_stdio(pipeline, router, resilience_manager)
         else:
             await run_streamable_http(
                 pipeline,
@@ -100,6 +104,7 @@ async def run_server(cfg: XAGuardConfig) -> None:
                 cfg.upstream.host,
                 cfg.upstream.port,
                 cfg.upstream.session_idle_timeout_seconds,
+                resilience_manager,
             )
     finally:
         watcher = getattr(pipeline, "overlay_watcher", None)

@@ -1,14 +1,16 @@
 # D1 技术方案报告草稿
 
 > 目标：最终导出为 30 页以内 PDF。
-> 写作原则：只写已有证据能支撑的结果；未跑完的真实环境和外部依赖写成限制或后续工作。
-> 最高依据：[../source-of-truth/XA-202620中国雄安集团数字城市科技有限公司-面向政企场景的大模型智能体安全关键技术研究比赛方案.pdf](../source-of-truth/XA-202620中国雄安集团数字城市科技有限公司-面向政企场景的大模型智能体安全关键技术研究比赛方案.pdf)
+> 交付口径：[../acceptance/DELIVERY-v2.md](../acceptance/DELIVERY-v2.md)
+> 写作原则：主实验 = Open Agent Range A/B + 六关 demo/audit；只写已有证据；退役项写 out-of-scope，不写 blocker。
+> 赛题依据：[../source-of-truth/XA-202620中国雄安集团数字城市科技有限公司-面向政企场景的大模型智能体安全关键技术研究比赛方案.pdf](../source-of-truth/XA-202620中国雄安集团数字城市科技有限公司-面向政企场景的大模型智能体安全关键技术研究比赛方案.pdf)
 
 ## 1. 摘要
 
-- 项目一句话：XA-Guard 是面向政企智能体的 Agent Gateway 和双面 MCP 安全代理。
+- 项目一句话：XA-Guard 是面向政企智能体的 Agent Gateway 与双面 MCP 安全代理。
 - 覆盖方向：输入攻击识别、工具执行约束、供应链安全、评测审计溯源。
-- 当前结论：核心原型与 L3 静态实现具备，最终真实验收仍有阻塞项。
+- 主评测结论：Open Agent Range 企业场景竖切下，Null vs XA-Guard live A/B 观测到可复核的 `protection_delta`；六关卡 demo 与审计链可回放。
+- 当前边界：D1/D3/D4 交付物进行中；不以 AgentDojo ASR 或 budget60 作为本文达标声明。
 
 ## 2. 问题分析
 
@@ -22,62 +24,91 @@
 - XA-Guard MCP Server：对 IDE/智能体暴露安全代理。
 - XA-Guard MCP Client：连接真实下游工具。
 - 六关卡：Gate1 输入、Gate2 审批、Gate3 策略、Gate4 污点、Gate5 沙箱、Gate6 审计。
-- Agent Governance v1：员工、Agent、数据域、预算和审批的本地治理预检。
+- Agent Governance v1：员工、Agent、数据域、预算和审批的本地治理预检（默认关闭）。
+- Open Agent Range：独立企业红队靶场，XA-Guard 作为 live SUT，产出 Tier B 主证据。
 
 ## 4. 关键技术一：复杂输入链路攻击识别
 
-- 已有：规则检测、Spotlighting、模型后端接入、holdout 协议。
-- 可写证据：以 [../gates/gate1-real-model-verification.md](../gates/gate1-real-model-verification.md) 和 [../gates/gate1-holdout-protocol.md](../gates/gate1-holdout-protocol.md) 为准。
-- 边界：正式独立 holdout 未完成时，不写正式 Recall/FPR 达标。
+- 已有：规则检测、Spotlighting、模型后端接入、CSAB-Gov-mini 290 seed。
+- 可写证据：[../gates/gate1-real-model-verification.md](../gates/gate1-real-model-verification.md)；OAR 注入面与 Gate1 联动 demo。
+- 边界：独立 holdout / formal dual-500（原 R1）**已退役**；holdout 协议仅研究资产，不写正式 Recall/FPR。
 
 ## 5. 关键技术二：工具调用与任务执行安全
 
-- 已有：Gate2 风险分级、HITL/pending、Gate3 policy、Gate4 taint、Gate5 沙箱配置。
-- 可写证据：L3 静态 verifier、MCP e2e、审计日志、pending ledger。
-- 边界：真实 Trae GUI 和 Linux gVisor/runsc 仍按 `BLOCKED` 写。
+- 已有：Gate2 风险分级、HITL/pending、Gate3 policy、Gate4 taint、Gate5 沙箱、Docker deploy。
+- 可写证据：L3 静态 verifier、MCP e2e、审计日志；OAR seat/SUT/ToolSurface 全链路。
+- 边界：Trae native elicitation、gVisor runsc 全验收 **已退役** 为硬承诺；演示可用 pending fallback 与支持 elicitation 的客户端。
 
 ## 6. 关键技术三：插件与供应链安全
 
-- 已有：内部 AIBOM gateway、离线准入、hash/provenance、CycloneDX-like 导出。
-- 可写证据：[../acceptance/L3-aibom-external-generator.md](../acceptance/L3-aibom-external-generator.md) 和 evidence 样例。
-- 边界：未接合法外部生成器前，只写“内部 AIBOM 准入原型”。
+- 已有：AIBOM gateway、离线准入、cdxgen CycloneDX 1.6 导入、`xa-aibom validate/admit`、离线 `install_plugin`。
+- 可写证据：[../acceptance/L3-aibom-external-generator.md](../acceptance/L3-aibom-external-generator.md)、R8 acceptance 目录。
+- 边界：marketplace/IDE native hook **已退役**；OAR supply/plugin consequence 作场景补充。
 
 ## 7. 关键技术四：评测、审计与持续优化
 
-- 已有：XA-Bench、CSAB-Gov-mini、AgentDojo/InjecAgent adapter、预算型 runner、Gate6 审计链。
-- 可写证据：性能报告、审计验链、R2/R3 dry-run/真实 sampled 结果。
-- 边界：`subscription_budget60_v1` 未实跑前，不写 sampled 指标达标。
+- **主实验叙事**：Open Agent Range — 企业 full-day 场景、hash ledger、`replay --verify-sut-audit`、Null vs XA-Guard live A/B。
+- 已有：Gate6 SM3/SM2、本地 TSA anchor、faithfulness v1；XA-Bench/CSAB-Gov-mini；bench 工具链（含 AgentDojo adapter，**附录可选**）。
+- 可写证据：`open-agent-range/` 下 `protection_delta=1.0` live A/B、`sut-session.json`、replay alignment JSON。
+- 边界：`subscription_budget60_v1` **已退役** 为比赛 Must；若附录提及 R2/R3，仅写工具存在与背景实验，不写指标达标。
 
 ## 8. 实验设计和结果
 
-表格占位：
+**主表（写入正文）**：
 
-| 实验 | 当前状态 | 可写结论 | 证据 |
+| 实验 | 状态 | 可写结论 | 证据 |
 |---|---|---|---|
-| L3 static verifier | `DONE` | 静态实现通过 | status / evidence |
-| 全仓 pytest | `DONE/PARTIAL` | 正确环境下通过；sandbox 镜像缺失 skip | status |
-| R2/R3 sampled | `TODO/BLOCKED` | 仅工具和 dry-run 准备 | acceptance |
-| 性能 | `DONE/PARTIAL` | 历史性能达中等档，最终前建议复跑 | evidence |
+| OAR Null vs XA-Guard live A/B | `DONE` | N=3：null 3/3 泄漏、xaguard 3/3 拦截、0 infra error、`protection_delta=1.0` | `oar-delivery-v2-20260711T123124Z-win-local` |
+| OAR full-day + ledger replay | `DONE` | 41 tool attempts、43 ledger、0 violations；7/7 attempt replay PASS | [证据总表](../acceptance/EVIDENCE-CONSOLIDATION.md) |
+| 六关 demo + verify_audit | `DONE` | 拦截、审批、污点、审计闭环 | `demo/`、`scripts/verify_audit.py` |
+| L3 static S1–S7 | `DONE` | 静态实现与验收入口齐备 | status / evidence |
+| R4 性能 | `DONE` | 10 会话达 PRD 中等档 | `docs/evidence/l3-r4-20260705-current/` |
+
+**附录表（可选，不欠赛题）**：
+
+| 实验 | 状态 | 说明 |
+|---|---|---|
+| R7 OPA parity | `DONE` | 64 fixtures 一致 |
+| R8 cdxgen + install_plugin | `DONE` | 方向 3 交换证据 |
+| R2/R3 budget60 sampled | `RETIRED` | 工具保留；未跑不写达标 |
+| AgentDojo/InjecAgent 全矩阵 | `RETIRED` | 2986 jobs 研究扩展 |
+
+### Open Agent Range 附录要点（建议 §8 末或独立小节）
+
+- 场景：`scenarios/dctg/full-day.json` 六域正常日；F3/F10/F11/F13/F14 等业务链。
+- SUT：attempt 级真实 `xa_guard.server` stdio MCP session（`sut-session.json`）。
+- 指标：`protection_delta`、violations、external sends、ledger projection。
+- 复现：见 [DELIVERY-v2 § OAR 命令块](../acceptance/DELIVERY-v2.md#可复现-oar-证据命令canonical)。
+- 封存：`D:/xa-evidence/sealed/oar-delivery-v2-20260711T123124Z-win-local.tar.gz`，SHA-256 `cffa89fb2ded79cb17685348bfb6571d85c3c233ad963528ca79b89e2ec49aa5`。
+- 限制：ReactiveSeat 为确定性状态机；非完整 7×24 工业沙盘。
 
 ## 9. 政企落地价值
 
 - 私有化部署：MCP 代理、Docker Compose、策略 overlay。
-- 合规对齐：等保、GB/T 45654、国密审计、OpenTelemetry GenAI 字段。
+- 合规对齐：等保、GB/T 45654（290 seed 为 PoC 缩减）、国密审计、OpenTelemetry GenAI 字段。
 - 责任归属：human principal、agent id、data domain、task id、approval token、audit hash。
+- 红队与持续改进：OAR workbench 支持 finding、A/B、promote 与证据审阅。
 
-## 10. 当前限制与未来工作
+## 10. 当前限制与未来工作（out-of-scope，非 blocker）
 
-- R1 独立 holdout。
-- R2/R3 `$60` sampled 实跑。
-- 真实 Trae GUI。
-- Linux gVisor/runsc。
-- 外部 AIBOM 生成器。
-- 第三方 TSA/HSM。
-- 生产级 IAM/SSO/RBAC。
+以下项 **不** 构成本文或比赛交付的失败条件：
+
+- R1 独立 holdout / formal dual-500
+- `subscription_budget60_v1` / `research_full_matrix` 2986 jobs 作为 mandatory 指标
+- R9 第三方 TSA/HSM 生产实证（本地 demo 已够叙事）
+- R8 marketplace/IDE hooks
+- R6 gVisor runsc 全验收（Docker deploy PASS 已够）
+- R5 Trae native elicitation
+- GB/T 45654 完整 500+ 语料
+- enterprise-agent-range 主叙事（已并入 OAR）
+- 外部 notarization
+
+**真实待完成**：D1 PDF 定稿、D2 clean release freeze、D3 视频、D4 报名。canonical OAR 证据封存（B5）已完成。
 
 ## 11. 红线检查
 
 - 不写未验证达标数字。
 - 不暴露 token、key、个人隐私。
 - 不把本地 demo 写成第三方生产服务。
+- 不把「L3 最终 BLOCKED」写成项目主状态。
 - PDF 最终页数不超过 30 页。

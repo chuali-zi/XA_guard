@@ -1,0 +1,11 @@
+version: xa-guard-tool-effects/v1
+tools:
+  business_submit_ticket:
+    side_effect_level: high
+    reversibility: compensatable
+    recovery_fields:
+      ticket_id: "$result#/body/ticket_id"
+    undo_tool: business_cancel_ticket
+    undo_arguments:
+      ticket_id: "$recovery#/ticket_id"
+      reason: "$request#/reason"

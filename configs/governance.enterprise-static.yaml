@@ -47,6 +47,17 @@ principals:
       limit_usd: 15.00
       spent_usd: 4.40
 
+  - principal_id: dora.security@acme.local
+    display_name: Dora Security Approver
+    tenant_id: acme-corp
+    status: active
+    department: Security
+    groups: [security-approvers]
+    allowed_agents: [general-office-agent]
+    budget:
+      limit_usd: 5.00
+      spent_usd: 0.00
+
   - principal_id: mallory.disabled@acme.local
     display_name: Mallory Disabled
     tenant_id: acme-corp
@@ -86,6 +97,10 @@ groups:
     tenant_id: acme-corp
     status: active
     members: [mallory.disabled@acme.local]
+  - group_id: security-approvers
+    tenant_id: acme-corp
+    status: active
+    members: [dora.security@acme.local]
   - group_id: beta-ops
     tenant_id: beta-corp
     status: active
@@ -101,6 +116,9 @@ budgets:
   - principal_id: carol.finance@acme.local
     limit_usd: 15.00
     spent_usd: 4.40
+  - principal_id: dora.security@acme.local
+    limit_usd: 5.00
+    spent_usd: 0.00
   - principal_id: mallory.disabled@acme.local
     limit_usd: 5.00
     spent_usd: 0.00
@@ -154,6 +172,19 @@ roles:
         data_domains: [finance_report]
         resource_owners: ["*"]
 
+  - role_id: undo_approver
+    tenant_id: acme-corp
+    name: Undo approver
+    status: active
+    permissions:
+      - action: use_agent
+        agents: [general-office-agent]
+      - action: call_tool
+        agents: [general-office-agent]
+        tools: [business_cancel_ticket]
+      - action: access_data_domain
+        data_domains: [engineering_docs]
+
   - role_id: beta_ops
     tenant_id: beta-corp
     name: Beta ops
@@ -183,6 +214,11 @@ role_bindings:
     role_id: finance_staff
     groups: [finance-team]
     status: active
+  - binding_id: bind-undo-approvers
+    tenant_id: acme-corp
+    role_id: undo_approver
+    groups: [security-approvers]
+    status: active
   - binding_id: bind-beta-ops
     tenant_id: beta-corp
     role_id: beta_ops
@@ -195,7 +231,7 @@ agents:
     tenant_id: acme-corp
     owner: platform-team
     purpose: 通用摘要、邮件草拟和内部资料检索
-    allowed_tools: [echo, content_generation, send_email, read_log, business_get_status, business_query_record, business_submit_ticket]
+    allowed_tools: [echo, content_generation, send_email, read_log, business_get_status, business_query_record, business_submit_ticket, business_cancel_ticket]
     allowed_data_domains: [employee_profile, engineering_docs, finance_report]
     risk_level: medium
     max_autonomy: assistive

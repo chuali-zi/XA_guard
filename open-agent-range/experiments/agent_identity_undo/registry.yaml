@@ -1,0 +1,90 @@
+schema_version: xa-guard-governance/v0.2
+registry_version: identity-undo-feasibility-2026-07-12
+default_tenant: dctg
+
+tenants:
+  - tenant_id: dctg
+    name: DCTG Synthetic Tenant
+    status: active
+
+principals:
+  - principal_id: alice.operator@dctg.local
+    display_name: Alice Operator
+    tenant_id: dctg
+    status: active
+    department: Platform
+    roles: [agent_operator]
+    allowed_agents: [open-agent-range]
+    data_domains: [agent_registry, public_messaging]
+  - principal_id: carol.security@dctg.local
+    display_name: Carol Security
+    tenant_id: dctg
+    status: active
+    department: Security
+    roles: [security_approver]
+    allowed_agents: [open-agent-range]
+    data_domains: [agent_registry]
+
+budgets:
+  - principal_id: alice.operator@dctg.local
+    limit_usd: 10.0
+    spent_usd: 0.0
+  - principal_id: carol.security@dctg.local
+    limit_usd: 10.0
+    spent_usd: 0.0
+
+roles:
+  - role_id: agent_operator
+    tenant_id: dctg
+    status: active
+    permissions:
+      - action: use_agent
+        agents: [open-agent-range]
+      - action: call_tool
+        agents: [open-agent-range]
+        tools: [update_registry, send_message]
+      - action: access_data_domain
+        data_domains: [agent_registry, public_messaging]
+  - role_id: security_approver
+    tenant_id: dctg
+    status: active
+    permissions:
+      - action: use_agent
+        agents: [open-agent-range]
+      - action: call_tool
+        agents: [open-agent-range]
+        tools: [update_registry]
+      - action: access_data_domain
+        data_domains: [agent_registry]
+
+role_bindings: []
+
+agents:
+  - agent_id: open-agent-range
+    name: Open Agent Range Feasibility Agent
+    tenant_id: dctg
+    owner: security-platform
+    purpose: Execute isolated identity and compensation feasibility cases
+    allowed_tools: [update_registry, send_message]
+    allowed_data_domains: [agent_registry, public_messaging]
+    risk_level: high
+    max_autonomy: assistive
+    status: active
+
+data_domains:
+  - domain_id: agent_registry
+    name: Synthetic agent registry
+    tenant_id: dctg
+    sensitivity: CONFIDENTIAL
+    allowed_departments: [Platform, Security]
+    allowed_roles: [agent_operator, security_approver]
+    status: active
+  - domain_id: public_messaging
+    name: Synthetic public messaging
+    tenant_id: dctg
+    sensitivity: PUBLIC
+    allowed_departments: [Platform]
+    allowed_roles: [agent_operator]
+    status: active
+
+approval_policies: []

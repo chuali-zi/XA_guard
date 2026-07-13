@@ -15,7 +15,7 @@ import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from typing import Any, BinaryIO, Callable, Iterator
 
 log = logging.getLogger("xa_guard.audit.merkle")
 
@@ -30,6 +30,45 @@ def _local_lock(path: Path) -> threading.Lock:
     key = str(path.resolve())
     with _LOCAL_LOCKS_GUARD:
         return _LOCAL_LOCKS.setdefault(key, threading.Lock())
+
+
+def _open_tail_reader(path: Path) -> BinaryIO:
+    """Open a reader that does not block audit rotation on Windows."""
+    if os.name != "nt":
+        return open(path, "rb")
+
+    import ctypes
+    import msvcrt
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateFileW.argtypes = (
+        wintypes.LPCWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.HANDLE,
+    )
+    kernel32.CreateFileW.restype = wintypes.HANDLE
+    handle = kernel32.CreateFileW(
+        str(path),
+        0x80000000,  # GENERIC_READ
+        0x00000001 | 0x00000002 | 0x00000004,  # SHARE_READ | SHARE_WRITE | SHARE_DELETE
+        None,
+        3,  # OPEN_EXISTING
+        0x00000080,  # FILE_ATTRIBUTE_NORMAL
+        None,
+    )
+    if handle == wintypes.HANDLE(-1).value:
+        raise OSError(ctypes.get_last_error(), f"cannot open audit tail reader: {path}")
+    try:
+        descriptor = msvcrt.open_osfhandle(int(handle), os.O_RDONLY | os.O_BINARY)
+    except Exception:
+        kernel32.CloseHandle(handle)
+        raise
+    return os.fdopen(descriptor, "rb")
 
 
 @contextmanager
@@ -137,7 +176,12 @@ class ChainStore:
         self.algo = algo
         self._last_hash: str = ""
         self._known_file_state: tuple[int, int] | None = None
-        self._recover_last_hash()
+        self._tail_reader: BinaryIO | None = None
+        self._tail_reader_identity: tuple[int, int] | None = None
+        # Construction may race a writer in another process. Recover under the
+        # same OS lock used by append so a partially written tail is never read.
+        with audit_file_lock(self.path):
+            self._recover_last_hash()
 
     def _file_state(self) -> tuple[int, int] | None:
         try:
@@ -167,6 +211,56 @@ class ChainStore:
         except Exception as exc:
             raise RuntimeError(f"cannot recover audit chain tail from {self.path}: {exc}") from exc
 
+    def _read_tail_hash(self) -> str:
+        """Read the last persisted record in O(last-line) time."""
+        try:
+            path_stat = self.path.stat()
+        except FileNotFoundError:
+            self._close_tail_reader()
+            return ""
+        if path_stat.st_size == 0:
+            return ""
+        try:
+            identity = (int(path_stat.st_dev), int(path_stat.st_ino))
+            if self._tail_reader is None or identity != self._tail_reader_identity:
+                self._close_tail_reader()
+                self._tail_reader = _open_tail_reader(self.path)
+                self._tail_reader_identity = identity
+            handle = self._tail_reader
+            handle.seek(0, os.SEEK_END)
+            position = handle.tell()
+            buffer = b""
+            while position > 0:
+                size = min(8192, position)
+                position -= size
+                handle.seek(position)
+                buffer = handle.read(size) + buffer
+                candidate = buffer.rstrip(b"\r\n")
+                boundary = candidate.rfind(b"\n")
+                if boundary >= 0 or position == 0:
+                    last = candidate[boundary + 1 :]
+                    break
+            else:
+                last = b""
+            record = json.loads(last.decode("utf-8"))
+            if not isinstance(record, dict) or not record.get(_RECORD_HASH_KEY):
+                raise ValueError("last audit record has no record_hash")
+            return str(record[_RECORD_HASH_KEY])
+        except Exception as exc:
+            raise RuntimeError(f"cannot read audit chain tail from {self.path}: {exc}") from exc
+
+    def _close_tail_reader(self) -> None:
+        if self._tail_reader is not None:
+            self._tail_reader.close()
+        self._tail_reader = None
+        self._tail_reader_identity = None
+
+    def __del__(self) -> None:
+        try:
+            self._close_tail_reader()
+        except Exception:
+            pass
+
     @contextmanager
     def _append_lock(self, timeout_seconds: float = 10.0) -> Iterator[None]:
         with audit_file_lock(self.path, timeout_seconds=timeout_seconds):
@@ -180,9 +274,11 @@ class ChainStore:
     ) -> dict[str, Any]:
         """Hash, optionally sign, and append one record under the writer lock."""
         with self._append_lock():
-            # The lock protects cross-process writers. Re-scan only when another
-            # writer or a signature patch changed the file since our last append.
-            if self._file_state() != self._known_file_state:
+            # Always compare against the authoritative persisted tail while
+            # holding the process lock. A (size, mtime) cache is insufficient
+            # on Windows/remote filesystems, but a matching tail hash still
+            # lets the common single-writer path avoid a full recovery scan.
+            if self._read_tail_hash() != self._last_hash:
                 self._recover_last_hash()
             record_dict = dict(record_dict)  # 复制避免外部 mutate
             record_dict[_HASH_PREV_KEY] = self._last_hash

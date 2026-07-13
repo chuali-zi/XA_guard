@@ -172,6 +172,19 @@ class GateContext:
     cost_estimate_usd: float = 0.0
     output_estimate: str = ""
     capability_token_summary: dict[str, Any] = field(default_factory=dict)
+    identity_verified: bool = False
+    identity_issuer: str = ""
+    identity_kid: str = ""
+    identity_jti_sha256: str = ""
+    identity_scopes: list[str] = field(default_factory=list)
+
+    # 可撤销副作用关联字段；恢复材料不进入 GateContext/审计明文。
+    effect_id: str = ""
+    side_effect_level: str = "none"
+    reversibility: str = "none"
+    undo_status: str = ""
+    compensates_effect_id: str = ""
+    operation_kind: str = "forward"
 
     # 累积属性
     taint: TaintLabel = TaintLabel.PUBLIC
@@ -262,6 +275,17 @@ class AuditRecord:
     gen_ai_governance_decision_reason_code: str = ""
     gen_ai_governance_role_ids: list[str] = field(default_factory=list)
     gen_ai_governance_approval_policy_id: str = ""
+    gen_ai_identity_verified: bool = False
+    gen_ai_identity_issuer: str = ""
+    gen_ai_identity_kid: str = ""
+    gen_ai_identity_jti_sha256: str = ""
+    gen_ai_identity_scopes: list[str] = field(default_factory=list)
+    gen_ai_resilience_effect_id: str = ""
+    gen_ai_resilience_side_effect_level: str = "none"
+    gen_ai_resilience_reversibility: str = "none"
+    gen_ai_resilience_undo_status: str = ""
+    gen_ai_resilience_compensates_effect_id: str = ""
+    gen_ai_resilience_operation_kind: str = "forward"
 
     # 链式签名（关卡 6）
     record_hash: str = ""                                         # 本条记录的哈希
@@ -312,6 +336,17 @@ class AuditRecord:
             "gen_ai.governance.decision_reason_code": self.gen_ai_governance_decision_reason_code,
             "gen_ai.governance.role_ids": self.gen_ai_governance_role_ids,
             "gen_ai.governance.approval_policy_id": self.gen_ai_governance_approval_policy_id,
+            "gen_ai.identity.verified": self.gen_ai_identity_verified,
+            "gen_ai.identity.issuer": self.gen_ai_identity_issuer,
+            "gen_ai.identity.kid": self.gen_ai_identity_kid,
+            "gen_ai.identity.jti_sha256": self.gen_ai_identity_jti_sha256,
+            "gen_ai.identity.scopes": self.gen_ai_identity_scopes,
+            "gen_ai.resilience.effect_id": self.gen_ai_resilience_effect_id,
+            "gen_ai.resilience.side_effect_level": self.gen_ai_resilience_side_effect_level,
+            "gen_ai.resilience.reversibility": self.gen_ai_resilience_reversibility,
+            "gen_ai.resilience.undo_status": self.gen_ai_resilience_undo_status,
+            "gen_ai.resilience.compensates_effect_id": self.gen_ai_resilience_compensates_effect_id,
+            "gen_ai.resilience.operation_kind": self.gen_ai_resilience_operation_kind,
             "record_hash": self.record_hash,
             "signature": self.signature,
         }

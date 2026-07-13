@@ -1,0 +1,87 @@
+{
+  "audit_bad_line": null,
+  "checks": {
+    "audit_chain_ok": true,
+    "compensation_trace_distinct": true,
+    "concurrent_single_claim": true,
+    "db_plaintext_absent": true,
+    "durable_compensated_status": true,
+    "effect_event_chain_ok": true,
+    "http_statuses_correct": true,
+    "idempotent_request": true,
+    "ledger_chain_ok": true,
+    "negative_executor_calls": 0,
+    "raw_tokens_absent": true,
+    "restart_recovery_matches": true,
+    "self_approval_denied": true,
+    "state_restored": true,
+    "valid_http_action_executed": true,
+    "wrong_key_rejected": true
+  },
+  "conclusion": "ROUND2-GO",
+  "counts": {
+    "audit_records": 2,
+    "compensation_started_events": 1,
+    "effect_events": 5,
+    "executor_calls": 2,
+    "ledger_entries": 4
+  },
+  "effect": {
+    "after_sha256": "9c8e266183864bb91ce77517c299fbc96c910061d14e7b0a0cb542e0b244454b",
+    "agent_id": "open-agent-range",
+    "before_sha256": "7b473141f47f975a9f3ddffeacf015c755f692934f8472689bb8263394509247",
+    "compensation_trace_id": "017f6266-b655-471e-9bb7-a17a66c267ff",
+    "effect_id": "effect-r2-f40de256-38d",
+    "key_id": "round2-7083beac28b3489d",
+    "principal": "alice.operator@dctg.local",
+    "reversibility": "reversible",
+    "schema_version": "xa-guard-effect-store-feasibility/v0.1",
+    "status": "compensated",
+    "tenant_id": "dctg",
+    "tool_name": "update_registry",
+    "trace_id": "f40de256-38d2-4218-9387-2eb143c970fa"
+  },
+  "effect_key_id": "round2-7083beac28b3489d",
+  "http_negative_cases": {
+    "bad_signature": {
+      "body": {
+        "error": "invalid_token",
+        "error_description": "Authentication required"
+      },
+      "status_code": 401
+    },
+    "identity_conflict": {
+      "body": {
+        "error": "identity_context_mismatch",
+        "error_description": "human_principal conflicts with verified bearer identity"
+      },
+      "status_code": 403
+    },
+    "missing_bearer": {
+      "body": {
+        "error": "invalid_token",
+        "error_description": "Authentication required"
+      },
+      "status_code": 401
+    },
+    "tool_scope": {
+      "body": {
+        "error": "identity_context_mismatch",
+        "error_description": "tool send_message is outside bearer scope"
+      },
+      "status_code": 403
+    }
+  },
+  "limitations": [
+    "local in-memory issuer; no production IdP, OIDC discovery, JWKS rotation, or revocation",
+    "experimental outer ASGI middleware; XA-Guard production upstream is unchanged",
+    "single-node SQLite and caller-supplied AES key; no KMS/HSM or multi-host consensus",
+    "one synthetic registry compensation; no generic connector or failure-retry scheduler"
+  ],
+  "public_key_sha256": "dc50bcd2f8c3587f8b20fe6c9f494470366469a96f04fbd36a4e871db4d5b071",
+  "schema_version": "xa-guard-identity-undo-feasibility-round2/v0.1",
+  "traces": {
+    "compensation": "017f6266-b655-471e-9bb7-a17a66c267ff",
+    "original_action": "f40de256-38d2-4218-9387-2eb143c970fa"
+  }
+}
