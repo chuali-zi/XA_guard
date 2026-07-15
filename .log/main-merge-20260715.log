@@ -1,1 +1,1 @@
-2026-07-15：经项目负责人授权，将 feat/identity-undo-reference fast-forward 合并到 main，并推送 origin/main 至 94041f6。未 force push、rebase 或 amend；等待 GitHub Quality，REFERENCE-READY/HA-READY 边界不变。
+2026-07-15：经项目负责人授权，将 feat/identity-undo-reference fast-forward 合并并推送 main。Python 3.10 首轮兼容失败经 f157f92 修复；Quality run 29418343744 双版本通过。未改写历史，REFERENCE-READY/HA-READY 边界不变。
