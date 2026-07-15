@@ -4,14 +4,17 @@ fullnameOverride: ""
 global:
   imagePullSecrets: []
   externalSecrets:
-    # These Secrets must be provisioned by the platform or an external-secrets
-    # controller. This chart intentionally never renders secret material.
+    # Provision these with an external-secrets controller or the platform.
+    # The chart never renders credentials or encryption keys.
     runtime: xa-guard-runtime
     businessApi: xa-guard-business-api
+    keyProvider: xa-guard-key-provider
   oidc:
     issuer: https://idp.example.gov/realms/xa-guard
     discoveryUrl: https://idp.example.gov/realms/xa-guard/.well-known/openid-configuration
     jwksUri: https://idp.example.gov/realms/xa-guard/protocol/openid-connect/certs
+    backchannelBaseUrl: ""
+    tokenEndpoint: ""
     audience: xa-guard-api
     publicClientId: xa-guard-console
     confidentialClientId: xa-guard-bff
@@ -19,27 +22,31 @@ global:
     introspectionClientId: xa-guard-api
     introspectionClientSecretKey: oidc-introspection-client-secret
     introspectionRequired: true
+    # HTTP remains reference-only. Production should leave this list unused
+    # and use HTTPS endpoints.
+    referenceHttpHosts: "keycloak,localhost,127.0.0.1"
   postgres:
     dsnSecretKey: database-url
     sslMode: verify-full
   kms:
-    provider: external
+    # Production defaults to an external HTTP key provider. Set provider=local
+    # only for an explicitly approved development/reference profile.
+    provider: http
     endpoint: https://kms.example.gov
+    authTokenSecretKey: auth-token
+    caSecretName: ""
+    caSecretKey: ca.crt
     keyringSecretKey: kek-keyring
+    referenceHttpHosts: ""
   internalAuthorizationSecretKey: internal-authorization-key
 
 referenceInfra:
-  # Production uses external OIDC, PostgreSQL, and KMS. Setting this flag only
-  # switches the advertised deployment profile; this chart does not install
-  # Keycloak/PostgreSQL/KMS subcharts.
+  # Reference dependencies remain outside the cluster. Enabling this flag only
+  # marks the profile and permits explicitly allowlisted reference HTTP hosts.
   enabled: false
-  oidcService: ""
-  postgresService: ""
-  kmsService: ""
-  networkPolicy:
-    # Optional reference-only CIDRs. They are used only when enabled=true and
-    # must still be supplied explicitly by the operator.
-    externalEgressCidrs: []
+  # Deterministic file-based failure hooks are accepted only in the isolated
+  # reference profile. Production always renders this false.
+  testFaults: false
 
 serviceAccount:
   create: true
@@ -79,12 +86,26 @@ api:
   replicas: 2
   image:
     repository: ghcr.io/chuali-zi/xa-guard
-    tag: "0.1.0"
+    tag: "0.2.0"
     digest: ""
     pullPolicy: IfNotPresent
   command: ["python"]
   args: ["-m", "xa_guard.control.api"]
   containerPort: 8080
+  terminationGracePeriodSeconds: 45
+  preStopDelaySeconds: 5
+  scheduling:
+    podAntiAffinity:
+      enabled: true
+      required: true
+      topologyKey: kubernetes.io/hostname
+      weight: 100
+    topologySpread:
+      enabled: true
+      maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      minDomains: 2
   service:
     type: ClusterIP
     port: 80
@@ -101,15 +122,21 @@ api:
       path: /livez
       initialDelaySeconds: 10
       periodSeconds: 10
+      timeoutSeconds: 3
+      failureThreshold: 3
     readiness:
       path: /readyz
       initialDelaySeconds: 5
       periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 3
   pdb:
     enabled: true
     minAvailable: 1
   autoscaling:
-    enabled: true
+    # Keep fixed two-replica placement while anti-affinity is required. Before
+    # enabling HPA, add enough failure domains or make anti-affinity preferred.
+    enabled: false
     minReplicas: 2
     maxReplicas: 8
     targetCPUUtilizationPercentage: 70
@@ -120,11 +147,30 @@ worker:
   replicas: 2
   image:
     repository: ghcr.io/chuali-zi/xa-guard
-    tag: "0.1.0"
+    tag: "0.2.0"
     digest: ""
     pullPolicy: IfNotPresent
   command: ["python"]
   args: ["-m", "xa_guard.control.worker"]
+  containerPort: 8082
+  terminationGracePeriodSeconds: 90
+  preStopDelaySeconds: 5
+  scheduling:
+    podAntiAffinity:
+      enabled: true
+      required: true
+      topologyKey: kubernetes.io/hostname
+      weight: 100
+    topologySpread:
+      enabled: true
+      maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      minDomains: 2
+  service:
+    type: ClusterIP
+    port: 8082
+    annotations: {}
   resources:
     requests:
       cpu: 100m
@@ -134,22 +180,33 @@ worker:
       memory: 768Mi
   probes:
     liveness:
-      command: ["python", "-c", "import os; os.kill(1, 0)"]
+      path: /livez
       initialDelaySeconds: 10
       periodSeconds: 10
+      timeoutSeconds: 3
+      failureThreshold: 3
     readiness:
-      command: ["python", "-c", "import os; os.kill(1, 0)"]
+      path: /readyz
       initialDelaySeconds: 5
       periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 3
   pdb:
     enabled: true
     minAvailable: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
 businessApi:
   enabled: true
   replicas: 1
   image:
     repository: ghcr.io/chuali-zi/xa-guard-business-api
-    tag: "0.1.0"
+    tag: "0.2.0"
     digest: ""
     pullPolicy: IfNotPresent
   command: ["python"]
@@ -157,6 +214,8 @@ businessApi:
   containerPort: 8081
   databaseDsnSecretKey: database-url
   apiKeySecretKey: api-key
+  terminationGracePeriodSeconds: 30
+  preStopDelaySeconds: 3
   service:
     type: ClusterIP
     port: 80
@@ -173,10 +232,14 @@ businessApi:
       path: /livez
       initialDelaySeconds: 10
       periodSeconds: 10
+      timeoutSeconds: 3
+      failureThreshold: 3
     readiness:
       path: /readyz
       initialDelaySeconds: 5
       periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 3
   pdb:
     enabled: true
     minAvailable: 1
@@ -191,12 +254,14 @@ console:
   replicas: 1
   image:
     repository: ghcr.io/chuali-zi/xa-guard-console
-    tag: "0.1.0"
+    tag: "0.2.0"
     digest: ""
     pullPolicy: IfNotPresent
   command: []
   args: []
   containerPort: 8080
+  terminationGracePeriodSeconds: 30
+  preStopDelaySeconds: 3
   service:
     type: ClusterIP
     port: 80
@@ -213,10 +278,14 @@ console:
       path: /healthz
       initialDelaySeconds: 10
       periodSeconds: 10
+      timeoutSeconds: 3
+      failureThreshold: 3
     readiness:
       path: /healthz
       initialDelaySeconds: 5
       periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 3
   pdb:
     enabled: true
     minAvailable: 1
@@ -230,12 +299,14 @@ migration:
   enabled: true
   image:
     repository: ghcr.io/chuali-zi/xa-guard
-    tag: "0.1.0"
+    tag: "0.2.0"
     digest: ""
     pullPolicy: IfNotPresent
   command: ["python"]
   args: ["-m", "xa_guard.control.migrate"]
+  nameSuffix: ""
   backoffLimit: 3
+  activeDeadlineSeconds: 300
   ttlSecondsAfterFinished: 86400
   resources:
     requests:
@@ -265,12 +336,55 @@ ingress:
 
 networkPolicy:
   enabled: true
-  ingressNamespaceSelector:
-    matchLabels:
-      kubernetes.io/metadata.name: ingress-nginx
-  # Empty means fail closed for external egress. Standard NetworkPolicy cannot
-  # target DNS names; supply only approved endpoint CIDRs here, or enforce FQDN
-  # policy with the cluster CNI.
-  externalEgressCidrs: []
-  extraIngress: []
-  extraEgress: []
+  defaultDeny: true
+  dns:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: kube-system
+    podSelector:
+      matchLabels:
+        k8s-app: kube-dns
+    ports: [53]
+  ingressController:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: ingress-nginx
+    podSelector:
+      matchLabels:
+        app.kubernetes.io/name: ingress-nginx
+  monitoring:
+    enabled: false
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: monitoring
+    podSelector:
+      matchLabels:
+        app.kubernetes.io/name: prometheus
+  # Standard NetworkPolicy cannot select FQDNs. Production operators must
+  # resolve and maintain only the approved endpoint CIDRs for each dependency.
+  # Empty CIDRs intentionally fail closed.
+  dependencies:
+    oidc:
+      cidrs: []
+      ports: [443]
+    postgres:
+      cidrs: []
+      ports: [5432]
+    keyProvider:
+      cidrs: []
+      ports: [443]
+  components:
+    api:
+      extraIngress: []
+      extraEgress: []
+    worker:
+      extraIngress: []
+      extraEgress: []
+    businessApi:
+      extraIngress: []
+      extraEgress: []
+    console:
+      extraIngress: []
+      extraEgress: []
+    migration:
+      extraEgress: []

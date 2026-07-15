@@ -26,6 +26,7 @@ from xa_guard.gates.gate3_policy import Gate3Policy
 from xa_guard.gates.gate4_taint import Gate4Taint
 from xa_guard.gates.gate5_sandbox import Gate5Sandbox
 from xa_guard.gates.gate6_audit import Gate6Audit
+from xa_guard.gates.base import Gate
 from xa_guard.governance import GovernanceEnforcer
 from xa_guard.pipeline import Pipeline
 from xa_guard.policy.hot_reload import OverlayWatcher
@@ -66,7 +67,12 @@ def _init_layered_policy(
     return src, watcher
 
 
-def build_pipeline(cfg: XAGuardConfig, *, start_overlay_watcher: bool = False) -> Pipeline:
+def build_pipeline(
+    cfg: XAGuardConfig,
+    *,
+    start_overlay_watcher: bool = False,
+    gate6: Gate | None = None,
+) -> Pipeline:
     """Build a pipeline; only lifecycle owners may request a background watcher."""
     _source, watcher = _init_layered_policy(
         cfg,
@@ -78,7 +84,7 @@ def build_pipeline(cfg: XAGuardConfig, *, start_overlay_watcher: bool = False) -
         gate3=Gate3Policy(cfg.gate("gate3")),
         gate4=Gate4Taint(cfg.gate("gate4")),
         gate5=Gate5Sandbox(cfg.gate("gate5")),
-        gate6=Gate6Audit(cfg.gate("gate6")),
+        gate6=gate6 or Gate6Audit(cfg.gate("gate6")),
         cfg=cfg,
         governance=GovernanceEnforcer(cfg.governance),
     )

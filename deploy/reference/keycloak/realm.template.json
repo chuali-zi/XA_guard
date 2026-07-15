@@ -18,7 +18,8 @@
   "groups": [
     {"name": "engineering-team"},
     {"name": "security-approvers"},
-    {"name": "governance-admins"}
+    {"name": "governance-admins"},
+    {"name": "beta-ops"}
   ],
   "clients": [
     {
@@ -35,7 +36,8 @@
       "protocolMappers": [
         {"name": "tenant-id", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "consentRequired": false, "config": {"user.attribute": "tenant_id", "claim.name": "tenant_id", "jsonType.label": "String", "access.token.claim": "true", "id.token.claim": "true"}},
         {"name": "groups", "protocol": "openid-connect", "protocolMapper": "oidc-group-membership-mapper", "consentRequired": false, "config": {"claim.name": "groups", "full.path": "false", "access.token.claim": "true", "id.token.claim": "true"}},
-        {"name": "agent-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper", "consentRequired": false, "config": {"included.client.audience": "general-office-agent", "access.token.claim": "true"}}
+        {"name": "agent-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper", "consentRequired": false, "config": {"included.client.audience": "general-office-agent", "access.token.claim": "true"}},
+        {"name": "beta-agent-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper", "consentRequired": false, "config": {"included.client.audience": "beta-ops-agent", "access.token.claim": "true"}}
       ]
     },
     {
@@ -46,6 +48,24 @@
       "publicClient": false,
       "clientAuthenticatorType": "client-secret",
       "secret": "__BFF_CLIENT_SECRET__",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "attributes": {"standard.token.exchange.enabled": "true"},
+      "protocolMappers": [
+        {"name": "tenant-id", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "consentRequired": false, "config": {"user.attribute": "tenant_id", "claim.name": "tenant_id", "jsonType.label": "String", "access.token.claim": "true"}},
+        {"name": "groups", "protocol": "openid-connect", "protocolMapper": "oidc-group-membership-mapper", "consentRequired": false, "config": {"claim.name": "groups", "full.path": "false", "access.token.claim": "true"}},
+        {"name": "api-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper", "consentRequired": false, "config": {"included.client.audience": "xa-guard-api", "access.token.claim": "true"}}
+      ]
+    },
+    {
+      "clientId": "beta-ops-agent",
+      "name": "Beta Tenant Isolation Agent",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "__BETA_AGENT_CLIENT_SECRET__",
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
@@ -82,6 +102,19 @@
       "groups": ["/engineering-team"],
       "realmRoles": ["undo.request"],
       "credentials": [{"type": "password", "value": "__ALICE_PASSWORD__", "temporary": false}]
+    },
+    {
+      "id": "20000000-0000-0000-0000-000000000001",
+      "username": "eve",
+      "enabled": true,
+      "email": "eve@beta.reference.invalid",
+      "emailVerified": true,
+      "firstName": "Eve",
+      "lastName": "Beta 隔离验收",
+      "attributes": {"tenant_id": ["beta-corp"]},
+      "groups": ["/beta-ops"],
+      "realmRoles": ["undo.approve"],
+      "credentials": [{"type": "password", "value": "__EVE_PASSWORD__", "temporary": false}]
     },
     {
       "id": "10000000-0000-0000-0000-000000000002",

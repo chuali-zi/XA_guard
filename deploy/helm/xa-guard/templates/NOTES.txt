@@ -1,12 +1,19 @@
-XA-Guard has been rendered with profile:
-  {{ ternary "reference interface" "production external infrastructure" .Values.referenceInfra.enabled }}
+XA-Guard {{ .Chart.AppVersion }} profile:
+  {{ ternary "reference external dependencies" "production external dependencies" .Values.referenceInfra.enabled }}
 
 Required pre-existing Secrets:
   runtime:      {{ .Values.global.externalSecrets.runtime }}
-    keys: {{ .Values.global.postgres.dsnSecretKey }}, {{ .Values.global.oidc.confidentialClientSecretKey }}, {{ .Values.global.oidc.introspectionClientSecretKey }}, {{ .Values.global.kms.keyringSecretKey }}, {{ .Values.global.internalAuthorizationSecretKey }}
+    keys: {{ .Values.global.postgres.dsnSecretKey }}, {{ .Values.global.oidc.confidentialClientSecretKey }}, {{ .Values.global.oidc.introspectionClientSecretKey }}, {{ .Values.global.internalAuthorizationSecretKey }}
   business API: {{ .Values.global.externalSecrets.businessApi }}
     keys: {{ .Values.businessApi.databaseDsnSecretKey }}, {{ .Values.businessApi.apiKeySecretKey }}
+{{- if eq .Values.global.kms.provider "http" }}
+  key provider: {{ .Values.global.externalSecrets.keyProvider }}
+    key: {{ .Values.global.kms.authTokenSecretKey }}
+  HTTP key-provider mode does not read or mount a KEK keyring.
+{{- else }}
+  local keyring key in runtime Secret: {{ .Values.global.kms.keyringSecretKey }}
+{{- end }}
 
-The chart does not install PostgreSQL, Keycloak, or a KMS. External egress is
-denied by default. Supply only approved endpoint CIDRs through
-networkPolicy.externalEgressCidrs (or the explicit reference override).
+The chart does not install PostgreSQL, Keycloak, or a key provider. External
+egress is denied until dependency-specific CIDRs are supplied under
+networkPolicy.dependencies. Do not use a catch-all 0.0.0.0/0 CIDR.

@@ -4,18 +4,17 @@ from __future__ import annotations
 
 import asyncio
 
-from xa_guard.control.runtime import build_runtime
+from xa_guard.control.runtime import build_migration_store
 
 
 async def migrate() -> None:
-    runtime = build_runtime()
-    await runtime.store.connect()
+    store = build_migration_store()
+    await store.connect()
     try:
-        await runtime.store.migrate()
+        await store.migrate()
     finally:
-        await runtime.store.close()
+        await store.close()
 
 
 if __name__ == "__main__":
     asyncio.run(migrate())
-

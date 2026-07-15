@@ -74,34 +74,53 @@ class Keyring:
     def encrypt(self, plaintext: bytes, aad: bytes) -> EncryptedEnvelope:
         dek = os.urandom(32)
         nonce = os.urandom(12)
+        key_id, wrapped_dek = self.wrap_key(dek)
         return EncryptedEnvelope(
-            key_id=self.active_key_id,
-            wrapped_dek=aes_key_wrap(self.keys[self.active_key_id], dek),
+            key_id=key_id,
+            wrapped_dek=wrapped_dek,
             nonce=nonce,
             ciphertext=AESGCM(dek).encrypt(nonce, plaintext, aad),
         )
 
     def decrypt(self, envelope: EncryptedEnvelope, aad: bytes) -> bytes:
-        kek = self.keys.get(envelope.key_id)
-        if kek is None:
-            raise CryptoError(f"KEK {envelope.key_id!r} is unavailable")
         try:
-            dek = aes_key_unwrap(kek, envelope.wrapped_dek)
+            dek = self.unwrap_key(envelope.key_id, envelope.wrapped_dek)
             return AESGCM(dek).decrypt(envelope.nonce, envelope.ciphertext, aad)
         except (InvalidTag, InvalidUnwrap, ValueError) as exc:
             raise CryptoError("recovery material authentication failed") from exc
 
     def rewrap(self, envelope: EncryptedEnvelope) -> EncryptedEnvelope:
-        old = self.keys.get(envelope.key_id)
-        if old is None:
-            raise CryptoError(f"KEK {envelope.key_id!r} is unavailable")
-        dek = aes_key_unwrap(old, envelope.wrapped_dek)
+        key_id, wrapped_dek = self.rewrap_key(envelope.key_id, envelope.wrapped_dek)
         return EncryptedEnvelope(
-            key_id=self.active_key_id,
-            wrapped_dek=aes_key_wrap(self.keys[self.active_key_id], dek),
+            key_id=key_id,
+            wrapped_dek=wrapped_dek,
             nonce=envelope.nonce,
             ciphertext=envelope.ciphertext,
         )
+
+    def wrap_key(self, plaintext_key: bytes) -> tuple[str, bytes]:
+        if len(plaintext_key) != 32:
+            raise CryptoError("plaintext data key must contain exactly 32 bytes")
+        return (
+            self.active_key_id,
+            aes_key_wrap(self.keys[self.active_key_id], plaintext_key),
+        )
+
+    def unwrap_key(self, key_id: str, wrapped_key: bytes) -> bytes:
+        kek = self.keys.get(key_id)
+        if kek is None:
+            raise CryptoError("requested KEK is unavailable")
+        try:
+            plaintext_key = aes_key_unwrap(kek, wrapped_key)
+        except (InvalidUnwrap, ValueError) as exc:
+            raise CryptoError("wrapped data key authentication failed") from exc
+        if len(plaintext_key) != 32:
+            raise CryptoError("unwrapped data key has invalid length")
+        return plaintext_key
+
+    def rewrap_key(self, key_id: str, wrapped_key: bytes) -> tuple[str, bytes]:
+        plaintext_key = self.unwrap_key(key_id, wrapped_key)
+        return self.wrap_key(plaintext_key)
 
 
 class InternalAuthorization:

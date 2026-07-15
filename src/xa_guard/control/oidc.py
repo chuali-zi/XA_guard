@@ -31,6 +31,8 @@ class OIDCSettings:
     role_clients: tuple[str, ...] = ()
     unknown_kid_ttl_seconds: int = 30
     unknown_kid_refresh_interval_seconds: int = 5
+    reference_http_hosts: tuple[str, ...] = ("keycloak", "127.0.0.1", "localhost")
+    ca_file: str = ""
 
 
 class OIDCVerifier:
@@ -52,10 +54,15 @@ class OIDCVerifier:
         if self.client is None:
             import httpx
 
-            self.client = httpx.AsyncClient(timeout=self.settings.timeout_seconds)
+            self.client = httpx.AsyncClient(
+                timeout=self.settings.timeout_seconds,
+                verify=self.settings.ca_file or True,
+            )
         url = self._backchannel(
             self.settings.issuer.rstrip("/") + "/.well-known/openid-configuration"
         )
+        if not self._safe_endpoint(url):
+            raise OIDCError("OIDC discovery URL is not permitted")
         response = await self.client.get(url)
         response.raise_for_status()
         self.discovery = response.json()
@@ -63,11 +70,7 @@ class OIDCVerifier:
             raise OIDCError("OIDC discovery issuer mismatch")
         for key in ("jwks_uri", "introspection_endpoint"):
             endpoint = self._backchannel(str(self.discovery.get(key) or ""))
-            parsed = urlsplit(endpoint)
-            safe_reference_http = parsed.scheme == "http" and parsed.hostname in {
-                "keycloak", "127.0.0.1", "localhost"
-            }
-            if parsed.scheme != "https" and not safe_reference_http:
+            if not self._safe_endpoint(endpoint):
                 raise OIDCError(f"OIDC discovery is missing a safe {key}")
         await self._refresh_jwks()
 
@@ -209,6 +212,17 @@ class OIDCVerifier:
         target = urlsplit(self.settings.backchannel_base_url)
         prefix = target.path.rstrip("/")
         return urlunsplit((target.scheme, target.netloc, prefix + source.path, source.query, ""))
+
+    def _safe_endpoint(self, value: str) -> bool:
+        parsed = urlsplit(value)
+        if parsed.scheme == "https" and parsed.hostname:
+            return True
+        allowed = {host.strip().lower() for host in self.settings.reference_http_hosts if host.strip()}
+        return bool(
+            parsed.scheme == "http"
+            and parsed.hostname
+            and parsed.hostname.lower() in allowed
+        )
 
     @staticmethod
     def _max_age(cache_control: str) -> int:

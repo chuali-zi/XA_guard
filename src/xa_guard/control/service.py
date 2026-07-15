@@ -10,6 +10,7 @@ from xa_guard.control.business import BusinessClient, BusinessError
 from xa_guard.control.ceiling import GovernanceCeiling
 from xa_guard.control.contracts import ContractRegistry, contract_succeeded, resolve_pointer
 from xa_guard.control.crypto import CryptoError, InternalAuthorization, sha256_json
+from xa_guard.control.faults import faults
 from xa_guard.control.models import Principal
 from xa_guard.control.store import AsyncEffectStore, AuthorizationError, ConflictError
 from xa_guard.types import Decision, GateContext, InputSource
@@ -83,7 +84,20 @@ class ControlService:
             raise ConflictError("ticket title and description are required")
         if arguments["priority"] not in {"low", "normal", "high", "urgent"}:
             raise ConflictError("ticket priority is invalid")
-        await self.authorize(principal, "business_submit_ticket", data_domain)
+        assignment = await self.authorize(principal, "business_submit_ticket", data_domain)
+        authorization_snapshot = {
+            key: assignment[key]
+            for key in (
+                "assignment_id",
+                "version",
+                "subject_type",
+                "subject_id",
+                "agent_id",
+                "tools",
+                "data_domains",
+            )
+            if key in assignment
+        }
         contract = self.contracts.for_tool("business_submit_ticket")
         if contract is None:
             raise ServiceError("business_submit_ticket contract is absent")
@@ -96,6 +110,7 @@ class ControlService:
                 data_domain=data_domain,
                 args=arguments,
                 contract=contract,
+                authorization_snapshot=authorization_snapshot,
             )
             active.effect_id = effect_id
             active.side_effect_level = contract.side_effect_level
@@ -115,6 +130,7 @@ class ControlService:
             if not contract_succeeded(contract, response):
                 await self.store.mark_prepared_manual(effect_id, "business_result_not_success")
                 raise ServiceError("business API did not satisfy the effect success contract")
+            faults.crash_if_armed("after_create_success_before_effect_complete")
             root = {"input": arguments, "result": response}
             recovery = {name: resolve_pointer(root, pointer) for name, pointer in contract.recovery_fields.items()}
             reference = str((response.get("body") or {}).get("ticket_id") or "")

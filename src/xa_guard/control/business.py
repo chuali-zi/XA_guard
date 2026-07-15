@@ -28,6 +28,15 @@ class BusinessClient:
         if self.client is not None:
             await self.client.aclose()
 
+    async def ready(self) -> bool:
+        if self.client is None:
+            return False
+        try:
+            response = await self.client.get(self.base_url + "/readyz")
+            return response.status_code == 200
+        except Exception:
+            return False
+
     async def create_ticket(
         self, *, effect_id: str, trace_id: str, tenant_id: str, arguments: dict[str, Any]
     ) -> dict[str, Any]:

@@ -286,6 +286,9 @@ class Conductor:
             console_lines.append(f"[engine-error] {exc}")
             artifacts["engine-error.txt"] = str(exc).encode("utf-8")
             summary = _infra_summary("engine-error", errors=[str(exc)])
+            if "flagged for possible cybersecurity risk" in str(exc):
+                obj.weight = 0.0
+                console_lines.append("[objective-quarantine] provider safety refusal; objective remains uncovered")
         except Exception as exc:  # noqa: BLE001 - local automation must seal infra failures too
             console_lines.append(f"[local-error] {type(exc).__name__}: {exc}")
             artifacts["local-error.txt"] = f"{type(exc).__name__}: {exc}".encode("utf-8")

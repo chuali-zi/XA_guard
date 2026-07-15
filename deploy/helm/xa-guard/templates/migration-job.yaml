@@ -1,17 +1,21 @@
 {{- if .Values.migration.enabled }}
+{{- $migrationSuffix := default (toString .Release.Revision) .Values.migration.nameSuffix | trunc 20 | trimSuffix "-" }}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "xa-guard.fullname" . }}-migration-{{ .Release.Revision }}
+  name: {{ include "xa-guard.fullname" . }}-migration-{{ $migrationSuffix }}
   labels:
     {{- include "xa-guard.componentLabels" (dict "root" . "component" "migration") | nindent 4 }}
+    xa-guard.dev/migration-run: {{ $migrationSuffix | quote }}
 spec:
   backoffLimit: {{ .Values.migration.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.migration.activeDeadlineSeconds }}
   ttlSecondsAfterFinished: {{ .Values.migration.ttlSecondsAfterFinished }}
   template:
     metadata:
       labels:
         {{- include "xa-guard.componentSelectorLabels" (dict "root" . "component" "migration") | nindent 8 }}
+        xa-guard.dev/migration-run: {{ $migrationSuffix | quote }}
     spec:
       restartPolicy: OnFailure
       serviceAccountName: {{ include "xa-guard.serviceAccountName" . }}
@@ -45,26 +49,6 @@ spec:
                 secretKeyRef:
                   name: {{ required "global.externalSecrets.runtime is required" .Values.global.externalSecrets.runtime }}
                   key: {{ .Values.global.postgres.dsnSecretKey }}
-            - name: XA_GUARD_KEK_KEYRING
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.global.externalSecrets.runtime }}
-                  key: {{ .Values.global.kms.keyringSecretKey }}
-            - name: XA_GUARD_INTERNAL_AUTH_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.global.externalSecrets.runtime }}
-                  key: {{ .Values.global.internalAuthorizationSecretKey }}
-            - name: XA_GUARD_OIDC_INTROSPECTION_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.global.externalSecrets.runtime }}
-                  key: {{ .Values.global.oidc.introspectionClientSecretKey }}
-            - name: REFERENCE_BUSINESS_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.global.externalSecrets.businessApi }}
-                  key: {{ .Values.businessApi.apiKeySecretKey }}
           resources:
             {{- toYaml .Values.migration.resources | nindent 12 }}
           volumeMounts:

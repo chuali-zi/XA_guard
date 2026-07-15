@@ -1,6 +1,7 @@
 {{- $root := . -}}
 {{- $components := list
   (dict "name" "api" "enabled" (and .Values.api.enabled .Values.api.autoscaling.enabled) "autoscaling" .Values.api.autoscaling)
+  (dict "name" "worker" "enabled" (and .Values.worker.enabled .Values.worker.autoscaling.enabled) "autoscaling" .Values.worker.autoscaling)
   (dict "name" "business-api" "enabled" (and .Values.businessApi.enabled .Values.businessApi.autoscaling.enabled) "autoscaling" .Values.businessApi.autoscaling)
   (dict "name" "console" "enabled" (and .Values.console.enabled .Values.console.autoscaling.enabled) "autoscaling" .Values.console.autoscaling)
 -}}

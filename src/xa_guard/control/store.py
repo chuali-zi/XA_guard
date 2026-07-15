@@ -8,9 +8,10 @@ import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from xa_guard.control.crypto import EncryptedEnvelope, Keyring, canonical_json, sha256_json
+from xa_guard.control.key_provider import KeyProvider, LocalKeyProvider
 from xa_guard.control.models import EffectContractV2, Principal
 
 
@@ -33,9 +34,14 @@ class AuthorizationError(StoreError):
 class AsyncEffectStore:
     MIGRATION_LOCK_ID = 0x58414744
 
-    def __init__(self, dsn: str, keyring: Keyring) -> None:
+    def __init__(self, dsn: str, keyring: Keyring | KeyProvider | None = None) -> None:
         self.dsn = dsn
-        self.keyring = keyring
+        if isinstance(keyring, Keyring):
+            self.keyring: Keyring | None = keyring
+            self.key_provider: KeyProvider | None = LocalKeyProvider(keyring)
+        else:
+            self.key_provider = keyring
+            self.keyring = getattr(keyring, "keyring", None)
         self.pool: Any = None
 
     async def connect(self) -> None:
@@ -90,7 +96,7 @@ class AsyncEffectStore:
             finally:
                 await conn.execute("SELECT pg_advisory_unlock($1)", self.MIGRATION_LOCK_ID)
 
-    async def ready(self) -> bool:
+    async def database_ready(self) -> bool:
         try:
             if not self.pool:
                 return False
@@ -99,7 +105,15 @@ class AsyncEffectStore:
                 "SELECT bool_and(to_regclass(name) IS NOT NULL) FROM unnest($1::text[]) AS name",
                 ["xa_effects", "xa_assignments", "xa_undo_requests", "xa_reference_tickets"],
             )
-            return version >= 3 and bool(tables)
+            return version >= 4 and bool(tables)
+        except Exception:
+            return False
+
+    async def ready(self) -> bool:
+        if not await self.database_ready() or self.key_provider is None:
+            return False
+        try:
+            return await self.key_provider.ready()
         except Exception:
             return False
 
@@ -200,6 +214,7 @@ class AsyncEffectStore:
         data_domain: str,
         args: dict[str, Any],
         contract: EffectContractV2,
+        authorization_snapshot: dict[str, Any] | None = None,
     ) -> str:
         effect_id = f"eff-{uuid.uuid4().hex}"
         snapshot = {
@@ -224,9 +239,10 @@ class AsyncEffectStore:
                 INSERT INTO xa_effects(
                   effect_id,tenant_id,trace_id,principal_sub,principal_username,agent_id,data_domain,
                   tool_name,args_sha256,contract_version,contract_hash,contract_snapshot,side_effect_level,
-                  reversibility,status,undo_expires_at,lease_owner,lease_until,heartbeat_at)
+                  reversibility,status,undo_expires_at,lease_owner,lease_until,heartbeat_at,
+                  authorization_snapshot)
                 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13,$14,'prepared',
-                       now()+make_interval(secs=>$15),$16,now()+make_interval(secs=>60),now())
+                       now()+make_interval(secs=>$15),$16,now()+make_interval(secs=>60),now(),$17::jsonb)
                 """,
                 effect_id,
                 principal.tenant_id,
@@ -244,6 +260,7 @@ class AsyncEffectStore:
                 contract.reversibility,
                 contract.undo_window_seconds,
                 f"api:{trace_id}",
+                authorization_snapshot or {},
             )
             await self._effect_event_conn(conn, principal.tenant_id, effect_id, "effect_prepared", principal.subject, {"trace_id": trace_id})
         return effect_id
@@ -262,7 +279,8 @@ class AsyncEffectStore:
         if row is None or row["tenant_id"] != principal.tenant_id or row["status"] != "prepared":
             raise ConflictError("effect is absent or no longer prepared")
         aad = canonical_json({"effect_id": effect_id, "tenant_id": principal.tenant_id, "tool_name": row["tool_name"]})
-        encrypted = self.keyring.encrypt(canonical_json(recovery), aad)
+        provider = self._require_key_provider()
+        encrypted = await provider.encrypt(canonical_json(recovery), aad)
         status = "available" if row["reversibility"] == "compensatable" else "manual_required"
         async with self.pool.acquire() as conn, conn.transaction():
             changed = await conn.fetchval(
@@ -301,7 +319,8 @@ class AsyncEffectStore:
             """
             SELECT effect_id,tenant_id,trace_id,principal_sub,principal_username,agent_id,data_domain,
               tool_name,side_effect_level,reversibility,status,prepared_at,completed_at,undo_expires_at,
-              result_sha256,downstream_reference,compensation_trace_id,retry_count,last_error_code
+              result_sha256,downstream_reference,compensation_trace_id,retry_count,last_error_code,
+              authorization_snapshot
               FROM xa_effects WHERE tenant_id=$1 ORDER BY prepared_at DESC LIMIT $2
             """,
             tenant_id,
@@ -314,7 +333,8 @@ class AsyncEffectStore:
             """
             SELECT effect_id,tenant_id,trace_id,principal_sub,principal_username,agent_id,data_domain,
               tool_name,side_effect_level,reversibility,status,prepared_at,completed_at,undo_expires_at,
-              result_sha256,downstream_reference,compensation_trace_id,retry_count,last_error_code
+              result_sha256,downstream_reference,compensation_trace_id,retry_count,last_error_code,
+              authorization_snapshot
               FROM xa_effects WHERE tenant_id=$1 AND effect_id=$2
             """,
             tenant_id,
@@ -509,7 +529,8 @@ class AsyncEffectStore:
             ciphertext=bytes(row["recovery_ciphertext"]),
         )
         aad = canonical_json({"effect_id": row["effect_id"], "tenant_id": row["tenant_id"], "tool_name": row["tool_name"]})
-        return json.loads(self.keyring.decrypt(envelope, aad))
+        provider = self._require_key_provider()
+        return json.loads(await provider.decrypt(envelope, aad))
 
     async def complete_work(self, row: dict[str, Any], worker_id: str, trace_id: str) -> None:
         async with self.pool.acquire() as conn, conn.transaction():
@@ -613,25 +634,148 @@ class AsyncEffectStore:
             )
 
     async def rewrap_batch(self, limit: int = 100) -> int:
+        provider = self._require_key_provider()
+        active_key_id = provider.active_key_id
+        if not active_key_id:
+            if not await provider.ready():
+                raise StoreError("key provider is unavailable")
+            active_key_id = provider.active_key_id
+        if not active_key_id:
+            raise StoreError("key provider has no active key")
         rows = await self.pool.fetch(
             "SELECT effect_id,key_id,wrapped_dek,recovery_nonce,recovery_ciphertext FROM xa_effects "
             "WHERE key_id IS NOT NULL AND key_id<>$1 LIMIT $2",
-            self.keyring.active_key_id,
+            active_key_id,
             limit,
         )
         count = 0
         for row in rows:
             envelope = EncryptedEnvelope(row["key_id"], bytes(row["wrapped_dek"]), bytes(row["recovery_nonce"]), bytes(row["recovery_ciphertext"]))
-            updated = self.keyring.rewrap(envelope)
-            await self.pool.execute(
-                "UPDATE xa_effects SET key_id=$1,wrapped_dek=$2,updated_at=now() WHERE effect_id=$3 AND key_id=$4",
+            updated = await provider.rewrap(envelope)
+            changed = await self.pool.fetchval(
+                "UPDATE xa_effects SET key_id=$1,wrapped_dek=$2,updated_at=now() "
+                "WHERE effect_id=$3 AND key_id=$4 RETURNING 1",
                 updated.key_id,
                 updated.wrapped_dek,
                 row["effect_id"],
                 row["key_id"],
             )
-            count += 1
+            if changed is not None:
+                count += 1
         return count
+
+    async def append_gate6_record(
+        self,
+        tenant_id: str,
+        trace_id: str,
+        record: dict[str, Any],
+        *,
+        hash_algo: str = "sha256",
+        source_instance: str = "",
+        signer: Callable[[bytes], str] | None = None,
+    ) -> dict[str, Any]:
+        """Append one canonical SHA-256 Gate6 record under a tenant chain lock."""
+
+        if not tenant_id or not trace_id:
+            raise ConflictError("tenant_id and trace_id are required for Gate6 persistence")
+        if hash_algo.lower() != "sha256":
+            raise ConflictError("PostgreSQL Gate6 persistence requires canonical SHA-256")
+        if len(source_instance) > 256:
+            raise ConflictError("Gate6 source instance is invalid")
+        value = dict(record)
+        recorded_trace = str(value.get("trace_id") or "")
+        if recorded_trace and recorded_trace != trace_id:
+            raise ConflictError("Gate6 record trace does not match persistence scope")
+        recorded_tenant = str(value.get("gen_ai.governance.tenant_id") or "")
+        if recorded_tenant and recorded_tenant != tenant_id:
+            raise ConflictError("Gate6 record tenant does not match persistence scope")
+        value["trace_id"] = trace_id
+        value.pop("record_hash", None)
+        value.pop("signature", None)
+        try:
+            canonical_json(value)
+        except (TypeError, ValueError) as exc:
+            raise ConflictError("Gate6 record is not canonical JSON") from exc
+
+        async with self.pool.acquire() as conn, conn.transaction():
+            await conn.execute(
+                "SELECT pg_advisory_xact_lock(hashtext($1))",
+                f"gate6-chain:{tenant_id}",
+            )
+            previous = (
+                await conn.fetchval(
+                    "SELECT record_hash FROM xa_gate6_events "
+                    "WHERE tenant_id=$1 ORDER BY seq DESC LIMIT 1",
+                    tenant_id,
+                )
+                or ""
+            )
+            value["gen_ai.evidence.hash_prev"] = previous
+            record_hash = hashlib.sha256(canonical_json(value)).hexdigest()
+            value["record_hash"] = record_hash
+            if signer is not None:
+                signature = signer(canonical_json(value))
+                if not isinstance(signature, str) or not signature:
+                    raise ConflictError("Gate6 signer returned an invalid signature")
+                value["signature"] = signature
+            seq = await conn.fetchval(
+                """
+                INSERT INTO xa_gate6_events(
+                  tenant_id,trace_id,record,prev_hash,record_hash,source_instance)
+                VALUES($1,$2,$3::jsonb,$4,$5,$6) RETURNING seq
+                """,
+                tenant_id,
+                trace_id,
+                value,
+                previous,
+                record_hash,
+                source_instance or "unknown",
+            )
+        return {"seq": int(seq), "record": value}
+
+    async def fetch_gate6_records(
+        self,
+        tenant_id: str,
+        *,
+        trace_id: str = "",
+        after_seq: int = 0,
+        limit: int = 1000,
+    ) -> list[dict[str, Any]]:
+        rows = await self.pool.fetch(
+            """
+            SELECT seq,tenant_id,trace_id,record,prev_hash,record_hash,source_instance,occurred_at
+              FROM xa_gate6_events
+             WHERE tenant_id=$1 AND seq>$2 AND ($3='' OR trace_id=$3)
+             ORDER BY seq LIMIT $4
+            """,
+            tenant_id,
+            max(0, after_seq),
+            trace_id,
+            max(1, min(limit, 10_000)),
+        )
+        return [self._json_row(dict(row)) for row in rows]
+
+    async def export_gate6_jsonl(
+        self,
+        tenant_id: str,
+        *,
+        trace_id: str = "",
+        after_seq: int = 0,
+        limit: int = 10_000,
+    ) -> str:
+        rows = await self.fetch_gate6_records(
+            tenant_id, trace_id=trace_id, after_seq=after_seq, limit=limit
+        )
+        if not rows:
+            return ""
+        return "".join(
+            canonical_json(row["record"]).decode("utf-8") + "\n" for row in rows
+        )
+
+    def _require_key_provider(self) -> KeyProvider:
+        if self.key_provider is None:
+            raise StoreError("effect encryption key provider is unavailable")
+        return self.key_provider
 
     async def _effect_event(self, tenant_id: str, effect_id: str, kind: str, actor: str, payload: dict[str, Any]) -> None:
         async with self.pool.acquire() as conn, conn.transaction():

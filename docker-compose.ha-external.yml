@@ -1,0 +1,103 @@
+name: xa-guard-ha-external
+
+services:
+  postgres:
+    image: postgres:17.6-bookworm@sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: xaguard
+      POSTGRES_DB: xaguard
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets:
+      - postgres_password
+    volumes:
+      - postgres-ha-data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/10-keycloak.sql:ro
+    ports:
+      - "${HA_EXTERNAL_BIND_ADDRESS:-127.0.0.1}:${HA_POSTGRES_PORT:-15432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xaguard -d xaguard"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [identity-data]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.0@sha256:2eb3cd316835c990e69e26ade292ffa78f6fb0db7d5fc6377463c162e1979ac0
+    restart: unless-stopped
+    entrypoint: ["/bin/bash", "-ec"]
+    command:
+      - |
+        export KC_DB_PASSWORD="$$(cat /run/secrets/postgres_password)"
+        export KC_BOOTSTRAP_ADMIN_PASSWORD="$$(cat /run/secrets/keycloak_admin_password)"
+        exec /opt/keycloak/bin/kc.sh start-dev --import-realm \
+          --health-enabled=true --metrics-enabled=true \
+          --hostname=http://localhost:${HA_KEYCLOAK_PORT:-13081} \
+          --hostname-backchannel-dynamic=true
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: xaguard
+      KC_BOOTSTRAP_ADMIN_USERNAME: kc-admin
+    secrets:
+      - postgres_password
+      - keycloak_admin_password
+    volumes:
+      - ${REFERENCE_RUNTIME:-.runtime/reference}/realm.json:/opt/keycloak/data/import/xa-guard-realm.json:ro
+    ports:
+      - "${HA_EXTERNAL_BIND_ADDRESS:-127.0.0.1}:${HA_KEYCLOAK_PORT:-13081}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000; printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3; grep -q '200 OK' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    networks: [identity-data]
+
+  key-provider:
+    build:
+      context: .
+      dockerfile: docker/reference.Dockerfile
+    image: xa-guard-reference:0.2.0
+    restart: unless-stopped
+    command: ["python", "-m", "xa_guard.reference.kms_api"]
+    environment:
+      PYTHONPATH: /app/src:/app
+      PORT: "8083"
+      REFERENCE_KMS_KEK_KEYRING_FILE: /run/secrets/kms_keyring
+      REFERENCE_KMS_AUTH_TOKEN_FILE: /run/secrets/kms_api_token
+    secrets:
+      - kms_keyring
+      - kms_api_token
+    ports:
+      - "${HA_EXTERNAL_BIND_ADDRESS:-127.0.0.1}:${HA_KMS_PORT:-13083}:8083"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; token=open('/run/secrets/kms_api_token', encoding='utf-8').read().strip(); request=urllib.request.Request('http://127.0.0.1:8083/readyz', headers={'Authorization':'Bearer '+token}); urllib.request.urlopen(request, timeout=2).read()"
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks: [identity-data]
+
+secrets:
+  postgres_password:
+    file: ${REFERENCE_RUNTIME:-.runtime/reference}/secrets/postgres_password
+  keycloak_admin_password:
+    file: ${REFERENCE_RUNTIME:-.runtime/reference}/secrets/keycloak_admin_password
+  kms_keyring:
+    file: ${REFERENCE_RUNTIME:-.runtime/reference}/secrets/kek_keyring
+  kms_api_token:
+    file: ${HA_RUNTIME:-.runtime/kind-ha}/secrets/kms_api_token
+
+volumes:
+  postgres-ha-data:
+
+networks:
+  identity-data:
+    internal: false

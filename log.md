@@ -3038,3 +3038,11 @@ Key finding:
 - 规划范围：模拟企业"数字城市科技集团"（~500 员工、~150 Agent Seat）、L1-L4 + Test 五级 Seat 体系、6 个企业域（Office/Operations/Business Data/Dev Supply/Governance/Audit）的 Seat 分配与能力定义、跨域访问规则矩阵、委托链约束、Seat 生命周期、成本模型（月均 ~$1,040）、与 Arena Core 组件的映射关系。
 - 更新 `enterprise-agent-range/docs/README.md` 先读顺序添加该规划入口。
 - 本规划不修改 runtime 代码、不改变 XA-Guard 验收结论、不引入真实模型调用。
+# 2026-07-15 两项 P0：Reference core 修复与 D2 release-candidate 验证
+
+- 将 `.runtime/kind-ha/` 与 `.runtime/evidence/` 纳入忽略，避免本机 KMS token 和未封存验收输出误提交；保留并未触碰 Auto-RedTeam/provenance 既有改动。
+- 修复 Console assignment 契约：人员主体由 `person` 改为后端接受的 `human`，撤销 `If-Match` 改为 `"vN"`。Console 5 tests、production build、npm audit 0 vulnerabilities 通过。
+- 从空 reference volume 重建后首次 core 运行显示跨租户已通过，但 PostgreSQL 故障恢复后下一案例的 PKCE 因未等待 Keycloak 返回 400；在编排中加入 discovery readiness，不降低断言，复跑 core 7/7 通过。Reference PKCE/token exchange/双人 Undo e2e 同步通过，六服务健康，schema v4。
+- Kind 前次 `kubectl.exe PermissionError` 本轮无法复现；仓内 kind/kubectl/helm 均可执行，deployment 静态测试 10/10 和 Helm strict lint 通过，但没有运行真实 kind 集群，不宣称 HA。
+- D2 release-candidate 门禁：Ruff PASS；全仓 772 collected、771 passed、1 skipped（Windows 目录 symlink 不可用）；OAR kernel + Auto-RedTeam 149 passed；L3 static 11/11；compileall、`git diff --check` 通过。
+- 当前仍未完成 D2 final freeze：工作树包含大量本轮功能资产及三处既有无关改动，尚未 commit/push，final artifact hash 不存在。本轮未运行 Reference long/keys/performance、三账号 UI、最终 evidence manifest 或 kind HA。

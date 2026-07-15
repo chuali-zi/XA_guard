@@ -19,7 +19,7 @@
 
 - [ ] final commit hash。
 - [ ] `git status --short` 干净截图或文本。
-- [x] 全仓 pytest 输出（2026-07-11：667 collected，666 passed、1 sandbox image skip）。
+- [x] release-candidate pytest 输出（2026-07-15：772 collected，771 passed、1 Windows directory-symlink skip）；提交前在 final commit 再跑一次并固定 hash。
 - [x] L3 static verifier 输出（工程参考，11/11 sections PASS）。
 - [x] **OAR canonical 证据目录**：`oar-delivery-v2-20260711T123124Z-win-local`。
 - [x] OAR live A/B summary：N=3、`protection_delta=1.0`、7/7 replay PASS。

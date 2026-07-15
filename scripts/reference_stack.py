@@ -37,6 +37,7 @@ def bootstrap() -> dict[str, str]:
     postgres_password = _write_once(SECRET_DIR / "postgres_password", _token())
     keycloak_admin_password = _write_once(SECRET_DIR / "keycloak_admin_password", _token())
     bff_secret = _write_once(SECRET_DIR / "bff_client_secret", _token(48))
+    beta_agent_secret = _write_once(SECRET_DIR / "beta_agent_client_secret", _token(48))
     api_secret = _write_once(SECRET_DIR / "api_client_secret", _token(48))
     _write_once(SECRET_DIR / "business_api_key", _token(48))
     _write_once(SECRET_DIR / "internal_auth_key", base64.b64encode(secrets.token_bytes(32)).decode())
@@ -44,28 +45,48 @@ def bootstrap() -> dict[str, str]:
     if not keyring_path.exists():
         _write_once(
             keyring_path,
-            json.dumps({"active": "reference-kek-v1", "keys": {"reference-kek-v1": base64.b64encode(secrets.token_bytes(32)).decode()}}),
+            json.dumps(
+                {
+                    "active": "reference-kek-v1",
+                    "keys": {"reference-kek-v1": base64.b64encode(secrets.token_bytes(32)).decode()},
+                }
+            ),
         )
     database_url = f"postgresql://xaguard:{quote(postgres_password, safe='')}@postgres:5432/xaguard"
     _write_once(SECRET_DIR / "database_url", database_url)
     credentials_path = RUNTIME / "credentials.json"
     if credentials_path.exists():
         credentials = json.loads(credentials_path.read_text(encoding="utf-8"))
+        credentials_changed = False
+        if "eve" not in credentials:
+            credentials["eve"] = {"username": "eve", "password": _token(18)}
+            credentials_changed = True
+        if credentials_changed:
+            credentials_path.write_text(
+                json.dumps(credentials, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+            )
+            if os.name != "nt":
+                credentials_path.chmod(0o600)
     else:
         credentials = {
             "keycloak_admin": {"username": "kc-admin", "password": keycloak_admin_password},
             "alice": {"username": "alice", "password": _token(18)},
             "dora": {"username": "dora", "password": _token(18)},
+            "eve": {"username": "eve", "password": _token(18)},
             "governance_admin": {"username": "admin", "password": _token(18)},
         }
-        credentials_path.write_text(json.dumps(credentials, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        credentials_path.write_text(
+            json.dumps(credentials, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
         if os.name != "nt":
             credentials_path.chmod(0o600)
     replacements = {
         "__BFF_CLIENT_SECRET__": bff_secret,
+        "__BETA_AGENT_CLIENT_SECRET__": beta_agent_secret,
         "__API_CLIENT_SECRET__": api_secret,
         "__ALICE_PASSWORD__": credentials["alice"]["password"],
         "__DORA_PASSWORD__": credentials["dora"]["password"],
+        "__EVE_PASSWORD__": credentials["eve"]["password"],
         "__GOVERNANCE_ADMIN_PASSWORD__": credentials["governance_admin"]["password"],
     }
     realm = TEMPLATE.read_text(encoding="utf-8")

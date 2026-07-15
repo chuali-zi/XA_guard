@@ -23,6 +23,7 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
+      terminationGracePeriodSeconds: {{ .Values.console.terminationGracePeriodSeconds }}
       serviceAccountName: {{ include "xa-guard.serviceAccountName" . }}
       automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
       securityContext:
@@ -55,6 +56,10 @@ spec:
               value: {{ .Values.global.oidc.issuer | quote }}
             - name: OIDC_PUBLIC_ISSUER
               value: {{ .Values.global.oidc.issuer | quote }}
+            {{- with .Values.global.oidc.tokenEndpoint }}
+            - name: OIDC_TOKEN_ENDPOINT
+              value: {{ . | quote }}
+            {{- end }}
             - name: OIDC_CONFIDENTIAL_CLIENT_ID
               value: {{ .Values.global.oidc.confidentialClientId | quote }}
             - name: OIDC_EXCHANGE_AUDIENCE
@@ -70,18 +75,26 @@ spec:
             - name: http
               containerPort: {{ .Values.console.containerPort }}
               protocol: TCP
+          lifecycle:
+            preStop:
+              exec:
+                command: ["node", "-e", "setTimeout(() => {}, {{ mul .Values.console.preStopDelaySeconds 1000 }})"]
           livenessProbe:
             httpGet:
               path: {{ .Values.console.probes.liveness.path }}
               port: http
             initialDelaySeconds: {{ .Values.console.probes.liveness.initialDelaySeconds }}
             periodSeconds: {{ .Values.console.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.console.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.console.probes.liveness.failureThreshold }}
           readinessProbe:
             httpGet:
               path: {{ .Values.console.probes.readiness.path }}
               port: http
             initialDelaySeconds: {{ .Values.console.probes.readiness.initialDelaySeconds }}
             periodSeconds: {{ .Values.console.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.console.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.console.probes.readiness.failureThreshold }}
           resources:
             {{- toYaml .Values.console.resources | nindent 12 }}
           volumeMounts:

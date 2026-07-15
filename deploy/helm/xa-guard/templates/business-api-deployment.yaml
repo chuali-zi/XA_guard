@@ -23,6 +23,7 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
+      terminationGracePeriodSeconds: {{ .Values.businessApi.terminationGracePeriodSeconds }}
       serviceAccountName: {{ include "xa-guard.serviceAccountName" . }}
       automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
       securityContext:
@@ -65,18 +66,26 @@ spec:
             - name: http
               containerPort: {{ .Values.businessApi.containerPort }}
               protocol: TCP
+          lifecycle:
+            preStop:
+              exec:
+                command: ["python", "-c", "import time; time.sleep({{ .Values.businessApi.preStopDelaySeconds }})"]
           livenessProbe:
             httpGet:
               path: {{ .Values.businessApi.probes.liveness.path }}
               port: http
             initialDelaySeconds: {{ .Values.businessApi.probes.liveness.initialDelaySeconds }}
             periodSeconds: {{ .Values.businessApi.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.businessApi.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.businessApi.probes.liveness.failureThreshold }}
           readinessProbe:
             httpGet:
               path: {{ .Values.businessApi.probes.readiness.path }}
               port: http
             initialDelaySeconds: {{ .Values.businessApi.probes.readiness.initialDelaySeconds }}
             periodSeconds: {{ .Values.businessApi.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.businessApi.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.businessApi.probes.readiness.failureThreshold }}
           resources:
             {{- toYaml .Values.businessApi.resources | nindent 12 }}
           volumeMounts:

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from xa_guard.audit.completeness import record_completeness_score
 from xa_guard.audit.faithfulness import assess_decision_faithfulness
@@ -64,7 +64,15 @@ class Gate6Audit(Gate):
         if self.signature_mode == "external" and (not self.external_sign_command or not self.external_key_id):
             raise ValueError("Gate6 signature_mode=external requires external_sign_command and external_key_id")
 
-    def evaluate(self, ctx: GateContext, stage: GateStage = GateStage.OUTBOUND) -> GateResult:
+    def render_record(
+        self, ctx: GateContext
+    ) -> tuple[dict[str, Any], Callable[[bytes], str] | None, Any]:
+        """Render one canonical Gate6 record without choosing its persistence backend.
+
+        The legacy file backend and the PostgreSQL HA backend deliberately share
+        this renderer so their evidence fields, record hashing, and signatures
+        cannot drift apart.
+        """
         # 1. 计算 tool_result_hash（canonical JSON）
         if ctx.tool_result is None:
             tool_result_payload = b""
@@ -210,16 +218,28 @@ class Gate6Audit(Gate):
                     provider=self.external_provider,
                     timeout_seconds=self.external_timeout_seconds,
                 ).signature
-        appended = self.chain.append(record_dict, signer=signer)
+        return record_dict, signer, faithfulness
+
+    def result_for_appended(
+        self,
+        appended: dict[str, Any],
+        faithfulness: Any,
+        *,
+        backend: str,
+        location: str,
+        sequence: int | None = None,
+    ) -> GateResult:
+        """Build the public GateResult for a record already persisted by a sink."""
         record_hash = appended.get("record_hash", "")
         audit_completeness = record_completeness_score(appended)
         signature: Any = appended.get("signature")
-
         return GateResult(
             gate_name=self.name,
             decision=Decision.ALLOW,
             metadata={
-                "audit_path": str(self.audit_path),
+                "audit_path": location,
+                "audit_backend": backend,
+                "audit_sequence": sequence,
                 "record_hash": record_hash,
                 "audit_completeness": audit_completeness,
                 "hash_algo": self.hash_algo,
@@ -230,4 +250,14 @@ class Gate6Audit(Gate):
                     "evidence": faithfulness.evidence,
                 },
             },
+        )
+
+    def evaluate(self, ctx: GateContext, stage: GateStage = GateStage.OUTBOUND) -> GateResult:
+        record_dict, signer, faithfulness = self.render_record(ctx)
+        appended = self.chain.append(record_dict, signer=signer)
+        return self.result_for_appended(
+            appended,
+            faithfulness,
+            backend="file",
+            location=str(self.audit_path),
         )

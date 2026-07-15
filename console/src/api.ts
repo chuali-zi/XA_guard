@@ -75,8 +75,7 @@ export class ControlApi {
   deleteAssignment(assignmentId: string, version: number) {
     return this.request<void>(`/assignments/${encodeURIComponent(assignmentId)}`, {
       method: "DELETE",
-      headers: { "if-match": `W/\"v ${version}\"` },
+      headers: { "if-match": `\"v${version}\"` },
     });
   }
 }
-

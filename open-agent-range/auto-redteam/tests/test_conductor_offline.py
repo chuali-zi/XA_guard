@@ -333,6 +333,40 @@ def test_local_engine_error_does_not_cover_objective(tmp_path, monkeypatch):
     assert obj.attempts == 0
 
 
+def test_provider_safety_refusal_quarantines_objective(tmp_path, monkeypatch):
+    from conductor.conductor import Conductor, DEFAULT_CONFIG
+
+    class RefusingEngine:
+        name = "refusing"
+        executable = "refusing"
+
+        def available(self):
+            return True
+
+        def propose(self, *_args, **_kwargs):
+            raise EngineError("content was flagged for possible cybersecurity risk")
+
+    cfg = dict(DEFAULT_CONFIG)
+    cfg.update({
+        "engines": ["opencode"],
+        "evidence_root": str(tmp_path / "evidence"),
+        "provenance_manifest": str(tmp_path / "manifest.jsonl"),
+        "novelty_registry": str(tmp_path / "novelty.json"),
+        "seed_prior_art": False,
+    })
+    conductor = Conductor(cfg, client=None, state_dir=tmp_path / "state")
+    conductor.local_engines = [RefusingEngine()]
+    monkeypatch.setattr(conductor, "_seal_local_run", lambda *_args, **_kwargs: None)
+
+    obj = conductor.queue.next()
+    verdict = conductor._run_local_objective(obj)
+
+    assert verdict.result_label == RESULT_INFRA
+    assert obj.covered is False
+    assert obj.attempts == 0
+    assert obj.weight == 0.0
+
+
 def test_local_successful_ab_covers_objective(tmp_path, monkeypatch):
     from conductor.conductor import Conductor, DEFAULT_CONFIG
 

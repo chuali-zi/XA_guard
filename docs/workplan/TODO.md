@@ -1,6 +1,6 @@
 # XA-Guard 下一步 TODO 与交付收束计划
 
-> 快照时间：**2026-07-11**（Delivery v2 口径）
+> 快照时间：**2026-07-15**（Delivery v2 口径）
 > 权威交付规格：[../acceptance/DELIVERY-v2.md](../acceptance/DELIVERY-v2.md)
 > 仓库状态：[../../status.md](../../status.md)
 > 赛题依据：[../source-of-truth/事实源.md](../source-of-truth/事实源.md)
@@ -10,10 +10,10 @@
 **活跃口径是 Delivery v2**，不是 L3 最终 BLOCKED 叙事。
 
 - **Tier A（必交）**：D1 PDF、D2 release、D3 视频、D4 报名 — 当前主矛盾。
-- **Tier B（主证据）**：Open Agent Range A/B + 六关 demo + audit + B5 canonical sealed chain 均 `DONE`。
+- **Tier B（主证据）**：B1–B5 均 `DONE`；B6/B7 core fault 7/7 已过，仍待长时故障、性能、UI 与最终 manifest。
 - **Tier C（加分）**：R4/R7/R8 已有证据；R2/R3、Trae 截图等为 **RETIRED** 硬承诺，仅背景实验。
 
-**下一步第一优先级**：D4 报名确认 → D1 PDF 定稿 → D3 录制 → D2 clean release freeze。
+**下一步第一优先级**：D2 clean release freeze/final hash；并行完成人工 D4、D1、D3。B6/B7 收口不阻塞最低 D2，但未封存前保持 `PARTIAL`。
 
 ---
 
@@ -34,9 +34,9 @@
 
 ### A2 D2 release checklist
 
-- [ ] `PYTHONUTF8=1 python -m pytest -q`
-- [ ] `python scripts/verify_l3_static.py --section all`
-- [ ] Docker healthz（如本机可用）
+- [x] `PYTHONUTF8=1 python -m pytest -q`（772 collected / 771 passed / 1 Windows symlink skip）
+- [x] `python scripts/verify_l3_static.py --section all`（11/11）
+- [x] Reference Docker 六服务 health + PKCE/Undo e2e + core fault 7/7
 - [ ] artifact hash manifest
 - [ ] README 命令与 D1 一致
 
@@ -51,6 +51,8 @@
 | B3 | Null vs XA-Guard live A/B | `DONE` | D3 展示 `protection_delta` |
 | B4 | Ledger replay + audit 对齐 | `DONE` | D1 附 replay JSON 摘要 |
 | B5 | 一键 canonical 证据链 | `DONE` | `oar-delivery-v2-20260711T123124Z-win-local` 已封存并锚定 |
+| B6 | 可信 Agent Identity | `PARTIAL` | core 身份负测/撤销/跨租户已过；待三账号 UI 与最终 evidence |
+| B7 | 可验证 Undo | `PARTIAL` | core 故障/双审批已过；待 Worker long、KEK、性能与最终 manifest |
 
 ### B5 封存结果
 

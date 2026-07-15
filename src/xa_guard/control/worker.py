@@ -4,11 +4,17 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import inspect
 import logging
 import os
 import socket
 import uuid
 from typing import Any
+
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import JSONResponse, PlainTextResponse
+from starlette.routing import Route
 
 from xa_guard.control.business import BusinessError
 from xa_guard.control.contracts import contract_succeeded, resolve_pointer
@@ -92,17 +98,11 @@ class CompensationWorker:
                 await heartbeat
         return True
 
-    async def _fail_if_owned(
-        self, row: dict[str, Any], retryable: bool, error_code: str
-    ) -> None:
+    async def _fail_if_owned(self, row: dict[str, Any], retryable: bool, error_code: str) -> None:
         try:
-            await self.runtime.store.fail_work(
-                row, self.worker_id, retryable, error_code
-            )
+            await self.runtime.store.fail_work(row, self.worker_id, retryable, error_code)
         except ConflictError:
-            log.warning(
-                "failure state not written after lease loss effect_id=%s", row["effect_id"]
-            )
+            log.warning("failure state not written after lease loss effect_id=%s", row["effect_id"])
 
     async def _compensate(self, row: dict[str, Any]) -> None:
         token = str(row.get("internal_authorization") or "")
@@ -135,7 +135,9 @@ class CompensationWorker:
         recovery = await self.runtime.store.decrypt_recovery(row)
         root = {"recovery": recovery, "request": parameters}
         arguments = {
-            key: resolve_pointer(root, expression) if isinstance(expression, str) and expression.startswith("$") else expression
+            key: resolve_pointer(root, expression)
+            if isinstance(expression, str) and expression.startswith("$")
+            else expression
             for key, expression in dict(contract["compensation_arguments"]).items()
         }
         ctx = self.runtime.service._context(principal, compensation_tool, arguments, row["data_domain"])
@@ -167,8 +169,94 @@ class CompensationWorker:
                 raise RuntimeError("worker lease was lost")
 
 
+async def _provider_ready(runtime: ControlRuntime) -> bool:
+    provider = getattr(runtime, "key_provider", None) or getattr(runtime.store, "key_provider", None)
+    if provider is None:
+        return True
+    check = getattr(provider, "ready", None)
+    if check is None:
+        return True
+    value = check()
+    return bool(await value) if inspect.isawaitable(value) else bool(value)
+
+
+def create_health_app(worker: CompensationWorker) -> Starlette:
+    async def livez(_request: Request) -> JSONResponse:
+        return JSONResponse({"status": "live", "worker_id": worker.worker_id})
+
+    async def readyz(_request: Request) -> JSONResponse:
+        database_ready = getattr(worker.runtime.store, "database_ready", worker.runtime.store.ready)
+        store_ok = await database_ready()
+        provider_ok = await _provider_ready(worker.runtime)
+        business_ok = await worker.runtime.business.ready()
+        ready = store_ok and provider_ok and business_ok
+        return JSONResponse(
+            {
+                "status": "ready" if ready else "not_ready",
+                "checks": {
+                    "postgresql": store_ok,
+                    "key_provider": provider_ok,
+                    "business_api": business_ok,
+                },
+            },
+            status_code=200 if ready else 503,
+        )
+
+    async def metrics(_request: Request) -> PlainTextResponse:
+        pool = worker.runtime.store.pool
+        if pool is None:
+            return PlainTextResponse("# worker storage is not connected\n", status_code=503)
+        queue = await pool.fetchval(
+            "SELECT count(*) FROM xa_effects WHERE status IN ('approved','retry_wait','compensating')"
+        )
+        retries = await pool.fetchval("SELECT COALESCE(sum(retry_count),0) FROM xa_effects")
+        leases = await pool.fetchval(
+            "SELECT count(*) FROM xa_effects WHERE status='compensating' AND lease_until>now()"
+        )
+        lines = [
+            "# HELP xa_guard_worker_queue_depth Compensation work awaiting completion.",
+            "# TYPE xa_guard_worker_queue_depth gauge",
+            f"xa_guard_worker_queue_depth {queue}",
+            "# HELP xa_guard_worker_retries_total Persisted compensation retry attempts.",
+            "# TYPE xa_guard_worker_retries_total counter",
+            f"xa_guard_worker_retries_total {retries}",
+            "# HELP xa_guard_worker_active_leases Active compensation leases.",
+            "# TYPE xa_guard_worker_active_leases gauge",
+            f"xa_guard_worker_active_leases {leases}",
+        ]
+        return PlainTextResponse("\n".join(lines) + "\n", media_type="text/plain; version=0.0.4")
+
+    return Starlette(routes=[Route("/livez", livez), Route("/readyz", readyz), Route("/metrics", metrics)])
+
+
 async def main_async() -> None:
-    await CompensationWorker(build_runtime()).run_forever()
+    import uvicorn
+
+    worker = CompensationWorker(build_runtime())
+    server = uvicorn.Server(
+        uvicorn.Config(
+            create_health_app(worker),
+            host="0.0.0.0",
+            port=int(os.getenv("PORT", "8082")),
+            log_level=os.getenv("LOG_LEVEL", "info").lower(),
+        )
+    )
+    worker_task = asyncio.create_task(worker.run_forever())
+    server_task = asyncio.create_task(server.serve())
+    try:
+        done, _pending = await asyncio.wait({worker_task, server_task}, return_when=asyncio.FIRST_COMPLETED)
+        if worker_task in done:
+            await worker_task
+        else:
+            server.should_exit = True
+            await server_task
+    finally:
+        server.should_exit = True
+        worker_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await worker_task
+        if not server_task.done():
+            await server_task
 
 
 def main() -> None:

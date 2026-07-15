@@ -1,5 +1,8 @@
 # scripts 工作日志
 
+## 2026-07-15 Reference core P0
+- 全新 volume 跑 core，定位 PostgreSQL 恢复后未等待 Keycloak，补 discovery readiness 后 7/7 通过；未运行 long/keys/performance，也未封存最终 evidence。
+
 ## 2026-07-05 R4 性能验收复跑
 - 复跑 `test_l3_performance_benchmark.py`、进程内 500、HTTP 10x500 与 HTTP 20x500 容量边界。
 - 10x500 两项达 PRD medium；20 session P95 483.732ms 超标，仅记 LIMIT。

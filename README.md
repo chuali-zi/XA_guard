@@ -155,7 +155,7 @@ python scripts/verify_reference_e2e.py
 # http://localhost:13081
 ```
 
-凭据位于 `.runtime/reference/credentials.json`，密码、client secret、KEK 和内部签名 key 不进入仓库。Reference 仅绑定 localhost；远程环境必须使用 TLS。该入口已验证协议级 `open -> cancelled`，但浏览器三账号人工录屏、完整故障注入、10 并发 p95 与 kind 多副本仍未完成，因此尚不标记 `REFERENCE-READY`。详见 [reference 部署说明](./deploy/reference/README.md)。
+凭据位于 `.runtime/reference/credentials.json`，密码、client secret、KEK 和内部签名 key 不进入仓库。Reference 仅绑定 localhost；远程环境必须使用 TLS。该入口已验证协议级 `open -> cancelled`，core 身份/故障 suite 7/7 也已通过；但浏览器三账号人工录屏、Worker long/KEK、10 并发 p95、最终 evidence manifest 与 kind 多副本仍未完成，因此尚不标记 `REFERENCE-READY`。详见 [reference 部署说明](./deploy/reference/README.md)。
 
 ## Docker Compose 一键部署（旧 L3 原型）
 

@@ -1,6 +1,7 @@
 {{- $root := . -}}
 {{- $components := list
   (dict "name" "api" "enabled" .Values.api.enabled "port" .Values.api.service.port "targetPort" "http" "service" .Values.api.service)
+  (dict "name" "worker" "enabled" .Values.worker.enabled "port" .Values.worker.service.port "targetPort" "http" "service" .Values.worker.service)
   (dict "name" "business-api" "enabled" .Values.businessApi.enabled "port" .Values.businessApi.service.port "targetPort" "http" "service" .Values.businessApi.service)
   (dict "name" "console" "enabled" .Values.console.enabled "port" .Values.console.service.port "targetPort" "http" "service" .Values.console.service)
 -}}

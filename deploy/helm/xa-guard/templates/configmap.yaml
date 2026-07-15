@@ -1,3 +1,18 @@
+{{- if not (has .Values.global.kms.provider (list "local" "http")) }}
+{{- fail "global.kms.provider must be one of: local, http" }}
+{{- end }}
+{{- if and (eq .Values.global.kms.provider "http") (not .Values.referenceInfra.enabled) (not (hasPrefix "https://" .Values.global.kms.endpoint)) }}
+{{- fail "production HTTP key provider endpoint must use https://" }}
+{{- end }}
+{{- if and (not .Values.referenceInfra.enabled) (not (hasPrefix "https://" .Values.global.oidc.issuer)) }}
+{{- fail "production OIDC issuer must use https://" }}
+{{- end }}
+{{- if and (not .Values.referenceInfra.enabled) .Values.global.oidc.backchannelBaseUrl (not (hasPrefix "https://" .Values.global.oidc.backchannelBaseUrl)) }}
+{{- fail "production OIDC backchannel must use https://" }}
+{{- end }}
+{{- if and (not .Values.referenceInfra.enabled) .Values.global.oidc.tokenEndpoint (not (hasPrefix "https://" .Values.global.oidc.tokenEndpoint)) }}
+{{- fail "production OIDC token endpoint must use https://" }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -6,15 +21,21 @@ metadata:
     {{- include "xa-guard.labels" . | nindent 4 }}
 data:
   XA_GUARD_DEPLOYMENT_PROFILE: {{ ternary "reference" "production" .Values.referenceInfra.enabled | quote }}
+  XA_GUARD_TEST_FAULTS: {{ ternary "true" "false" (and .Values.referenceInfra.enabled .Values.referenceInfra.testFaults) | quote }}
   XA_GUARD_LOG_LEVEL: {{ .Values.config.logLevel | quote }}
   XA_GUARD_OIDC_ISSUER: {{ required "global.oidc.issuer is required" .Values.global.oidc.issuer | quote }}
   XA_GUARD_OIDC_DISCOVERY_URL: {{ required "global.oidc.discoveryUrl is required" .Values.global.oidc.discoveryUrl | quote }}
   XA_GUARD_OIDC_AUDIENCE: {{ required "global.oidc.audience is required" .Values.global.oidc.audience | quote }}
+  {{- with .Values.global.oidc.backchannelBaseUrl }}
+  XA_GUARD_OIDC_BACKCHANNEL_BASE_URL: {{ . | quote }}
+  {{- end }}
+  {{- if and .Values.referenceInfra.enabled .Values.global.oidc.referenceHttpHosts }}
+  XA_GUARD_OIDC_REFERENCE_HTTP_HOSTS: {{ .Values.global.oidc.referenceHttpHosts | quote }}
+  {{- end }}
   XA_GUARD_OIDC_INTROSPECTION_CLIENT_ID: {{ .Values.global.oidc.introspectionClientId | quote }}
   XA_GUARD_OIDC_INTROSPECTION_REQUIRED: {{ .Values.global.oidc.introspectionRequired | quote }}
   XA_GUARD_POSTGRES_SSLMODE: {{ .Values.global.postgres.sslMode | quote }}
-  XA_GUARD_KMS_PROVIDER: {{ .Values.global.kms.provider | quote }}
-  XA_GUARD_KMS_ENDPOINT: {{ .Values.global.kms.endpoint | quote }}
+  XA_GUARD_KEY_PROVIDER: {{ .Values.global.kms.provider | quote }}
   XA_GUARD_MIGRATION_REQUIRED: {{ .Values.config.migrationRequired | quote }}
   XA_GUARD_WORKER_LEASE_SECONDS: {{ .Values.config.worker.leaseSeconds | quote }}
   XA_GUARD_WORKER_HEARTBEAT_SECONDS: {{ .Values.config.worker.heartbeatSeconds | quote }}
@@ -47,7 +68,9 @@ data:
         postgres_dsn_env: XA_GUARD_DATABASE_URL
         contracts_file: {{ .Values.config.contractsFile | quote }}
         key_provider: {{ .Values.global.kms.provider | quote }}
+        {{- if eq .Values.global.kms.provider "local" }}
         keyring_env: XA_GUARD_KEK_KEYRING
+        {{- end }}
       governance:
         enabled: false
         registry_file: {{ .Values.config.assignmentCeilingFile | quote }}

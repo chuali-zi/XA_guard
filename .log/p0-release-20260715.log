@@ -1,0 +1,1 @@
+2026-07-15：保护 runtime secret/evidence 路径；修复 Console assignment 契约和 Reference PostgreSQL 恢复后的 Keycloak readiness。Reference core 7/7、e2e、Ruff、772 项 pytest、OAR 149 项、静态 verifier、Helm/deployment 门禁通过。未跑 long/keys/perf/kind，未 commit/push/final hash。

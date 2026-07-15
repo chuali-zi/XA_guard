@@ -8,9 +8,31 @@ from xa_guard.control.runtime import build_runtime
 
 
 REFERENCE_ASSIGNMENTS = (
-    ("asg-reference-engineering", "group", "engineering-team", "general-office-agent", ["business_submit_ticket"], ["engineering_docs"]),
-    ("asg-reference-approvers", "group", "security-approvers", "general-office-agent", ["business_cancel_ticket"], ["engineering_docs"]),
-    ("asg-reference-admins", "group", "governance-admins", "general-office-agent", ["business_submit_ticket", "business_cancel_ticket"], ["engineering_docs"]),
+    (
+        "asg-reference-engineering",
+        "group",
+        "engineering-team",
+        "general-office-agent",
+        ["business_submit_ticket"],
+        ["engineering_docs"],
+    ),
+    (
+        "asg-reference-approvers",
+        "group",
+        "security-approvers",
+        "general-office-agent",
+        ["business_cancel_ticket"],
+        ["engineering_docs"],
+    ),
+    (
+        "asg-reference-admins",
+        "group",
+        "governance-admins",
+        "general-office-agent",
+        ["business_submit_ticket", "business_cancel_ticket"],
+        ["engineering_docs"],
+    ),
+    ("asg-reference-beta-ops", "group", "beta-ops", "beta-ops-agent", ["echo"], ["beta_ops_notes"]),
 )
 
 
@@ -19,8 +41,9 @@ async def seed() -> None:
     await runtime.store.connect()
     try:
         for assignment_id, subject_type, subject_id, agent_id, tools, domains in REFERENCE_ASSIGNMENTS:
+            tenant_id = "beta-corp" if agent_id == "beta-ops-agent" else "acme-corp"
             runtime.service.ceiling.validate_assignment(
-                "acme-corp",
+                tenant_id,
                 {
                     "subject_type": subject_type,
                     "subject_id": subject_id,
@@ -33,10 +56,11 @@ async def seed() -> None:
                 """
                 INSERT INTO xa_assignments(assignment_id,tenant_id,subject_type,subject_id,agent_id,tools,
                   data_domains,changed_by)
-                VALUES($1,'acme-corp',$2,$3,$4,$5::jsonb,$6::jsonb,'reference-bootstrap')
+                VALUES($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,'reference-bootstrap')
                 ON CONFLICT (assignment_id) DO NOTHING
                 """,
                 assignment_id,
+                tenant_id,
                 subject_type,
                 subject_id,
                 agent_id,

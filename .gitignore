@@ -36,6 +36,8 @@ htmlcov/
 # Runtime / audit output (保留 .log/ 模块工作日志，不提交 logs/)
 logs/
 .runtime/reference/
+.runtime/kind-ha/
+.runtime/evidence/
 open-agent-range/.runtime/delivery-v2-canonical-*/
 open-agent-range/.runtime/my-try-ab-offline/
 open-agent-range/auto-redteam/.state/

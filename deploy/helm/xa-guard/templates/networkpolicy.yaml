@@ -1,56 +1,251 @@
+{{- define "xa-guard.networkPolicyDnsEgress" -}}
+- to:
+    - namespaceSelector:
+        {{- toYaml .Values.networkPolicy.dns.namespaceSelector | nindent 8 }}
+      podSelector:
+        {{- toYaml .Values.networkPolicy.dns.podSelector | nindent 8 }}
+  ports:
+    {{- range .Values.networkPolicy.dns.ports }}
+    - protocol: UDP
+      port: {{ . }}
+    - protocol: TCP
+      port: {{ . }}
+    {{- end }}
+{{- end }}
+
+{{- define "xa-guard.networkPolicyDependencyEgress" -}}
+{{- if .dependency.cidrs }}
+- to:
+    {{- range .dependency.cidrs }}
+    - ipBlock:
+        cidr: {{ . | quote }}
+    {{- end }}
+  ports:
+    {{- range .dependency.ports }}
+    - protocol: TCP
+      port: {{ . }}
+    {{- end }}
+{{- end }}
+{{- end }}
+
+{{- define "xa-guard.networkPolicyMonitoringIngress" -}}
+- from:
+    - namespaceSelector:
+        {{- toYaml .Values.networkPolicy.monitoring.namespaceSelector | nindent 8 }}
+      podSelector:
+        {{- toYaml .Values.networkPolicy.monitoring.podSelector | nindent 8 }}
+  ports:
+    - protocol: TCP
+      port: {{ .port }}
+{{- end }}
+
 {{- if .Values.networkPolicy.enabled }}
-{{- $externalCidrs := .Values.networkPolicy.externalEgressCidrs -}}
-{{- if .Values.referenceInfra.enabled -}}
-{{- $externalCidrs = concat $externalCidrs .Values.referenceInfra.networkPolicy.externalEgressCidrs -}}
-{{- end -}}
+{{- if .Values.networkPolicy.defaultDeny }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "xa-guard.fullname" . }}
+  name: {{ include "xa-guard.fullname" . }}-default-deny
   labels:
     {{- include "xa-guard.labels" . | nindent 4 }}
 spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+{{- end }}
+{{- if .Values.api.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "xa-guard.componentName" (dict "root" . "component" "api") }}
+  labels:
+    {{- include "xa-guard.componentLabels" (dict "root" . "component" "api") | nindent 4 }}
+spec:
   podSelector:
     matchLabels:
-      {{- include "xa-guard.selectorLabels" . | nindent 6 }}
-  policyTypes:
-    - Ingress
-    - Egress
+      {{- include "xa-guard.componentSelectorLabels" (dict "root" . "component" "api") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
   ingress:
     - from:
+        - namespaceSelector:
+            {{- toYaml .Values.networkPolicy.ingressController.namespaceSelector | nindent 12 }}
+          podSelector:
+            {{- toYaml .Values.networkPolicy.ingressController.podSelector | nindent 12 }}
+        {{- if .Values.console.enabled }}
         - podSelector:
             matchLabels:
-              {{- include "xa-guard.selectorLabels" . | nindent 14 }}
-        - namespaceSelector:
-            {{- toYaml .Values.networkPolicy.ingressNamespaceSelector | nindent 12 }}
-    {{- with .Values.networkPolicy.extraIngress }}
+              {{- include "xa-guard.componentSelectorLabels" (dict "root" . "component" "console") | nindent 14 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.api.containerPort }}
+    {{- if .Values.networkPolicy.monitoring.enabled }}
+    {{- include "xa-guard.networkPolicyMonitoringIngress" (dict "Values" .Values "port" .Values.api.containerPort) | nindent 4 }}
+    {{- end }}
+    {{- with .Values.networkPolicy.components.api.extraIngress }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
   egress:
+    {{- include "xa-guard.networkPolicyDnsEgress" . | nindent 4 }}
+    {{- if .Values.businessApi.enabled }}
     - to:
         - podSelector:
             matchLabels:
-              {{- include "xa-guard.selectorLabels" . | nindent 14 }}
-    - to:
-        - namespaceSelector: {}
-          podSelector:
-            matchLabels:
-              k8s-app: kube-dns
+              {{- include "xa-guard.componentSelectorLabels" (dict "root" . "component" "business-api") | nindent 14 }}
       ports:
-        - protocol: UDP
-          port: 53
         - protocol: TCP
-          port: 53
-    {{- range $externalCidrs }}
-    - to:
-        - ipBlock:
-            cidr: {{ .cidr }}
-            {{- with .except }}
-            except:
-              {{- toYaml . | nindent 14 }}
-            {{- end }}
+          port: {{ .Values.businessApi.containerPort }}
     {{- end }}
-    {{- with .Values.networkPolicy.extraEgress }}
+    {{- include "xa-guard.networkPolicyDependencyEgress" (dict "dependency" .Values.networkPolicy.dependencies.oidc) | nindent 4 }}
+    {{- include "xa-guard.networkPolicyDependencyEgress" (dict "dependency" .Values.networkPolicy.dependencies.postgres) | nindent 4 }}
+    {{- if eq .Values.global.kms.provider "http" }}
+    {{- include "xa-guard.networkPolicyDependencyEgress" (dict "dependency" .Values.networkPolicy.dependencies.keyProvider) | nindent 4 }}
+    {{- end }}
+    {{- with .Values.networkPolicy.components.api.extraEgress }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
+---
+{{- end }}
+{{- if .Values.worker.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "xa-guard.componentName" (dict "root" . "component" "worker") }}
+  labels:
+    {{- include "xa-guard.componentLabels" (dict "root" . "component" "worker") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "xa-guard.componentSelectorLabels" (dict "root" . "component" "worker") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  {{- if .Values.networkPolicy.monitoring.enabled }}
+  ingress:
+    {{- include "xa-guard.networkPolicyMonitoringIngress" (dict "Values" .Values "port" .Values.worker.containerPort) | nindent 4 }}
+    {{- with .Values.networkPolicy.components.worker.extraIngress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- else if .Values.networkPolicy.components.worker.extraIngress }}
+  ingress:
+    {{- toYaml .Values.networkPolicy.components.worker.extraIngress | nindent 4 }}
+  {{- else }}
+  ingress: []
+  {{- end }}
+  egress:
+    {{- include "xa-guard.networkPolicyDnsEgress" . | nindent 4 }}
+    {{- if .Values.businessApi.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "xa-guard.componentSelectorLabels" (dict "root" . "component" "business-api") | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.businessApi.containerPort }}
+    {{- end }}
+    {{- include "xa-guard.networkPolicyDependencyEgress" (dict "dependency" .Values.networkPolicy.dependencies.postgres) | nindent 4 }}
+    {{- if eq .Values.global.kms.provider "http" }}
+    {{- include "xa-guard.networkPolicyDependencyEgress" (dict "dependency" .Values.networkPolicy.dependencies.keyProvider) | nindent 4 }}
+    {{- end }}
+    {{- with .Values.networkPolicy.components.worker.extraEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+---
+{{- end }}
+{{- if .Values.businessApi.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "xa-guard.componentName" (dict "root" . "component" "business-api") }}
+  labels:
+    {{- include "xa-guard.componentLabels" (dict "root" . "component" "business-api") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "xa-guard.componentSelectorLabels" (dict "root" . "component" "business-api") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        {{- if .Values.api.enabled }}
+        - podSelector:
+            matchLabels:
+              {{- include "xa-guard.componentSelectorLabels" (dict "root" . "component" "api") | nindent 14 }}
+        {{- end }}
+        {{- if .Values.worker.enabled }}
+        - podSelector:
+            matchLabels:
+              {{- include "xa-guard.componentSelectorLabels" (dict "root" . "component" "worker") | nindent 14 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.businessApi.containerPort }}
+    {{- with .Values.networkPolicy.components.businessApi.extraIngress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  egress:
+    {{- include "xa-guard.networkPolicyDnsEgress" . | nindent 4 }}
+    {{- include "xa-guard.networkPolicyDependencyEgress" (dict "dependency" .Values.networkPolicy.dependencies.postgres) | nindent 4 }}
+    {{- with .Values.networkPolicy.components.businessApi.extraEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+---
+{{- end }}
+{{- if .Values.console.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "xa-guard.componentName" (dict "root" . "component" "console") }}
+  labels:
+    {{- include "xa-guard.componentLabels" (dict "root" . "component" "console") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "xa-guard.componentSelectorLabels" (dict "root" . "component" "console") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            {{- toYaml .Values.networkPolicy.ingressController.namespaceSelector | nindent 12 }}
+          podSelector:
+            {{- toYaml .Values.networkPolicy.ingressController.podSelector | nindent 12 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.console.containerPort }}
+    {{- with .Values.networkPolicy.components.console.extraIngress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  egress:
+    {{- include "xa-guard.networkPolicyDnsEgress" . | nindent 4 }}
+    {{- if .Values.api.enabled }}
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "xa-guard.componentSelectorLabels" (dict "root" . "component" "api") | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.api.containerPort }}
+    {{- end }}
+    {{- include "xa-guard.networkPolicyDependencyEgress" (dict "dependency" .Values.networkPolicy.dependencies.oidc) | nindent 4 }}
+    {{- with .Values.networkPolicy.components.console.extraEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+---
+{{- end }}
+{{- if .Values.migration.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "xa-guard.componentName" (dict "root" . "component" "migration") }}
+  labels:
+    {{- include "xa-guard.componentLabels" (dict "root" . "component" "migration") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "xa-guard.componentSelectorLabels" (dict "root" . "component" "migration") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    {{- include "xa-guard.networkPolicyDnsEgress" . | nindent 4 }}
+    {{- include "xa-guard.networkPolicyDependencyEgress" (dict "dependency" .Values.networkPolicy.dependencies.postgres) | nindent 4 }}
+    {{- with .Values.networkPolicy.components.migration.extraEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}
 {{- end }}

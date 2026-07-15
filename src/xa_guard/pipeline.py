@@ -86,6 +86,16 @@ class Pipeline:
         ctx.append(result)
         return result
 
+    async def _audit_async(self, ctx: GateContext) -> GateResult:
+        """Use an async Gate6 sink when supplied, preserving file-gate behavior."""
+        evaluator = getattr(self.gate6, "evaluate_async", None)
+        if evaluator is None:
+            result = self.gate6(ctx, GateStage.OUTBOUND)
+        else:
+            result = await evaluator(ctx, GateStage.OUTBOUND)
+        ctx.append(result)
+        return result
+
     def finalize_preflight(self, ctx: GateContext) -> PipelineResult:
         """Audit a domain-specific preflight without re-running generic gates.
 
@@ -112,7 +122,7 @@ class Pipeline:
         # the first blocking cause and audit it without evaluating/executing the
         # downstream path again.
         if ctx.final_decision == Decision.DENY:
-            self._audit(ctx)
+            await self._audit_async(ctx)
             return PipelineResult(
                 ctx=ctx,
                 allowed=False,
@@ -125,7 +135,7 @@ class Pipeline:
             result = self.governance.evaluate(ctx)
             ctx.append(result)
             if result.decision in (Decision.DENY, Decision.REQUIRE_APPROVAL):
-                self._audit(ctx)
+                await self._audit_async(ctx)
                 return PipelineResult(
                     ctx=ctx,
                     allowed=False,
@@ -139,7 +149,7 @@ class Pipeline:
         _sync_ctx_from_result(ctx, result)
         ctx.append(result)
         if result.decision in (Decision.DENY, Decision.REQUIRE_APPROVAL):
-            self._audit(ctx)
+            await self._audit_async(ctx)
             return PipelineResult(
                 ctx=ctx,
                 allowed=False,
@@ -156,7 +166,7 @@ class Pipeline:
 
         if ctx.final_decision in (Decision.DENY, Decision.REQUIRE_APPROVAL):
             # 写一条 audit 后返回；REQUIRE_APPROVAL 同样阻断 executor。
-            self._audit(ctx)
+            await self._audit_async(ctx)
             return PipelineResult(
                 ctx=ctx,
                 allowed=False,
@@ -170,7 +180,7 @@ class Pipeline:
         _sync_ctx_from_result(ctx, result)
         ctx.append(result)
         if result.decision in (Decision.DENY, Decision.REQUIRE_APPROVAL):
-            self._audit(ctx)
+            await self._audit_async(ctx)
             return PipelineResult(
                 ctx=ctx,
                 allowed=False,
@@ -189,7 +199,7 @@ class Pipeline:
             ctx.final_decision = Decision.DENY
             ctx.final_reason = f"tool_error: {type(exc).__name__}: {exc}"
             # 仍写 audit
-            self._audit(ctx)
+            await self._audit_async(ctx)
             return PipelineResult(
                 ctx=ctx,
                 allowed=False,
@@ -207,7 +217,7 @@ class Pipeline:
             ctx.tool_result = None
             tool_result = None
 
-        self._audit(ctx)
+        await self._audit_async(ctx)
 
         return PipelineResult(
             ctx=ctx,
@@ -243,7 +253,7 @@ class Pipeline:
         if not valid:
             ctx.final_decision = Decision.DENY
             ctx.final_reason = f"approval_token_invalid: {why}"
-            self._audit(ctx)
+            await self._audit_async(ctx)
             return PipelineResult(
                 ctx=ctx,
                 allowed=False,
@@ -259,7 +269,7 @@ class Pipeline:
         _sync_ctx_from_result(ctx, result)
         ctx.append(result)
         if result.decision in (Decision.DENY, Decision.REQUIRE_APPROVAL):
-            self._audit(ctx)
+            await self._audit_async(ctx)
             return PipelineResult(
                 ctx=ctx,
                 allowed=False,
@@ -276,7 +286,7 @@ class Pipeline:
             log.exception("downstream tool failed after HITL approval")
             ctx.final_decision = Decision.DENY
             ctx.final_reason = f"tool_error: {type(exc).__name__}: {exc}"
-            self._audit(ctx)
+            await self._audit_async(ctx)
             return PipelineResult(
                 ctx=ctx,
                 allowed=False,
@@ -292,7 +302,7 @@ class Pipeline:
             ctx.tool_result = None
             tool_result = None
 
-        self._audit(ctx)
+        await self._audit_async(ctx)
 
         return PipelineResult(
             ctx=ctx,
@@ -331,7 +341,7 @@ class Pipeline:
         ctx.tool_result = None
         ctx.final_decision = Decision.DENY
         ctx.final_reason = "hitl_rejected" if not reason else f"hitl_rejected: {reason}"
-        self._audit(ctx)
+        await self._audit_async(ctx)
         return PipelineResult(
             ctx=ctx,
             allowed=False,

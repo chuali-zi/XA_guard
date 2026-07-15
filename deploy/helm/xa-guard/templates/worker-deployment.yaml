@@ -28,10 +28,19 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
+      terminationGracePeriodSeconds: {{ .Values.worker.terminationGracePeriodSeconds }}
       serviceAccountName: {{ include "xa-guard.serviceAccountName" . }}
       automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- if .Values.worker.scheduling.podAntiAffinity.enabled }}
+      affinity:
+        {{- include "xa-guard.podAntiAffinity" (dict "root" . "component" "worker" "scheduling" .Values.worker.scheduling) | nindent 8 }}
+      {{- end }}
+      {{- if .Values.worker.scheduling.topologySpread.enabled }}
+      topologySpreadConstraints:
+        {{- include "xa-guard.topologySpreadConstraints" (dict "root" . "component" "worker" "scheduling" .Values.worker.scheduling) | nindent 8 }}
+      {{- end }}
       {{- with .Values.global.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -54,16 +63,13 @@ spec:
             - configMapRef:
                 name: {{ include "xa-guard.fullname" . }}-config
           env:
+            - name: PORT
+              value: {{ .Values.worker.containerPort | quote }}
             - name: XA_GUARD_DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: {{ required "global.externalSecrets.runtime is required" .Values.global.externalSecrets.runtime }}
                   key: {{ .Values.global.postgres.dsnSecretKey }}
-            - name: XA_GUARD_KEK_KEYRING
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.global.externalSecrets.runtime }}
-                  key: {{ .Values.global.kms.keyringSecretKey }}
             - name: XA_GUARD_INTERNAL_AUTH_KEY
               valueFrom:
                 secretKeyRef:
@@ -79,18 +85,31 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.global.externalSecrets.businessApi }}
                   key: {{ .Values.businessApi.apiKeySecretKey }}
+            {{- include "xa-guard.keyProviderEnv" . | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.worker.containerPort }}
+              protocol: TCP
+          lifecycle:
+            preStop:
+              exec:
+                command: ["python", "-c", "import time; time.sleep({{ .Values.worker.preStopDelaySeconds }})"]
           livenessProbe:
-            exec:
-              command:
-                {{- toYaml .Values.worker.probes.liveness.command | nindent 16 }}
+            httpGet:
+              path: {{ .Values.worker.probes.liveness.path }}
+              port: http
             initialDelaySeconds: {{ .Values.worker.probes.liveness.initialDelaySeconds }}
             periodSeconds: {{ .Values.worker.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.worker.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.worker.probes.liveness.failureThreshold }}
           readinessProbe:
-            exec:
-              command:
-                {{- toYaml .Values.worker.probes.readiness.command | nindent 16 }}
+            httpGet:
+              path: {{ .Values.worker.probes.readiness.path }}
+              port: http
             initialDelaySeconds: {{ .Values.worker.probes.readiness.initialDelaySeconds }}
             periodSeconds: {{ .Values.worker.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.worker.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.worker.probes.readiness.failureThreshold }}
           resources:
             {{- toYaml .Values.worker.resources | nindent 12 }}
           volumeMounts:
@@ -101,6 +120,11 @@ spec:
               mountPath: /tmp
             - name: logs
               mountPath: /app/logs
+            {{- if and (eq .Values.global.kms.provider "http") .Values.global.kms.caSecretName }}
+            - name: key-provider-ca
+              mountPath: /var/run/xa-guard/key-provider-ca
+              readOnly: true
+            {{- end }}
       volumes:
         - name: config
           configMap:
@@ -109,4 +133,12 @@ spec:
           emptyDir: {}
         - name: logs
           emptyDir: {}
+        {{- if and (eq .Values.global.kms.provider "http") .Values.global.kms.caSecretName }}
+        - name: key-provider-ca
+          secret:
+            secretName: {{ .Values.global.kms.caSecretName }}
+            items:
+              - key: {{ .Values.global.kms.caSecretKey }}
+                path: {{ .Values.global.kms.caSecretKey }}
+        {{- end }}
 {{- end }}

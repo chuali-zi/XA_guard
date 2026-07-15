@@ -13,8 +13,10 @@ from typing import Any
 
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, PlainTextResponse
 from starlette.routing import Route
+
+from xa_guard.control.faults import faults
 
 log = logging.getLogger("xa_guard.reference.ticket_api")
 
@@ -64,10 +66,29 @@ async def readyz(request: Request) -> JSONResponse:
     return _response({"status": "ready" if ok else "not_ready"}, request, 200 if ok else 503)
 
 
+async def metrics(request: Request) -> PlainTextResponse:
+    values = request.app.state.metrics
+    lines = [
+        "# HELP xa_reference_business_attempts_total Authenticated business API attempts.",
+        "# TYPE xa_reference_business_attempts_total counter",
+        f'xa_reference_business_attempts_total{{operation="create"}} {values["create_attempts"]}',
+        f'xa_reference_business_attempts_total{{operation="cancel"}} {values["cancel_attempts"]}',
+        "# HELP xa_reference_business_effective_transitions_total Effective state transitions.",
+        "# TYPE xa_reference_business_effective_transitions_total counter",
+        f'xa_reference_business_effective_transitions_total{{transition="open_to_cancelled"}} {values["effective_cancels"]}',
+        "# HELP xa_reference_business_idempotent_replays_total Successful idempotent replays.",
+        "# TYPE xa_reference_business_idempotent_replays_total counter",
+        f'xa_reference_business_idempotent_replays_total{{operation="create"}} {values["create_replays"]}',
+        f'xa_reference_business_idempotent_replays_total{{operation="cancel"}} {values["cancel_replays"]}',
+    ]
+    return PlainTextResponse("\n".join(lines) + "\n", media_type="text/plain; version=0.0.4")
+
+
 async def create_ticket(request: Request) -> JSONResponse:
     denied = await _authenticate(request)
     if denied:
         return denied
+    request.app.state.metrics["create_attempts"] += 1
     effect_id = request.headers.get("x-xa-effect-id") or request.headers.get("idempotency-key") or ""
     if not effect_id:
         return _response({"ok": False, "code": "effect_id_required", "message": "X-XA-Effect-ID is required"}, request, 400)
@@ -106,6 +127,7 @@ async def create_ticket(request: Request) -> JSONResponse:
             )
             if existing["create_fingerprint"] != fingerprint:
                 return _response({"ok": False, "code": "idempotency_conflict", "message": "effect_id was used with different ticket parameters"}, request, 409)
+            request.app.state.metrics["create_replays"] += 1
             return _response({"ok": True, "body": _safe_ticket(existing), "idempotent_replay": True}, request)
     log.info("ticket_created ticket_id=%s effect_id=%s correlation_id=%s", ticket_id, effect_id, correlation)
     return _response({"ok": True, "body": _safe_ticket(row), "idempotent_replay": False}, request, 201)
@@ -142,6 +164,7 @@ async def cancel_ticket(request: Request) -> JSONResponse:
     denied = await _authenticate(request)
     if denied:
         return denied
+    request.app.state.metrics["cancel_attempts"] += 1
     idem = request.headers.get("idempotency-key", "")
     if not idem:
         return _response({"ok": False, "code": "idempotency_key_required", "message": "Idempotency-Key is required"}, request, 400)
@@ -152,6 +175,25 @@ async def cancel_ticket(request: Request) -> JSONResponse:
     tenant_id = str(body.get("tenant_id") or "")
     if not tenant_id or not str(body.get("reason") or "").strip():
         return _response({"ok": False, "code": "invalid_cancel", "message": "tenant_id and reason are required"}, request, 422)
+    fault_step = faults.next_step("cancel_response_plan")
+    timeout_seconds = 0.0
+    if fault_step:
+        mode = str(fault_step.get("mode") or "response")
+        if mode == "response":
+            status = int(fault_step.get("status") or 503)
+            if status < 400 or status > 599:
+                raise RuntimeError("fault response status must be between 400 and 599")
+            return _response(
+                {"ok": False, "code": "fault_injected", "message": "reference fault response"},
+                request,
+                status,
+            )
+        if mode == "timeout":
+            timeout_seconds = float(fault_step.get("seconds") or 12.0)
+            if timeout_seconds <= 0 or timeout_seconds > 600:
+                raise RuntimeError("fault timeout is outside 0..600 seconds")
+        elif mode != "normal":
+            raise RuntimeError("unsupported cancel fault mode")
     pool = request.app.state.pool
     cancel_fingerprint = _fingerprint(
         {"tenant_id": tenant_id, "reason": str(body["reason"]).strip(), "idempotency_key": idem}
@@ -166,6 +208,7 @@ async def cancel_ticket(request: Request) -> JSONResponse:
             return _response({"ok": False, "code": "not_found", "message": "ticket not found"}, request, 404)
         if row["state"] == "cancelled":
             if hmac.compare_digest(str(row["cancel_fingerprint"] or ""), cancel_fingerprint):
+                request.app.state.metrics["cancel_replays"] += 1
                 return _response({"ok": True, "body": _safe_ticket(row), "idempotent_replay": True}, request)
             return _response({"ok": False, "code": "compensation_conflict", "message": "ticket was cancelled by a different idempotency context"}, request, 409)
         row = await conn.fetchrow(
@@ -175,7 +218,13 @@ async def cancel_ticket(request: Request) -> JSONResponse:
             cancel_fingerprint,
             row["ticket_id"],
         )
+    request.app.state.metrics["effective_cancels"] += 1
     log.info("ticket_cancelled ticket_id=%s correlation_id=%s", row["ticket_id"], request.headers.get("x-correlation-id", ""))
+    if timeout_seconds:
+        import asyncio
+
+        await asyncio.sleep(timeout_seconds)
+    await faults.delay_if_armed("after_cancel_commit", default_seconds=120.0)
     return _response({"ok": True, "body": _safe_ticket(row), "idempotent_replay": False}, request)
 
 
@@ -188,6 +237,13 @@ def create_app() -> Starlette:
         dsn = open(dsn_path, encoding="utf-8").read().strip() if dsn_path else os.environ["XA_GUARD_DATABASE_URL"]
         key_path = os.getenv("REFERENCE_BUSINESS_API_KEY_FILE", "")
         app.state.api_key = open(key_path, encoding="utf-8").read().strip() if key_path else os.environ["REFERENCE_BUSINESS_API_KEY"]
+        app.state.metrics = {
+            "create_attempts": 0,
+            "cancel_attempts": 0,
+            "effective_cancels": 0,
+            "create_replays": 0,
+            "cancel_replays": 0,
+        }
         app.state.pool = await asyncpg.create_pool(dsn, min_size=1, max_size=5)
         try:
             yield
@@ -198,6 +254,7 @@ def create_app() -> Starlette:
         routes=[
             Route("/livez", livez),
             Route("/readyz", readyz),
+            Route("/metrics", metrics),
             Route("/tickets", create_ticket, methods=["POST"]),
             Route("/tickets/by-effect/{effect_id}", get_by_effect, methods=["GET"]),
             Route("/tickets/{ticket_id}", get_ticket, methods=["GET"]),

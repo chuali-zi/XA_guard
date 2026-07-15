@@ -8,6 +8,10 @@ x-python-service: &python-service
   restart: unless-stopped
   environment: &runtime-environment
     PYTHONPATH: /app/src:/app
+    XA_GUARD_DEPLOYMENT_PROFILE: reference
+    XA_GUARD_AUDIT_BACKEND: postgresql
+    XA_GUARD_KEY_PROVIDER: local
+    XA_GUARD_TEST_FAULTS: ${XA_GUARD_TEST_FAULTS:-false}
     XA_GUARD_DATABASE_URL_FILE: /run/secrets/database_url
     XA_GUARD_KEK_KEYRING_FILE: /run/secrets/kek_keyring
     XA_GUARD_INTERNAL_AUTH_KEY_FILE: /run/secrets/internal_auth_key
@@ -106,6 +110,8 @@ services:
     environment:
       <<: *runtime-environment
       PORT: "8081"
+    ports:
+      - "127.0.0.1:13082:8081"
     depends_on:
       migration:
         condition: service_completed_successfully
@@ -114,7 +120,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
-    networks: [business, data]
+    networks: [business, data, acceptance]
 
   xa-guard:
     <<: *python-service
@@ -141,6 +147,9 @@ services:
   worker:
     <<: *python-service
     command: ["python", "-m", "xa_guard.control.worker"]
+    environment:
+      <<: *runtime-environment
+      PORT: "8082"
     depends_on:
       xa-guard:
         condition: service_healthy
@@ -201,3 +210,7 @@ networks:
     internal: true
   console:
     internal: true
+  acceptance:
+    # A host-facing bridge is required for the localhost-only direct business
+    # baseline used by paired performance acceptance. No other service joins it.
+    internal: false

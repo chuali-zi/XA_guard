@@ -74,7 +74,11 @@ async def error_handler(request: Request, exc: Exception) -> JSONResponse:
         "store_error": "control plane storage is unavailable",
         "service_error": "operation could not be completed",
     }
-    return _json(request, {"code": code, "message": messages.get(code, "operation failed"), "trace_id": _trace(request)}, status)
+    return _json(
+        request,
+        {"code": code, "message": messages.get(code, "operation failed"), "trace_id": _trace(request)},
+        status,
+    )
 
 
 async def livez(request: Request) -> JSONResponse:
@@ -83,12 +87,20 @@ async def livez(request: Request) -> JSONResponse:
 
 async def readyz(request: Request) -> JSONResponse:
     runtime = request.app.state.runtime
-    store_ok = await runtime.store.ready()
+    store_ok = await runtime.store.database_ready()
+    provider_ok = runtime.key_provider is not None and await runtime.key_provider.ready()
     oidc_ok = bool(runtime.verifier.discovery and runtime.verifier.jwks and runtime.verifier.last_refresh_ok)
-    ready = store_ok and oidc_ok
+    ready = store_ok and provider_ok and oidc_ok
     return _json(
         request,
-        {"status": "ready" if ready else "not_ready", "checks": {"postgresql": store_ok, "oidc_jwks": oidc_ok}},
+        {
+            "status": "ready" if ready else "not_ready",
+            "checks": {
+                "postgresql": store_ok,
+                "key_provider": provider_ok,
+                "oidc_jwks": oidc_ok,
+            },
+        },
         200 if ready else 503,
     )
 
@@ -102,9 +114,7 @@ async def metrics(request: Request) -> PlainTextResponse:
     queue = await runtime.store.pool.fetchval(
         "SELECT count(*) FROM xa_effects WHERE status IN ('approved','retry_wait','compensating')"
     )
-    retries = await runtime.store.pool.fetchval(
-        "SELECT COALESCE(sum(retry_count),0) FROM xa_effects"
-    )
+    retries = await runtime.store.pool.fetchval("SELECT COALESCE(sum(retry_count),0) FROM xa_effects")
     assignments = await runtime.store.pool.fetchval(
         "SELECT count(*) FROM xa_assignments WHERE deleted_at IS NULL "
         "AND valid_from<=now() AND (valid_until IS NULL OR valid_until>now())"
@@ -132,10 +142,7 @@ async def metrics(request: Request) -> PlainTextResponse:
             "# TYPE xa_guard_undo_requests gauge",
         )
     )
-    lines.extend(
-        f'xa_guard_undo_requests{{status="{row["status"]}"}} {row["count"]}'
-        for row in undo_rows
-    )
+    lines.extend(f'xa_guard_undo_requests{{status="{row["status"]}"}} {row["count"]}' for row in undo_rows)
     lines.extend(
         (
             "# HELP xa_guard_identity_rejections_total Process-local identity and assignment rejections.",
@@ -177,7 +184,9 @@ async def effect_detail(request: Request) -> JSONResponse:
     principal = await bearer_principal(request)
     if not await request.app.state.runtime.store.effective_assignments(principal, principal.agent_id):
         raise AuthorizationError("an active agent assignment is required")
-    value = await request.app.state.runtime.store.get_effect(principal.tenant_id, request.path_params["effect_id"])
+    value = await request.app.state.runtime.store.get_effect(
+        principal.tenant_id, request.path_params["effect_id"]
+    )
     return _json(request, value)
 
 
@@ -222,9 +231,7 @@ async def decide(request: Request) -> JSONResponse:
 
 async def retry(request: Request) -> JSONResponse:
     principal = await bearer_principal(request, sensitive=True)
-    await request.app.state.runtime.service.retry_failed(
-        principal, request.path_params["request_id"]
-    )
+    await request.app.state.runtime.service.retry_failed(principal, request.path_params["request_id"])
     return _json(request, {"request_id": request.path_params["request_id"], "status": "approved"})
 
 
@@ -233,7 +240,9 @@ async def assignments(request: Request) -> JSONResponse:
     if "governance.admin" not in principal.roles:
         raise AuthorizationError("governance.admin role is required")
     if request.method == "GET":
-        return _json(request, {"items": await request.app.state.runtime.store.list_assignments(principal.tenant_id)})
+        return _json(
+            request, {"items": await request.app.state.runtime.store.list_assignments(principal.tenant_id)}
+        )
     if request.headers.get("if-none-match") != "*":
         raise ConflictError("If-None-Match: * is required")
     value = await request.app.state.runtime.service.create_assignment(principal, await _body(request))

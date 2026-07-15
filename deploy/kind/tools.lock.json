@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "kind": {
+    "version": "v0.31.0",
+    "artifacts": {
+      "linux-amd64": {
+        "url": "https://github.com/kubernetes-sigs/kind/releases/download/v0.31.0/kind-linux-amd64",
+        "sha256": "eb244cbafcc157dff60cf68693c14c9a75c4e6e6fedaf9cd71c58117cb93e3fa"
+      },
+      "windows-amd64": {
+        "url": "https://github.com/kubernetes-sigs/kind/releases/download/v0.31.0/kind-windows-amd64",
+        "sha256": "2c3a9ff954de16244380778683cf99e271bfc2fac9c6c4e797e4623c45e59d9d"
+      }
+    }
+  },
+  "kubectl": {
+    "version": "v1.34.3",
+    "artifacts": {
+      "linux-amd64": {
+        "url": "https://dl.k8s.io/release/v1.34.3/bin/linux/amd64/kubectl",
+        "sha256": "ab60ca5f0fd60c1eb81b52909e67060e3ba0bd27e55a8ac147cbc2172ff14212"
+      },
+      "windows-amd64": {
+        "url": "https://dl.k8s.io/release/v1.34.3/bin/windows/amd64/kubectl.exe",
+        "sha256": "5ef6e0b019cfea5b0eff55b576c0118f64c0758a8bcbf52587c7f454f302f7bc"
+      }
+    }
+  },
+  "helm": {
+    "version": "v3.17.3",
+    "artifacts": {
+      "linux-amd64": {
+        "url": "https://get.helm.sh/helm-v3.17.3-linux-amd64.tar.gz",
+        "sha256": "ee88b3c851ae6466a3de507f7be73fe94d54cbf2987cbaa3d1a3832ea331f2cd",
+        "archive": "tar.gz"
+      },
+      "windows-amd64": {
+        "url": "https://get.helm.sh/helm-v3.17.3-windows-amd64.zip",
+        "sha256": "8ea93e2f6285e649dede583ac90ff8cdb938ca53ec6cf5fe909f2303fbc22d96",
+        "archive": "zip"
+      }
+    }
+  },
+  "calico": {
+    "version": "v3.32.1",
+    "manifest": {
+      "url": "https://raw.githubusercontent.com/projectcalico/calico/v3.32.1/manifests/calico.yaml",
+      "sha256": "a1df919d9721cf667accdc3e72848911b0cb25cfab7d2478ad0c996302c95744"
+    }
+  },
+  "kind_node": {
+    "kubernetes_version": "v1.34.3",
+    "image": "kindest/node:v1.34.3@sha256:08497ee19eace7b4b5348db5c6a1591d7752b164530a36f855cb0f2bdcbadd48"
+  }
+}

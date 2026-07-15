@@ -45,8 +45,8 @@ compensated:cancelled:true
 ## 尚未完成，因此不能封存 B6/B7
 
 - 当前环境没有可用的交互式浏览器控制实例；三账号 UI 视觉验收、截图和录屏未完成。协议测试使用真实 Authorization Code + PKCE，不使用 direct grant。
-- 尚未跑完 Compose 级全部坏签名/错误 audience/跨租户/撤销 assignment 负测矩阵。
-- PostgreSQL 断连零下游、API crash-window reconciliation、Worker kill/lease takeover、错误 KEK/rewrap 的整栈故障注入未封存。
+- 2026-07-15 已在全新 volume 上完成 core suite：坏签名/错误 audience/伪造身份零下游、assignment 撤销、跨租户、PostgreSQL 断连零下游、API crash-window reconciliation 和双审批单任务 7/7 通过；本目录尚未纳入并封存该运行。
+- Worker kill/lease takeover、5/30/120 retry、错误 KEK/rewrap 的整栈故障注入仍未封存。
 - 10 并发 identity/effect p95 与批准到恢复时延的正式统计未完成。
 - kind 双 API/双 Worker、NetworkPolicy、外部 IdP/PostgreSQL/key provider 替换和 Helm rollback 未验收。
 - 本目录还不是最终 artifact manifest；不得据此把 Delivery v2 B6/B7 改为 `DONE`。
