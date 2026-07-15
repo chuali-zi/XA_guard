@@ -1,5 +1,8 @@
 # audit 模块工作日志
 
+## 2026-07-15 SM2 strict signer 稳定性
+- strict signer 增加有限自验重试，拒绝 gmssl 偶发不可自验签名；verifier 将第三方点运算异常按无效签名 fail-closed。
+
 ---
 
 ## 2026-06-17 09:30 Codex 主 agent

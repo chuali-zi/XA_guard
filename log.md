@@ -3,6 +3,7 @@
 - 项目负责人明确授权直接合并和推送。提交前确认工作树干净、`origin/main` 是 `feat/identity-undo-reference` 的祖先，分支为 0 behind / 2 ahead，无分叉、无同名远端分支或 PR。
 - 本地 `main` 从 `36d503f` fast-forward 到 `94041f6`，包含 `07f7342` Identity/Undo 核心和 `94041f6` Reference/HA/P0 加固；随后成功推送 `origin/main`（`dfeaf41..94041f6`）。
 - 没有 force push、rebase、amend 或改写历史。后续等待 GitHub Quality 的 Python 3.10/3.12 结果；`REFERENCE-READY` 与 `HA-READY` 状态边界不变。
+- 首次远端 Quality 中 Python 3.12 通过，3.10 暴露 `datetime.UTC` 兼容错误和 gmssl 偶发不可自验签名。实现改用 `timezone.utc`；strict signer 增加有限自验重试并对第三方点运算异常 fail-closed。deployment 10/10、SM2 目标用例连续 20 轮和 Ruff 通过，未修改测试。
 
 # 2026-07-12 Identity + Undo Reference 实际实现与验收收口
 

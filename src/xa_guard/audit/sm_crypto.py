@@ -228,10 +228,18 @@ def sm2_sign_strict(data: bytes, key_path: str) -> str:
     int(private_hex, 16)
     public_hex = sm2_public_key_hex(key_path)
     signer = gm_sm2.CryptSM2(private_key=private_hex, public_key=public_hex)
-    signature = signer.sign_with_sm3(data)
-    if not signature or len(signature) != 128:
-        raise RuntimeError("SM2-with-SM3 signing failed")
-    return signature
+    # gmssl can rarely return a signature that triggers an internal point-at-
+    # infinity error in its own verifier. Never emit an unverifiable artifact.
+    for _ in range(32):
+        signature = signer.sign_with_sm3(data)
+        if not signature or len(signature) != 128:
+            continue
+        try:
+            if signer.verify_with_sm3(signature, data):
+                return signature
+        except (IndexError, TypeError, ValueError):
+            continue
+    raise RuntimeError("SM2-with-SM3 signing failed self-verification")
 
 
 def sm2_verify_strict(data: bytes, signature: str, key_path: str) -> bool:
@@ -242,7 +250,10 @@ def sm2_verify_strict(data: bytes, signature: str, key_path: str) -> bool:
         return False
     public_hex = sm2_public_key_hex(key_path)
     verifier = gm_sm2.CryptSM2(private_key="", public_key=public_hex)
-    return bool(verifier.verify_with_sm3(signature, data))
+    try:
+        return bool(verifier.verify_with_sm3(signature, data))
+    except (IndexError, TypeError, ValueError):
+        return False
 
 
 def sm2_sign(data: bytes, key_path: str = "", *, prefer_gm: bool = False) -> str:

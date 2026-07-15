@@ -19,7 +19,7 @@ import sys
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote, urlsplit, urlunsplit
@@ -56,7 +56,7 @@ EFFECT_ID = re.compile(r"^eff-[0-9a-f]{32}$")
 
 @dataclass
 class Evidence:
-    started_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    started_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     commands: list[dict[str, Any]] = field(default_factory=list)
     phases: dict[str, dict[str, Any]] = field(default_factory=dict)
 
@@ -881,9 +881,9 @@ class HARunner:
                 "required_phases": list(ACCEPTANCE_PHASES),
             },
         )
-        self.evidence.phases["summary"]["completed_at"] = datetime.now(UTC).isoformat()
+        self.evidence.phases["summary"]["completed_at"] = datetime.now(timezone.utc).isoformat()
         output = self.args.evidence or (
-            HERE / "evidence" / f"ha-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}.json"
+            HERE / "evidence" / f"ha-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
         )
         if not self.args.dry_run:
             output.parent.mkdir(parents=True, exist_ok=True)
