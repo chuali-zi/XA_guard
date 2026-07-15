@@ -78,6 +78,6 @@ Core 身份负测、assignment 撤销/跨租户隔离、PostgreSQL 零下游、p
 
 ## 仓库与工作树
 
-- 现有 PR #3 已合并到远端 `main`；本轮实现位于 `feat/identity-undo-reference`，本地提交尚未推送。
-- 按维护者“提交全部脏改动”的授权，本批同时包含 Auto-RedTeam provider safety quarantine 与追加 provenance；合并审查时应把它们作为独立关注面核对。
+- `feat/identity-undo-reference` 已经 fast-forward 合并并推送远端 `main`；功能提交为 `07f7342` 与 `94041f6`，未改写历史。
+- `94041f6` 同时包含 Auto-RedTeam provider safety quarantine 与追加 provenance；后续回归审查应继续把它们作为独立关注面核对。
 - `.runtime/reference/`、`.runtime/kind-ha/` 与 `.runtime/evidence/` 被 gitignore，包含本机随机凭据、密钥或未封存验收输出，不得提交。

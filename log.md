@@ -1,3 +1,9 @@
+# 2026-07-15 Identity/Undo 分支 fast-forward 合并并推送 main
+
+- 项目负责人明确授权直接合并和推送。提交前确认工作树干净、`origin/main` 是 `feat/identity-undo-reference` 的祖先，分支为 0 behind / 2 ahead，无分叉、无同名远端分支或 PR。
+- 本地 `main` 从 `36d503f` fast-forward 到 `94041f6`，包含 `07f7342` Identity/Undo 核心和 `94041f6` Reference/HA/P0 加固；随后成功推送 `origin/main`（`dfeaf41..94041f6`）。
+- 没有 force push、rebase、amend 或改写历史。后续等待 GitHub Quality 的 Python 3.10/3.12 结果；`REFERENCE-READY` 与 `HA-READY` 状态边界不变。
+
 # 2026-07-12 Identity + Undo Reference 实际实现与验收收口
 
 - 按计划先处理代码基线：将 PR #3 从 draft 转 ready 并 merge 到 `main`（merge commit `dfeaf41c835e71a6f1a67b790e23ecbf5fad9b1a`），随后在 `feat/identity-undo-reference` 开发。识别并保留 Auto-RedTeam/remote-evidence 三处既有脏改动，没有把它们混入本功能实现。
