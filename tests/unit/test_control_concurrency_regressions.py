@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -11,8 +13,12 @@ from xa_guard.control.store import (
     AuthorizationError,
     AsyncEffectStore,
     _ChainTailConflict,
+    _Gate6Mutation,
+    _PreparedEffectAuditMutation,
     _PreparedEffectMutation,
+    _compact_json,
 )
+from xa_guard.control.timing import request_timing
 
 
 def test_concurrent_effect_mutations_share_one_tenant_batch() -> None:
@@ -47,6 +53,17 @@ def test_concurrent_effect_mutations_share_one_tenant_batch() -> None:
     asyncio.run(exercise())
 
 
+def test_asyncpg_json_codec_is_compact_utf8_and_round_trips() -> None:
+    value = {'message': '审计', 'nested': {'allowed': True}}
+
+    encoded = _compact_json(value)
+
+    assert encoded == '{"message":"审计","nested":{"allowed":true}}'
+    assert ' ' not in encoded
+    assert '\\u' not in encoded
+    assert json.loads(encoded) == value
+
+
 def test_chain_tail_cas_retries_once_after_a_stale_cache_conflict() -> None:
     async def exercise() -> None:
         store = AsyncEffectStore('postgresql://unused')
@@ -64,6 +81,106 @@ def test_chain_tail_cas_retries_once_after_a_stale_cache_conflict() -> None:
 
         assert result == []
         assert calls == 2
+
+    asyncio.run(exercise())
+
+
+def test_prepared_batch_diagnostics_split_sql_from_other_work() -> None:
+    async def exercise() -> None:
+        store = AsyncEffectStore('postgresql://unused')
+        loop = asyncio.get_running_loop()
+        effect = _PreparedEffectMutation(
+            'eff-1', (), 'acme', 'alice', 'trace-1', loop.create_future()
+        )
+        gate6 = _Gate6Mutation(
+            'acme', 'trace-1', {}, 'test', None, loop.create_future()
+        )
+        batch = [_PreparedEffectAuditMutation(effect, gate6)]
+
+        async def persist(_tenant_id: str, items: list[Any]) -> list[Any]:
+            items[0].effect.diagnostics_ms['xa-effect-prepare-batch-sql'] = 0.25
+            await asyncio.sleep(0.02)
+            return []
+
+        setattr(store, '_persist_prepared_effect_audits_cte', persist)
+        assert await store._persist_prepared_effect_audits_retry('acme', batch) == []
+
+        total = effect.diagnostics_ms['xa-effect-prepare-batch-total']
+        assert total >= 0.25
+        assert effect.diagnostics_ms['xa-effect-prepare-batch-other'] == pytest.approx(
+            total - 0.25
+        )
+
+        effect.future.set_result(effect.effect_id)
+        store._effect_audit_tasks['acme'] = asyncio.current_task()
+        with request_timing(True) as recorder:
+            assert await store._enqueue_prepared_effect_audit(batch[0]) == 'eff-1'
+        assert recorder is not None
+        assert recorder.durations_ms['xa-effect-prepare-batch-sql'] == 0.25
+        assert recorder.durations_ms['xa-effect-prepare-batch-total'] == total
+
+    asyncio.run(exercise())
+
+
+def test_effect_gate6_connection_is_reentrant_in_one_task() -> None:
+    class Connection:
+        def transaction(self) -> Any:
+            return self
+
+        async def __aenter__(self) -> Connection:
+            return self
+
+        async def __aexit__(self, *_args: Any) -> None:
+            return None
+
+    class Pool:
+        def __init__(self) -> None:
+            self.connection = Connection()
+            self.acquires = 0
+
+        def acquire(self) -> Connection:
+            self.acquires += 1
+            return self.connection
+
+    async def exercise() -> None:
+        store = AsyncEffectStore('postgresql://unused')
+        pool = Pool()
+        store.pool = pool
+
+        async with store._effect_gate6_connection('acme') as outer:
+            async with store._effect_gate6_connection('acme') as inner:
+                assert inner is outer
+
+        assert pool.acquires == 1
+
+    asyncio.run(exercise())
+
+
+def test_mixed_effect_batches_keep_final_before_prepared_in_one_transaction() -> None:
+    async def exercise() -> None:
+        store = AsyncEffectStore('postgresql://unused')
+        order: list[str] = []
+
+        @asynccontextmanager
+        async def transaction(_tenant_id: str) -> Any:
+            order.append('transaction')
+            yield object()
+            order.append('commit')
+
+        async def persist_final(_tenant_id: str, _batch: list[Any]) -> list[Any]:
+            order.append('final')
+            return []
+
+        async def persist_prepared(_tenant_id: str, _batch: list[Any]) -> list[Any]:
+            order.append('prepared')
+            return []
+
+        setattr(store, '_effect_gate6_connection', transaction)
+        setattr(store, '_persist_final_effect_audits_retry', persist_final)
+        setattr(store, '_persist_prepared_effect_audits_retry', persist_prepared)
+
+        assert await store._persist_mixed_effect_audits('acme', [], []) == ([], [])
+        assert order == ['transaction', 'final', 'prepared', 'commit']
 
     asyncio.run(exercise())
 

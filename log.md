@@ -1,3 +1,32 @@
+# 2026-07-21 02:43 PDT 并发性能硬缺口关闭（已完整重建复验，仍不冻结）
+
+- 继续处理上一提交 08c38c8 后唯一硬缺口：Identity + Undo 连续正式 3×500 并发性能。开始时工作树干净；Docker 引擎可用但项目栈已停止，先以 --no-build 恢复后发现容器 store.py SHA-256 与宿主源码不一致，未使用旧镜像作结论，随后基于当前代码完整重建 Reference 镜像。
+- 重建原提交后的基线：单轮 500-pair 曾通过 44.611/45.176ms，但连续正式三轮为 p95 57.268/50.918/59.818ms、upper 58.833/52.368/62.894ms，仍失败；没有以单轮结果关闭问题。
+- 新增脱敏批次诊断：把 prepared/final 分成批次 SQL、事务其余部分和批次总耗时，并通过 mutation future 回到原请求的 Server-Timing context。诊断显示 prepared 请求 p95 25.329ms，但批次本身 p95 8.882ms（SQL 3.540ms）；final 请求 p95 15.974ms，批次 p95 9.360ms（SQL 2.765ms），主要剩余开销为串行排队和事务边界。
+- asyncpg JSON/JSONB codec 改为紧凑 UTF-8 编码（无默认空格、不过度 ASCII 转义），语义和 round-trip 不变；500-pair 对比从 p95/upper 51.094/53.131ms 降至 45.070/47.961ms。该优化单独完整重建复验仍只有 2/3 通过，因此没有提前宣称稳定达标。
+- 实现同任务、同 store、同 tenant 的 Effect/Gate6 连接上下文可重入。当统一调度周期同时有 final 与 prepared 批次时，仍按 final→prepared 执行两条原子 CTE，仍固定顺序持有 Effect/Gate6 双链锁并分别做 CAS，但复用同一连接和事务、只提交一次；prepared intent、final 审计和响应前持久化语义未放宽。
+- 为新实现补充回归：紧凑 UTF-8 JSON round-trip、prepared SQL/other/total 诊断传递、同任务连接可重入只 acquire 一次、混合批次在单事务内保持 final→prepared→commit 顺序。没有修改既有阈值或断言。
+
+## 正式性能结果
+
+- 注入候选连续正式 3×500：p95 39.049/38.899/42.827ms，bootstrap upper 40.249/40.065/45.149ms，三轮全部 ≤50ms；10 次 Undo 全过，约 0.22–0.97s。
+- 基于最终候选完整重建镜像，确认容器/宿主 store.py SHA-256 一致、Server-Timing=false、commit delay=0 后，以独立 seed 再跑连续正式 3×500：p95 45.109/42.141/43.934ms，bootstrap upper 46.984/43.120/45.528ms，三轮全部 ≤50ms；10 次 Undo 全过，约 0.45–0.94s。
+- 两组均使用 10 并发、每轮 30 warmup + 500 paired writes、5000 次 bootstrap；第二组是可复现完整镜像而非源码注入。性能硬缺口据此关闭。
+
+## 回归、故障与一致性
+
+- 定向回归：27 passed；产品文件和新增测试 Ruff 通过；git diff --check 通过。
+- 全仓 pytest：782 collected / 777 passed / 5 skipped / 0 failed，耗时 291.9s。4 个 skip 因本机缺 Helm，1 个因 Windows directory-symlink capability。
+- 最终候选 Reference core fault：7/7 passed，场景净耗时 231.016s；身份拒绝、spoof header、assignment 立即撤销、跨租户、PostgreSQL 中断、API crash 后 prepared reconcile、并发双审批均通过。
+- fault 后库约 99,556 条 Effect event、98,701 条 Gate6 event；Effect/Gate6 相邻链 gap 均为 0，两个 xa_chain_tails tail mismatch 均为 0。一次初始 full join 查询各显示 1，展开后确认是 ON 条件未过滤另一 chain 的查询假阳性，改为预过滤 tails 子查询后真实结果为 0/0；未改数据库数据掩盖问题。
+
+## 撤回实验与剩余事项
+
+- 撤回 prepared-first 调度：500-pair 仅 48.088/50.173ms，未显示稳定收益。
+- 撤回最多等 2ms、累计 5 条提前唤醒：500-pair 49.130/50.685ms，没有改善。
+- 当前 Reference 栈为最终候选完整构建，fault hooks=true、Server-Timing=false。未冻结、未生成 final manifest、未重封存证据。
+- 下一步是按最终候选重跑 long/keys/all fault，采集并独立验签新证据；在具备 Helm 的隔离环境重跑发布验证。只有负责人后续允许时才执行 freeze。
+
 # 2026-07-21 01:27 PDT 并发性能、链尾一致性与回归收口（已提交候选，不冻结）
 
 - 本轮目标：优先解决 Identity + Undo 10 并发性能，补回归和故障测试；获授权启动 Docker、整理既有脏改动并提交；明确不做 release freeze。

@@ -10,7 +10,8 @@ import os
 import uuid
 import weakref
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from contextvars import ContextVar
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -19,6 +20,11 @@ from xa_guard.control.crypto import EncryptedEnvelope, Keyring, canonical_json, 
 from xa_guard.control.key_provider import KeyProvider, LocalKeyProvider
 from xa_guard.control.models import EffectContractV2, Principal
 from xa_guard.control.timing import add_duration, span
+
+
+_EFFECT_GATE6_CONNECTION: ContextVar[tuple[Any, str, Any] | None] = ContextVar(
+    'xa_guard_effect_gate6_connection', default=None
+)
 
 
 class StoreError(RuntimeError):
@@ -41,6 +47,10 @@ class _ChainTailConflict(StoreError):
     pass
 
 
+def _compact_json(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, separators=(',', ':'))
+
+
 @dataclass
 class _PreparedEffectMutation:
     effect_id: str
@@ -49,6 +59,7 @@ class _PreparedEffectMutation:
     actor: str
     trace_id: str
     future: asyncio.Future[str]
+    diagnostics_ms: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -73,6 +84,7 @@ class _CompletedEffectMutation:
     result_sha256: str
     downstream_reference: str
     future: asyncio.Future[None]
+    diagnostics_ms: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -143,10 +155,18 @@ class AsyncEffectStore:
 
     @asynccontextmanager
     async def _effect_gate6_connection(self, tenant_id: str):
+        current = _EFFECT_GATE6_CONNECTION.get()
+        if current is not None and current[0] is self and current[1] == tenant_id:
+            yield current[2]
+            return
         async with self._chain_lock('effect', tenant_id):
             async with self._chain_lock('gate6', tenant_id):
                 async with self.pool.acquire() as conn, conn.transaction():
-                    yield conn
+                    token = _EFFECT_GATE6_CONNECTION.set((self, tenant_id, conn))
+                    try:
+                        yield conn
+                    finally:
+                        _EFFECT_GATE6_CONNECTION.reset(token)
 
     @staticmethod
     async def _execute_many(conn: Any, query: str, rows: list[tuple[Any, ...]]) -> None:
@@ -514,7 +534,10 @@ class AsyncEffectStore:
             self._effect_audit_tasks[tenant_id] = asyncio.create_task(
                 self._flush_effect_audits(tenant_id)
             )
-        return str(await asyncio.shield(mutation.effect.future))
+        result = str(await asyncio.shield(mutation.effect.future))
+        for name, duration_ms in mutation.effect.diagnostics_ms.items():
+            add_duration(name, duration_ms)
+        return result
 
     async def _flush_effect_audits(self, tenant_id: str) -> None:
         try:
@@ -524,6 +547,39 @@ class AsyncEffectStore:
                 prepared_batch = self._prepared_audit_batches.pop(tenant_id, [])
                 if not final_batch and not prepared_batch:
                     return
+                if final_batch and prepared_batch:
+                    try:
+                        final_completed, prepared_completed = (
+                            await self._persist_mixed_effect_audits(
+                                tenant_id, final_batch, prepared_batch
+                            )
+                        )
+                    except BaseException as exc:
+                        for item in final_batch:
+                            if not item.effect.future.done():
+                                item.effect.future.cancel()
+                            if not item.gate6.future.done():
+                                item.gate6.future.set_exception(exc)
+                        for item in prepared_batch:
+                            if not item.effect.future.done():
+                                item.effect.future.set_exception(exc)
+                            if not item.gate6.future.done():
+                                item.gate6.future.cancel()
+                    else:
+                        for item in final_batch:
+                            if not item.effect.future.done():
+                                item.effect.future.set_result(None)
+                        for gate6, result in final_completed:
+                            if not gate6.future.done():
+                                gate6.future.set_result(result)
+                        for item in prepared_batch:
+                            if not item.effect.future.done():
+                                item.effect.future.set_result(item.effect.effect_id)
+                        for gate6, result in prepared_completed:
+                            if not gate6.future.done():
+                                gate6.future.set_result(result)
+                    final_batch = []
+                    prepared_batch = []
                 if final_batch:
                     try:
                         final_completed = (
@@ -574,13 +630,51 @@ class AsyncEffectStore:
             if self._effect_audit_tasks.get(tenant_id) is current:
                 self._effect_audit_tasks.pop(tenant_id, None)
 
+    async def _persist_mixed_effect_audits(
+        self,
+        tenant_id: str,
+        final_batch: list[_FinalEffectAuditMutation],
+        prepared_batch: list[_PreparedEffectAuditMutation],
+    ) -> tuple[
+        list[tuple[_Gate6Mutation, dict[str, Any]]],
+        list[tuple[_Gate6Mutation, dict[str, Any]]],
+    ]:
+        started = asyncio.get_running_loop().time()
+        try:
+            async with self._effect_gate6_connection(tenant_id):
+                final_completed = await self._persist_final_effect_audits_retry(
+                    tenant_id, final_batch
+                )
+                prepared_completed = await self._persist_prepared_effect_audits_retry(
+                    tenant_id, prepared_batch
+                )
+            return final_completed, prepared_completed
+        finally:
+            total_ms = (asyncio.get_running_loop().time() - started) * 1000.0
+            for item in final_batch:
+                item.effect.diagnostics_ms['xa-effect-mixed-batch-total'] = total_ms
+            for item in prepared_batch:
+                item.effect.diagnostics_ms['xa-effect-mixed-batch-total'] = total_ms
+
     async def _persist_prepared_effect_audits_retry(
         self, tenant_id: str, batch: list[_PreparedEffectAuditMutation]
     ) -> list[tuple[_Gate6Mutation, dict[str, Any]]]:
+        started = asyncio.get_running_loop().time()
         try:
-            return await self._persist_prepared_effect_audits_cte(tenant_id, batch)
-        except _ChainTailConflict:
-            return await self._persist_prepared_effect_audits_cte(tenant_id, batch)
+            try:
+                return await self._persist_prepared_effect_audits_cte(tenant_id, batch)
+            except _ChainTailConflict:
+                return await self._persist_prepared_effect_audits_cte(tenant_id, batch)
+        finally:
+            total_ms = (asyncio.get_running_loop().time() - started) * 1000.0
+            for item in batch:
+                item.effect.diagnostics_ms['xa-effect-prepare-batch-total'] = total_ms
+                sql_ms = item.effect.diagnostics_ms.get(
+                    'xa-effect-prepare-batch-sql', 0.0
+                )
+                item.effect.diagnostics_ms['xa-effect-prepare-batch-other'] = max(
+                    0.0, total_ms - sql_ms
+                )
 
     async def _persist_prepared_effect_audits_cte(
         self, tenant_id: str, batch: list[_PreparedEffectAuditMutation]
@@ -619,6 +713,7 @@ class AsyncEffectStore:
             gate_rows = self._render_gate6_rows(
                 gate_previous, [item.gate6 for item in batch]
             )
+            sql_started = asyncio.get_running_loop().time()
             inserted = await conn.fetch(
                 self._prepared_effect_audit_cte_sql(),
                 tenant_id,
@@ -637,6 +732,14 @@ class AsyncEffectStore:
                     for item, _value, _previous, _hash in gate_rows
                 ],
             )
+            sql_ms = (asyncio.get_running_loop().time() - sql_started) * 1000.0
+            for item in batch:
+                item.effect.diagnostics_ms['xa-effect-prepare-batch-sql'] = (
+                    item.effect.diagnostics_ms.get(
+                        'xa-effect-prepare-batch-sql', 0.0
+                    )
+                    + sql_ms
+                )
             if len(inserted) != len(batch):
                 await self._refresh_tail_pair(conn, tenant_id)
                 raise _ChainTailConflict('prepared Effect/Gate6 tail CAS conflict')
@@ -729,15 +832,30 @@ class AsyncEffectStore:
             self._effect_audit_tasks[tenant_id] = asyncio.create_task(
                 self._flush_effect_audits(tenant_id)
             )
-        return await asyncio.shield(mutation.gate6.future)
+        result = await asyncio.shield(mutation.gate6.future)
+        for name, duration_ms in mutation.effect.diagnostics_ms.items():
+            add_duration(name, duration_ms)
+        return result
 
     async def _persist_final_effect_audits_retry(
         self, tenant_id: str, batch: list[_FinalEffectAuditMutation]
     ) -> list[tuple[_Gate6Mutation, dict[str, Any]]]:
+        started = asyncio.get_running_loop().time()
         try:
-            return await self._persist_final_effect_audits_cte(tenant_id, batch)
-        except _ChainTailConflict:
-            return await self._persist_final_effect_audits_cte(tenant_id, batch)
+            try:
+                return await self._persist_final_effect_audits_cte(tenant_id, batch)
+            except _ChainTailConflict:
+                return await self._persist_final_effect_audits_cte(tenant_id, batch)
+        finally:
+            total_ms = (asyncio.get_running_loop().time() - started) * 1000.0
+            for item in batch:
+                item.effect.diagnostics_ms['xa-effect-final-batch-total'] = total_ms
+                sql_ms = item.effect.diagnostics_ms.get(
+                    'xa-effect-final-batch-sql', 0.0
+                )
+                item.effect.diagnostics_ms['xa-effect-final-batch-other'] = max(
+                    0.0, total_ms - sql_ms
+                )
 
     async def _persist_final_effect_audits_cte(
         self, tenant_id: str, batch: list[_FinalEffectAuditMutation]
@@ -786,6 +904,7 @@ class AsyncEffectStore:
             gate_rows = self._render_gate6_rows(
                 gate_previous, [item.gate6 for item in batch]
             )
+            sql_started = asyncio.get_running_loop().time()
             inserted = await conn.fetch(
                 self._final_effect_audit_cte_sql(),
                 tenant_id,
@@ -804,6 +923,14 @@ class AsyncEffectStore:
                     for item, _value, _previous, _hash in gate_rows
                 ],
             )
+            sql_ms = (asyncio.get_running_loop().time() - sql_started) * 1000.0
+            for item in batch:
+                item.effect.diagnostics_ms['xa-effect-final-batch-sql'] = (
+                    item.effect.diagnostics_ms.get(
+                        'xa-effect-final-batch-sql', 0.0
+                    )
+                    + sql_ms
+                )
             if len(inserted) != len(batch):
                 await self._refresh_tail_pair(conn, tenant_id)
                 raise _ChainTailConflict('final Effect/Gate6 tail CAS conflict')
@@ -1006,7 +1133,7 @@ class AsyncEffectStore:
                     await conn.set_type_codec(
                         type_name,
                         schema="pg_catalog",
-                        encoder=json.dumps,
+                        encoder=_compact_json,
                         decoder=json.loads,
                         format="text",
                     )
