@@ -1,8 +1,8 @@
 # 下一步工作设计
 
-> 快照：**2026-07-11**（对齐 [DELIVERY-v2](../acceptance/DELIVERY-v2.md)）
+> 快照：**2026-07-18**（对齐 [DELIVERY-v2](../acceptance/DELIVERY-v2.md)）
 > 目标：把「接下来做什么」固定为可执行顺序，不与 PRD、TODO、status 打架。
-> 状态标签：`DONE` / `PARTIAL` / `TODO` / `RETIRED` / `REFERENCE`
+> 状态标签：`DONE` / `PARTIAL` / `TODO` / `BLOCKED-MANUAL` / `RETIRED` / `REFERENCE`
 > **比赛交付权威口径**：[DELIVERY-v2](../acceptance/DELIVERY-v2.md) · 仓库状态：[status.md](../../status.md)
 
 ## 1. 当前总体结论
@@ -11,7 +11,7 @@
 
 当前只能谨慎写成：
 
-> **Delivery v2**：Tier A（D1/D3/D4）未完成；Tier B 主体 `DONE`，B5 canonical OAR 证据链待冻结；Tier C 为可选附录。
+> **Delivery v2**：D4 与三账号 UI 已完成；D1/D3 按负责人要求暂缓；D2 与 B6/B7 因正式 Identity + Undo 性能和 clean release freeze 保持 `PARTIAL`；B1–B5 `DONE`。
 
 **不再使用**「L3 最终验收 BLOCKED」作为项目主叙事。工程 L3 清单见 [L3-test-and-acceptance.md](../acceptance/L3-test-and-acceptance.md)（已弃用为比赛承诺）。
 
@@ -19,10 +19,10 @@
 
 | 交付物 | 状态 | 下一步 |
 |---|---|---|
-| D1 技术方案 PDF | `TODO` | [D1 草稿](../delivery/D1-technical-report-draft.md)，主实验写 OAR A/B |
+| D1 技术方案 PDF | `BLOCKED-MANUAL` | 负责人要求暂缓；恢复后从 [D1 草稿](../delivery/D1-technical-report-draft.md) 导出 |
 | D2 原型代码/仓库 | `PARTIAL` | clean main、复现命令、artifact hash |
-| D3 演示视频 | `TODO` | [D3 脚本](../delivery/D3-video-script.md)：demo + OAR A/B + 审计回放 |
-| D4 审核通过报名表 | `TODO` | 人工确认；仓库不伪造证据 |
+| D3 演示视频 | `BLOCKED-MANUAL` | 负责人要求暂缓；恢复后按 [D3 脚本](../delivery/D3-video-script.md) 录制 |
+| D4 审核通过报名表 | `DONE` | 2026-07-18 负责人确认；隐私证据在仓库外 |
 | 可选补充材料 | `PARTIAL` | [提交清单](../delivery/submission-checklist.md) |
 
 ## 3. 四个赛题方向（Delivery v2 叙事）
@@ -46,12 +46,10 @@
 
 ## 5. P0 执行顺序
 
-1. 确认 D4 报名审核状态。
-2. 起草 D1：四方向 + OAR 一节 + 诚实限制（不写退役项为 blocker）。
-3. 冻结一条 canonical OAR 证据链（DELIVERY-v2 §B5 命令）并写入 D1/D3。
-4. 录制 D3：demo 场景 → OAR Null vs XA-Guard → `verify_audit`。
-5. 跑不花钱验证：`pytest`、`demo/scenarios`、OAR replay smoke。
-6. 收束 D2：README、提交清单、artifact hash。
+1. 收敛 Identity + Undo 正式 10 并发 p95/upper ≤50ms，不削弱审计一致性。
+2. 达标后重跑、重封存并独立验证 Identity + Undo evidence。
+3. clean release commit 上重跑 unified verifier，生成 D2 final release manifest。
+4. D1/D3 保持 `BLOCKED-MANUAL`，仅在负责人恢复后推进。
 
 ## 6. P1 / P2（可选，不欠账）
 

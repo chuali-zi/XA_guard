@@ -153,6 +153,11 @@ class HARunner:
             self.compose_cmd("up", "-d", "--build", "--wait", "--wait-timeout", "240"),
             env=self.compose_env,
         )
+        extra_dependency_cidrs = list(self.args.extra_dependency_cidr)
+        if not self.args.dry_run:
+            discovered = self._discover_external_dependency_cidr()
+            if discovered not in extra_dependency_cidrs:
+                extra_dependency_cidrs.append(discovered)
         self._create_cluster()
         self._install_calico()
         host_cidr = self.args.host_cidr or (
@@ -168,10 +173,16 @@ class HARunner:
                     keycloak_port=self.args.keycloak_port,
                     postgres_port=self.args.postgres_port,
                     kms_port=self.args.kms_port,
+                    extra_dependency_cidrs=extra_dependency_cidrs,
                 ),
             )
         self._apply_secrets()
-        self.evidence.phase("bootstrap", "PASS", host_cidr=host_cidr)
+        self.evidence.phase(
+            "bootstrap",
+            "PASS",
+            host_cidr=host_cidr,
+            extra_dependency_cidrs=extra_dependency_cidrs,
+        )
 
     def _bootstrap_reference_material(self) -> None:
         self.exec.run(
@@ -239,8 +250,17 @@ class HARunner:
             check=False,
         )
         candidates = [line.split()[0] for line in resolved.stdout.splitlines() if line.split()]
+        cluster = yaml.safe_load(CLUSTER_CONFIG.read_text(encoding="utf-8")) or {}
+        pod_subnet = str((cluster.get("networking") or {}).get("podSubnet") or "")
+        if pod_subnet:
+            pod_network = ipaddress.ip_network(pod_subnet, strict=True)
+            candidates = [
+                candidate
+                for candidate in candidates
+                if ipaddress.ip_address(candidate) not in pod_network
+            ]
         if not candidates:
-            gateway = self.exec.run(
+            gateway_result = self.exec.run(
                 "inspect Kind Docker gateway",
                 [
                     "docker",
@@ -248,12 +268,46 @@ class HARunner:
                     "inspect",
                     "kind",
                     "--format",
-                    "{{(index .IPAM.Config 0).Gateway}}",
+                    "{{json .IPAM.Config}}",
                 ],
-            ).stdout.strip()
-            candidates = [gateway]
+            )
+            configs = json.loads(gateway_result.stdout)
+            gateways = [
+                str(value.get("Gateway") or "")
+                for value in configs
+                if value.get("Gateway")
+            ]
+            candidates = [
+                gateway
+                for gateway in gateways
+                if ipaddress.ip_address(gateway).version == 4
+            ] or gateways
+        if not candidates:
+            raise RuntimeError("no non-overlapping Docker host gateway is available")
         address = ipaddress.ip_address(candidates[0])
         return f"{address}/{address.max_prefixlen}"
+
+    def _discover_external_dependency_cidr(self) -> str:
+        container = self.exec.run(
+            "locate external key provider",
+            self.compose_cmd("ps", "-q", "key-provider"),
+            env=self.compose_env,
+        ).stdout.strip()
+        if not container:
+            raise RuntimeError("external key provider container is unavailable")
+        result = self.exec.run(
+            "inspect external dependency network",
+            ["docker", "inspect", "--format", "{{json .NetworkSettings.Networks}}", container],
+        )
+        networks = json.loads(result.stdout)
+        cidrs = {
+            str(ipaddress.ip_interface(f"{value['IPAddress']}/{value['IPPrefixLen']}").network)
+            for value in networks.values()
+            if value.get("IPAddress") and value.get("IPPrefixLen")
+        }
+        if len(cidrs) != 1:
+            raise RuntimeError("external dependency network did not resolve to one local subnet")
+        return cidrs.pop()
 
     def _configure_host_dns(self, host_ip: str) -> None:
         result = self.exec.run(
@@ -399,6 +453,8 @@ class HARunner:
             *self._console_overrides(),
         )
         self.exec.run(phase.replace("_", " "), command)
+        self._wait_rollout("api")
+        self._wait_rollout("worker")
         self._assert_ha_replicas()
         revision = self._current_revision()
         self.evidence.phase(phase, "PASS", revision=revision)
@@ -486,14 +542,17 @@ class HARunner:
                 *overrides,
             ),
         )
+        apply_command = self.kubectl_cmd(
+            "-n", self.args.namespace, "apply", "-f", "-"
+        )
         if self.args.dry_run:
-            self.exec.run("apply migration rerun", self.kubectl_cmd("apply", "-f", "-"))
+            self.exec.run("apply migration rerun", apply_command)
         else:
             document = next(d for d in yaml.safe_load_all(rendered.stdout) if d)
             job_name = document["metadata"]["name"]
             self.exec.run(
                 "apply migration rerun",
-                self.kubectl_cmd("apply", "-f", "-"),
+                apply_command,
                 input_text=rendered.stdout,
             )
             self.exec.run(
@@ -950,6 +1009,12 @@ def parser() -> argparse.ArgumentParser:
     value.add_argument("--namespace", default="xa-guard")
     value.add_argument("--release", default="xa-guard-ha")
     value.add_argument("--host-cidr", help="explicit Docker host /32 or /128")
+    value.add_argument(
+        "--extra-dependency-cidr",
+        action="append",
+        default=[],
+        help="additional local post-DNAT subnet allowed by NetworkPolicy (repeatable)",
+    )
     value.add_argument("--external-bind-address", default="127.0.0.1")
     value.add_argument("--keycloak-port", type=int, default=13081)
     value.add_argument("--postgres-port", type=int, default=15432)

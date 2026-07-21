@@ -106,7 +106,11 @@ function formatTs(ts) {
  * 推断 decision 字段（兼容大小写、下划线/空格）
  */
 function inferDecision(rec) {
-  const raw = rec.decision || rec["gen_ai.decision"] || "";
+  const raw =
+    rec.decision ||
+    rec["gen_ai.decision.final"] ||
+    rec["gen_ai.decision"] ||
+    "";
   return DECISION_LABEL[raw.toUpperCase()] || DECISION_LABEL[raw] || "ALLOW";
 }
 

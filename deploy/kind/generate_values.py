@@ -6,6 +6,7 @@ import argparse
 import ipaddress
 import os
 import tempfile
+from collections.abc import Sequence
 from pathlib import Path
 
 import yaml
@@ -15,10 +16,26 @@ HERE = Path(__file__).resolve().parent
 DEFAULT_OUTPUT = HERE / "values.generated.yaml"
 
 
-def values(host_cidr: str, *, keycloak_port: int, postgres_port: int, kms_port: int) -> dict:
+def values(
+    host_cidr: str,
+    *,
+    keycloak_port: int,
+    postgres_port: int,
+    kms_port: int,
+    extra_dependency_cidrs: Sequence[str] = (),
+) -> dict:
     network = ipaddress.ip_network(host_cidr, strict=True)
     if network.num_addresses != 1:
         raise ValueError("host CIDR must identify exactly one Docker host address (/32 or /128)")
+    dependency_cidrs = [str(network)]
+    for raw in extra_dependency_cidrs:
+        extra = ipaddress.ip_network(raw, strict=True)
+        minimum_prefix = 16 if extra.version == 4 else 64
+        if extra.prefixlen < minimum_prefix:
+            raise ValueError("extra dependency CIDR is broader than the permitted local subnet")
+        normalized = str(extra)
+        if normalized not in dependency_cidrs:
+            dependency_cidrs.append(normalized)
     host = "host.docker.internal"
     public_issuer = f"http://localhost:{keycloak_port}/realms/xa-guard"
     backchannel = f"http://{host}:{keycloak_port}"
@@ -43,9 +60,9 @@ def values(host_cidr: str, *, keycloak_port: int, postgres_port: int, kms_port: 
         "ingress": {"enabled": False},
         "networkPolicy": {
             "dependencies": {
-                "oidc": {"cidrs": [host_cidr], "ports": [keycloak_port]},
-                "postgres": {"cidrs": [host_cidr], "ports": [postgres_port]},
-                "keyProvider": {"cidrs": [host_cidr], "ports": [kms_port]},
+                "oidc": {"cidrs": dependency_cidrs, "ports": [keycloak_port]},
+                "postgres": {"cidrs": dependency_cidrs, "ports": [postgres_port]},
+                "keyProvider": {"cidrs": dependency_cidrs, "ports": [kms_port]},
             }
         },
     }
@@ -66,6 +83,12 @@ def write_values(output: Path, data: dict) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host-cidr", required=True, help="Docker host address as /32 or /128")
+    parser.add_argument(
+        "--extra-dependency-cidr",
+        action="append",
+        default=[],
+        help="additional local post-DNAT subnet allowed by NetworkPolicy (repeatable)",
+    )
     parser.add_argument("--keycloak-port", type=int, default=13081)
     parser.add_argument("--postgres-port", type=int, default=15432)
     parser.add_argument("--kms-port", type=int, default=13083)
@@ -78,6 +101,7 @@ def main() -> None:
             keycloak_port=args.keycloak_port,
             postgres_port=args.postgres_port,
             kms_port=args.kms_port,
+            extra_dependency_cidrs=args.extra_dependency_cidr,
         ),
     )
     print(args.output.resolve())

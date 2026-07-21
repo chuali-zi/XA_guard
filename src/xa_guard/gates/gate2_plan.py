@@ -38,6 +38,14 @@ class Gate2Plan(Gate):
     name = "gate2_plan"
     supported_stages = (GateStage.INBOUND,)
 
+    def __init__(self, cfg=None) -> None:
+        super().__init__(cfg)
+        risk_file = self.opt("tool_risk_file", "policies/baseline/gate2_tool_risks.yaml")
+        try:
+            self._legacy_risks = _load_tool_risks(risk_file)
+        except FileNotFoundError:
+            self._legacy_risks = {}
+
     def _load_risks(self) -> dict[str, RiskLevel]:
         """LayeredPolicySource（baseline+overlay 合并）opt-in；默认走单文件。
 
@@ -52,8 +60,7 @@ class Gate2Plan(Gate):
                 if risks:
                     return risks
         # legacy 路径：单文件直读（单测兼容；tool_risk_file 配置指向 gate2_tool_risks.yaml 仅作历史保留）
-        risk_file = self.opt("tool_risk_file", "policies/baseline/gate2_tool_risks.yaml")
-        return _load_tool_risks(risk_file)
+        return self._legacy_risks
 
     def _request_approval(self, ctx: GateContext) -> GateResult:
         """RED 工具的 fallback 审批。真正 MCP elicitation 由 proxy/upstream.py 处理。

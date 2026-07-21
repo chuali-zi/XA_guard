@@ -144,18 +144,31 @@ class CompensationWorker:
         ctx.operation_kind = "compensation"
         ctx.compensates_effect_id = row["effect_id"]
 
+        downstream_error: BusinessError | None = None
+
         async def execute(active: GateContext) -> dict[str, Any]:
-            return await self.runtime.business.cancel_ticket(
-                ticket_id=str(arguments["ticket_id"]),
-                tenant_id=row["tenant_id"],
-                reason=str(arguments["reason"]),
-                idempotency_key=row["request_id"],
-                trace_id=active.trace_id,
-            )
+            nonlocal downstream_error
+            try:
+                return await self.runtime.business.cancel_ticket(
+                    ticket_id=str(arguments["ticket_id"]),
+                    tenant_id=row["tenant_id"],
+                    reason=str(arguments["reason"]),
+                    idempotency_key=row["request_id"],
+                    trace_id=active.trace_id,
+                )
+            except BusinessError as exc:
+                # The security pipeline deliberately converts executor
+                # exceptions into audited DENY results. Preserve the typed
+                # downstream failure here so the Worker can still apply the
+                # contract's persisted retry policy after that audit completes.
+                downstream_error = exc
+                raise
 
         result = await self.runtime.service._run_confirmed(
             ctx, execute, principal.username, "signed Undo approval"
         )
+        if downstream_error is not None:
+            raise downstream_error
         if not result.allowed or not contract_succeeded(
             self.runtime.service.contracts.contracts[compensation_tool], result.tool_result
         ):

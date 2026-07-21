@@ -1,84 +1,80 @@
 # 仓库状态：XA-Guard / XA-202620
 
-> 快照日期：**2026-07-15**（America/Los_Angeles）
-> 当前统一口径：**CORE-IMPLEMENTED / DEPLOYMENT-PENDING**
+> 快照日期：**2026-07-20**（America/Los_Angeles）
+> 当前统一口径：**CORE-IMPLEMENTED / KIND-HA-PASS / PERFORMANCE-IMPROVED-NOT-STABLE / RELEASE-NOT-FROZEN**
 > 比赛交付口径：[docs/acceptance/DELIVERY-v2.md](docs/acceptance/DELIVERY-v2.md)
 > 本文件只描述当前状态；工作历史见 [log.md](log.md)。
 
 ## 总体结论
 
-XA-Guard 六关、OAR 主评测和新 Identity + Undo 核心代码均已实现。Reference Compose 已从空 PostgreSQL volume 一键构建启动，并通过真实 Keycloak Authorization Code + PKCE、Standard Token Exchange V2、Alice 创建工单、Alice 自批拒绝、Dora 独立批准、Worker 补偿、业务 `open -> cancelled` 的协议级闭环。
+Gate1–6、OAR 主评测、MCP 代理、OIDC + 动态 assignment、PostgreSQL Effect、可审批 Undo、Worker 补偿、Console/BFF 和本地 kind HA 主路径均已实现。Identity + Undo 的功能、故障、链完整性和恢复时延在 Reference 环境通过；并发写路径相较本轮起点显著改善，但正式 3×500 的 p95 与 bootstrap 上界仍不能连续稳定满足 ≤50ms，因此当前仍不标记 REFERENCE-READY。
 
-当前仍**不是** `REFERENCE-READY`，也不是 `HA-READY`：Reference core 身份负测和核心故障场景已在全新 volume 上 7/7 通过，但 Worker 长时接管/retry、KEK、并发性能、三账号 UI、最终 evidence manifest 和 kind 多副本尚未封存。Delivery v2 的 B6/B7 因此保持 `PARTIAL`，不得改写为生产 IAM、绝对 exactly-once 或通用数据库 Undo 已落地。
+本轮没有冻结发布。代码将整理提交，但不生成 final release manifest、不重封存证据、不宣称生产 HA。
+
+## 2026-07-20 当前验证基线
+
+- 全仓 pytest：**778 collected / 773 passed / 5 skipped / 0 failed**。4 个 skip 为本机缺 Helm，1 个为 Windows directory-symlink capability。
+- 本轮并发/链尾/授权/intent-first/Undo 相关回归：**25 passed**。
+- Reference core fault suite：**7/7 passed**，包含身份拒绝、伪造 header、assignment 立即撤销、跨租户隔离、PostgreSQL 中断、prepared-effect 恢复、并发双审批单任务。
+- 故障套件后 SQL 全链检查：Effect gaps 0、Gate6 gaps 0、Effect tail mismatches 0、Gate6 tail mismatches 0。
+- Reference Compose：PostgreSQL、Keycloak、business-api、xa-guard、worker 均在运行；API/Worker 使用最终候选源码；schema 为 **v8**；故障钩子开启，Server-Timing 关闭。
+- 产品相关 Ruff 与本轮新增测试 Ruff 通过。全仓 Ruff 仍有 **19 个既有测试代码样式告警**，主要是未使用 import 和测试变量名；未修改测试来消除这些告警。
+- 当前全局 Python 环境仍有 letta-evals 0.13.0 要求 anyio==4.10.0、实际 anyio 4.14.1 的环境冲突；项目依赖文件未为此做不安全改写。
+
+## 并发性能状态
+
+### 已完成的优化
+
+- 将 prepared/completed Effect 的同租户写入统一成单 worker 微批，消除任务碎片化。
+- prepared Effect + pre-approval Gate6 在一个事务内写入；final Effect + final Gate6 在一个事务内写入，保持 intent-first 和响应前持久化。
+- 新增 xa_chain_tails 双链尾表和固定顺序 FOR UPDATE + CAS；跨实例缓存冲突只重试一次。
+- Worker、Undo、独立 Effect/Gate6 旧写入路径与链尾表在同一事务推进，避免 API/Worker 交错后断链。
+- prepared/final 使用统一按租户调度器；final 优先；仅空闲边界聚合 2ms，已有 backlog 立即处理。
+- Effect completion 使用批量 UNNEST UPDATE；Gate6 CTE 改为有序列数组 unnest，去掉外层 Gate6 JSON 数组拆解。
+- assignment 授权匹配下推到 PostgreSQL 单行实时查询，不做 TTL 缓存，撤销语义保持即时。
+- schema v8 为完整 Gate6 JSONB 启用 PostgreSQL 内置 LZ4，保留 EXTENDED 存储、完整证据字段和可重放性。
+- 性能脚本增加可选、脱敏的 Server-Timing 诊断；Docker Compose 瞬时查询失败只在 Undo 有界轮询内重试，持续失败仍会超时失败。
+
+### 当前数据
+
+- 本轮起点 200-pair 诊断：增量 p95 **113.891ms**、bootstrap upper **178.923ms**。
+- 200-pair 中间候选曾达到 p95/upper **43.530/45.076ms**，Undo 3/3 在 1 秒内。
+- 最终候选三个正式 seed 分开跑 500 pairs 均通过：
+  - seed 20260712：p95/upper **44.472/49.042ms**
+  - seed 20365441：p95/upper **41.127/42.445ms**
+  - seed 20470170：p95/upper **41.397/44.928ms**
+- 但连续正式 3×500 仍不稳定。当前长期压测库维护后的最新正式报告为 p95 **52.598/55.185/54.988ms**、upper **54.528/58.092/56.402ms**，10 次 Undo 全部通过，批准到取消约 **0.50–0.89s**。
+- 当前测试库已有约 7 万条 Effect/Gate6 事件；数据库无 deadlock、链断点或 tail mismatch。环境波动不能当作通过理由，正式性能阻塞保持未关闭。
+
+结论：性能问题已经从数量级锁等待降到阈值附近，功能与一致性回归通过；但作品口径仍为 PERFORMANCE-IMPROVED-NOT-STABLE，B6/B7 和 D2 不得因单轮或单 seed 通过而标记完成。
 
 ## 当前能力状态
 
 | 能力面 | 状态 | 当前事实与边界 |
 |---|---|---|
-| Gate1–6 与 Gate6 审计 | `DONE` | 既有 MCP/demo/OAR 路径保留；新原动作和补偿也进入相同 Pipeline |
-| OAR B1–B5 主证据 | `DONE` | canonical Null vs XA-Guard A/B、ledger replay 与 audit 对齐保持原状态 |
-| Keycloak/OIDC 身份 | `CORE-IMPLEMENTED` | discovery/JWKS 启动必需；普通离线验签；敏感接口 introspection；`act.sub` 优先、Keycloak `azp` reference 映射；未知 kid 有刷新、负缓存和节流 |
-| 动态 Agent assignment | `CORE-IMPLEMENTED` | PostgreSQL human/group→Agent→tool/data-domain，有效期/版本/变更人；每次调用与 YAML ceiling 相交，撤销即时生效 |
-| PostgreSQL EffectStore | `CORE-IMPLEMENTED` | asyncpg、编号 migration、schema v4、migration lock、事件 hash chain；旧 MCP/SQLite 路径保留原兼容语义，不具备新 intent/lease 保证，只作单测且不作为比赛证据 |
-| intent-first 写入 | `CORE-IMPLEMENTED` | `prepared` + execution lease 后才调用下游；`effect_id` 是幂等键；过期 lease 才允许 reconciler 接管 |
-| 恢复材料加密 | `CORE-IMPLEMENTED` | 每 Effect 随机 DEK、AES-GCM、版本化 KEK wrap、旧 key 解密与 rewrap API；Compose 使用 Docker Secret keyring |
-| Undo/审批/Worker | `CORE-IMPLEMENTED` | SOD、Undo 窗口、内部签名授权、SKIP LOCKED、60s lease/20s heartbeat、5/30/120 retry、admin 有界重签；至少一次 + 下游幂等 |
-| Reference ticket API | `CORE-IMPLEMENTED` | stateful PostgreSQL create/query/by-effect/cancel，`open -> cancelled`，相同补偿幂等，不同上下文 409；只在内部网络 |
-| Control API | `CORE-IMPLEMENTED` | `/me`、agents、tickets、effects/timeline、Undo、assignments、livez/readyz/metrics；错误统一脱敏并带一致 trace |
-| React Console/BFF | `BUILT / VISUAL-QA-PENDING` | 六固定页面、PKCE S256、内存 token、Agent confidential BFF token exchange、无角色切换；已修正 human assignment 与 If-Match 契约，npm build/test/audit 已过，交互浏览器人工验收未做 |
-| Reference Compose | `CORE-FAULT-PASS / NOT READY` | PostgreSQL 17.6、Keycloak 26.7.0 和 Python/Node 基础镜像锁 digest；随机 gitignored secrets；从空 volume 重建、协议闭环和 core fault 7/7 已过 |
-| Helm/HA | `CHART-IMPLEMENTED / KIND-PENDING` | API/Worker/Business/Console、migration、Ingress、Secret 引用、NetworkPolicy、PDB、API HPA；lint/template 通过；未做 kind、Pod 接管、rollback/外部服务替换 |
+| Gate1–6、Gate6 审计、OAR B1–B5 | DONE | canonical OAR A/B、ledger replay 与 audit 对齐已有证据 |
+| MCP 代理主形态 | LIVE-PASS | 真实 MCP JSON-RPC 9 场景、Gate6 审计链和 Console 三账号闭环已有证据 |
+| OIDC 与动态 assignment | REFERENCE-PASS | 身份拒绝、伪造、撤销、跨租户通过；授权每请求实时查库 |
+| PostgreSQL EffectStore | REFERENCE-PASS / PERF-LIMIT | schema v8、intent-first、CAS 双链尾、reconciler、批处理通过；正式性能仍不稳定 |
+| Undo / Worker | REFERENCE-PASS | core fault 通过；至少一次 + 下游幂等，不能宣称绝对 exactly-once |
+| Console/BFF | BUILT / MANUAL-QA-PASS | Alice 建票/请求 Undo、Dora 批准、Admin 只读闭环通过 |
+| Reference Compose | RUNNING / CORE-FAULT-PASS / PERF-LIMIT | 当前整栈健康；本轮 core 7/7；历史 all suite 11/11，long/keys 本轮未重跑 |
+| Helm / kind HA profile | PASS-HISTORICAL | 本地三节点升级、接管、网络策略和回滚已有 PASS；本机当前缺 Helm，未重跑 |
+| Evidence（Identity + Undo） | SEALED-HISTORICAL / NEEDS-RESEAL | 历史包独立验签通过；本轮性能改动未重封存 |
+| D2 release freeze | PARTIAL / NOT-FROZEN | 用户明确要求暂不冻结；final manifest 和新证据封存未生成 |
 
-## 本轮可复核结果
+## 距离赛题目标的剩余事项
 
-- 从空 reference volumes 执行 `python scripts/reference_stack.py up` 成功；六个常驻服务健康，migration/seed 一次性任务成功。
-- `/readyz`：PostgreSQL、key provider 与 OIDC/JWKS 均为 true；schema version 4；reference assignment 的 tools/domains 均为 JSONB array。
-- `python scripts/verify_reference_e2e.py`：真实 PKCE + token exchange；Alice immutable `sub`/assignment 验证；Effect 创建；Undo 幂等 replay；Alice self-approval 403；Dora 独立 approval；Worker compensation；结果 `compensated:cancelled:true`。
-- `verify_reference_faults.py --suite core`：全新 volume 首轮发现 PostgreSQL 恢复后未等待 Keycloak；修复编排后 7/7 通过，包括身份伪造零下游、assignment 即时撤销、跨租户隔离、PostgreSQL 断连零下游、prepared reconciler 和双审批单任务。
-- `/metrics` 已输出 JWKS、身份拒绝原因、Effect、Undo、重试、队列深度和 active assignment。
-- Console：5 tests passed，production build passed，npm audit 为 0 vulnerabilities。
-- Helm 3.17.3：`helm lint --strict` 和 deployment tests 10/10 通过；仓内 kind/kubectl/helm 可执行，但未执行真实 kind 集群、Pod 接管或 rollback。
-- 当前 release-candidate 口径：Ruff 通过；全仓 pytest **772 collected / 771 passed / 0 failed / 1 skipped**，唯一 skip 为 Windows 目录 symlink 不可用；OAR kernel + Auto-RedTeam **149 passed**；L3 static 11/11；`git diff --check` 通过。代码已提交推送，但 D2 final artifact hash 尚未生成。
-- 远端 GitHub Quality run `29418343744`：Python 3.10 与 3.12 矩阵均通过；此前 3.10 暴露的 Kind `datetime.UTC` 和 gmssl 偶发不可自验签名已由 `f157f92` 修复。
+1. **硬缺口**：在可复现、受控环境连续通过正式 3×500，使每轮 incremental p95 和 bootstrap upper 都 ≤50ms。
+2. 性能通过后重跑 Reference all fault、正式性能、证据采集与独立验签，并重封存 Identity + Undo evidence。
+3. 在具备 Helm 的环境重跑 kind/发布验证；隔离全局 letta-evals/anyio 冲突。
+4. 用户允许冻结后再生成 clean commit provenance 与 final release manifest；当前不得提前冻结。
+5. D1 PDF / D3 视频继续按负责人要求暂缓；D4 已完成。
 
-部分 reference 验证记录见 [docs/evidence/agent-identity-undo-reference-2026-07-12/README.md](docs/evidence/agent-identity-undo-reference-2026-07-12/README.md)。该目录明确未封存为最终 B6/B7 证据。
+## 声明边界
 
-## REFERENCE-READY 差距
-
-Core 身份负测、assignment 撤销/跨租户隔离、PostgreSQL 零下游、prepared reconciler 与双审批单任务已通过，但尚未封存。以下项仍未完成，全部通过并生成最终 manifest 后才可标记 `REFERENCE-READY`：
-
-1. 交互式浏览器完成 Alice、Dora、Admin 三账号 UI 登录、页面隔离和录屏；当前环境没有可用浏览器控制实例，只有真实 PKCE 协议自动验收。
-2. Worker 补偿中被杀、lease 到期由另一 Worker 接管，并确认 5/30/120 retry 和工单只有一次有效取消。
-3. 错误 KEK、增加新 KEK、旧记录读取与在线 rewrap 的整栈演练。
-4. 10 并发 identity/effect 新增开销 p95 ≤ 50ms、批准到恢复 ≤ 30s 的正式数据。
-5. 脱敏 evidence 包：业务前后态、claims 摘要、assignment 版本、Effect/Undo events、双 trace、Gate6/Effect chain 校验和 artifact manifest。
-
-## HA-READY 差距
-
-- kind/Kubernetes 实际安装；API 与 Worker 至少各 2 副本。
-- 删除 API Pod 不影响请求；删除 lease Worker 后另一副本接管。
-- migration 重跑、滚动升级、Helm rollback 与 schema/effect 可读性。
-- 外部 OIDC、PostgreSQL、key provider 各一项替换测试。
-- NetworkPolicy 实际连通性证明，而不只是模板静态检查。
-
-## Delivery v2 与赛题距离
-
-| 层级 | 项 | 状态 |
-|---|---|---|
-| Tier A | D1 ≤30 页 PDF | `TODO`；草稿已增加 Identity + Undo 主创新章节 |
-| Tier A | D2 代码/部署 | `PARTIAL`；主体具备，release freeze/final hash 未做 |
-| Tier A | D3 ≤10 分钟视频 | `TODO`；已改为固定八镜头双人闭环脚本 |
-| Tier A | D4 报名 | `TODO`；人工事项 |
-| Tier B | B1–B5 六关/OAR | `DONE` |
-| Tier B | B6 可信 Agent Identity | `PARTIAL`；待 REFERENCE-READY evidence 封存 |
-| Tier B | B7 可验证 Undo | `PARTIAL`；待 REFERENCE-READY evidence 封存 |
-
-比赛主叙事统一为：
-
-> 传统 IAM 只回答谁登录，传统审计只回答发生了什么。XA-Guard 同时绑定“谁委托了哪个 Agent”，并为 Agent 的真实副作用提供受控补偿能力——前有身份、途中六关、后有撤销、全程有证据。
-
-## 仓库与工作树
-
-- `feat/identity-undo-reference` 已经 fast-forward 合并并推送远端 `main`；功能提交为 `07f7342` 与 `94041f6`，未改写历史。
-- `94041f6` 同时包含 Auto-RedTeam provider safety quarantine 与追加 provenance；后续回归审查应继续把它们作为独立关注面核对。
-- `.runtime/reference/`、`.runtime/kind-ha/` 与 `.runtime/evidence/` 被 gitignore，包含本机随机凭据、密钥或未封存验收输出，不得提交。
+- kind PASS 只证明本机三节点 profile，不外推为生产多地域 HA。
+- 本轮 core fault PASS 不替代未重跑的 long/keys 套件。
+- 单轮、单 seed 或开发 profile 的性能通过不替代正式连续三轮。
+- .runtime/reference/、.runtime/kind-ha/、.runtime/evidence/ 含运行时数据或敏感材料且被 gitignore，不得提交。
+- 所有新依赖均为 PostgreSQL/Python 现有合法能力；未加入来源不明依赖。

@@ -13,6 +13,7 @@ from xa_guard.control.crypto import CryptoError, InternalAuthorization, sha256_j
 from xa_guard.control.faults import faults
 from xa_guard.control.models import Principal
 from xa_guard.control.store import AsyncEffectStore, AuthorizationError, ConflictError
+from xa_guard.control.timing import span
 from xa_guard.types import Decision, GateContext, InputSource
 
 
@@ -84,7 +85,8 @@ class ControlService:
             raise ConflictError("ticket title and description are required")
         if arguments["priority"] not in {"low", "normal", "high", "urgent"}:
             raise ConflictError("ticket priority is invalid")
-        assignment = await self.authorize(principal, "business_submit_ticket", data_domain)
+        with span("xa-authorize"):
+            assignment = await self.authorize(principal, "business_submit_ticket", data_domain)
         authorization_snapshot = {
             key: assignment[key]
             for key in (
@@ -101,28 +103,34 @@ class ControlService:
         contract = self.contracts.for_tool("business_submit_ticket")
         if contract is None:
             raise ServiceError("business_submit_ticket contract is absent")
-        ctx = self._context(principal, "business_submit_ticket", arguments, data_domain)
+        ctx = self._context(principal, 'business_submit_ticket', arguments, data_domain)
+        ctx.defer_gate6_until_effect = (
+            getattr(getattr(self.pipeline, 'gate6', None), 'store', None)
+            is self.store
+        )
 
         async def execute(active: GateContext) -> Any:
-            effect_id = await self.store.prepare_effect(
-                principal=principal,
-                trace_id=active.trace_id,
-                data_domain=data_domain,
-                args=arguments,
-                contract=contract,
-                authorization_snapshot=authorization_snapshot,
-            )
+            with span("xa-effect-prepare"):
+                effect_id = await self.store.prepare_effect(
+                    principal=principal,
+                    trace_id=active.trace_id,
+                    data_domain=data_domain,
+                    args=arguments,
+                    contract=contract,
+                    authorization_snapshot=authorization_snapshot,
+                )
             active.effect_id = effect_id
             active.side_effect_level = contract.side_effect_level
             active.reversibility = contract.reversibility
             active.undo_status = "prepared"
             try:
-                response = await self.business.create_ticket(
-                    effect_id=effect_id,
-                    trace_id=active.trace_id,
-                    tenant_id=principal.tenant_id,
-                    arguments=arguments,
-                )
+                with span("xa-business-create"):
+                    response = await self.business.create_ticket(
+                        effect_id=effect_id,
+                        trace_id=active.trace_id,
+                        tenant_id=principal.tenant_id,
+                        arguments=arguments,
+                    )
             except BusinessError:
                 # An ambiguous network result intentionally remains prepared;
                 # the reconciler will query by effect_id before changing state.
@@ -134,7 +142,24 @@ class ControlService:
             root = {"input": arguments, "result": response}
             recovery = {name: resolve_pointer(root, pointer) for name, pointer in contract.recovery_fields.items()}
             reference = str((response.get("body") or {}).get("ticket_id") or "")
-            await self.store.complete_effect(effect_id, principal, recovery, response, reference)
+            with span("xa-effect-complete"):
+                await self.store.complete_effect(
+                    effect_id,
+                    principal,
+                    recovery,
+                    response,
+                    reference,
+                    expected_tool_name=contract.tool_name,
+                    expected_reversibility=contract.reversibility,
+                    defer_trace_id=(
+                        active.trace_id
+                        if getattr(
+                            getattr(self.pipeline, 'gate6', None), 'store', None
+                        )
+                        is self.store
+                        else ''
+                    ),
+                )
             active.undo_status = "available"
             return response
 
@@ -299,7 +324,15 @@ class ControlService:
             )
             ticket_id = str((response.get("body") or {}).get("ticket_id") or "")
             if ticket_id:
-                await self.store.complete_effect(row["effect_id"], principal, {"ticket_id": ticket_id}, response, ticket_id)
+                await self.store.complete_effect(
+                    row["effect_id"],
+                    principal,
+                    {"ticket_id": ticket_id},
+                    response,
+                    ticket_id,
+                    expected_tool_name=row["tool_name"],
+                    expected_reversibility=row["reversibility"],
+                )
                 reconciled += 1
         return reconciled
 
@@ -318,16 +351,19 @@ class ControlService:
         approver: str,
         reason: str,
     ) -> Any:
-        result = await self.pipeline.run(ctx, executor)
+        with span("xa-pipeline"):
+            result = await self.pipeline.run(ctx, executor)
         if result.final_decision == Decision.REQUIRE_APPROVAL:
-            ctx.approval = issue_approval(
-                trace_id=ctx.trace_id,
-                tool_name=ctx.tool_name,
-                arguments=ctx.arguments,
-                approver=approver,
-                reason=reason,
-            )
-            result = await self.pipeline.run_after_approval(ctx, executor)
+            with span("xa-approval-issue"):
+                ctx.approval = issue_approval(
+                    trace_id=ctx.trace_id,
+                    tool_name=ctx.tool_name,
+                    arguments=ctx.arguments,
+                    approver=approver,
+                    reason=reason,
+                )
+            with span("xa-pipeline-resume"):
+                result = await self.pipeline.run_after_approval(ctx, executor)
         return result
 
     @staticmethod

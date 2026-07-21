@@ -12,6 +12,8 @@ x-python-service: &python-service
     XA_GUARD_AUDIT_BACKEND: postgresql
     XA_GUARD_KEY_PROVIDER: local
     XA_GUARD_TEST_FAULTS: ${XA_GUARD_TEST_FAULTS:-false}
+    XA_GUARD_CONTROL_TIMING: ${XA_GUARD_CONTROL_TIMING:-false}
+    XA_GUARD_DB_COMMIT_DELAY_US: ${XA_GUARD_DB_COMMIT_DELAY_US:-0}
     XA_GUARD_DATABASE_URL_FILE: /run/secrets/database_url
     XA_GUARD_KEK_KEYRING_FILE: /run/secrets/kek_keyring
     XA_GUARD_INTERNAL_AUTH_KEY_FILE: /run/secrets/internal_auth_key

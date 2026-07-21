@@ -4,7 +4,7 @@
 > 题目：**面向政企场景的大模型智能体安全关键技术研究**
 > 提交截止：**2026-09-15 24:00**
 >
-> ⚠ 当前统一口径为 **CORE-IMPLEMENTED / DEPLOYMENT-PENDING**：六关与 OAR 主证据可复现，Identity + Undo reference 协议闭环已跑通，但完整 REFERENCE-READY/HA-READY 验收尚未封存。比赛交付口径见 [DELIVERY-v2](./docs/acceptance/DELIVERY-v2.md)，仓库状态见 [status.md](./status.md)。
+> ⚠ 当前统一口径为 **CORE-IMPLEMENTED / KIND-HA-PASS / PERFORMANCE-LIMIT**：Identity + Undo 故障套件 11/11、kind HA 和签名证据链均已通过，但正式 10 并发新增开销 p95 未达到 ≤50ms，因此仍不标记 REFERENCE-READY，也不外推为生产 HA。比赛交付口径见 [DELIVERY-v2](./docs/acceptance/DELIVERY-v2.md)，仓库状态见 [status.md](./status.md)。
 
 ---
 
@@ -39,7 +39,8 @@
 配套：
 - **XA-Bench**（赛题方向 4 评测）：CSAB-Gov-mini 290 条 seed 回归 + 双 500 候选语料 + ASR/FPR/Recall/CuP/Latency
 - **AIBOM 准入网关**（赛题方向 3）：插件 AST 扫描 + CycloneDX-like BOM + schema/signing/drift + bench/真实 MCP `install_plugin` 离线 preflight
-- **演示前端**：审计回放时间线 + Agent Governance 控制台（单页 HTML，离线可用）
+- **Identity + Undo 控制台**：`console/`（React + BFF）是三账号验收与 D3 的权威界面
+- **轻量演示前端**：`frontend/` 提供六关审计时间线与 Agent Governance 离线展示，不替代 `console/`
 - **演示脚本**：3 个攻击场景独立可跑
 
 ## 赛题 4 方向 ↔ 模块对照
@@ -155,7 +156,23 @@ python scripts/verify_reference_e2e.py
 # http://localhost:13081
 ```
 
-凭据位于 `.runtime/reference/credentials.json`，密码、client secret、KEK 和内部签名 key 不进入仓库。Reference 仅绑定 localhost；远程环境必须使用 TLS。该入口已验证协议级 `open -> cancelled`，core 身份/故障 suite 7/7 也已通过；但浏览器三账号人工录屏、Worker long/KEK、10 并发 p95、最终 evidence manifest 与 kind 多副本仍未完成，因此尚不标记 `REFERENCE-READY`。详见 [reference 部署说明](./deploy/reference/README.md)。
+凭据位于 `.runtime/reference/credentials.json`，密码、client secret、KEK 和内部签名 key 不进入仓库。Reference 仅绑定 localhost；远程环境必须使用 TLS。干净 volume 的全故障 suite 11/11 通过，包括 Worker kill/lease takeover、5/30/120 retry、错误 KEK 与 v1→v2 rewrap；kind 三节点升级/接管/NetworkPolicy/rollback 也已通过，最终证据包已封存验签。正式 10 并发新增开销 p95 三轮为 352.548/486.272/248.346ms，未达到 ≤50ms，故仍不标记 `REFERENCE-READY`。详见 [验收证据说明](./docs/evidence/agent-identity-undo-acceptance-2026-07-16.md)。
+
+## D2 统一自动验证
+
+```powershell
+python scripts/verify_release.py
+```
+
+该命令要求 Docker daemon 可用，缺少仓库锁定版本 Helm 时会先执行校验下载，缺少 `xa-guard/sandbox:latest` 时会构建镜像；随后检查当前 Python 环境依赖、产品代码 Ruff、全仓 pytest、L3 static、Compose 配置、Console test/build 和 Identity + Undo 签名证据。除 Windows 目录 symlink capability 外，任何 skip 都按失败处理。2026-07-18 在干净隔离 Python 环境中的结果为 772 collected、771 passed、1 个允许的 capability skip；汇总写入 gitignored `.runtime/evidence/release-verification/summary.json`。
+
+最终 release manifest 只能在 clean worktree 上生成：
+
+```powershell
+python scripts/build_release_manifest.py
+```
+
+该脚本绑定当前 commit、分支和所有 tracked files 的 SHA-256；工作树不干净时直接失败，避免把开发态 hash 冒充最终发布 provenance。
 
 ## Docker Compose 一键部署（旧 L3 原型）
 

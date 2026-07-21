@@ -13,6 +13,7 @@
 | `DONE` | 已有代码、测试或证据，可在声明边界内写入 D1/D2/D3 |
 | `PARTIAL` | 主体具备，仍缺正式交付物、冻结证据链或人工事项 |
 | `TODO` | 尚未完成，属于当前真实差距 |
+| `BLOCKED-MANUAL` | 尚未完成且负责人明确要求暂缓，恢复后必须人工完成 |
 | `RETIRED` | 不再作为交付承诺、BLOCKED 项或比赛硬门槛 |
 
 ---
@@ -23,10 +24,10 @@
 
 | ID | 交付物 | 要求 | 状态 | 入口 |
 |---|---|---|---|---|
-| **A1** | D1 技术方案 PDF | ≤ 30 页 | `TODO` | [D1 草稿](../delivery/D1-technical-report-draft.md) |
-| **A2** | D2 代码 + README/部署 | 可复现原型与运行说明 | `PARTIAL` | [根 README](../../README.md)、`docker-compose.yml` |
-| **A3** | D3 演示视频 | ≤ 10 分钟 | `TODO` | [D3 脚本](../delivery/D3-video-script.md) |
-| **A4** | D4 报名表 | 系统审核通过 + 学校盖章 | `TODO` | 人工；见 [提交清单](../delivery/submission-checklist.md) |
+| **A1** | D1 技术方案 PDF | ≤ 30 页 | `BLOCKED-MANUAL` | [D1 草稿](../delivery/D1-technical-report-draft.md)；负责人要求暂缓 |
+| **A2** | D2 代码 + README/部署 | 可复现原型与运行说明 | `PARTIAL` | [根 README](../../README.md)、`docker-compose.yml`；2026-07-18 unified verifier PASS，待性能与 clean release manifest |
+| **A3** | D3 演示视频 | ≤ 10 分钟 | `BLOCKED-MANUAL` | [D3 脚本](../delivery/D3-video-script.md)；负责人要求暂缓 |
+| **A4** | D4 报名表 | 系统审核通过 + 学校盖章 | `DONE` | 2026-07-18 负责人确认完成；隐私材料在仓库外 |
 
 **Tier A 完成定义**：四件官方材料齐备、可下载/可访问、与邮件提交一致；D2 命令与 D1/D3 叙述一致。
 
@@ -43,8 +44,8 @@
 | **B3** | Null vs XA-Guard live A/B | 真实 `xa_guard.server` session、`protection_delta` | `DONE` | OAR `run-ab --sut-mode null,xaguard --live` |
 | **B4** | Ledger replay + audit 对齐 | hash ledger、`replay --verify-sut-audit`、raw XA-Guard audit | `DONE` | OAR `range_cli replay` |
 | **B5** | 一键可复现证据链 | 单命令或短脚本产出标准 evidence 目录 | `DONE` | [canonical run 与 hash](./EVIDENCE-CONSOLIDATION.md#2-canonical-主证据) |
-| **B6** | 可信 Agent Identity | PKCE 登录、Standard Token Exchange、双主体与动态 assignment | `PARTIAL` | [Identity + Undo 架构](../architecture/agent-identity-and-undo.md)、`scripts/verify_reference_e2e.py`；待 REFERENCE-READY 证据封存后改为 DONE |
-| **B7** | 可验证 Undo | PostgreSQL intent、独立审批、六关补偿、业务恢复与事件链 | `PARTIAL` | `src/xa_guard/control/`、`docker-compose.reference.yml`；待故障注入/并发/浏览器验收和 evidence manifest 后改为 DONE |
+| **B6** | 可信 Agent Identity | PKCE 登录、Standard Token Exchange、双主体与动态 assignment | `PARTIAL` | [Identity + Undo 架构](../architecture/agent-identity-and-undo.md)；全故障/kind/evidence/三账号 UI 已过，正式性能未过 |
+| **B7** | 可验证 Undo | PostgreSQL intent、独立审批、六关补偿、业务恢复与事件链 | `PARTIAL` | [2026-07-16 验收证据](../evidence/agent-identity-undo-acceptance-2026-07-16.md)；接管/retry/KEK/Undo 时延通过，写路径性能未过 |
 
 ### 赛题四方向映射（Tier B 为主叙事）
 
@@ -119,8 +120,8 @@ python -m kernel.range_cli run-ab `
 
 - **OAR** 是红队竖切与证据链中心，不是完整工业级 7×24 在线沙盘；ReactiveSeat 为确定性状态机，非任意长度 live agent。
 - **XA-Guard 主产品**：六关 + 审计 + AIBOM + Docker 部署已可演示；20 会话 HTTP 容量为 LIMIT，不宣称生产容量。
-- **Identity + Undo**：核心与 reference Compose 双人协议链已实现，但 B6/B7 保持 `PARTIAL`；未完成全部 REFERENCE-READY/HA-READY 验收前，不写成生产 IAM、绝对 exactly-once 或通用数据库回滚。
-- **未交付**：D1 PDF、D2 clean release freeze、D3 视频、D4 报名证据。B5 canonical OAR 证据已封存。
+- **Identity + Undo**：Reference 故障 11/11、kind HA profile 与签名 evidence 已通过；进程内同链预排队的开发探针改善到 206.557ms，但正式 10 并发新增开销三轮仍均超过 50ms，B6/B7 保持 `PARTIAL`；不写成生产 IAM、生产 HA、绝对 exactly-once 或通用数据库回滚。
+- **人工交付**：D4 与三账号 UI 已由负责人确认完成；D1 PDF、D3 视频按负责人要求处于 `BLOCKED-MANUAL`。D2 clean release freeze/final manifest 仍未完成。B5 canonical OAR 证据已封存；2026-07-18 D2 自动 verifier 已通过但不等同于 final release provenance。
 - **L3 文档**：`L3-test-and-acceptance.md` 中的 R2–R9 BLOCKED 语言描述的是**历史工程验收面**，不是 Delivery v2 比赛缺口。
 
 ---

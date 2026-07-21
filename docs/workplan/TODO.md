@@ -1,6 +1,6 @@
 # XA-Guard 下一步 TODO 与交付收束计划
 
-> 快照时间：**2026-07-15**（Delivery v2 口径）
+> 快照时间：**2026-07-18**（Delivery v2 口径）
 > 权威交付规格：[../acceptance/DELIVERY-v2.md](../acceptance/DELIVERY-v2.md)
 > 仓库状态：[../../status.md](../../status.md)
 > 赛题依据：[../source-of-truth/事实源.md](../source-of-truth/事实源.md)
@@ -9,11 +9,11 @@
 
 **活跃口径是 Delivery v2**，不是 L3 最终 BLOCKED 叙事。
 
-- **Tier A（必交）**：D1 PDF、D2 release、D3 视频、D4 报名 — 当前主矛盾。
-- **Tier B（主证据）**：B1–B5 均 `DONE`；B6/B7 core fault 7/7 已过，仍待长时故障、性能、UI 与最终 manifest。
+- **Tier A（必交）**：D4 已完成；D1 PDF、D3 视频按负责人要求暂缓；D2 release 仍为自动收尾主线。
+- **Tier B（主证据）**：B1–B5 均 `DONE`；B6/B7 的全故障 11/11、kind HA、签名 evidence 与三账号 UI 已过，正式并发性能未达标。
 - **Tier C（加分）**：R4/R7/R8 已有证据；R2/R3、Trae 截图等为 **RETIRED** 硬承诺，仅背景实验。
 
-**下一步第一优先级**：D2 clean release freeze/final hash；并行完成人工 D4、D1、D3。B6/B7 收口不阻塞最低 D2，但未封存前保持 `PARTIAL`。
+**下一步自动任务第一优先级**：继续优化或重新设计 Identity + Undo 并发写路径并重跑正式性能；达标后重新封存 evidence，再做 D2 clean release freeze/final hash。统一自动发布 verifier 已通过。D4 与三账号 UI 已完成；D1、D3 标记 `BLOCKED-MANUAL`，在负责人恢复前不推进。
 
 ---
 
@@ -21,24 +21,26 @@
 
 | ID | 任务 | 状态 | 下一步 |
 |---|---|---|---|
-| A1 | D1 PDF ≤30 页 | `TODO` | 按 [D1 草稿](../delivery/D1-technical-report-draft.md) 写；主实验 = OAR A/B |
-| A2 | D2 代码 + README/部署 | `PARTIAL` | release freeze、pytest、verifier、artifact hash |
-| A3 | D3 视频 ≤10 分钟 | `TODO` | [D3 脚本](../delivery/D3-video-script.md)；含 OAR 镜头 |
-| A4 | D4 报名表审核通过 | `TODO` | 人工确认 `2026.tiaozhanbei.net`；仓库外存证据 |
+| A1 | D1 PDF ≤30 页 | `BLOCKED-MANUAL` | 负责人要求暂缓；恢复后从草稿导出并复核 |
+| A2 | D2 代码 + README/部署 | `PARTIAL` | 性能收敛后 release freeze、final verifier、release manifest |
+| A3 | D3 视频 ≤10 分钟 | `BLOCKED-MANUAL` | 负责人要求暂缓；恢复后按 D3 脚本录制 |
+| A4 | D4 报名表审核通过 | `DONE` | 2026-07-18 负责人确认；隐私证据在仓库外 |
 
 ### A4 报名（人工）
 
-- [ ] 确认系统审核状态为「审核通过」
-- [ ] 盖章扫描件与系统信息一致
-- [ ] 证据不入 Git（个人隐私）
+- [x] 负责人确认系统审核状态为「审核通过」
+- [x] 负责人确认盖章扫描件与系统信息一致
+- [x] 证据不入 Git（个人隐私）
 
 ### A2 D2 release checklist
 
-- [x] `PYTHONUTF8=1 python -m pytest -q`（772 collected / 771 passed / 1 Windows symlink skip）
+- [x] `python scripts/verify_release.py`（2026-07-18：772 collected / 771 passed / 1 Windows symlink capability skip；产品 Ruff、static、Compose、Console、evidence verifier 一并通过）
 - [x] `python scripts/verify_l3_static.py --section all`（11/11）
-- [x] Reference Docker 六服务 health + PKCE/Undo e2e + core fault 7/7
-- [ ] artifact hash manifest
-- [ ] README 命令与 D1 一致
+- [x] Reference health + PKCE/Undo e2e + full fault 11/11
+- [x] kind 三节点 HA 全阶段 + SM2-with-SM3 evidence verifier
+- [ ] 正式 10 并发性能（当前 3/3 失败；Undo latency 10/10 通过）
+- [ ] final release manifest（仅 clean final commit 上运行 `scripts/build_release_manifest.py`）
+- [x] README 已增加统一 verifier 与 release manifest 命令；提交前仍需与最终 D1 数字复核
 
 ---
 
@@ -51,8 +53,20 @@
 | B3 | Null vs XA-Guard live A/B | `DONE` | D3 展示 `protection_delta` |
 | B4 | Ledger replay + audit 对齐 | `DONE` | D1 附 replay JSON 摘要 |
 | B5 | 一键 canonical 证据链 | `DONE` | `oar-delivery-v2-20260711T123124Z-win-local` 已封存并锚定 |
-| B6 | 可信 Agent Identity | `PARTIAL` | core 身份负测/撤销/跨租户已过；待三账号 UI 与最终 evidence |
-| B7 | 可验证 Undo | `PARTIAL` | core 故障/双审批已过；待 Worker long、KEK、性能与最终 manifest |
+| B6 | 可信 Agent Identity | `PARTIAL` | 自动故障、HA、evidence、三账号 UI 已过；待性能达标 |
+| B7 | 可验证 Undo | `PARTIAL` | Worker 接管、retry、KEK、Undo 时延已过；写路径性能未达标 |
+
+### B6/B7 最新验收
+
+- [x] Reference 全故障 suite：11/11。
+- [x] Worker kill takeover：2 个 Worker actor，1 次有效取消。
+- [x] 5/30/120 retry：3 次调度，1 次有效取消。
+- [x] 错误 KEK fail closed、admin retry、v1→v2 rewrap 7 条旧记录。
+- [x] kind 三节点升级、API/Worker 接管、migration、NetworkPolicy、rollback。
+- [x] SM2-with-SM3 封存与独立 verifier。
+- [x] Alice/Dora/Admin 三独立会话手测；建票、职责分离、独立批准、补偿和审计内容 PASS。
+- [x] 同链进程内预排队减少 connection-pool starvation；开发探针 incremental p95 403.604ms → 206.557ms，未冒充正式通过。
+- [ ] 正式 10 并发 incremental p95/upper ≤50ms；当前三轮 p95 352.548/486.272/248.346ms。
 
 ### B5 封存结果
 
@@ -105,24 +119,22 @@
 
 ## 6. 建议执行顺序
 
-### 第 0 步（当天）
+### 第 0 步（自动，当前）
 
-1. 确认 D4 报名
-2. 完成 D1 正文与图表
-3. 按 canonical OAR 证据录制 D3
+1. 收敛 Identity + Undo 正式并发性能
+2. 性能通过后重跑、重封存、独立验签
+3. clean release commit 上重跑统一 verifier 并生成 final release manifest
 
-### 第 1 步（不花钱）
+### 第 1 步（暂缓的人工交付）
 
-1. 全仓 pytest + L3 static verifier
-2. D1 正文 + 图表
-3. D3 旁白与录屏脚本对齐 D1 数字
+1. D1 PDF 导出并人工复核 ≤30 页（`BLOCKED-MANUAL`）
+2. D3 录制、剪辑并人工复核 ≤10 分钟（`BLOCKED-MANUAL`）
 
-### 第 2 步（交付）
+### 第 2 步（提交）
 
-1. D1 PDF 导出 ≤30 页
-2. D3 剪辑 ≤10 分钟
-3. D2 release + submission-checklist
-4. 2026-09-15 前邮件提交
+1. 人工验收结果回填 submission-checklist
+2. 核对仓库链接、PDF、视频、报名表和证据包可访问
+3. 2026-09-15 前邮件提交
 
 ---
 
@@ -154,4 +166,4 @@
 | DELIVERY-v2 | `docs/acceptance/DELIVERY-v2.md` | `ACTIVE` |
 | L3 工程清单 | `docs/acceptance/L3-test-and-acceptance.md` | `DEPRECATED` |
 | D1 草稿 | `docs/delivery/D1-technical-report-draft.md` | `TODO` |
-| NEXT-WORK-DESIGN | `docs/workplan/NEXT-WORK-DESIGN.md` | `REFERENCE`（待按需同步 v2） |
+| NEXT-WORK-DESIGN | `docs/workplan/NEXT-WORK-DESIGN.md` | `REFERENCE`（2026-07-18 已同步 v2 状态） |

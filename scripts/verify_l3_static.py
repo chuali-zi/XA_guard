@@ -236,11 +236,26 @@ def build_report(root: str | Path = ".", section: str = "all") -> dict[str, Any]
         failed = sum(item["status"] == "fail" for item in checks.items)
         sections[name] = {"status": "pass" if checks.items and not failed else "fail", "passed": len(checks.items) - failed, "failed": failed, "checks": checks.items}
     failed_sections = [name for name, result in sections.items() if result["status"] == "fail"]
-    runtime = [{"section": name, "id": RUNTIME_EVIDENCE[name][0], "reason": RUNTIME_EVIDENCE[name][1], "status": "required"} for name in selected]
+    runtime = [
+        {
+            "section": name,
+            "id": RUNTIME_EVIDENCE[name][0],
+            "reason": RUNTIME_EVIDENCE[name][1],
+            "status": "required",
+            "scope": "former-l3-formal-reference",
+            "delivery_v2_blocker": False,
+        }
+        for name in selected
+    ]
     return {
         "schema_version": "xa-guard-l3-static-verification/v1",
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "mode": "static_only",
+        "delivery_authority": "docs/acceptance/DELIVERY-v2.md",
+        "runtime_evidence_semantics": (
+            "Compatibility requirements for upgrading a static section to the former formal L3 "
+            "claim; they are engineering references and are not Delivery v2 blockers."
+        ),
         "repository_root": str(root_path),
         "selected_sections": selected,
         "sections": sections,

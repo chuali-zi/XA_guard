@@ -17,7 +17,6 @@ from enterprise_agent_range.arena.opencode_seat import (
     build_vulnerable_followup,
     path_text as _path_text,
     run_opencode,
-    session_id_from_events,
     write_opencode_config,
 )
 from enterprise_agent_range.arena.oracle import Verdict

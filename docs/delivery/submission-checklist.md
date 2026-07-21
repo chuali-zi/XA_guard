@@ -8,10 +8,10 @@
 
 | 交付物 | 状态 | 文件/链接 | 负责人确认 |
 |---|---|---|---|
-| D1 技术方案 PDF，不超过 30 页 | `TODO` | 待从 D1 草稿导出 | [ ] |
+| D1 技术方案 PDF，不超过 30 页 | `BLOCKED-MANUAL` | 负责人要求暂缓；待从 D1 草稿导出 | [ ] |
 | D2 原型代码仓库链接 | `PARTIAL` | GitHub main + release commit | [ ] |
-| D3 演示视频，不超过 10 分钟 | `TODO` | 待录制/导出 | [ ] |
-| D4 审核通过报名表 | `TODO` | 需人工确认系统审核通过 | [ ] |
+| D3 演示视频，不超过 10 分钟 | `BLOCKED-MANUAL` | 负责人要求暂缓；待录制/导出 | [ ] |
+| D4 审核通过报名表 | `DONE` | 2026-07-18 负责人确认；隐私材料在仓库外 | [x] |
 
 ## 证据包（Tier B 为主）
 
@@ -19,7 +19,7 @@
 
 - [ ] final commit hash。
 - [ ] `git status --short` 干净截图或文本。
-- [x] release-candidate pytest 输出（2026-07-15：772 collected，771 passed、1 Windows directory-symlink skip）；提交前在 final commit 再跑一次并固定 hash。
+- [x] 统一自动验证输出（2026-07-18：772 collected，771 passed、1 Windows directory-symlink capability skip；产品 Ruff、L3 static、Compose、Console、证据验签均通过）；提交前在 final commit 再跑一次并固定 hash。
 - [x] L3 static verifier 输出（工程参考，11/11 sections PASS）。
 - [x] **OAR canonical 证据目录**：`oar-delivery-v2-20260711T123124Z-win-local`。
 - [x] OAR live A/B summary：N=3、`protection_delta=1.0`、7/7 replay PASS。
@@ -27,7 +27,8 @@
 - [x] 性能报告（Tier C 附录，可选）。
 - [x] R8 cdxgen / install_plugin 证据（Tier C 附录，可选）。
 - [ ] R2/R3 sampled：仅当背景实验已跑时附；否则标 `RETIRED` / 省略。
-- [x] artifact hash manifest 与 sealed provenance。
+- [x] OAR sealed provenance 与 Identity + Undo 签名 evidence manifest。
+- [ ] D2 最终 release manifest：仅在 clean final commit 上运行 `python scripts/build_release_manifest.py` 后勾选。
 
 ## 邮件与附件
 

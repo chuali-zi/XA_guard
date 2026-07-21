@@ -1,0 +1,212 @@
+{
+  "acceptance": {
+    "assertions": [
+      {
+        "evidence": [
+          "business.json",
+          "effect-events.jsonl"
+        ],
+        "id": "business-restored",
+        "passed": true,
+        "statement": "The reference ticket transitioned from open to cancelled under compensation."
+      },
+      {
+        "evidence": [
+          "assignment.json",
+          "identity.json",
+          "undo-request.json"
+        ],
+        "id": "identity-separated",
+        "passed": true,
+        "statement": "Requester and approver are distinct persisted subjects under the captured assignment."
+      },
+      {
+        "evidence": [
+          "effect-events.jsonl",
+          "gate6-source-provenance.json",
+          "gate6.jsonl"
+        ],
+        "id": "traces-cross-linked",
+        "passed": true,
+        "statement": "Original and compensation traces are linked across the Effect and Gate6 chains."
+      },
+      {
+        "evidence": [
+          "effect-events.jsonl",
+          "effect.json",
+          "undo-request.json"
+        ],
+        "id": "undo-compensated",
+        "passed": true,
+        "statement": "The approved Undo request reached the compensated Effect state."
+      }
+    ],
+    "boundaries": [
+      {
+        "id": "business-before-state",
+        "statement": "The open before-state is reconstructed from the reference create invariant and persisted transition timestamps, not a separate point-in-time snapshot."
+      },
+      {
+        "id": "delivery-scope",
+        "statement": "This bundle proves one reference Compose workflow and does not by itself establish HA readiness."
+      },
+      {
+        "id": "execution-semantics",
+        "statement": "Compensation uses at-least-once execution with downstream idempotency, not absolute exactly-once delivery."
+      },
+      {
+        "id": "gate6-public-projection",
+        "statement": "Gate6 evidence is a chain-verified public projection; replayable credentials are excluded and source hashes are mapped separately."
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "bytes": 158939,
+      "path": "acceptance/ha-final-clean-20260716.json",
+      "sha256": "85ead0f976ba5d34571432c298160d21b8d4c0f14b2eff4ce7748d154870ef99"
+    },
+    {
+      "bytes": 37086,
+      "path": "acceptance/identity-undo-performance-clean.json",
+      "sha256": "54de11912766845323fa0d496f78bb7d2cba770405b496470c704f8b48a62d1d"
+    },
+    {
+      "bytes": 448,
+      "path": "acceptance/index.json",
+      "sha256": "32e545b07590762bb8d1ac364aee348b777753721b78534329ffd26c3f80427c"
+    },
+    {
+      "bytes": 5357,
+      "path": "acceptance/reference-faults-all-clean.json",
+      "sha256": "adee8a9536941a106fdd62264131d16dc64289e88aeeed868c0872a80ed7a423"
+    },
+    {
+      "bytes": 1688,
+      "path": "artifact-source-provenance.json",
+      "sha256": "758379a8a273816c67d333e33b09a5dedf9ea1d1996d5ed2a6300a37761b275b"
+    },
+    {
+      "bytes": 357,
+      "path": "assignment.json",
+      "sha256": "92d01f922123e7b98056a3b466bca875a91215cda3d2c5800949fb0946d3d79d"
+    },
+    {
+      "bytes": 439,
+      "path": "business.json",
+      "sha256": "43562c94d26825404e4654977a33f1c27a746cf2a7b2eeb0ff3f3fb54f60e31d"
+    },
+    {
+      "bytes": 21398,
+      "path": "effect-events.jsonl",
+      "sha256": "1bd7e78e55d9aa696929f71546318013c10484bdcf618f6c8bdfc5dff27e8cc7"
+    },
+    {
+      "bytes": 961,
+      "path": "effect.json",
+      "sha256": "787254881571117b79a5a146ff3dc5f00b949617d109f837990cfef705baa85d"
+    },
+    {
+      "bytes": 6271,
+      "path": "gate6-source-provenance.json",
+      "sha256": "e56352e507caf2e30e11a125a2fe1d823733e1be4df75db9d137434be45d7523"
+    },
+    {
+      "bytes": 71150,
+      "path": "gate6.jsonl",
+      "sha256": "30a58746bd014b82d1d060810bcd413b9e94b3b704ffb0c251ff854a34688474"
+    },
+    {
+      "bytes": 465,
+      "path": "identity.json",
+      "sha256": "cc058d86f7a71aab28fc492aad568be69b808caf7c08dd50828a192b2bb3472b"
+    },
+    {
+      "bytes": 3200,
+      "path": "sealing-metadata.json",
+      "sha256": "9ae1040e8e6c80dbb97ec2ee5de13671d01110e72d4fca3e050674e2d61826d0"
+    },
+    {
+      "bytes": 771,
+      "path": "undo-request.json",
+      "sha256": "627f8ae8e653dc7dbdc2e8cbdf60cdd0415eabbcafc306d003a30a0a9a5bb9e4"
+    }
+  ],
+  "chains": {
+    "effect": {
+      "algorithm": "sha256",
+      "path": "effect-events.jsonl",
+      "records": 46
+    },
+    "gate6": {
+      "algorithm": "sha256",
+      "path": "gate6.jsonl",
+      "records": 25
+    }
+  },
+  "cross_links": {
+    "agent_id": "general-office-agent",
+    "approver_sub": "10000000-0000-0000-0000-000000000002",
+    "assignment_artifact": "assignment.json",
+    "assignment_id": "asg-9c15dba107b544f5ae076abd26139749",
+    "assignment_snapshot_sha256": "92d01f922123e7b98056a3b466bca875a91215cda3d2c5800949fb0946d3d79d",
+    "assignment_version": 1,
+    "business_artifact": "business.json",
+    "business_effect_id": "eff-e41f1f7bf04d456e9bd5d3fa2f59c568",
+    "compensation_trace_id": "0c1d4560-1d1d-4e64-994a-ef7dc222c169",
+    "effect_id": "eff-e41f1f7bf04d456e9bd5d3fa2f59c568",
+    "original_trace_id": "4fd5ef98-c6e2-4e0e-becc-8f6daa60c293",
+    "requester_sub": "10000000-0000-0000-0000-000000000001",
+    "tenant_id": "acme-corp"
+  },
+  "images": [
+    {
+      "digest": "sha256:f3bd19c606e442c3d7bdfa8002e03fe260a1023351e0ea4598032022b68dd6e3",
+      "name": "postgres"
+    },
+    {
+      "digest": "sha256:2eb3cd316835c990e69e26ade292ffa78f6fb0db7d5fc6377463c162e1979ac0",
+      "name": "quay.io/keycloak/keycloak"
+    },
+    {
+      "digest": "sha256:9f09b0f83b9e3ebd3cc93dbf161c4a2fe18084c5cc6edb20b816ce444b400c74",
+      "name": "xa-guard-console:0.2.0"
+    },
+    {
+      "digest": "sha256:02c1ae3ae31c12f4122293b167da4df965bb3b383c9f62d980d52e522fec3849",
+      "name": "xa-guard-reference:0.2.0"
+    }
+  ],
+  "run": {
+    "completed_at": "2026-07-16T10:46:20.001894Z",
+    "id": "reference-identity-undo-eff-e41f1f7bf04d456e9bd5d3fa2f59c568",
+    "mode": "docker-compose-reference",
+    "started_at": "2026-07-16T10:45:40.767387Z"
+  },
+  "schema": "xa-guard-evidence/v1",
+  "signature": {
+    "algorithm": "SM2-with-SM3",
+    "key_id": "87ca0b5c56dc9313",
+    "public_key": "cb7c0bded827d7f39aab0d989662e100b496a243844384aeba940823d0852a2cf8e4b7a0361e7db2cd474b3fc47c8e3b7b2e95cc29a8fc9670c480796d54afb4",
+    "value": "ffe1dac9bcbc8dff697cd695c61608ccfe054b8f1835bffdf463124724efff3a621e3e462a182a930af0c31da08e68c3c32c95e8eac7e2162da2b024d86b6837"
+  },
+  "source": {
+    "dirty": true,
+    "repository": "XA_guard",
+    "revision": "342ea635e56fac056b5a4bc027d4a665aa01dada"
+  },
+  "tools": [
+    {
+      "name": "docker",
+      "version": "29.5.2"
+    },
+    {
+      "name": "python",
+      "version": "3.12.10"
+    },
+    {
+      "name": "xa-guard-evidence-collector",
+      "version": "1"
+    }
+  ]
+}

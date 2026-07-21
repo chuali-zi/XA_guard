@@ -1,6 +1,6 @@
 # Agent Identity + Undo 参考架构
 
-> 当前口径：`CORE-IMPLEMENTED / REFERENCE-VALIDATION-IN-PROGRESS`。本文描述已经进入正式代码路径的实现，以及尚未完成的部署验收；不把代码存在等同于生产落地。
+> 当前口径：`CORE-IMPLEMENTED / KIND-HA-PASS / PERFORMANCE-LIMIT`。本文描述已经进入正式代码路径的实现和已完成的 Reference/kind 验收；不把本地通过改写为生产落地。
 
 ## 1. 主链路
 
@@ -58,6 +58,8 @@ prepared -> available -> undo_pending -> approved -> compensating -> compensated
 
 Undo 请求和审批都必须在 `undo_expires_at` 前完成；已批准任务不会因窗口随后结束而被丢弃。每个恢复材料使用 AES-GCM 随机 DEK，DEK 用活动 KEK 包裹；keyring 同时保留新写 key 和旧解密 key，并支持在线 rewrap。SQLite 后端只保留旧 MCP/本地单测兼容，不作为比赛实际落地证据；SQLite 导入 PostgreSQL 时只迁移公开 provenance，并强制 `manual_required`，不会伪造可恢复能力。
 
+同一租户/链的 Effect 与 Gate6 append 在单进程内先进入异步锁队列，再申请 asyncpg connection、事务与 PostgreSQL advisory lock。该预排队减少同链等待者占满连接池的现象；数据库 advisory lock 仍是跨进程/跨副本一致性的最终互斥点，没有改成仅依赖进程内锁。2026-07-18 开发探针显示 incremental p95 从 403.604ms 降至 206.557ms，但仍未达到 50ms，不能作为正式通过证据。
+
 ## 4. 独立 Worker 与语义边界
 
 Worker 使用 `FOR UPDATE SKIP LOCKED`、60 秒 lease、20 秒 heartbeat。网络超时、429 和 5xx 按合同的 5/30/120 秒最多重试三次；策略拒绝、4xx、参数和签名错误不自动重试。heartbeat 丢失会取消本地补偿，所有完成/失败写入仍以 lease owner 条件更新。
@@ -94,12 +96,12 @@ python scripts/verify_reference_e2e.py
 
 bootstrap 将随机密码、client secret、session/internal authorization key 和 KEK keyring 写入 gitignored `.runtime/reference/`，以 Docker Secret 挂载。对外端口只绑定 loopback；远程环境必须使用 TLS 和组织 Secret/KMS。
 
-Helm chart 位于 `deploy/helm/xa-guard/`，默认引用外部 OIDC、PostgreSQL 与 key provider，`referenceInfra.enabled=false`。它提供 API/Worker/Business/Console、migration Job、ConfigMap/Secret 引用、Ingress、NetworkPolicy、PDB 和 HPA 基线；kind、多副本接管、rollback 与外部服务替换仍属于 `HA-READY` 待验收项。
+Helm chart 位于 `deploy/helm/xa-guard/`，默认引用外部 OIDC、PostgreSQL 与 key provider，`referenceInfra.enabled=false`。它提供 API/Worker/Business/Console、migration Job、ConfigMap/Secret 引用、Ingress、NetworkPolicy、PDB 和 HPA 基线。三节点 kind profile 已实际通过 N-1→N 升级、migration 重跑、API Pod 删除、Worker lease 接管、NetworkPolicy 探测和 Helm rollback；外部依赖仍是本地 reference Compose，因此该结果不等于组织级生产 `HA-READY`。
 
 ## 7. 已验证与未验证
 
-已实际验证：镜像构建、Compose 启动、migration v3、OIDC/JWKS ready、缺 token 401、真实 Alice/Dora Authorization Code + PKCE、Standard Token Exchange V2、dynamic assignment、intent/effect、Alice 自批拒绝、Dora 独立批准、Worker 补偿、工单 `cancelled`、双 trace 分离、相关单元/回归测试。
+已实际验证：镜像构建、Compose 启动、schema v4、真实 PKCE + Token Exchange、dynamic assignment、双人审批、补偿、身份负测、assignment 撤销、租户隔离、PostgreSQL fail-closed、prepared reconciler、双审批并发、Worker kill takeover、5/30/120 retry、错误 KEK、KEK rewrap、kind 多副本接管/升级/回滚及签名 evidence。
 
-尚未完成：交互式浏览器三账号人工 UI 录屏；全部身份负测的 Compose 级自动化；PostgreSQL 断连零下游、API crash-window reconciler、Worker kill/lease takeover、KEK rewrap 的整栈故障注入；10 并发 p95；kind 两副本、NetworkPolicy 证明、rollback 与外部 OIDC/PostgreSQL/KMS 替换。完成这些项前不得标记 `REFERENCE-READY` 或 `HA-READY`。
+尚未通过的自动化门槛是正式 10 并发新增开销 p95 ≤50ms；三轮为 352.548/486.272/248.346ms，Undo 10/10 均低于 30s。2026-07-18 Alice/Dora/Admin 三个独立浏览器会话已由负责人完成业务闭环手测：职责分离、独立批准、补偿、双 trace/Gate6 与同租户审计内容均通过；D3 正式录屏仍按负责人要求暂缓。生产环境还需替换并验收组织 OIDC、托管 PostgreSQL、KMS/HSM、TLS 与备份恢复。性能达标并重新封存 evidence 前不得标记 `REFERENCE-READY`；本地 kind PASS 不得改写为生产 `HA-READY`。
 
 依赖合规：Keycloak/asyncpg/项目代码为 Apache-2.0，PostgreSQL 使用 PostgreSQL License，Starlette/HTTPX 为 BSD-3-Clause，PyJWT 为 MIT，cryptography 为 Apache-2.0/BSD，Console 直接依赖许可证见 `console/THIRD_PARTY_NOTICES.md`。

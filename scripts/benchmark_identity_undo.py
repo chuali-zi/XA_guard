@@ -22,6 +22,7 @@ import math
 import random
 import re
 import statistics
+import subprocess
 import sys
 import time
 import uuid
@@ -231,22 +232,56 @@ def build_evidence(
     }
 
 
+def parse_server_timing(value: str) -> dict[str, float]:
+    """Parse numeric Server-Timing durations without retaining descriptions."""
+
+    parsed: dict[str, float] = {}
+    for metric in value.split(","):
+        parts = [part.strip() for part in metric.split(";") if part.strip()]
+        if not parts:
+            continue
+        name = parts[0]
+        for part in parts[1:]:
+            if not part.startswith("dur="):
+                continue
+            try:
+                parsed[name] = float(part[4:])
+            except ValueError:
+                pass
+            break
+    return parsed
+
+
 async def _timed_request(
     request: Callable[[], Any],
     *,
     expected_status: int,
     label: str,
+    diagnostics: list[dict[str, Any]] | None = None,
+    diagnostic_context: dict[str, Any] | None = None,
 ) -> float:
     started = time.perf_counter_ns()
     response = await request()
     elapsed_ms = (time.perf_counter_ns() - started) / 1_000_000.0
     if response.status_code != expected_status:
         raise PerformanceFailure(f"{label} failed with HTTP {response.status_code}")
+    if diagnostics is not None:
+        diagnostics.append(
+            {
+                **(diagnostic_context or {}),
+                "client_ms": round(elapsed_ms, 6),
+                "server_timing_ms": parse_server_timing(
+                    response.headers.get("server-timing", "")
+                ),
+                "trace_id": response.headers.get("x-trace-id", ""),
+            }
+        )
     return elapsed_ms
 
 
 async def _measure_pairs(
     *,
+    client: httpx.AsyncClient,
     control_url: str,
     business_url: str,
     agent_token: str,
@@ -255,68 +290,77 @@ async def _measure_pairs(
     concurrency: int,
     seed: int,
     namespace: str,
+    diagnostics: list[dict[str, Any]] | None = None,
+    run_number: int = 0,
 ) -> tuple[list[str], list[float], list[float]]:
     orders = randomized_orders(pair_count, seed)
     baseline_ms = [0.0] * pair_count
     protected_ms = [0.0] * pair_count
     semaphore = asyncio.Semaphore(concurrency)
-    limits = httpx.Limits(max_connections=max(20, concurrency * 2), max_keepalive_connections=20)
 
-    async with httpx.AsyncClient(timeout=30.0, limits=limits) as client:
-        async def one_pair(index: int, order: str) -> None:
-            unique = f"{namespace}-{index:06d}-{uuid.uuid4().hex[:12]}"
-            baseline_effect_id = f"perf-{unique}"
-            title = f"Performance acceptance {unique}"
-            description = f"Stateful paired write {unique}"
+    async def one_pair(index: int, order: str) -> None:
+        unique = f"{namespace}-{index:06d}-{uuid.uuid4().hex[:12]}"
+        baseline_effect_id = f"perf-{unique}"
+        title = f"Performance acceptance {unique}"
+        description = f"Stateful paired write {unique}"
 
-            async def baseline() -> float:
-                return await _timed_request(
-                    lambda: client.post(
-                        business_url + "/tickets",
-                        headers={
-                            "Authorization": f"Bearer {business_api_key}",
-                            "X-XA-Effect-ID": baseline_effect_id,
-                            "Idempotency-Key": baseline_effect_id,
-                            "X-Correlation-ID": f"perf-baseline-{unique}",
-                        },
-                        json={
-                            "tenant_id": "acme-corp",
-                            "title": title,
-                            "description": description,
-                            "priority": "normal",
-                        },
-                    ),
-                    expected_status=201,
-                    label="direct business baseline write",
-                )
+        async def baseline() -> float:
+            return await _timed_request(
+                lambda: client.post(
+                    business_url + "/tickets",
+                    headers={
+                        "Authorization": f"Bearer {business_api_key}",
+                        "X-XA-Effect-ID": baseline_effect_id,
+                        "Idempotency-Key": baseline_effect_id,
+                        "X-Correlation-ID": f"perf-baseline-{unique}",
+                    },
+                    json={
+                        "tenant_id": "acme-corp",
+                        "title": title,
+                        "description": description,
+                        "priority": "normal",
+                    },
+                ),
+                expected_status=201,
+                label="direct business baseline write",
+            )
 
-            async def protected() -> float:
-                headers = ReferenceIdentity.headers(agent_token)
-                headers["X-Correlation-ID"] = f"perf-protected-{unique}"
-                return await _timed_request(
-                    lambda: client.post(
-                        control_url + "/control/v1/tickets",
-                        headers=headers,
-                        json={
-                            "title": title,
-                            "description": description,
-                            "priority": "normal",
-                            "data_domain": "engineering_docs",
-                        },
-                    ),
-                    expected_status=201,
-                    label="protected control-plane write",
-                )
+        async def protected() -> float:
+            headers = ReferenceIdentity.headers(agent_token)
+            headers["X-Correlation-ID"] = f"perf-protected-{unique}"
+            if diagnostics is not None:
+                headers["X-XA-Diagnostics"] = "timing"
+            return await _timed_request(
+                lambda: client.post(
+                    control_url + "/control/v1/tickets",
+                    headers=headers,
+                    json={
+                        "title": title,
+                        "description": description,
+                        "priority": "normal",
+                        "data_domain": "engineering_docs",
+                    },
+                ),
+                expected_status=201,
+                label="protected control-plane write",
+                diagnostics=diagnostics,
+                diagnostic_context={
+                    "operation": "protected",
+                    "order": order,
+                    "pair": index + 1,
+                    "run": run_number,
+                },
+            )
 
-            async with semaphore:
-                if order == "AB":
-                    baseline_ms[index] = await baseline()
-                    protected_ms[index] = await protected()
-                else:
-                    protected_ms[index] = await protected()
-                    baseline_ms[index] = await baseline()
+        async with semaphore:
+            if order == "AB":
+                baseline_ms[index] = await baseline()
+                protected_ms[index] = await protected()
+            else:
+                protected_ms[index] = await protected()
+                baseline_ms[index] = await baseline()
 
-        await asyncio.gather(*(one_pair(index, order) for index, order in enumerate(orders)))
+    await asyncio.gather(*(one_pair(index, order) for index, order in enumerate(orders)))
     return orders, baseline_ms, protected_ms
 
 
@@ -332,43 +376,81 @@ async def _run_write_benchmark(
     concurrency: int,
     bootstrap_iterations: int,
     seed: int,
+    diagnostics: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     namespace = f"{int(time.time())}-{uuid.uuid4().hex[:10]}"
     results: list[dict[str, Any]] = []
+    limits = httpx.Limits(max_connections=max(20, concurrency * 2), max_keepalive_connections=20)
     for run_index in range(runs):
-        run_number = run_index + 1
-        run_seed = seed + run_index * 104_729
-        await _measure_pairs(
-            control_url=control_url,
-            business_url=business_url,
-            agent_token=agent_token,
-            business_api_key=business_api_key,
-            pair_count=warmups,
-            concurrency=concurrency,
-            seed=run_seed - 1,
-            namespace=f"{namespace}-warmup-r{run_number}",
-        )
-        orders, baseline_ms, protected_ms = await _measure_pairs(
-            control_url=control_url,
-            business_url=business_url,
-            agent_token=agent_token,
-            business_api_key=business_api_key,
-            pair_count=pairs,
-            concurrency=concurrency,
-            seed=run_seed,
-            namespace=f"{namespace}-measured-r{run_number}",
-        )
-        results.append(
-            _summarize_latency_run(
-                run_number=run_number,
-                seed=run_seed,
-                orders=orders,
-                baseline_ms=baseline_ms,
-                protected_ms=protected_ms,
-                bootstrap_iterations=bootstrap_iterations,
+        async with httpx.AsyncClient(timeout=30.0, limits=limits) as client:
+            run_number = run_index + 1
+            run_seed = seed + run_index * 104_729
+            await _measure_pairs(
+                client=client,
+                control_url=control_url,
+                business_url=business_url,
+                agent_token=agent_token,
+                business_api_key=business_api_key,
+                pair_count=warmups,
+                concurrency=concurrency,
+                seed=run_seed - 1,
+                namespace=f"{namespace}-warmup-r{run_number}",
             )
-        )
+            orders, baseline_ms, protected_ms = await _measure_pairs(
+                client=client,
+                control_url=control_url,
+                business_url=business_url,
+                agent_token=agent_token,
+                business_api_key=business_api_key,
+                pair_count=pairs,
+                concurrency=concurrency,
+                seed=run_seed,
+                namespace=f"{namespace}-measured-r{run_number}",
+                diagnostics=diagnostics,
+                run_number=run_number,
+            )
+            results.append(
+                _summarize_latency_run(
+                    run_number=run_number,
+                    seed=run_seed,
+                    orders=orders,
+                    baseline_ms=baseline_ms,
+                    protected_ms=protected_ms,
+                    bootstrap_iterations=bootstrap_iterations,
+                )
+            )
     return results
+
+
+def summarize_diagnostics(samples: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    if not samples:
+        return {}
+    metrics = sorted(
+        {
+            str(metric)
+            for sample in samples
+            for metric in (sample.get("server_timing_ms") or {})
+        }
+    )
+    summary: dict[str, Any] = {
+        "client": sample_statistics([float(sample["client_ms"]) for sample in samples])
+    }
+    for metric in metrics:
+        values = [
+            float(sample["server_timing_ms"][metric])
+            for sample in samples
+            if metric in (sample.get("server_timing_ms") or {})
+        ]
+        if values:
+            summary[metric] = sample_statistics(values)
+    gaps = [
+        float(sample["client_ms"]) - float(sample["server_timing_ms"].get("xa-total", 0.0))
+        for sample in samples
+        if "xa-total" in (sample.get("server_timing_ms") or {})
+    ]
+    if gaps:
+        summary["client_minus_server"] = sample_statistics(gaps)
+    return summary
 
 
 def _expect_object(response: httpx.Response, status: int, label: str) -> dict[str, Any]:
@@ -474,10 +556,16 @@ def _measure_undo_flows(
             )
 
             deadline = time.monotonic() + timeout_seconds
-            timestamps = _undo_timestamps(request_id)
+            try:
+                timestamps = _undo_timestamps(request_id)
+            except subprocess.CalledProcessError:
+                timestamps = None
             while timestamps is None and time.monotonic() < deadline:
                 time.sleep(0.25)
-                timestamps = _undo_timestamps(request_id)
+                try:
+                    timestamps = _undo_timestamps(request_id)
+                except subprocess.CalledProcessError:
+                    timestamps = None
             if timestamps is None:
                 raise PerformanceFailure("Undo did not reach cancelled state before polling timeout")
             decided_at, cancelled_at, elapsed_ms = timestamps
@@ -503,7 +591,11 @@ def _validate_args(args: argparse.Namespace) -> None:
     if any(int(getattr(args, name)) < 1 for name in positive):
         raise PerformanceFailure("benchmark counts must all be positive")
     if args.dev:
+        if args.diagnostics_output is not None:
+            return
         return
+    if args.diagnostics_output is not None:
+        raise PerformanceFailure("diagnostics output is restricted to --dev runs")
     if args.runs < 3:
         raise PerformanceFailure("reference acceptance requires at least 3 independent runs")
     if args.pairs < 500:
@@ -531,6 +623,11 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=20_260_712)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument(
+        "--diagnostics-output",
+        type=Path,
+        help="write a secret-free timing sidecar; allowed only with --dev",
+    )
+    parser.add_argument(
         "--dev",
         action="store_true",
         help="allow reduced counts; resulting evidence is not REFERENCE-READY eligible",
@@ -549,6 +646,9 @@ def main() -> None:
         identity = ReferenceIdentity(control_url=control_url)
         agent_token = identity.agent_token("alice")
         business_api_key = read_secret("business_api_key")
+        diagnostics: list[dict[str, Any]] | None = (
+            [] if args.diagnostics_output is not None else None
+        )
         runs = asyncio.run(
             _run_write_benchmark(
                 control_url=control_url,
@@ -561,6 +661,7 @@ def main() -> None:
                 concurrency=args.concurrency,
                 bootstrap_iterations=args.bootstrap_iterations,
                 seed=args.seed,
+                diagnostics=diagnostics,
             )
         )
         undo_flows = _measure_undo_flows(
@@ -586,6 +687,18 @@ def main() -> None:
             development_mode=args.dev,
         )
         write_json(args.output.resolve(), evidence)
+        if args.diagnostics_output is not None:
+            write_json(
+                args.diagnostics_output.resolve(),
+                {
+                    "schema": "xa-guard.identity-undo-diagnostics.v1",
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
+                    "profile": "development",
+                    "samples": diagnostics,
+                    "summary": summarize_diagnostics(diagnostics or []),
+                    "tokens_or_credentials_persisted": False,
+                },
+            )
     except (OSError, ValueError, KeyError, httpx.HTTPError, AcceptanceFailure) as exc:
         raise SystemExit(f"IDENTITY + UNDO PERFORMANCE FAILED: {exc}") from None
 

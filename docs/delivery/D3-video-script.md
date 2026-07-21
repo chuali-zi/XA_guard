@@ -13,7 +13,7 @@
 | 4:00–5:20 | 5. Dora 独立审批 | 退出 Alice，Dora 独立 Keycloak 登录；“待我审批”看到同租户 pending，查看 Effect 与理由后批准。 |
 | 5:20–6:40 | 6. Worker 重新过六关 | 展示内部签名授权摘要、Worker lease/heartbeat、补偿 `business_cancel_ticket` 再次进入 Governance + Gate1–6；工单恢复为 `cancelled`。 |
 | 6:40–8:10 | 7. 审计证据 | 控制台时间轨并列原动作 trace、审批身份、补偿 trace、业务前后态、assignment 版本、Gate6/Effect 两条 hash chain。补充 OAR canonical N=3：Null 3/3 泄漏、XA-Guard 3/3 拦截。 |
-| 8:10–9:30 | 8. 部署与边界 | 展示 `python scripts/reference_stack.py up`、六服务健康状态、Helm 双副本架构。明确：不可逆动作只人工处置；至少一次 + 下游幂等；外部 IdP/KMS/PostgreSQL 与 kind 故障恢复仍需组织/HA 验收。 |
+| 8:10–9:30 | 8. 部署与边界 | 展示 `python scripts/reference_stack.py up`、六服务健康状态、Helm 双副本架构。明确：本地 kind 三节点升级/接管/NetworkPolicy/rollback 已通过；不可逆动作只人工处置；至少一次 + 下游幂等；组织级外部 IdP、托管 PostgreSQL、KMS/HSM、TLS、备份与容量仍需生产验收。 |
 
 9:30–10:00 预留片尾、字幕和命令/hash，不新增功能镜头。
 

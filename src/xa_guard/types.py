@@ -184,7 +184,8 @@ class GateContext:
     reversibility: str = "none"
     undo_status: str = ""
     compensates_effect_id: str = ""
-    operation_kind: str = "forward"
+    operation_kind: str = 'forward'
+    defer_gate6_until_effect: bool = False
 
     # 累积属性
     taint: TaintLabel = TaintLabel.PUBLIC

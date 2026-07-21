@@ -53,7 +53,7 @@ human sub -> Agent act.sub/azp -> tenant -> dynamic assignment ∩ YAML ceiling
 | 只有审计 | 可记录 human/Agent 字段 | 无 | 能回答发生了什么 | 已发生错误副作用无法进入受控恢复闭环 |
 | Identity + Undo | OIDC 双主体 + 实时 assignment | v2 合同 + 独立审批 + Worker | 原 trace、补偿 trace、Effect/Gate6 两条链 | 在可逆合同边界内同时实现事前授权、事中六关、事后恢复 |
 
-Reference Compose 已通过 Alice/Dora 的真实 PKCE + token exchange 协议链和工单 `open -> cancelled`；交互式浏览器录屏、故障注入全集、并发 p95 与 kind 多副本仍未完成，因此当前口径是 `CORE-IMPLEMENTED / REFERENCE-VALIDATION-IN-PROGRESS`，不是生产落地声明。
+Reference Compose 已通过真实 PKCE + token exchange、全故障 11/11、Worker 接管/retry/KEK 轮换；kind 多副本升级、接管、网络策略和回滚也已通过，并形成签名 evidence。正式 10 并发新增开销 p95 三轮为 352.548/486.272/248.346ms，未达到 ≤50ms；交互式浏览器录屏仍属人工待办。因此当前口径是 `CORE-IMPLEMENTED / KIND-HA-PASS / PERFORMANCE-LIMIT`，不是生产落地声明。
 
 ## 4. 关键技术一：复杂输入链路攻击识别
 

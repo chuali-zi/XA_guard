@@ -1,6 +1,6 @@
 {
   "schema_version": "xa-guard-evidence-index/v1",
-  "snapshot_utc": "2026-07-11T12:41:10Z",
+  "snapshot_utc": "2026-07-18T16:59:41Z",
   "delivery_authority": "docs/acceptance/DELIVERY-v2.md",
   "canonical": {
     "run_id": "oar-delivery-v2-20260711T123124Z-win-local",
@@ -36,7 +36,37 @@
       "tarball_sha256": "ed63536572244ba7a4788d289b71feada26e9c267326fe0776ed762d96e7571b"
     }
   ],
+  "local_release_verification": {
+    "date": "2026-07-18",
+    "status": "PASS",
+    "command": "python scripts/verify_release.py",
+    "pytest": {
+      "collected": 772,
+      "passed": 771,
+      "skipped": 1,
+      "skip_reason": "Windows directory symlinks are unavailable"
+    },
+    "checks": [
+      "clean isolated environment pip check",
+      "product Ruff",
+      "L3 static 11/11",
+      "Docker Compose config",
+      "Console 5/5 and build",
+      "Identity + Undo evidence verification"
+    ],
+    "runtime_summary": ".runtime/evidence/release-verification/summary.json",
+    "publish": false,
+    "reason": "local runtime result is not a clean final-commit provenance manifest"
+  },
   "supporting": [
+    {
+      "id": "agent-identity-undo-acceptance-2026-07-16",
+      "classification": "tier-b-current-partial",
+      "path": "docs/evidence/agent-identity-undo-acceptance-2026-07-16",
+      "manifest_sha256": "f6c1cc156f6593448c008f58a0f79f4e51d6817a6b160647cdaacb0ce4455c7c",
+      "verification": "SM2-with-SM3 PASS; Reference faults 11/11 PASS; Kind HA PASS; performance FAIL",
+      "signature_key_id": "87ca0b5c56dc9313"
+    },
     {
       "id": "r4-performance",
       "classification": "tier-c-current",
@@ -74,10 +104,17 @@
     "open-agent-range/.runtime except the canonical source directory",
     "enterprise-agent-range/reports"
   ],
+  "automatic_remaining": [
+    "Identity + Undo 10-concurrency incremental p95 and bootstrap upper <= 50 ms",
+    "Reseal Identity + Undo evidence after performance passes",
+    "D2 clean release commit and final release manifest"
+  ],
   "manual_remaining": [
     "D1 final PDF <=30 pages",
-    "D2 clean release commit and final hash manifest",
-    "D3 final video <=10 minutes",
-    "D4 approved and stamped registration form"
+    "D3 final video <=10 minutes"
+  ],
+  "manual_completed": [
+    "D4 approved and stamped registration form confirmed by project owner on 2026-07-18; private evidence remains outside Git",
+    "Alice/Dora/Admin independent browser acceptance passed on 2026-07-18; screenshots remain gitignored"
   ]
 }

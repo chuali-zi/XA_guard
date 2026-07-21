@@ -40,8 +40,11 @@ Bootstrap performs these operations:
    `host.docker.internal`, and writes `values.generated.yaml`;
 6. creates the three pre-existing Kubernetes Secrets expected by the chart.
 
-The generated values contain endpoint topology and the Docker host `/32`, not
-credentials. They are deliberately ignored by `deploy/kind/.gitignore`.
+The generated values contain endpoint topology, the selected Docker host
+`/32`, and any narrowly scoped external dependency network CIDR needed after
+Docker DNAT; they never contain credentials. CIDRs broader than IPv4 `/16` or
+IPv6 `/64` are rejected. Generated values are deliberately ignored by
+`deploy/kind/.gitignore`.
 
 Use `--host-cidr 172.18.0.1/32` when automatic host-gateway discovery is not
 appropriate. Port overrides must be supplied consistently to the runner.
@@ -79,8 +82,11 @@ non-mutating plan with:
 python deploy/kind/ha_runner.py accept --dry-run --allow-incomplete
 ```
 
-Evidence is written below the gitignored `deploy/kind/evidence/`. This repository
-does not claim HA-ready until a real run completes every required phase.
+Evidence is written below the gitignored `deploy/kind/evidence/`. The clean
+2026-07-16 run completed every required phase and is committed as
+`docs/evidence/agent-identity-undo-acceptance-2026-07-16/acceptance/ha-final-clean-20260716.json`.
+It proves this local Kind profile, not production HA: the external OIDC,
+PostgreSQL, and key provider were the reference Compose services.
 
 ## Cleanup
 

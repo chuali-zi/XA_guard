@@ -10,6 +10,7 @@ from xa_guard.config import GateConfig
 from xa_guard.gates.base import GateStage
 from xa_guard.gates.gate6_audit import Gate6Audit
 from xa_guard.types import Decision, GateContext, GateResult
+from xa_guard.control.timing import span
 
 
 class PostgresGate6Audit(Gate6Audit):
@@ -50,14 +51,22 @@ class PostgresGate6Audit(Gate6Audit):
             )
         started = time.perf_counter()
         record, signer, faithfulness = self.render_record(ctx)
-        persisted = await self.store.append_gate6_record(
-            tenant_id=ctx.tenant_id or "__system__",
-            trace_id=ctx.trace_id,
-            record=record,
-            hash_algo=self.hash_algo,
-            source_instance=self.source_instance,
-            signer=signer,
-        )
+        persistence_options: dict[str, Any] = {}
+        if (
+            ctx.defer_gate6_until_effect
+            and ctx.final_decision == Decision.REQUIRE_APPROVAL
+        ):
+            persistence_options['defer_for_effect'] = True
+        with span("xa-gate6-persist"):
+            persisted = await self.store.append_gate6_record(
+                tenant_id=ctx.tenant_id or "__system__",
+                trace_id=ctx.trace_id,
+                record=record,
+                hash_algo=self.hash_algo,
+                source_instance=self.source_instance,
+                signer=signer,
+                **persistence_options,
+            )
         appended = dict(persisted.get("record") or persisted)
         sequence = persisted.get("seq")
         result = self.result_for_appended(

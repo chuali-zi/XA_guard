@@ -1066,7 +1066,7 @@ def build_workbench_state(world_path: Path, findings_dir: Path, out_dir: Path) -
 
 def render_markdown_report(report: dict[str, Any]) -> str:
     lines = [
-        f"# Open Agent Range Report",
+        "# Open Agent Range Report",
         "",
         f"- Run: `{report['run_dir']}`",
         f"- Scenario: `{report.get('scenario_id', '')}`",

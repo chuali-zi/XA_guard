@@ -2,6 +2,11 @@
 
 ---
 
+## 2026-07-19 Claude(Opus4.8) 修复 timeline.js 决策字段名缺陷
+- 缺陷：inferDecision 只读 `rec.decision`/`gen_ai.decision`，未读服务端真实字段 `gen_ai.decision.final`，导致真实审计文件的 deny/require_approval 被静默错显为「允许」、拒绝计数=0（示例数据用旧字段名故未暴露）。
+- 修复：inferDecision 增加 `gen_ai.decision.final` 读取，向后兼容旧 `decision`/`gen_ai.decision`。
+- 验证：MCP 真实验收产出的 11 条审计（logs/mcp-acceptance）经浏览器实测正确渲染 5 deny + 待审批 + 允许、哈希链完整。证据见 docs/evidence/mcp-live-acceptance-2026-07-19/。
+
 ## 2026-05-25 agent-F 完成演示前端初版
 - 创建 index.html：banner + 左侧文件选择 + 统计条 + 时间线主区，纯 HTML5，无构建链
 - 创建 timeline.js：fetch ReadableStream 逐行解析 JSONL；File API 拖拽/选择；verifyChain() 比对 hash_prev

@@ -20,6 +20,7 @@ from xa_guard.control.oidc import OIDCError, bearer_principal
 from xa_guard.control.runtime import build_runtime
 from xa_guard.control.service import ServiceError
 from xa_guard.control.store import AuthorizationError, ConflictError, NotFoundError, StoreError
+from xa_guard.control.timing import request_enabled, request_timing, span
 
 
 def _trace(request: Request) -> str:
@@ -167,9 +168,19 @@ async def agents(request: Request) -> JSONResponse:
 
 
 async def create_ticket(request: Request) -> JSONResponse:
-    principal = await bearer_principal(request)
-    value = await request.app.state.runtime.service.create_ticket(principal, await _body(request))
-    return _json(request, value, 201)
+    enabled = request_enabled(request.headers.get("x-xa-diagnostics", ""))
+    with request_timing(enabled) as recorder:
+        with span("xa-auth"):
+            principal = await bearer_principal(request)
+        with span("xa-body"):
+            body = await _body(request)
+        with span("xa-service"):
+            value = await request.app.state.runtime.service.create_ticket(principal, body)
+        response = _json(request, value, 201)
+    if recorder is not None:
+        response.headers["Server-Timing"] = recorder.server_timing()
+        response.headers["X-XA-Diagnostics"] = "xa-guard.control.timing.v1"
+    return response
 
 
 async def effects(request: Request) -> JSONResponse:

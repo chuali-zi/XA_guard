@@ -1,3 +1,146 @@
+# 2026-07-21 01:27 PDT 并发性能、链尾一致性与回归收口（已提交候选，不冻结）
+
+- 本轮目标：优先解决 Identity + Undo 10 并发性能，补回归和故障测试；获授权启动 Docker、整理既有脏改动并提交；明确不做 release freeze。
+- 起点诊断：200 paired writes 的增量 p95 113.891ms、bootstrap upper 178.923ms。Server-Timing 显示 Effect chain wait p95 64.91ms、Gate6 wait p95 30.10ms，主要问题是同租户任务碎片化、两套 worker 竞争同一链锁和多次独立事务。
+
+## 本轮实际实现
+
+- 重构 AsyncEffectStore 同租户调度：prepared/completed Effect 统一微批；prepared Effect + pre-approval Gate6、final Effect + final Gate6 分别在单事务提交；prepared/final 再统一到同一个按租户 worker，final 优先，仅空闲边界聚合 2ms，已有 backlog 立即处理。
+- 新增 schema 007 xa_chain_tails：Effect/Gate6 两条链固定顺序 FOR UPDATE，以缓存 expected tail 做双链 CAS；缓存冲突有界重试一次。Worker、Undo、独立 Effect/Gate6 旧写入路径在同一事务更新链尾，解决 API 与 Worker 交错时的 stale tail 风险。
+- completion 更新改为批量 UNNEST UPDATE；Gate6 原子 CTE 的大记录输入从外层 JSON 数组改为有序列数组 unnest；授权从先取全量 assignment 再 Python 过滤，改为 PostgreSQL 实时匹配 tool/domain 并 LIMIT 1，不引入 TTL 缓存。
+- 新增 schema 008：Gate6 完整 JSONB 使用 PostgreSQL 内置 LZ4，保留 EXTENDED 存储；没有删除 faithfulness evidence、审计字段或降低 fsync/synchronous_commit。
+- ControlService 只在 Gate6 与 Effect 共用同一 PostgreSQL store 时启用原子 defer；其他 pipeline/fake store 保持兼容。GateContext 新增明确 defer 标志；PostgresGate6Audit 只对 require_approval pre-audit 暂存。
+- 性能脚本增加可选脱敏 Server-Timing sidecar；Undo 时间戳查询在有界轮询内容忍单次 Docker Compose exec 失败，持续失败仍按超时失败。Compose 增加 timing 和 commit-delay 显式开关，默认均关闭/为 0。
+- 新增 tests/unit/test_control_concurrency_regressions.py，覆盖并发 Effect 合批、CAS stale-cache 重试、双链固定顺序锁与推进、Gate6 有序 unnest、实时授权 SQL、schema 007 初始化和 schema 008 LZ4。
+
+## 明确撤回的实验
+
+- 撤回授权 singleflight：会把请求同步成惊群，500-pair p95 升到 68.605ms。
+- 撤回自适应 5 条/4ms 和 0.5ms 空闲窗口：分别导致 prepare p95 30.279ms、总体 p95 58.327ms。
+- 撤回 STORAGE MAIN：Gate6 主表页膨胀后 p95 54.552ms；最终保持 EXTENDED + LZ4。
+- 撤回 PostgreSQL wal_compression/wal_buffers Compose 调优：未降低正式第 2 轮尾延迟；fsync、synchronous_commit、full_page_writes 始终保持开启。
+- 撤回 prepared 34 列全量 unnest：asyncpg 参数绑定开销使 prepare p95 从约 22.17ms 升到 27.39ms；只保留 Gate6 5 列有序 unnest。
+- 没有修改既有测试断言或产品阈值来制造通过。
+
+## 性能与一致性结果
+
+- 200-pair 候选达到 p95/upper 43.530/45.076ms，3 次 Undo 为 0.23/0.96/0.65 秒。
+- 最终候选按三个正式 seed 分开跑 500 pairs 均通过：44.472/49.042ms、41.127/42.445ms、41.397/44.928ms。
+- 连续正式 3×500 仍不稳定。当前长期压测库维护后的最新正式结果为 p95 52.598/55.185/54.988ms、upper 54.528/58.092/56.402ms；10 次 Undo 全部通过，约 0.50–0.89 秒。不能标记 REFERENCE-READY。
+- Reference 数据库在本轮累计到约 7 万条 Effect/Gate6 事件；多轮检查均为 Effect gaps 0、Gate6 gaps 0、Effect/Gate6 tail mismatch 0。
+
+## 测试与环境
+
+- 相关回归：25 passed。
+- 全仓 pytest：778 collected / 773 passed / 5 skipped / 0 failed，耗时 274.5s。4 个 skip 因本机缺 Helm，1 个因 Windows directory-symlink capability。
+- Reference core fault suite：7/7 passed，耗时 221.1s；覆盖身份拒绝、伪造 header、assignment 立即撤销、跨租户隔离、PostgreSQL 中断、prepared 恢复和并发双审批单任务。
+- core fault 后所有 Reference 服务恢复健康，SQL 全链 gaps/tail mismatches 均为 0。
+- 本轮产品相关 Ruff 和新增测试 Ruff 通过。全仓 Ruff 仍有 19 个既有测试代码样式告警，未修改测试消除。
+- 全局 Python 仍有 letta-evals/anyio 环境冲突，未擅自改依赖。
+
+## 尚未完成与下一步
+
+- 性能已从约 114ms 降到阈值附近，但连续正式 3×500 尚未稳定全过；这是当前硬缺口。
+- 本轮只重跑 core fault；历史 long/keys/all 结论未被推翻，但性能最终通过后必须重跑 all。
+- 未重封存 Identity + Undo evidence，未生成 final release manifest，未做 release freeze。
+- 下一步应在干净、受控的 Reference 数据卷和低外部负载环境复跑正式三轮；若仍超线，继续以 prepared 事务和持续负载调度为唯一性能优化面。达标后再跑 all fault、重封存验签，最后等待负责人授权冻结。
+
+# 2026-07-20 22:33 PDT 仓库进度与发布环境复核
+
+- 按赛题 Delivery v2 口径读取并核对根 `status.md`、`log.md`、`docs/acceptance/DELIVERY-v2.md`、`docs/workplan/TODO.md`、提交清单、PRD 导航和当前 Git 状态；未修改产品代码或测试代码。
+- 本轮全仓 pytest 实跑：772 collected，766 passed、6 skipped、0 failed，耗时 286.8s。6 个 skip 为缺少 Helm 4 个、缺少本地 `xa-guard/sandbox:latest` 1 个、Windows directory symlink capability 1 个；不能把本轮写成 07-18 的 771 passed / 1 skip 完整发布环境复现。
+- 产品 Ruff PASS；L3 static 11/11 sections PASS；Console 5/5 tests 与 production build PASS；Identity + Undo evidence verifier PASS（14 artifacts、46 Effect、25 Gate6，SM2-with-SM3 key id `87ca0b5c56dc9313`）。验签首次因系统 TEMP 不在沙箱可写范围失败，改用仓库内 gitignored 临时目录后通过，证据包未改动。
+- 当前 Docker daemon 不可用，未运行 Reference Compose，也未复跑 Reference 故障、kind HA 或正式性能套件。`pip check` 失败：全局 `letta-evals 0.13.0` 要求 `anyio==4.10.0`，当前为 `anyio 4.14.1`；本轮未擅自修改全局依赖。
+- Git 核对：`main` 与 `origin/main` 同在 `342ea63`；32 个已跟踪改动条目、11 个未跟踪条目、无暂存改动，且无 merge/rebase/cherry-pick 冲突态。D2 clean freeze/final release manifest 未完成。
+- 已把 `status.md` 快照更新到 2026-07-20，统一口径增加 `RELEASE-ENV-DEGRADED`。核心功能、历史故障/HA/现场证据结论未被本轮推翻；正式 10 并发 p95/upper ≤50ms 仍是产品硬缺口。
+- 下一步：先恢复隔离发布环境（Docker、Helm、sandbox image、无 `letta-evals`/`anyio` 冲突）并重跑 `scripts/verify_release.py`；随后继续收敛 Identity + Undo 并发写路径，达标后重跑正式套件、重封存验签，最后 clean freeze 并生成 final manifest。D1 PDF 与 D3 视频仍按负责人要求暂缓。
+
+# 2026-07-19 Identity + Undo P0 持久化热路径续优化（仍未达标）
+
+- 完成 `complete_effect` 热路径 CAS：ControlService/Reconciler 传入已知 tool/reversibility，数据库以 tenant+tool+reversibility+prepared 原子校验；兼容直接 Store 调用的原查询路径仍保留。
+- Effect prepared/event 改为有序批量 INSERT；Gate6/Effect 继续按租户微批，连接池默认 min/max 调整为 1/20。新增 migration 006：VOLATILE PL/pgSQL 函数先取事务 advisory lock，再以函数内第二条查询读取最新链尾，减少客户端往返且保留跨副本新快照语义。
+- 发现并撤销一个错误方向：同一 SQL CTE 内“取锁+读链尾”会沿用等待前 statement snapshot，跨副本可能读到旧链尾；同时撤销 size-triggered flush、2.5ms complete window、Gate6 合并查询和 completion unnest UPDATE 等回退实验。
+- 验证：产品 Ruff 通过；11 个 control 单测文件 40 tests PASS；Reference DB migration version=6；真实并发请求和 10/10 Undo 均成功；全量 Effect/Gate6 租户链相邻 `prev_hash` 缺口均为 0。未修改测试代码。
+- 当前安全实现 200-pair 候选 p95/upper=51.102/52.239ms。累计约 28k Event/Gate6/ticket 行的 Reference volume 执行 VACUUM ANALYZE 后，3×500 候选仍为 p95 52.363/82.343/58.757ms、upper 54.321/87.416/66.237ms，状态 `failed`；不得标记 `REFERENCE-READY`。
+- 运行栈仍是 `docker cp` 注入候选源码，非重建可信镜像；外部依赖 hash mismatch 阻塞镜像重建。下一步应统一 prepare/complete Effect mutation queue，减少同一 Effect 链两套 flush task 的互相等待；达标后再重建镜像、跑正式套件并重封存。
+
+# 2026-07-19 仓库状态盘点（证据 / 测试 / 作品完整性，不含 D1/D3）
+
+- 按负责人要求只评估作品侧：证据、测试、完整性；文档 PDF 与演示视频暂不展开。
+- 结论口径维持 `CORE-IMPLEMENTED / KIND-HA-PASS / PERFORMANCE-LIMIT`，不是 `REFERENCE-READY`。
+- 已齐：B1–B5（OAR canonical 封存）、六关/MCP live 9 场景、全仓 pytest/static/release verifier、Reference 故障 11/11、kind HA、Identity+Undo SM2 验签包、三账号 Console 闭环、D4。
+- 唯一硬缺口：正式 10 并发写路径 p95/upper ≤50ms（封存三轮均失败）；连带缺口为性能达标后重封存 evidence，以及 dirty worktree 下的 D2 clean freeze/final release manifest。
+- 已同步重写 `status.md` 快照至 2026-07-19；本轮未改产品代码、未改测试、未宣称性能通过。
+
+# 2026-07-19 三账号 Console 业务闭环真实验收（Reference 整栈 + 浏览器桥）
+
+- 起真实 Reference 整栈（Docker：PostgreSQL/Keycloak/API/Worker/ticket API/Console-BFF，全 Healthy），浏览器桥经 Keycloak Auth Code+PKCE 三账号独立登录验收。
+- alice(acme-corp)：建票→Effect eff-23915cff（HIGH/COMPENSATABLE, available）；发起 Undo undo-bcde70…（201）；审批页 NO APPROVER ROLE → 不能自批。
+- dora(acme-corp, undo.approve)：独立会话 APPROVER VERIFIED，批准补偿（decision 200）。Worker 经 internal_authorization（非重放 alice JWT）重过 Governance+Gate1-6，调业务 API POST /tickets/TKT-E6C355E49649/cancel（200）完成补偿。
+- admin(governance.admin)：GOVERNANCE ADMIN，授权矩阵/Effect/审计仅同租户可见；eve 属 beta-corp，零跨租户泄露。证据面 CHAIN SEGMENT CONTINUOUS + 6 事件链。
+- DB 独立复核：xa_effects status=compensated 且 trace_id≠compensation_trace_id（true）；xa_undo_requests requester=alice≠approver=dora, status=completed。
+- 过程真实拦截：alice 首张工单描述含「密钥/token/撤销权限」触发词 → Control API 503(service_error)、业务 API 未收到 POST，即六关 fail-closed 拒绝；无触发词后 201。
+- 未改产品代码；证据+8 张 Console 截图并入 docs/evidence/mcp-live-acceptance-2026-07-19/。整栈仍运行，停用 reference_stack.py down。
+
+# 2026-07-19 向负责人确认产品本质口径（未改代码）
+
+- 负责人确认理解：是否在做 MCP、是否本质是控制系统、是否通过 MCP 控制各智能体。
+- 已按 README/PRD 澄清：主产品形态是 **MCP 安全代理（双面 proxy）**，不是“用 MCP 去编排/遥控智能体”。智能体客户端经 MCP 调工具；XA-Guard 夹在中间做治理预检、六关拦截、审批与审计，再透传到下游真实工具。
+- 另有独立 Control API / Console 的 Identity + Undo 治理路径，不替代 MCP 主形态，也不应说成“整套系统只靠 MCP 控制智能体”。
+- 本轮只答口径，未改实现、未改测试、未动交付阻塞项。
+
+# 2026-07-19 MCP 真实验收 + 子 agent 测试矩阵 + 前端审计字段名缺陷修复
+
+- MCP 安装/连接：`claude mcp add xa-guard`（smoke 配置）后 `claude mcp list` = ✔ Connected，证明 XA-Guard 作为 Claude Code MCP server 可装可连。
+- 真实 MCP 协议端到端：独立进程扮演 LLM 客户端经真实 MCP stdio JSON-RPC 驱动 9 场景（绿区放行 / 关卡1 shell / 关卡3 外发+角色越权 / AIBOM F / 关卡2 待审批 / 控制工具批准执行 / elicitation 批准+拒绝），六关决策全部符合预期；Gate6 审计 11 条经 verify_audit 独立复核 0 错误。harness/config/audit 在 gitignored logs/mcp-acceptance/。
+- 子 agent（2×sonnet 并行）：pytest integration 46 passed / unit+smoke+approval 661 passed 1 skip / 3 演示场景全拦截 / verify_l3_static 11 sections / 工具→关卡覆盖矩阵零漂移；综合 CLEAN。
+- 改代码：修复 `frontend/timeline.js` inferDecision 未读 `gen_ai.decision.final`（真实审计 deny 被错显为允许、拒绝计数=0）；向后兼容旧字段。浏览器实测修复后正确显示 5 deny + 待审批 + 允许、哈希链完整。
+- 证据：docs/evidence/mcp-live-acceptance-2026-07-19/（README + json + 2 张时间线截图）。范围限规则链路/mock 下游/本机单进程，未跑三账号 Console 整栈与真实模型。
+
+# 2026-07-18 负责人人工手测实验教学启动（未改代码）
+
+- 按负责人要求：不修改仓库代码，只逐步指导完成 Codex 留下的人工验收阻塞项（三账号 UI + D1/D3/D4 确认）。
+- 已确认本机 `http://localhost:13080` 返回 HTTP 200；凭据文件存在于 gitignored `.runtime/reference/credentials.json`（alice / dora / governance_admin），本日志不复制密码。
+- 实验目标对齐：Alice 建票+发起 Undo+不能自批；Dora 独立会话批准；审计原/补偿 trace 不同且双链完整；Admin 只读无跨租户泄露；另确认 D4/D1/D3。
+- 进度更新：三账号 UI 业务手测完成——Alice/Dora/Admin 均为 PASS（Admin=`admin@acme-corp`，GOVERNANCE ADMIN，assignment/身份/审计只读可见同租户 Effect，未见跨租户数据）。已知 UI 缺陷：建票曾误传 `record_id`（已修）、证据页 `CHAIN GAP` 误报（未修）。截图根目录 `.runtime/evidence/manual-ui-acceptance-2026-07-18/`。剩余人工项仅 D1 PDF≤30页、D3 视频≤10分钟、D4 报名审核/盖章；这些未在本会话完成前，交付仍直接阻塞。
+
+# 2026-07-18 三账号人工验收回填、Console 误报修正与 D4 完成确认
+
+- 项目负责人回填 Alice/Dora/Admin 三个独立浏览器会话手测结果为 PASS。Alice 看到 `general-office-agent / ACTIVE`，创建 Effect `eff-982da84e830742e59974b512959db408` 与工单 `TKT-442AF1D5B51B`，发起 Undo 后不能自批；Dora 独立批准 `undo-70d582b89c1e456bbbb88d4e694f4912`，Effect 最终 `COMPENSATED`、retry 0；governance_admin 以 admin/acme-corp 独立登录完成只读核查，未见跨租户数据。截图留在 gitignored `.runtime/evidence/manual-ui-acceptance-2026-07-18/`。
+- 验收过程暴露 Console 把不受 Control API 接受的 `record_id` 传给建票接口并触发 409。保留负责人已有的最小白名单传参修复，并从表单状态/UI 移除无效“关联记录”字段，避免显示一个不会提交的输入。
+- 证据页原逻辑要求单 Effect 投影的首条 event 必须没有 `prev_hash`，但 Effect events 实际位于租户级 hash chain，首条可合法指向投影外前驱，因而误报 `CHAIN GAP`。改为只验证当前投影内相邻 event 链接，并明确显示 `CHAIN SEGMENT CONTINUOUS`，不冒充已在浏览器中验证整个租户链；正式 evidence verifier 仍负责全链验证。
+- Console 5/5 tests 与 production build 通过；重新构建并替换运行中的 Console 容器，健康检查和 HTTP 200 通过。三账号验收结束且 D3 暂缓后执行 `python scripts/reference_stack.py down`，停止并移除本轮容器/网络，保留 `xa-guard-reference_postgres-data` 与 `xa-guard-reference_reference-audit` volumes。未修改测试代码。
+- 项目负责人确认 D4 报名审核与盖章已完成，隐私材料不进入 Git，D4 更新为 `DONE`。D1 PDF 与 D3 视频按负责人要求暂缓并标记 `BLOCKED-MANUAL`；本轮不生成 PDF、不录制视频。
+- 同步 `status.md`、Delivery v2、Evidence Consolidation、TODO、submission checklist、Identity + Undo 架构与 evidence index。正式并发性能、达标后重封存、D2 clean freeze/final manifest 仍是自动阻塞，不因人工 UI/D4 完成而改写。
+
+# 2026-07-18 自动验收收束、并发热路径优化与仓库冲突核查
+
+- 按要求先完成可自动执行的工作，把浏览器、报名、PDF 和视频人工验收集中留到最后。本轮没有修改任何测试代码，也没有提交、推送或把 dirty worktree 冒充 release freeze。
+- 检查仓库内部冲突：`git ls-files -u` 为空，未发现 merge/rebase/cherry-pick 进行态或 Git 冲突标记。发现并修正文档口径冲突：证据总表残留 667/666 旧测试数字、提交清单把 OAR sealed provenance 与 D2 final release manifest 混为同一项、D3 仍写 kind 恢复未验收，以及 `frontend/` 与 `console/` 的权威 UI 边界不清。
+- 定位 Identity + Undo 10 并发延迟的主要局部原因：同租户链的 PostgreSQL advisory-lock 等待者先占满 asyncpg connection pool。为 Effect/Gate6 同链写入增加进程内异步预排队，再申请 connection/transaction/advisory lock；跨进程/跨副本仍由 PostgreSQL advisory lock 保证，未削弱事务、hash-chain 或持久化边界。
+- 开发探针中 incremental p95 从 403.604ms 降至 206.557ms；容器内 append Gate6 p95 降至 39.685ms，但完整同步链仍明显超过 50ms。2026-07-16 已封存的正式三轮 352.548/486.272/248.346ms 失败证据保持不变，没有用小样本覆盖正式结果；B6/B7 继续为 `PARTIAL`。
+- 新增 `scripts/verify_release.py`：缺少时引导安装锁定 Helm、构建 sandbox image，检查 `pip check`、产品 Ruff、全仓 pytest、L3 static、Compose config、Console test/build 与 Identity + Undo 签名 evidence；除 Windows directory-symlink capability 外不接受 skip。新增 `scripts/build_release_manifest.py`：只允许 clean worktree，绑定 commit/branch 并计算所有 tracked files SHA-256；当前 dirty 状态下按设计拒绝生成 final manifest。
+- 在 `D:\tmp\xa-guard-release-venv-20260718` 干净隔离环境执行统一 verifier，结果 PASS：772 collected / 771 passed / 1 个允许的 Windows symlink skip，0 fail/error；产品 Ruff、L3 static 11/11、Compose、Console 5/5/build、签名 evidence verifier 和 `pip check` 均通过。全局 Python 环境另有非本仓库 `letta-evals` 对 anyio 的版本冲突，因此发布结论只采用隔离环境结果。
+- 统一 verifier 之后又执行真实 Reference E2E，Authorization Code + PKCE、token exchange、Alice/Dora 独立审批、Undo 幂等、Worker 补偿、不同 trace 和不持久化 token 全部通过。定向 L3 verifier 测试首次因系统 Temp 被 Windows 沙箱拒绝；改用新建 `D:\tmp\xa-guard-pytest-final-20260718-1502` 后 5/5 通过，属于环境权限差异而非测试失败。
+- 机械清理两个非测试 Ruff 告警：Enterprise Agent Range 未使用 import、OAR 无意义 f-string。更新 static verifier，使旧 L3 的 runtime-required 项明确标为 former-L3 engineering reference 且非 Delivery v2 blocker。同步 README、Delivery v2、Evidence Consolidation、架构、D3、submission checklist、TODO、证据索引与 `status.md`。
+- 当前仍未完成的自动项：正式并发 p95/upper ≤50ms；达标后的正式重跑、证据重封存；clean final commit 与 D2 release manifest。当前 Reference Compose 六个服务保持健康并仅绑定 localhost，专门留给负责人立即手测；凭据仍只在 gitignored `.runtime/reference/credentials.json`，未打印或提交。
+- 最终人工阻塞项：Alice/Dora/Admin 三独立会话 UI 全链路，D4 审核通过与盖章，D1 ≤30 页 PDF，D3 ≤10 分钟视频。收到负责人手测结果前不标记这些事项完成，也不标记 `REFERENCE-READY`。
+
+# 2026-07-16 Worker 接管、KEK 轮换、并发性能与 kind HA 验收收敛
+
+- 按要求跳过必须由负责人手动完成的三账号浏览器 UI/录屏、D1 PDF、D3 视频和 D4 报名；本轮只收敛可自动执行的 Worker 接管、密钥轮换、并发性能、kind HA、证据封存和回归。
+- 从干净 Reference volume 执行全故障 suite。首次暴露 Worker 把下游 retryable 429/503/timeout 包装为不可重试 Pipeline DENY；修正 `src/xa_guard/control/worker.py`，在保留六关审计的同时把类型化 `BusinessError` 传回重试状态机。最终 `reference-faults-all-clean.json` 为 11/11 PASS，未修改测试。
+- Worker 被杀接管实测 102.719s，持有 lease 的 Worker 被杀后由第二个 Worker 完成，2 个不同 actor，业务有效取消仅 1 次。retry 实测三次调度约 5.057/30.141/120.454s，最终补偿成功且有效取消仅 1 次。
+- KEK 演练先用错误 key 使任务 fail closed 到 `compensation_failed`，随后 admin retry 恢复；加入 `reference-kek-v2` 后在线 rewrap 7 条记录，旧 v1 记录仍可解密并补偿。未提交任何 KEK、token 或私钥。
+- 执行正式 `reference-acceptance` 性能套件：10 并发、每轮 30 warmup + 500 paired writes、3 轮、5000 次 bootstrap。三轮 incremental p95 为 352.548/486.272/248.346ms，bootstrap upper 为 369.115/494.184/261.184ms，均未达到 ≤50ms；报告保持 `failed`。Undo 批准到业务取消 10/10 通过，46.935–916.320ms，平均 538.779ms。另做 4 Worker 非正式 probe 后仍未达标，因此没有牺牲 Gate6 一致性来伪造性能通过。
+- 用基线 commit `94041f6` 构建 N-1 镜像并从干净 kind cluster/HA volume 执行真实 HA runner。过程中真实发现并修正 Docker Desktop host gateway 与 Pod CIDR 重叠、外部 key-provider DNAT CIDR、Helm API rolling-update 死锁、Helm wait 未保证精确副本、migration rerun namespace 等问题；修改 `generate_values.py`、`ha_runner.py` 和 API Deployment rollout 策略。
+- 最终 `ha-final-clean-20260716.json` 的 bootstrap、N-1 install、N upgrade、migration rerun、API Pod deletion、prepared Effect takeover、Worker lease takeover、NetworkPolicy probes 和 Helm rollback 全部 PASS，共记录 116 条命令。验收后已停止临时绑定 `0.0.0.0` 的外部 reference 服务并删除 kind cluster；HA 数据 volume 保留。该结果只证明本地 kind profile，不宣称生产 HA。
+- 收集脱敏 Identity + Undo evidence 并用 SM2-with-SM3 封存。独立 verifier 通过：14 artifacts、46 Effect records、25 Gate6 records，key id `87ca0b5c56dc9313`；manifest SHA-256 为 `f6c1cc156f6593448c008f58a0f79f4e51d6817a6b160647cdaacb0ce4455c7c`。签名包原样包含性能失败报告，未把完整性 PASS 改写为性能 PASS。
+- 最终交付前停止了本轮启动的 Reference Compose 容器并确认无同名运行容器；PostgreSQL 与 audit volumes 保留。kind cluster 同样已删除，没有遗留验收服务。
+- 最终回归：全仓 pytest 收集 772 项，首轮 767 passed/5 skipped/0 failed；显式加入仓内 Helm 路径后 deployment 10/10 通过，剩余 1 个 Windows symlink capability skip，等价覆盖 771 passed/1 skip。L3 static 11/11、Console 5 tests/build/audit、Helm strict lint、本轮改动文件 Ruff 通过。全仓 Ruff 仍有 22 个既存告警，主要位于测试和两个 range 子项目；遵守约束未修改测试。一次 `py_compile` 因 Windows sandbox 无法写 `__pycache__`，不作为代码失败。
+- 已更新 `status.md`、README、架构、Delivery v2、TODO、证据索引和证据说明。当前真实状态是 `CORE-IMPLEMENTED / KIND-HA-PASS / PERFORMANCE-LIMIT`，不是 `REFERENCE-READY`。
+- 尚未完成的自动任务：优化同步 tenant Gate6 hash-chain 等并发热路径，使三轮 p95/upper 均 ≤50ms；达标后重跑并重封存 evidence；最后完成 D2 clean release freeze 与 artifact hash。人工事项按本轮要求跳过。
+
 # 2026-07-15 Identity/Undo 分支 fast-forward 合并并推送 main
 
 - 项目负责人明确授权直接合并和推送。提交前确认工作树干净、`origin/main` 是 `feat/identity-undo-reference` 的祖先，分支为 0 behind / 2 ahead，无分叉、无同名远端分支或 PR。
