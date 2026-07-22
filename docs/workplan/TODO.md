@@ -22,7 +22,7 @@
 | ID | 任务 | 状态 | 下一步 |
 |---|---|---|---|
 | A1 | D1 PDF ≤30 页 | `DONE` | 14 页 PDF 已生成并完成渲染抽检 |
-| A2 | D2 代码 + README/部署 | `DONE-LOCAL` | 最终 evidence 与 unified verifier 通过；本地冻结提交和 manifest 本次完成 |
+| A2 | D2 代码 + README/部署 | `DONE-REMOTE` | 最终 evidence、unified verifier、冻结提交和 manifest 完成并同步 `origin/main` |
 | A3 | D3 视频 ≤10 分钟 | `MANUAL-PENDING` | 指南与字幕完成；负责人按黄金路径录制 |
 | A4 | D4 报名表审核通过 | `DONE` | 2026-07-18 负责人确认；隐私证据在仓库外 |
 

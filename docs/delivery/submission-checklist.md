@@ -9,7 +9,7 @@
 | 交付物 | 状态 | 文件/链接 | 负责人确认 |
 |---|---|---|---|
 | D1 技术方案 PDF，不超过 30 页 | `DONE` | `output/pdf/XA-Guard-XA-202620-technical-report.pdf`（14 页） | [x] |
-| D2 原型代码仓库链接 | `DONE-LOCAL` | 本地冻结提交与 manifest；远端链接仍需负责人 push/确认 | [ ] |
+| D2 原型代码仓库链接 | `DONE-REMOTE` | `https://github.com/chuali-zi/XA_guard`，冻结提交与 manifest 已同步 | [x] |
 | D3 演示视频，不超过 10 分钟 | `MANUAL-PENDING` | 逐镜指南与字幕模板完成；待负责人录制/导出 | [ ] |
 | D4 审核通过报名表 | `DONE` | 2026-07-18 负责人确认；隐私材料在仓库外 | [x] |
 
