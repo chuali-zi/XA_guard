@@ -1,0 +1,1 @@
+{"agent_id":"general-office-agent","assignment":{"agent_id":"general-office-agent","assignment_id":"asg-a7e9e82957c0462682cc537590174d31","data_domains":["engineering_docs"],"subject_id":"engineering-team","subject_type":"group","tools":["business_submit_ticket"],"version":1},"principal_sub":"10000000-0000-0000-0000-000000000001","tenant_id":"acme-corp"}

@@ -17,3 +17,6 @@ bench/cases/csab-gov-v1-candidate/THIRD_PARTY_LICENSE.XAGuardAuthoredRefusal.txt
 
 # R8 acceptance evidence is byte-bound by its artifact-hashes.json manifest.
 docs/acceptance/r8-aibom-external/evidence/l3-r8-aibom-20260707T105519Z/** -text
+
+# Final Identity + Undo evidence is byte-bound by its signed artifact manifest.
+docs/evidence/agent-identity-undo-final-2026-07-21/** -text

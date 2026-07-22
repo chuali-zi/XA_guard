@@ -13,7 +13,7 @@
 2. **产品闭环**：六关 demo、MCP e2e、Gate6 audit 与当前全仓测试。
 3. **工程附录**：R4 性能、R7 OPA、R8 AIBOM、R6 system runsc。
 4. **密码审计附录**：R9 本地 SM3/SM2/anchor 为 `LIMIT`，仅作 demo，不宣称第三方 TSA/HSM。
-5. **Identity + Undo**：最终候选 Reference 全故障 11/11、kind HA 与正式并发性能通过；最终 SM2-with-SM3 evidence 正在本次收口重封存。
+5. **Identity + Undo**：最终候选 Reference 全故障 11/11、kind HA 与正式并发性能通过；[最终 evidence](../evidence/agent-identity-undo-final-2026-07-21.md) 已以 SM2-with-SM3 封存并独立验签通过。
 6. **历史研究资产**：旧 L3、R2/R3、Enterprise Agent Range 和分散 `.runtime`，不进入比赛主结论。
 
 Identity + Undo 三账号浏览器业务闭环于 2026-07-18 由负责人手测 PASS；2026-07-21 最终候选全故障 11/11、kind HA 全阶段和正式性能通过。交付自动项只剩最终 evidence、unified verifier 与 clean manifest；D1 PDF 已完成，D3 指南/字幕完成但视频仍需负责人录制。
@@ -65,7 +65,7 @@ Identity + Undo 三账号浏览器业务闭环于 2026-07-18 由负责人手测 
 | B4 replay/audit | `DONE` | 7/7 attempt replay PASS；XA-Guard 侧 raw audit 逐序对齐 |
 | B5 一键证据链 | `DONE` | 标准 run + deterministic tar.gz + SHA-256 + git provenance 记录；提交/推送后形成远端信任锚 |
 | B6 可信 Agent Identity | `DONE` | 最终候选 Reference 全故障 11/11、kind HA、三账号 UI 与正式性能通过 |
-| B7 可验证 Undo | `DONE` | Worker 接管、retry、KEK、Undo latency 与正式写路径性能通过；最终 evidence 收口中 |
+| B7 可验证 Undo | `DONE` | Worker 接管、retry、KEK、Undo latency 与正式写路径性能通过；最终 14-artifact evidence 独立验签通过 |
 
 ## 5. Tier C 与支撑证据
 

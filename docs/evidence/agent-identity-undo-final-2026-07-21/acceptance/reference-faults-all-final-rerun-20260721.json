@@ -1,0 +1,181 @@
+{
+  "cases": [
+    {
+      "details": {
+        "business_create_attempt_delta": 0,
+        "effect_delta": 0,
+        "probe_statuses": {
+          "bad_signature": 401,
+          "forged_azp": 401,
+          "forged_sub": 401,
+          "forged_tenant": 401,
+          "malformed": 401,
+          "unauthenticated": 401,
+          "wrong_audience": 401
+        }
+      },
+      "duration_seconds": 13.828,
+      "name": "identity_rejections_before_execution",
+      "status": "passed"
+    },
+    {
+      "details": {
+        "signed_identity": {
+          "agent_id": "general-office-agent",
+          "subject": "10000000-0000-0000-0000-000000000001",
+          "tenant_id": "acme-corp"
+        },
+        "spoof_headers_ignored": true
+      },
+      "duration_seconds": 6.75,
+      "name": "signed_identity_ignores_spoof_headers",
+      "status": "passed"
+    },
+    {
+      "details": {
+        "business_create_attempt_delta": 0,
+        "denied_status": 403,
+        "effect_delta": 0,
+        "restored_assignment_version": 1
+      },
+      "duration_seconds": 27.266,
+      "name": "assignment_revocation_is_immediate",
+      "status": "passed"
+    },
+    {
+      "details": {
+        "beta_effect_count": 0,
+        "foreign_effect_detail_status": 404,
+        "foreign_request_absent": true
+      },
+      "duration_seconds": 22.359,
+      "name": "cross_tenant_effect_and_queue_isolation",
+      "status": "passed"
+    },
+    {
+      "details": {
+        "business_create_attempt_delta": 0,
+        "effect_delta": 0,
+        "recovered": true,
+        "write_result": 500
+      },
+      "duration_seconds": 22.969,
+      "name": "postgresql_unavailable_calls_no_business",
+      "status": "passed"
+    },
+    {
+      "details": {
+        "business_create_attempt_delta": 1,
+        "effect_id": "eff-dd7f20eb3bfc4237aeefdbbd0b36a0a4",
+        "final_status": "available",
+        "initial_status": "prepared",
+        "ticket_count": 1
+      },
+      "duration_seconds": 72.766,
+      "name": "prepared_effect_reconciles_after_api_crash",
+      "status": "passed"
+    },
+    {
+      "details": {
+        "final_status": "compensated",
+        "http_statuses": [
+          200,
+          409
+        ],
+        "logical_request_rows": 1,
+        "undo_approved_events": 1
+      },
+      "duration_seconds": 17.094,
+      "name": "concurrent_double_approval_is_one_task",
+      "status": "passed"
+    },
+    {
+      "details": {
+        "distinct_worker_actors": 2,
+        "effect_id": "eff-14c5732ae3e744999ae58cd4288c8588",
+        "effective_cancel_delta": 1,
+        "final_status": "compensated",
+        "killed_lease_holder": "71942e807ec5"
+      },
+      "duration_seconds": 84.859,
+      "name": "killed_worker_lease_is_taken_over",
+      "status": "passed"
+    },
+    {
+      "details": {
+        "effect_id": "eff-e0304a2eabe14c7791b9f87e8362e68f",
+        "effective_cancel_delta": 1,
+        "final_status": "compensated",
+        "retry_count": 3,
+        "schedule": {
+          "observations": [
+            {
+              "expected_seconds": 5.0,
+              "observed_seconds": 5.022,
+              "passed": true,
+              "retry": 1
+            },
+            {
+              "expected_seconds": 30.0,
+              "observed_seconds": 30.103,
+              "passed": true,
+              "retry": 2
+            },
+            {
+              "expected_seconds": 120.0,
+              "observed_seconds": 120.379,
+              "passed": true,
+              "retry": 3
+            }
+          ],
+          "passed": true
+        }
+      },
+      "duration_seconds": 190.0,
+      "name": "retry_schedule_5_30_120_is_effective_once",
+      "status": "passed"
+    },
+    {
+      "details": {
+        "admin_retry_authorized": true,
+        "effect_id": "eff-d46edbbd43a647319238daabecc16ef8",
+        "final_status": "compensated",
+        "record_key_id": "reference-kek-v3",
+        "wrong_key_status": "compensation_failed"
+      },
+      "duration_seconds": 27.547,
+      "name": "wrong_kek_fails_then_admin_retry_recovers",
+      "status": "passed"
+    },
+    {
+      "details": {
+        "effect_id": "eff-4dec20b128244c498187bbd1a83a3c9f",
+        "new_key_id": "reference-kek-v4",
+        "old_created_record_final_status": "compensated",
+        "old_key_id": "reference-kek-v3",
+        "old_key_preserved": true,
+        "record_key_id_after_rewrap": "reference-kek-v4",
+        "rewrapped_records": 16
+      },
+      "duration_seconds": 34.625,
+      "name": "kek_rotation_rewrap_preserves_old_record",
+      "status": "passed"
+    }
+  ],
+  "checks": {
+    "all_cases_passed": true
+  },
+  "destructive_reset_explicitly_requested": false,
+  "generated_at": "2026-07-22T04:12:22.585243+00:00",
+  "methodology": {
+    "database_observation": "fixed, identifier-validated PostgreSQL queries",
+    "fault_control": "one-shot files inside reference containers",
+    "raw_tokens_persisted": false,
+    "secrets_persisted": false,
+    "worker_semantics": "at-least-once with downstream idempotency"
+  },
+  "schema": "xa-guard.reference-fault-acceptance.v1",
+  "stack_prepared_by_runner": false,
+  "status": "passed",
+  "suite": "all"
+}

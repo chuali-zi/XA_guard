@@ -43,14 +43,13 @@ D1 技术方案已生成 14 页 PDF并完成渲染抽检；D3 逐镜录制指南
 | Undo / Worker | REFERENCE-PASS | 至少一次调度 + 下游幂等，不宣称绝对 exactly-once |
 | Console/BFF | BUILT / MANUAL-QA-PASS | 三账号职责分离闭环已由负责人手测 |
 | Helm / kind | LOCAL-PROFILE-PASS | 只证明本机三节点 profile，不是生产多地域 HA |
-| Evidence | RESEALING | 历史包有效；最终候选的新包尚待本次收口完成 |
+| Evidence | SEALED / VERIFIED | 最终候选 14 artifacts、102 Effect、59 Gate6；SM2-with-SM3 key id `87ca0b5c56dc9313` 独立验签通过 |
 
 ## 剩余事项
 
-1. 采集最终 Identity + Undo evidence，使用仓库外私钥封存并按固定 key id 独立验签。
-2. 在 clean release candidate 上运行 `scripts/verify_release.py`，不修改测试处理任何失败。
-3. 完成本地冻结提交，并在干净工作树生成 final release manifest；不打 tag、不 push。
-4. 负责人按 D3 指南录制、剪辑并复核不超过 10 分钟的视频，随后人工核对 D1–D4 附件并提交。
+1. 在 clean release candidate 上运行 `scripts/verify_release.py`，不修改测试处理任何失败。
+2. 完成本地冻结提交，并在干净工作树生成 final release manifest；不打 tag、不 push。
+3. 负责人按 D3 指南录制、剪辑并复核不超过 10 分钟的视频，随后人工核对 D1–D4 附件并提交。
 
 ## 声明边界
 
