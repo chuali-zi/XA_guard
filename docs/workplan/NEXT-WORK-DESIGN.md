@@ -1,6 +1,6 @@
 # 下一步工作设计
 
-> 快照：**2026-07-18**（对齐 [DELIVERY-v2](../acceptance/DELIVERY-v2.md)）
+> 快照：**2026-07-21**（对齐 [DELIVERY-v2](../acceptance/DELIVERY-v2.md)）
 > 目标：把「接下来做什么」固定为可执行顺序，不与 PRD、TODO、status 打架。
 > 状态标签：`DONE` / `PARTIAL` / `TODO` / `BLOCKED-MANUAL` / `RETIRED` / `REFERENCE`
 > **比赛交付权威口径**：[DELIVERY-v2](../acceptance/DELIVERY-v2.md) · 仓库状态：[status.md](../../status.md)
@@ -11,7 +11,7 @@
 
 当前只能谨慎写成：
 
-> **Delivery v2**：D4 与三账号 UI 已完成；D1/D3 按负责人要求暂缓；D2 与 B6/B7 因正式 Identity + Undo 性能和 clean release freeze 保持 `PARTIAL`；B1–B5 `DONE`。
+> **Delivery v2**：D1 PDF、D4、B1–B7 已完成；D3 指南与字幕已完成但视频仍需负责人手工录制；D2 正在完成 evidence、统一复验和本地冻结。
 
 **不再使用**「L3 最终验收 BLOCKED」作为项目主叙事。工程 L3 清单见 [L3-test-and-acceptance.md](../acceptance/L3-test-and-acceptance.md)（已弃用为比赛承诺）。
 
@@ -19,9 +19,9 @@
 
 | 交付物 | 状态 | 下一步 |
 |---|---|---|
-| D1 技术方案 PDF | `BLOCKED-MANUAL` | 负责人要求暂缓；恢复后从 [D1 草稿](../delivery/D1-technical-report-draft.md) 导出 |
+| D1 技术方案 PDF | `DONE` | 14 页 PDF 已生成并完成渲染抽检 |
 | D2 原型代码/仓库 | `PARTIAL` | clean main、复现命令、artifact hash |
-| D3 演示视频 | `BLOCKED-MANUAL` | 负责人要求暂缓；恢复后按 [D3 脚本](../delivery/D3-video-script.md) 录制 |
+| D3 演示视频 | `MANUAL-PENDING` | [逐镜指南](../delivery/D3-video-script.md)与字幕模板完成；负责人后续录制 |
 | D4 审核通过报名表 | `DONE` | 2026-07-18 负责人确认；隐私证据在仓库外 |
 | 可选补充材料 | `PARTIAL` | [提交清单](../delivery/submission-checklist.md) |
 
@@ -46,10 +46,10 @@
 
 ## 5. P0 执行顺序
 
-1. 收敛 Identity + Undo 正式 10 并发 p95/upper ≤50ms，不削弱审计一致性。
-2. 达标后重跑、重封存并独立验证 Identity + Undo evidence。
-3. clean release commit 上重跑 unified verifier，生成 D2 final release manifest。
-4. D1/D3 保持 `BLOCKED-MANUAL`，仅在负责人恢复后推进。
+1. 重封存并独立验证最终 Identity + Undo evidence。
+2. 在 clean release candidate 上重跑 unified verifier。
+3. 完成本地冻结提交并生成 D2 final release manifest。
+4. 负责人按现成 D3 指南录制不超过 10 分钟的视频。
 
 ## 6. P1 / P2（可选，不欠账）
 

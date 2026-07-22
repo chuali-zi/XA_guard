@@ -1,3 +1,33 @@
+# 2026-07-21 23:10 PDT 工程收口：最终候选复验、D1/D3 与发布材料
+
+- 按负责人“停止改产品、实施收口计划”的要求执行，仅处理验证、交付物、证据和发布文档；未新增或修改产品功能，未修改测试、既有断言或性能阈值。
+- 在 `.runtime/evidence/release-venv` 建立隔离 Python 环境并安装项目锁定依赖，`pip check` PASS；全局 Python 的 `letta-evals 0.13.0` 与宿主 `anyio 4.14.1` 冲突保持为宿主边界，未改项目依赖制造通过。Console 执行 `npm ci`，161 packages，audit 0 vulnerabilities。
+- 经授权只重置 XA-Guard Reference Compose 自有 PostgreSQL/audit volumes。首次 all fault 在 PostgreSQL 恢复后的首个 Keycloak 登录遇到一次 HTTP 400，报告保留；随后同序 core 独立复跑 7/7 PASS，完整 all 以独立 seed 复跑 11/11 PASS。覆盖身份/伪造/assignment/跨租户、PostgreSQL 中断、API crash reconcile、并发审批、Worker takeover、5/30/120 retry、错误 KEK 与 rewrap。
+- kind HA 首次因 Reference 占用 13081 失败；停 Reference 后第二次因当前 Docker Desktop 的 localhost bind 使 Pod 无法访问外部依赖而 Helm timeout。诊断验证后仅在测试期将 HA 外部依赖绑定 0.0.0.0，清理失败 cluster 并从头重跑，最终安装、升级、migration、API 删除、Effect/Worker 接管、NetworkPolicy 探针和 rollback 全阶段 PASS；测试集群和外部依赖随后已停止，Reference 恢复为 localhost-only。
+- 将 D1 从提纲扩展为完整技术报告，覆盖威胁模型、架构、双主体身份、intent-first Effect/Undo、赛题四方向、OAR、可量化结果、部署与限制；新增可重复 ReportLab 构建脚本，生成 14 页仓库安全版 PDF 与 SHA-256。渲染抽检封面、摘要、表格、架构图、结果页与尾页；发现表头文字不可见后修复构建样式，并启用 invariant 输出后连续两次构建 hash 一致，最终 SHA-256 为 `c35f4df8a407e873f9fa741dee28f4303f33a9bcaa2566c5806c76870789f3b5`。
+- 将 D3 短脚本扩展为 9:10–9:30 的逐镜手工录制指南，补齐启动/健康检查、固定证据、八镜头画面与口播、失败预案、脱敏检查、ffmpeg/ffprobe/hash 命令；新增 SRT 字幕模板。按负责人要求未生成或冒充 MP4。
+- 统一 README、Delivery v2、证据总表、架构、TODO、下一步设计、提交清单和 status 的性能/D1/D3 口径。当前尚未完成：最终 evidence 采集封存、unified verifier、本地冻结提交和 clean release manifest；这些将在本轮后续继续执行。
+
+# 2026-07-21 19:37 PDT 比赛功利主义阶段复盘（维护状态与日志）
+
+- 按用户提出的“剩余一个月应封存转 docs/答辩，还是再投入 20 天加功能”问题，核对赛题评分权重、事实源、Delivery v2、PRD、根状态、TODO、下一步设计、D1/D3 草稿、提交清单、README、近期提交和 Git 工作树；未修改产品代码或测试代码，未运行测试、故障套件或性能套件。
+- 客观发现：核心工程与四方向覆盖已经足以参赛，正式并发性能也已通过；但最终候选仍欠 all fault、证据重封存、隔离发布复验和 final manifest。D1 当前仅 142 行/约 695 词，D3 当前仅 36 行/约 239 词，均未形成最终交付物。
+- 发现活跃文档状态漂移：README、Delivery v2、TODO、NEXT-WORK-DESIGN、D1 等仍写旧的性能失败口径，与根 `status.md` 的 `PERFORMANCE-PASS` 冲突；本轮只把该风险记录进当前状态，没有擅自批量改写这些交付文档。
+- 功利主义建议：停止把净新增功能作为默认主线；先用 3–7 天完成最终候选验证、证据和口径收束，再把主要时间投入 D1、D3、原理复盘和模拟答辩。只允许修复收口/录制/答辩暴露的问题，或加入能直接填评分缺口、两天内产生对照证据且能被负责人独立解释的小增强。
+- 已更新 `status.md`：增加 `SUBMISSION-NOT-READY`、当前交付成熟度、材料与文档一致性风险，以及下一阶段完成定义。未执行 release freeze；D1/D3 的既有 `BLOCKED-MANUAL` 状态未擅自改为完成。
+
+# 2026-07-21 19:28 PDT 剩余一个月策略建议（只读）
+
+- 用户问：功能/性能是否已够，应封存转原理/docs/答辩，还是继续优化。
+- 对照 Delivery v2 Tier A/B/C 与当前 `status.md`：性能硬缺口已关；真正欠的是 all-fault 重封存、D2 freeze、以及负责人侧 D1 PDF / D3 视频。
+- 建议口径：停止以性能为主线的继续优化；先做一周工程收口（all fault → 证据重封 → 授权后 freeze），其后主线转 D1/D3/答辩叙事与原理梳理；仅对答辩会问到的演示毛刺做定点修补。未改代码。
+
+# 2026-07-21 19:27 PDT 进度查询（只读汇报）
+
+- 用户询问当前进度与剩余事项，并确认性能是否已基本完成。
+- 仅读取 `status.md` / `log.md` 与赛题交付口径，未改产品代码、未重跑测试、未冻结发布。
+- 结论口径与 status 一致：CORE-IMPLEMENTED / KIND-HA-PASS / PERFORMANCE-PASS / RELEASE-NOT-FROZEN；性能硬缺口已关闭，剩余为 all-fault 重跑、证据重封存、Helm/kind 复验与负责人授权后的 freeze；D1/D3 仍暂缓。
+
 # 2026-07-21 02:43 PDT 并发性能硬缺口关闭（已完整重建复验，仍不冻结）
 
 - 继续处理上一提交 08c38c8 后唯一硬缺口：Identity + Undo 连续正式 3×500 并发性能。开始时工作树干净；Docker 引擎可用但项目栈已停止，先以 --no-build 恢复后发现容器 store.py SHA-256 与宿主源码不一致，未使用旧镜像作结论，随后基于当前代码完整重建 Reference 镜像。
@@ -92,6 +122,12 @@
 - 验证：产品 Ruff 通过；11 个 control 单测文件 40 tests PASS；Reference DB migration version=6；真实并发请求和 10/10 Undo 均成功；全量 Effect/Gate6 租户链相邻 `prev_hash` 缺口均为 0。未修改测试代码。
 - 当前安全实现 200-pair 候选 p95/upper=51.102/52.239ms。累计约 28k Event/Gate6/ticket 行的 Reference volume 执行 VACUUM ANALYZE 后，3×500 候选仍为 p95 52.363/82.343/58.757ms、upper 54.321/87.416/66.237ms，状态 `failed`；不得标记 `REFERENCE-READY`。
 - 运行栈仍是 `docker cp` 注入候选源码，非重建可信镜像；外部依赖 hash mismatch 阻塞镜像重建。下一步应统一 prepare/complete Effect mutation queue，减少同一 Effect 链两套 flush task 的互相等待；达标后再重建镜像、跑正式套件并重封存。
+
+# 2026-07-21 推送本地 main 到 origin
+
+- 负责人要求推送。确认 `main` 相对 `origin/main` ahead 2，工作树无待提交跟踪改动。
+- 已执行 `git push origin HEAD`：`342ea63..2de70bf` → `origin/main` 成功。
+- 推送提交：`08c38c8 feat: consolidate identity undo acceptance and performance`、`2de70bf perf: stabilize identity undo concurrency`。本轮未新建 commit、未 force push。
 
 # 2026-07-19 仓库状态盘点（证据 / 测试 / 作品完整性，不含 D1/D3）
 

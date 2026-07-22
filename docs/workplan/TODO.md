@@ -1,6 +1,6 @@
 # XA-Guard 下一步 TODO 与交付收束计划
 
-> 快照时间：**2026-07-18**（Delivery v2 口径）
+> 快照时间：**2026-07-21**（Delivery v2 口径）
 > 权威交付规格：[../acceptance/DELIVERY-v2.md](../acceptance/DELIVERY-v2.md)
 > 仓库状态：[../../status.md](../../status.md)
 > 赛题依据：[../source-of-truth/事实源.md](../source-of-truth/事实源.md)
@@ -9,11 +9,11 @@
 
 **活跃口径是 Delivery v2**，不是 L3 最终 BLOCKED 叙事。
 
-- **Tier A（必交）**：D4 已完成；D1 PDF、D3 视频按负责人要求暂缓；D2 release 仍为自动收尾主线。
-- **Tier B（主证据）**：B1–B5 均 `DONE`；B6/B7 的全故障 11/11、kind HA、签名 evidence 与三账号 UI 已过，正式并发性能未达标。
+- **Tier A（必交）**：D1 PDF 与 D4 已完成；D3 录制指南和字幕已完成，最终视频由负责人手工录制；D2 release 正在封存。
+- **Tier B（主证据）**：B1–B7 均在竞赛原型声明边界内完成；最终候选全故障 11/11、kind HA 和正式并发性能通过。
 - **Tier C（加分）**：R4/R7/R8 已有证据；R2/R3、Trae 截图等为 **RETIRED** 硬承诺，仅背景实验。
 
-**下一步自动任务第一优先级**：继续优化或重新设计 Identity + Undo 并发写路径并重跑正式性能；达标后重新封存 evidence，再做 D2 clean release freeze/final hash。统一自动发布 verifier 已通过。D4 与三账号 UI 已完成；D1、D3 标记 `BLOCKED-MANUAL`，在负责人恢复前不推进。
+**下一步自动任务第一优先级**：重新封存最终 evidence，执行 unified verifier，生成 clean release manifest 并完成本地冻结提交；不再新增产品功能。D3 视频录制、报名系统附件检查和最终提交仍为人工事项。
 
 ---
 
@@ -21,9 +21,9 @@
 
 | ID | 任务 | 状态 | 下一步 |
 |---|---|---|---|
-| A1 | D1 PDF ≤30 页 | `BLOCKED-MANUAL` | 负责人要求暂缓；恢复后从草稿导出并复核 |
-| A2 | D2 代码 + README/部署 | `PARTIAL` | 性能收敛后 release freeze、final verifier、release manifest |
-| A3 | D3 视频 ≤10 分钟 | `BLOCKED-MANUAL` | 负责人要求暂缓；恢复后按 D3 脚本录制 |
+| A1 | D1 PDF ≤30 页 | `DONE` | 14 页 PDF 已生成并完成渲染抽检 |
+| A2 | D2 代码 + README/部署 | `CLOSING` | 最终 evidence、unified verifier、local freeze、release manifest |
+| A3 | D3 视频 ≤10 分钟 | `MANUAL-PENDING` | 指南与字幕完成；负责人按黄金路径录制 |
 | A4 | D4 报名表审核通过 | `DONE` | 2026-07-18 负责人确认；隐私证据在仓库外 |
 
 ### A4 报名（人工）
@@ -38,7 +38,7 @@
 - [x] `python scripts/verify_l3_static.py --section all`（11/11）
 - [x] Reference health + PKCE/Undo e2e + full fault 11/11
 - [x] kind 三节点 HA 全阶段 + SM2-with-SM3 evidence verifier
-- [ ] 正式 10 并发性能（当前 3/3 失败；Undo latency 10/10 通过）
+- [x] 正式 10 并发性能（完整重建组三轮 p95/upper 均 ≤50ms；Undo latency 10/10 通过）
 - [ ] final release manifest（仅 clean final commit 上运行 `scripts/build_release_manifest.py`）
 - [x] README 已增加统一 verifier 与 release manifest 命令；提交前仍需与最终 D1 数字复核
 
@@ -53,8 +53,8 @@
 | B3 | Null vs XA-Guard live A/B | `DONE` | D3 展示 `protection_delta` |
 | B4 | Ledger replay + audit 对齐 | `DONE` | D1 附 replay JSON 摘要 |
 | B5 | 一键 canonical 证据链 | `DONE` | `oar-delivery-v2-20260711T123124Z-win-local` 已封存并锚定 |
-| B6 | 可信 Agent Identity | `PARTIAL` | 自动故障、HA、evidence、三账号 UI 已过；待性能达标 |
-| B7 | 可验证 Undo | `PARTIAL` | Worker 接管、retry、KEK、Undo 时延已过；写路径性能未达标 |
+| B6 | 可信 Agent Identity | `DONE` | 自动故障、HA、三账号 UI 和正式性能通过 |
+| B7 | 可验证 Undo | `DONE` | Worker 接管、retry、KEK、Undo 时延与写路径性能通过 |
 
 ### B6/B7 最新验收
 
@@ -65,8 +65,8 @@
 - [x] kind 三节点升级、API/Worker 接管、migration、NetworkPolicy、rollback。
 - [x] SM2-with-SM3 封存与独立 verifier。
 - [x] Alice/Dora/Admin 三独立会话手测；建票、职责分离、独立批准、补偿和审计内容 PASS。
-- [x] 同链进程内预排队减少 connection-pool starvation；开发探针 incremental p95 403.604ms → 206.557ms，未冒充正式通过。
-- [ ] 正式 10 并发 incremental p95/upper ≤50ms；当前三轮 p95 352.548/486.272/248.346ms。
+- [x] 同链批处理、紧凑 JSON 和 final/prepared 混合单事务完成，保留 intent-first 与双链原子语义。
+- [x] 正式 10 并发 incremental p95/upper ≤50ms；完整重建组三轮为 45.109/46.984、42.141/43.120、43.934/45.528ms。
 
 ### B5 封存结果
 
@@ -121,14 +121,14 @@
 
 ### 第 0 步（自动，当前）
 
-1. 收敛 Identity + Undo 正式并发性能
-2. 性能通过后重跑、重封存、独立验签
-3. clean release commit 上重跑统一 verifier 并生成 final release manifest
+1. 重封存并独立验签最终 Identity + Undo evidence
+2. clean release candidate 上重跑统一 verifier
+3. 完成本地冻结提交并生成 final release manifest
 
 ### 第 1 步（暂缓的人工交付）
 
-1. D1 PDF 导出并人工复核 ≤30 页（`BLOCKED-MANUAL`）
-2. D3 录制、剪辑并人工复核 ≤10 分钟（`BLOCKED-MANUAL`）
+1. D1 PDF 已导出并复核为 14 页
+2. D3 按逐镜指南录制、剪辑并人工复核 ≤10 分钟（`MANUAL-PENDING`）
 
 ### 第 2 步（提交）
 

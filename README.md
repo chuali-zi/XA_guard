@@ -4,7 +4,7 @@
 > 题目：**面向政企场景的大模型智能体安全关键技术研究**
 > 提交截止：**2026-09-15 24:00**
 >
-> ⚠ 当前统一口径为 **CORE-IMPLEMENTED / KIND-HA-PASS / PERFORMANCE-LIMIT**：Identity + Undo 故障套件 11/11、kind HA 和签名证据链均已通过，但正式 10 并发新增开销 p95 未达到 ≤50ms，因此仍不标记 REFERENCE-READY，也不外推为生产 HA。比赛交付口径见 [DELIVERY-v2](./docs/acceptance/DELIVERY-v2.md)，仓库状态见 [status.md](./status.md)。
+> 当前统一口径为 **CORE-IMPLEMENTED / KIND-HA-PASS / PERFORMANCE-PASS / RELEASE-CLOSING**：最终候选的 Reference 全故障 11/11、kind HA 和正式 10 并发三轮性能均已通过，正在执行最终证据重封存、统一发布复验和本地冻结提交；kind 结果不外推为生产 HA。比赛交付口径见 [DELIVERY-v2](./docs/acceptance/DELIVERY-v2.md)，仓库状态见 [status.md](./status.md)。
 
 ---
 
@@ -156,7 +156,7 @@ python scripts/verify_reference_e2e.py
 # http://localhost:13081
 ```
 
-凭据位于 `.runtime/reference/credentials.json`，密码、client secret、KEK 和内部签名 key 不进入仓库。Reference 仅绑定 localhost；远程环境必须使用 TLS。干净 volume 的历史全故障 suite 11/11 通过，包括 Worker kill/lease takeover、5/30/120 retry、错误 KEK 与 v1→v2 rewrap；kind 三节点升级/接管/NetworkPolicy/rollback 也已通过。2026-07-21 最终性能候选在 10 并发、30 warmup、连续 3×500 paired writes、5000 次 bootstrap 下完成两组独立正式通过；完整重建镜像组的 incremental p95 为 45.109/42.141/43.934ms，bootstrap upper 为 46.984/43.120/45.528ms，均满足 ≤50ms。当前仍未冻结：最终候选的 long/keys、证据重封存和 final manifest 尚待执行。历史证据边界见 [验收证据说明](./docs/evidence/agent-identity-undo-acceptance-2026-07-16.md)，当前状态见 [status.md](./status.md)。
+凭据位于 `.runtime/reference/credentials.json`，密码、client secret、KEK 和内部签名 key 不进入仓库。Reference 仅绑定 localhost；远程环境必须使用 TLS。2026-07-21 最终候选的 clean-volume 全故障 suite 11/11 通过，包括 Worker kill/lease takeover、5/30/120 retry、错误 KEK 与 v1→v2 rewrap；kind 三节点安装/升级/接管/NetworkPolicy/rollback 全阶段通过。正式性能在 10 并发、30 warmup、连续 3×500 paired writes、5000 次 bootstrap 下完成两组独立通过；完整重建镜像组的 incremental p95 为 45.109/42.141/43.934ms，bootstrap upper 为 46.984/43.120/45.528ms，均满足 ≤50ms。最终封存状态和证据入口见 [status.md](./status.md)。
 
 ## D2 统一自动验证
 

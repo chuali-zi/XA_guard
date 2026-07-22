@@ -1,6 +1,6 @@
 # Agent Identity + Undo 参考架构
 
-> 当前口径：`CORE-IMPLEMENTED / KIND-HA-PASS / PERFORMANCE-LIMIT`。本文描述已经进入正式代码路径的实现和已完成的 Reference/kind 验收；不把本地通过改写为生产落地。
+> 当前口径：`CORE-IMPLEMENTED / KIND-HA-PASS / PERFORMANCE-PASS / RELEASE-CLOSING`。本文描述已经进入正式代码路径的实现和已完成的 Reference/kind 验收；不把本地通过改写为生产落地。
 
 ## 1. 主链路
 
@@ -102,6 +102,6 @@ Helm chart 位于 `deploy/helm/xa-guard/`，默认引用外部 OIDC、PostgreSQL
 
 已实际验证：镜像构建、Compose 启动、schema v4、真实 PKCE + Token Exchange、dynamic assignment、双人审批、补偿、身份负测、assignment 撤销、租户隔离、PostgreSQL fail-closed、prepared reconciler、双审批并发、Worker kill takeover、5/30/120 retry、错误 KEK、KEK rewrap、kind 多副本接管/升级/回滚及签名 evidence。
 
-尚未通过的自动化门槛是正式 10 并发新增开销 p95 ≤50ms；三轮为 352.548/486.272/248.346ms，Undo 10/10 均低于 30s。2026-07-18 Alice/Dora/Admin 三个独立浏览器会话已由负责人完成业务闭环手测：职责分离、独立批准、补偿、双 trace/Gate6 与同租户审计内容均通过；D3 正式录屏仍按负责人要求暂缓。生产环境还需替换并验收组织 OIDC、托管 PostgreSQL、KMS/HSM、TLS 与备份恢复。性能达标并重新封存 evidence 前不得标记 `REFERENCE-READY`；本地 kind PASS 不得改写为生产 `HA-READY`。
+正式 10 并发三轮新增开销已满足 p95 与单侧 95% bootstrap upper 均 ≤50ms：完整重建组三轮为 45.109/46.984、42.141/43.120、43.934/45.528ms；Undo 10/10 在约 0.45–0.94s 内完成。2026-07-18 Alice/Dora/Admin 三个独立浏览器会话已由负责人完成业务闭环手测：职责分离、独立批准、补偿、双 trace/Gate6 与同租户审计内容均通过。生产环境仍需替换并验收组织 OIDC、托管 PostgreSQL、KMS/HSM、TLS 与备份恢复；本地 kind PASS 不得改写为生产 `HA-READY`。
 
 依赖合规：Keycloak/asyncpg/项目代码为 Apache-2.0，PostgreSQL 使用 PostgreSQL License，Starlette/HTTPX 为 BSD-3-Clause，PyJWT 为 MIT，cryptography 为 Apache-2.0/BSD，Console 直接依赖许可证见 `console/THIRD_PARTY_NOTICES.md`。
