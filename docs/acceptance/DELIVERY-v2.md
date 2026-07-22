@@ -25,7 +25,7 @@
 | ID | 交付物 | 要求 | 状态 | 入口 |
 |---|---|---|---|---|
 | **A1** | D1 技术方案 PDF | ≤ 30 页 | `DONE` | [D1 正文](../delivery/D1-technical-report-draft.md)；14 页 PDF 位于 `output/pdf/` |
-| **A2** | D2 代码 + README/部署 | 可复现原型与运行说明 | `CLOSING` | [根 README](../../README.md)、`docker-compose.yml`；最终 evidence、unified verifier 与 clean manifest 收口中 |
+| **A2** | D2 代码 + README/部署 | 可复现原型与运行说明 | `DONE` | [根 README](../../README.md)、`docker-compose.yml`；最终 evidence 与 unified verifier 通过，clean manifest 随冻结提交生成 |
 | **A3** | D3 演示视频 | ≤ 10 分钟 | `MANUAL-PENDING` | [逐镜录制指南](../delivery/D3-video-script.md)与 [字幕模板](../delivery/D3-video-subtitles.srt) 已完成；视频由负责人后续录制 |
 | **A4** | D4 报名表 | 系统审核通过 + 学校盖章 | `DONE` | 2026-07-18 负责人确认完成；隐私材料在仓库外 |
 
@@ -121,7 +121,7 @@ python -m kernel.range_cli run-ab `
 - **OAR** 是红队竖切与证据链中心，不是完整工业级 7×24 在线沙盘；ReactiveSeat 为确定性状态机，非任意长度 live agent。
 - **XA-Guard 主产品**：六关 + 审计 + AIBOM + Docker 部署已可演示；20 会话 HTTP 容量为 LIMIT，不宣称生产容量。
 - **Identity + Undo**：Reference 最终候选全故障 11/11、kind HA profile 和正式 10 并发三轮性能通过；完整重建组 p95/upper 为 45.109/46.984、42.141/43.120、43.934/45.528ms。它仍不是生产 IAM、生产多地域 HA、绝对 exactly-once 或通用数据库回滚。
-- **人工交付**：D4 与三账号 UI 已由负责人确认完成；D1 PDF 已生成；D3 录制指南与字幕模板已完成，最终视频仍由负责人手工录制。D2 clean release freeze/final manifest 正在收口。B5 canonical OAR 证据已封存。
+- **人工交付**：D4 与三账号 UI 已由负责人确认完成；D1 PDF 已生成；D3 录制指南与字幕模板已完成，最终视频仍由负责人手工录制。D2 最终 evidence 与 unified verifier 已通过，本地冻结提交与 clean manifest 在本次收口完成。B5 canonical OAR 证据已封存。
 - **L3 文档**：`L3-test-and-acceptance.md` 中的 R2–R9 BLOCKED 语言描述的是**历史工程验收面**，不是 Delivery v2 比赛缺口。
 
 ---

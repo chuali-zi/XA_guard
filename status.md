@@ -1,15 +1,15 @@
 # 仓库状态：XA-Guard / XA-202620
 
 > 快照日期：**2026-07-21**（America/Los_Angeles）
-> 当前统一口径：**CORE-IMPLEMENTED / KIND-HA-PASS / PERFORMANCE-PASS / RELEASE-CLOSING / SUBMISSION-MANUAL-PENDING**
+> 当前统一口径：**ENGINEERING-FROZEN / RELEASE-VERIFIED / SUBMISSION-MANUAL-PENDING**
 > 比赛交付口径：[docs/acceptance/DELIVERY-v2.md](docs/acceptance/DELIVERY-v2.md)
 > 工作历史见 [log.md](log.md)。
 
 ## 总体结论
 
-产品功能不再扩展，当前处于工程收口。Gate1–6、OAR 主评测、MCP 代理、OIDC + 动态 assignment、PostgreSQL Effect、独立审批 Undo、Worker 补偿、Console/BFF 与本地 kind HA 主路径均已实现。最终候选的 Reference 全故障 11/11、kind HA 全阶段和正式 10 并发性能均已通过。
+产品功能已停止扩展并完成本地工程冻结。Gate1–6、OAR 主评测、MCP 代理、OIDC + 动态 assignment、PostgreSQL Effect、独立审批 Undo、Worker 补偿、Console/BFF 与本地 kind HA 主路径均已实现。最终候选的 Reference 全故障 11/11、kind HA 全阶段、正式 10 并发性能和 unified release verifier 均已通过。
 
-D1 技术方案已生成 14 页 PDF并完成渲染抽检；D3 逐镜录制指南与字幕模板已完成，最终视频仍需负责人手工录制。自动收口尚差最终 evidence 重封存/独立验签、unified verifier 和 clean release manifest，因此本快照仍是 `RELEASE-CLOSING`，不是最终冻结状态。
+D1 技术方案已生成 14 页 PDF 并完成渲染抽检；D2 最终 evidence、统一发布复验、本地冻结提交和 clean release manifest 已完成；D3 逐镜录制指南与字幕模板已完成，最终视频仍需负责人手工录制。剩余事项均为人工录制、远端发布与正式提交，不再是工程实现缺口。
 
 ## 当前交付成熟度
 
@@ -18,7 +18,7 @@ D1 技术方案已生成 14 页 PDF并完成渲染抽检；D3 逐镜录制指南
 | 核心功能与四方向覆盖 | DONE | 六关、MCP、AIBOM、OAR、Identity + Undo、Console 和审计均有实现与证据 |
 | B6/B7 Identity + Undo | DONE | 最终候选 all fault 11/11、kind HA 和正式性能通过；不外推为生产 IAM/多地域 HA |
 | D1 技术方案 | DONE | `output/pdf/XA-Guard-XA-202620-technical-report.pdf`，14 页，仓库安全封面 |
-| D2 代码与发布 | CLOSING | 最终 evidence、统一复验、本地冻结提交与 manifest 收口中 |
+| D2 代码与发布 | DONE-LOCAL / RELEASE-VERIFIED | 最终 evidence、统一复验、本地冻结提交与 clean manifest 完成；未 tag、未 push |
 | D3 演示视频 | MANUAL-PENDING | 录制指南和 SRT 模板完成；MP4 尚未录制 |
 | D4 报名表 | DONE-MANUAL | 负责人已确认审核/盖章完成；隐私材料在仓库外 |
 | 文档一致性 | CONVERGED | README、Delivery v2、TODO、架构和交付文档已统一到最终性能口径 |
@@ -31,6 +31,7 @@ D1 技术方案已生成 14 页 PDF并完成渲染抽检；D3 逐镜录制指南
 - 完整重建镜像正式性能三轮：incremental p95 **45.109/42.141/43.934ms**；单侧 95% bootstrap upper **46.984/43.120/45.528ms**；均满足 ≤50ms。Undo **10/10**，约 **0.45–0.94s**。
 - 隔离发布 Python 环境：项目依赖安装完成，`pip check` PASS。全局 Python 的 `letta-evals`/`anyio` 冲突属于宿主环境，不通过改写项目依赖规避。
 - Console 使用 `npm ci` 恢复依赖；audit 为 **0 vulnerabilities**。
+- unified verifier：**782 collected / 781 passed / 1 allowed capability skip / 0 failure / 0 error**；隔离 `pip check`、产品 Ruff、L3 static 11/11、Compose config、Console 5/5 + build 和最终 evidence 验签全部 PASS。
 - 本轮未修改任何测试代码、既有断言或性能阈值。
 
 ## 关键能力边界
@@ -47,9 +48,9 @@ D1 技术方案已生成 14 页 PDF并完成渲染抽检；D3 逐镜录制指南
 
 ## 剩余事项
 
-1. 在 clean release candidate 上运行 `scripts/verify_release.py`，不修改测试处理任何失败。
-2. 完成本地冻结提交，并在干净工作树生成 final release manifest；不打 tag、不 push。
-3. 负责人按 D3 指南录制、剪辑并复核不超过 10 分钟的视频，随后人工核对 D1–D4 附件并提交。
+1. 负责人按 D3 指南录制、剪辑并复核不超过 10 分钟的视频。
+2. 人工确认 D2 远端仓库链接、D4 隐私附件、网盘权限和邮件内容；需要时再执行 push/tag，本轮未做。
+3. 按提交清单核对 D1–D4，并在 2026-09-15 截止前提交。
 
 ## 声明边界
 

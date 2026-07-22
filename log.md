@@ -6,7 +6,9 @@
 - kind HA 首次因 Reference 占用 13081 失败；停 Reference 后第二次因当前 Docker Desktop 的 localhost bind 使 Pod 无法访问外部依赖而 Helm timeout。诊断验证后仅在测试期将 HA 外部依赖绑定 0.0.0.0，清理失败 cluster 并从头重跑，最终安装、升级、migration、API 删除、Effect/Worker 接管、NetworkPolicy 探针和 rollback 全阶段 PASS；测试集群和外部依赖随后已停止，Reference 恢复为 localhost-only。
 - 将 D1 从提纲扩展为完整技术报告，覆盖威胁模型、架构、双主体身份、intent-first Effect/Undo、赛题四方向、OAR、可量化结果、部署与限制；新增可重复 ReportLab 构建脚本，生成 14 页仓库安全版 PDF 与 SHA-256。渲染抽检封面、摘要、表格、架构图、结果页与尾页；发现表头文字不可见后修复构建样式，并启用 invariant 输出后连续两次构建 hash 一致，最终 SHA-256 为 `c35f4df8a407e873f9fa741dee28f4303f33a9bcaa2566c5806c76870789f3b5`。
 - 将 D3 短脚本扩展为 9:10–9:30 的逐镜手工录制指南，补齐启动/健康检查、固定证据、八镜头画面与口播、失败预案、脱敏检查、ffmpeg/ffprobe/hash 命令；新增 SRT 字幕模板。按负责人要求未生成或冒充 MP4。
-- 统一 README、Delivery v2、证据总表、架构、TODO、下一步设计、提交清单和 status 的性能/D1/D3 口径。基于干净候选提交 `610de9262fa541ee9202ad82693daf4795fde3f6` 采集最终 evidence：14 artifacts、102 Effect、59 Gate6，以 SM2-with-SM3 key id `87ca0b5c56dc9313` 封存并独立验签 PASS；私钥未进入 Git。当前尚未完成：unified verifier、本地冻结提交和 clean release manifest。
+- 统一 README、Delivery v2、证据总表、架构、TODO、下一步设计、提交清单和 status 的性能/D1/D3 口径。基于干净候选提交 `610de9262fa541ee9202ad82693daf4795fde3f6` 采集最终 evidence：14 artifacts、102 Effect、59 Gate6，以 SM2-with-SM3 key id `87ca0b5c56dc9313` 封存并独立验签 PASS；私钥未进入 Git。为避免 Git 换行转换破坏签名报告字节，将 evidence 目录标记为 `-text`，把三份 Windows 报告机械规范化为 LF 后重新封存并再次验签 PASS。
+- 在干净证据提交 `5d50c4a` 上运行最终 unified verifier，耗时 293.8s、退出码 0：隔离 `pip check` PASS，产品 Ruff PASS，全仓 pytest 782 collected / 781 passed / 1 个允许的 Windows directory-symlink capability skip / 0 failure / 0 error，L3 static 11/11，Compose config PASS，Console 5/5 与 production build PASS，最终 evidence 独立验签 PASS。没有修改测试处理结果。
+- 本轮最终动作是创建本地冻结提交，并仅在干净冻结提交上生成 `.runtime/evidence/release-manifest.json`。按负责人要求不创建 tag、不 push；工程之外仍待负责人手工录制 D3、核对远端仓库/报名表/邮件并正式提交。
 
 # 2026-07-21 19:37 PDT 比赛功利主义阶段复盘（维护状态与日志）
 

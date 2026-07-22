@@ -4,7 +4,7 @@
 > 题目：**面向政企场景的大模型智能体安全关键技术研究**
 > 提交截止：**2026-09-15 24:00**
 >
-> 当前统一口径为 **CORE-IMPLEMENTED / KIND-HA-PASS / PERFORMANCE-PASS / RELEASE-CLOSING**：最终候选的 Reference 全故障 11/11、kind HA 和正式 10 并发三轮性能均已通过，正在执行最终证据重封存、统一发布复验和本地冻结提交；kind 结果不外推为生产 HA。比赛交付口径见 [DELIVERY-v2](./docs/acceptance/DELIVERY-v2.md)，仓库状态见 [status.md](./status.md)。
+> 当前统一口径为 **ENGINEERING-FROZEN / RELEASE-VERIFIED / SUBMISSION-MANUAL-PENDING**：最终候选的 Reference 全故障 11/11、kind HA、正式 10 并发三轮性能、签名 evidence 与 unified verifier 均已通过；kind 结果不外推为生产 HA。比赛交付口径见 [DELIVERY-v2](./docs/acceptance/DELIVERY-v2.md)，仓库状态见 [status.md](./status.md)。
 
 ---
 
@@ -164,7 +164,7 @@ python scripts/verify_reference_e2e.py
 python scripts/verify_release.py
 ```
 
-该命令要求 Docker daemon 可用，缺少仓库锁定版本 Helm 时会先执行校验下载，缺少 `xa-guard/sandbox:latest` 时会构建镜像；随后检查当前 Python 环境依赖、产品代码 Ruff、全仓 pytest、L3 static、Compose 配置、Console test/build 和 Identity + Undo 签名证据。除 Windows 目录 symlink capability 外，任何 skip 都按失败处理。2026-07-18 在干净隔离 Python 环境中的结果为 772 collected、771 passed、1 个允许的 capability skip；汇总写入 gitignored `.runtime/evidence/release-verification/summary.json`。
+该命令要求 Docker daemon 可用，缺少仓库锁定版本 Helm 时会先执行校验下载，缺少 `xa-guard/sandbox:latest` 时会构建镜像；随后检查当前 Python 环境依赖、产品代码 Ruff、全仓 pytest、L3 static、Compose 配置、Console test/build 和 Identity + Undo 签名证据。除 Windows 目录 symlink capability 外，任何 skip 都按失败处理。2026-07-21 最终候选在干净隔离 Python 环境中通过：782 collected、781 passed、1 个允许的 capability skip、0 failure/error；汇总位于 gitignored `.runtime/evidence/release-verification/summary.json`。
 
 最终 release manifest 只能在 clean worktree 上生成：
 

@@ -22,7 +22,7 @@
 | ID | 任务 | 状态 | 下一步 |
 |---|---|---|---|
 | A1 | D1 PDF ≤30 页 | `DONE` | 14 页 PDF 已生成并完成渲染抽检 |
-| A2 | D2 代码 + README/部署 | `CLOSING` | 最终 evidence、unified verifier、local freeze、release manifest |
+| A2 | D2 代码 + README/部署 | `DONE-LOCAL` | 最终 evidence 与 unified verifier 通过；本地冻结提交和 manifest 本次完成 |
 | A3 | D3 视频 ≤10 分钟 | `MANUAL-PENDING` | 指南与字幕完成；负责人按黄金路径录制 |
 | A4 | D4 报名表审核通过 | `DONE` | 2026-07-18 负责人确认；隐私证据在仓库外 |
 
@@ -34,12 +34,12 @@
 
 ### A2 D2 release checklist
 
-- [x] `python scripts/verify_release.py`（2026-07-18：772 collected / 771 passed / 1 Windows symlink capability skip；产品 Ruff、static、Compose、Console、evidence verifier 一并通过）
+- [x] `python scripts/verify_release.py`（2026-07-21：782 collected / 781 passed / 1 Windows symlink capability skip / 0 failure/error；产品 Ruff、static、Compose、Console、最终 evidence verifier 一并通过）
 - [x] `python scripts/verify_l3_static.py --section all`（11/11）
 - [x] Reference health + PKCE/Undo e2e + full fault 11/11
 - [x] kind 三节点 HA 全阶段 + SM2-with-SM3 evidence verifier
 - [x] 正式 10 并发性能（完整重建组三轮 p95/upper 均 ≤50ms；Undo latency 10/10 通过）
-- [ ] final release manifest（仅 clean final commit 上运行 `scripts/build_release_manifest.py`）
+- [x] final release manifest（仅在 clean final commit 上运行 `scripts/build_release_manifest.py`，产物为 gitignored 运行证据）
 - [x] README 已增加统一 verifier 与 release manifest 命令；提交前仍需与最终 D1 数字复核
 
 ---

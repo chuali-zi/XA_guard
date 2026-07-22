@@ -20,7 +20,7 @@
 | 交付物 | 状态 | 下一步 |
 |---|---|---|
 | D1 技术方案 PDF | `DONE` | 14 页 PDF 已生成并完成渲染抽检 |
-| D2 原型代码/仓库 | `PARTIAL` | clean main、复现命令、artifact hash |
+| D2 原型代码/仓库 | `DONE-LOCAL` | 最终 evidence/unified verifier 通过；本地冻结提交与 clean manifest 完成 |
 | D3 演示视频 | `MANUAL-PENDING` | [逐镜指南](../delivery/D3-video-script.md)与字幕模板完成；负责人后续录制 |
 | D4 审核通过报名表 | `DONE` | 2026-07-18 负责人确认；隐私证据在仓库外 |
 | 可选补充材料 | `PARTIAL` | [提交清单](../delivery/submission-checklist.md) |

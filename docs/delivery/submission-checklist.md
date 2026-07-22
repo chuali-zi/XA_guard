@@ -9,7 +9,7 @@
 | 交付物 | 状态 | 文件/链接 | 负责人确认 |
 |---|---|---|---|
 | D1 技术方案 PDF，不超过 30 页 | `DONE` | `output/pdf/XA-Guard-XA-202620-technical-report.pdf`（14 页） | [x] |
-| D2 原型代码仓库链接 | `PARTIAL` | GitHub main + release commit | [ ] |
+| D2 原型代码仓库链接 | `DONE-LOCAL` | 本地冻结提交与 manifest；远端链接仍需负责人 push/确认 | [ ] |
 | D3 演示视频，不超过 10 分钟 | `MANUAL-PENDING` | 逐镜指南与字幕模板完成；待负责人录制/导出 | [ ] |
 | D4 审核通过报名表 | `DONE` | 2026-07-18 负责人确认；隐私材料在仓库外 | [x] |
 
@@ -19,7 +19,7 @@
 
 - [ ] final commit hash。
 - [ ] `git status --short` 干净截图或文本。
-- [x] 统一自动验证输出（2026-07-18：772 collected，771 passed、1 Windows directory-symlink capability skip；产品 Ruff、L3 static、Compose、Console、证据验签均通过）；提交前在 final commit 再跑一次并固定 hash。
+- [x] 统一自动验证输出（2026-07-21：782 collected，781 passed、1 Windows directory-symlink capability skip、0 failure/error；产品 Ruff、L3 static、Compose、Console、最终证据验签均通过）。
 - [x] L3 static verifier 输出（工程参考，11/11 sections PASS）。
 - [x] **OAR canonical 证据目录**：`oar-delivery-v2-20260711T123124Z-win-local`。
 - [x] OAR live A/B summary：N=3、`protection_delta=1.0`、7/7 replay PASS。
